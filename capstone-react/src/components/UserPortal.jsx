@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
 
 function getCategoryIcon(category) {
   const map = {
-    academic: 'fa-solid fa-book',
-    project:  'fa-solid fa-diagram-project',
+    academic: 'fa-solid fa-graduation-cap',
+    project:  'fa-solid fa-flask',
     hobby:    'fa-solid fa-gamepad',
-    social:   'fa-solid fa-users',
+    social:   'fa-solid fa-user-group',
     system:   'fa-solid fa-earth-asia',
   };
-  return map[category] || 'fa-solid fa-circle-nodes';
+  return map[category] || 'fa-solid fa-network-wired';
 }
 
 function categoryGradient(category) {
@@ -24,8 +25,8 @@ function categoryGradient(category) {
 }
 
 const GLOBAL_COMM = {
-  id: 'global', name: 'Global Feed',
-  description: 'Official campus-wide communication node for all CTU students.',
+  id: 'global', name: 'NEXO Hub',
+  description: 'The central gathering space for all CTU students and faculty.',
   icon: null, faIcon: 'fa-solid fa-earth-asia', category: 'system', creator_id: 'SYSTEM',
 };
 
@@ -33,100 +34,139 @@ function Toast({ message }) {
   return <div className={`toast ${message ? 'show' : ''}`}>{message?.toUpperCase()}</div>;
 }
 
+// ── POST TYPE CONFIG ──────────────────────────────────────────────────────────
+const POST_TYPE = {
+  announcement: { label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
+  event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
+  shoutout:     { label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
+  general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
+};
+
+function AnnouncementCard({ a, user, onPin, onDelete }) {
+  const type = POST_TYPE[a.post_type] || POST_TYPE.general;
+  return (
+    <div className={`announcement-card ${a.pinned ? 'pinned' : ''}`}>
+      {a.pinned && (
+        <div className="announcement-pin-badge">
+          <i className="fa-solid fa-thumbtack"></i> Pinned
+        </div>
+      )}
+      <div className="announcement-header">
+        <div className="announcement-author-avatar">{(a.author_name || 'A')[0].toUpperCase()}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'white' }}>{a.author_name}</span>
+            <span style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10 }}>
+              <i className={type.icon} style={{ marginRight: 4 }}></i>{type.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+            {a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+          </div>
+        </div>
+        {(user?.user_type === 'Admin' || a.author_id === user?.id) && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {user?.user_type === 'Admin' && (
+              <button className="chat-action-btn" onClick={() => onPin(a.id, a.pinned)}
+                style={{ color: 'var(--cyber-yellow)' }} title={a.pinned ? 'Unpin' : 'Pin'}>
+                <i className="fa-solid fa-thumbtack"></i>
+              </button>
+            )}
+            <button className="chat-action-btn" onClick={() => onDelete(a.id)} style={{ color: 'var(--red)' }}>
+              <i className="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        )}
+      </div>
+      <h3 className="announcement-title">{a.title}</h3>
+      <p className="announcement-body">{a.content}</p>
+    </div>
+  );
+}
+
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
 function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
-  const menuRef = useRef(null);
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const [hovered, setHovered] = useState(false);
 
   const handleEdit = async () => {
     if (!editVal.trim() || editVal === m.content) { setEditing(false); return; }
     await onEdit(m.id, editVal.trim());
     setEditing(false);
-    setMenuOpen(false);
   };
 
-  const handleUnsend = async () => {
-    setMenuOpen(false);
-    await onDelete(m.id);
-  };
-
-  const handleDelete = async () => {
-    setMenuOpen(false);
-    await onDelete(m.id);
-  };
+  const initials = (m.full_name || 'U')[0].toUpperCase();
+  const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const showActions = (isOwnerMsg || canDelete) && hovered && !editing;
 
   return (
-    <div className="post msg-post">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 4, background: tagColor, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11 }}>
-            {(m.full_name || 'U')[0]}
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>
-              {m.full_name}
-              {m.role && <span style={{ fontSize: 9, color: 'var(--cyber-cyan)', marginLeft: 5, border: '1px solid', padding: '1px 4px', borderRadius: 3 }}>{m.role}</span>}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {m.edited && <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontStyle: 'italic' }}>(edited)</span>}
-            </div>
-          </div>
-        </div>
+    <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
+      {!isOwnerMsg && (
+        <div className="chat-avatar" style={{ background: tagColor }}>{initials}</div>
+      )}
 
-        {/* 3-dot menu — visible on hover */}
-        {(isOwnerMsg || canDelete) && (
-          <div className="msg-menu-wrap" ref={menuRef}>
-            <button className="msg-menu-btn" onClick={() => setMenuOpen(o => !o)}>
-              <i className="fa-solid fa-ellipsis"></i>
-            </button>
-            {menuOpen && (
-              <div className="msg-menu-dropdown">
-                {isOwnerMsg && (
-                  <button onClick={() => { setEditing(true); setMenuOpen(false); }}>
-                    <i className="fa-solid fa-pen"></i> Edit
-                  </button>
-                )}
-                {isOwnerMsg && !canDelete && (
-                  <button onClick={handleUnsend} style={{ color: 'var(--cyber-yellow)' }}>
-                    <i className="fa-solid fa-rotate-left"></i> Unsend
-                  </button>
-                )}
-                {canDelete && (
-                  <button onClick={handleDelete} style={{ color: 'var(--red)' }}>
-                    <i className="fa-solid fa-trash-can"></i> Delete
-                  </button>
-                )}
-              </div>
+      <div className="chat-body">
+        {!isOwnerMsg && (
+          <div className="chat-meta">
+            <span className="chat-name">{m.full_name}</span>
+            {m.role && <span className="chat-role">{m.role}</span>}
+            <span className="chat-time">{time}</span>
+          </div>
+        )}
+
+        {editing ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input className="msg-edit-input" value={editVal}
+              onChange={e => setEditVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
+              autoFocus />
+            <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
+            <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
+          </div>
+        ) : (
+          <div
+            className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+          >
+            {m.content}
+          </div>
+        )}
+
+        {/* Inline action bar — appears below bubble on hover */}
+        {showActions && (
+          <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
+            {isOwnerMsg && (
+              <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
+                <i className="fa-solid fa-pen"></i>
+              </button>
             )}
+            {isOwnerMsg && !canDelete && (
+              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Unsend"
+                style={{ color: 'var(--cyber-yellow)' }}>
+                <i className="fa-solid fa-rotate-left"></i>
+              </button>
+            )}
+            {canDelete && (
+              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Delete"
+                style={{ color: 'var(--red)' }}>
+                <i className="fa-solid fa-trash-can"></i>
+              </button>
+            )}
+          </div>
+        )}
+
+        {isOwnerMsg && !editing && (
+          <div className="chat-meta own">
+            {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
+            <span className="chat-time">{time}</span>
           </div>
         )}
       </div>
 
-      {/* Content or edit input */}
-      {editing ? (
-        <div style={{ marginLeft: 42, display: 'flex', gap: 8 }}>
-          <input
-            className="msg-edit-input"
-            value={editVal}
-            onChange={e => setEditVal(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
-            autoFocus
-          />
-          <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
-          <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
-        </div>
-      ) : (
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginLeft: 42 }}>{m.content}</div>
+      {isOwnerMsg && (
+        <div className="chat-avatar own" style={{ background: tagColor }}>{initials}</div>
       )}
     </div>
   );
@@ -320,18 +360,6 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
     if (!error) fetchMembers();
   };
 
-  const promoteToCoLeader = async (memberId) => {
-    const { error } = await supabase.from('memberships')
-      .update({ rank_level: 2 }).eq('id', memberId);
-    if (!error) fetchMembers();
-  };
-
-  const demoteToMember = async (memberId) => {
-    const { error } = await supabase.from('memberships')
-      .update({ rank_level: 0 }).eq('id', memberId);
-    if (!error) fetchMembers();
-  };
-
   const setRank = async (memberId, level) => {
     // Enforce caps before writing
     if (level === 2 && members.filter(m => m.rank_level === 2).length >= 2) {
@@ -364,6 +392,11 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
             <button className={`manage-tab ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
               <i className="fa-solid fa-user-clock"></i> Requests
               {requests.length > 0 && <span className="req-badge">{requests.length}</span>}
+            </button>
+          )}
+          {viewerIsOwner && (
+            <button className={`manage-tab ${tab === 'audition' ? 'active' : ''}`} onClick={() => setTab('audition')}>
+              <i className="fa-solid fa-microphone"></i> Audition
             </button>
           )}
         </div>
@@ -488,6 +521,23 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
             )}
           </div>
         )}
+
+        {tab === 'audition' && viewerIsOwner && (
+          <div className="manage-tab-content">
+            <AuditionFormBuilder
+              comm={comm}
+              onToggle={(enabled) => onSaved({ ...comm, audition_enabled: enabled })}
+            />
+            {comm.audition_enabled && (
+              <>
+                <div className="audition-section-label" style={{ marginTop: 24 }}>
+                  <span>Applications Received</span>
+                </div>
+                <AuditionReviewPanel comm={comm} />
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -534,6 +584,8 @@ export default function UserPortal() {
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
+  const [showAuditionForm, setShowAuditionForm] = useState(null);
+  const [myAuditions, setMyAuditions] = useState([]); // audition_responses for this user
   const [search, setSearch] = useState('');
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
@@ -541,6 +593,12 @@ export default function UserPortal() {
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [announcements, setAnnouncements] = useState([]);
+  const [circleAnnouncements, setCircleAnnouncements] = useState([]);
+  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general' });
+  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '' });
+  const [postingAnnouncement, setPostingAnnouncement] = useState(false);
+  const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const toastTimer = useRef(null);
 
   useEffect(() => {
@@ -576,6 +634,81 @@ export default function UserPortal() {
       .eq('user_id', user.id);
     setMyMemberships(data || []);
   }, [user?.id]);
+
+  const loadMyAuditions = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from('audition_responses')
+      .select('community_id, status, phase2_result, id')
+      .eq('applicant_id', user.id);
+    setMyAuditions(data || []);
+  }, [user?.id]);
+
+  const loadAnnouncements = useCallback(async () => {
+    const { data } = await supabase.from('announcements')
+      .select('*')
+      .is('community_id', null)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false });
+    setAnnouncements(data || []);
+  }, []);
+
+  const loadCircleAnnouncements = useCallback(async (commId) => {
+    if (!commId || commId === 'global') { setCircleAnnouncements([]); return; }
+    const { data } = await supabase.from('announcements')
+      .select('*')
+      .eq('community_id', commId)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false });
+    setCircleAnnouncements(data || []);
+  }, []);
+
+  const postAnnouncement = async () => {
+    if (!newPost.title.trim() || !newPost.content.trim()) return;
+    // Only admins can post 'announcement' type
+    const type = user?.user_type === 'Admin' || user?.user_type === 'Faculty'
+      ? newPost.post_type
+      : (communities.some(c => c.creator_id === user?.id) ? 'shoutout' : 'general');
+    setPostingAnnouncement(true);
+    const { error } = await supabase.from('announcements').insert([{
+      author_id: user.id,
+      author_name: user.full_name,
+      author_type: user.user_type,
+      title: newPost.title.trim(),
+      content: newPost.content.trim(),
+      post_type: type,
+      community_id: null,
+    }]);
+    setPostingAnnouncement(false);
+    if (!error) { setNewPost({ title: '', content: '', post_type: 'general' }); loadAnnouncements(); }
+  };
+
+  const postCircleAnnouncement = async (commId) => {
+    if (!newCirclePost.title.trim() || !newCirclePost.content.trim()) return;
+    setPostingAnnouncement(true);
+    const { error } = await supabase.from('announcements').insert([{
+      author_id: user.id,
+      author_name: user.full_name,
+      author_type: user.user_type,
+      title: newCirclePost.title.trim(),
+      content: newCirclePost.content.trim(),
+      post_type: 'announcement',
+      community_id: commId,
+    }]);
+    setPostingAnnouncement(false);
+    if (!error) { setNewCirclePost({ title: '', content: '' }); loadCircleAnnouncements(commId); }
+  };
+
+  const deleteAnnouncement = async (id) => {
+    if (!confirm('Delete this announcement?')) return;
+    await supabase.from('announcements').delete().eq('id', id);
+    loadAnnouncements();
+  };
+
+  const togglePin = async (id, pinned) => {
+    await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
+    loadAnnouncements();
+  };
 
   const loadMessages = useCallback(async (commId, channelId) => {
     if (commId === 'global') {
@@ -638,12 +771,9 @@ export default function UserPortal() {
     return () => { supabase.removeChannel(subscription); };
   }, [activeCommId, activeChannelId, loadMessages]);
 
-  useEffect(() => { loadCommunities(); loadMyMemberships(); }, [loadCommunities, loadMyMemberships]);
-  useEffect(() => { loadChannels(activeCommId); }, [activeCommId, loadChannels]);
+  useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements]);
+  useEffect(() => { loadChannels(activeCommId); loadCircleAnnouncements(activeCommId); }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
-  useEffect(() => { loadCommunities(); loadMyMemberships(); }, [loadCommunities, loadMyMemberships]);
-  useEffect(() => { loadChannels(activeCommId); }, [activeCommId, loadChannels]);
-  useEffect(() => { loadMessages(activeCommId, activeChannelId); }, [activeCommId, activeChannelId, loadMessages]);
   const initials = user?.full_name
     ? user.full_name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
@@ -661,6 +791,7 @@ export default function UserPortal() {
     return m?.status === 'active';
   };
   const isPending = (commId) => getMembership(commId)?.status === 'pending';
+  const getMyAudition = (commId) => myAuditions.find(a => a.community_id === commId);
 
   const requestJoin = async (commId) => {
     const { error } = await supabase.from('memberships').insert([{
@@ -697,6 +828,17 @@ export default function UserPortal() {
     if (error) { showToast('Failed to delete circle.'); return; }
     showToast('Circle deleted.');
     await loadCommunities();
+    setActiveCommId('global'); setSection('home');
+  };
+
+  const leaveCircle = async (commId) => {
+    if (!confirm('Leave this circle? You will need to request to join again.')) return;
+    const membership = getMembership(commId);
+    if (!membership) return;
+    const { error } = await supabase.from('memberships').delete().eq('id', membership.id);
+    if (error) { showToast('Failed to leave circle.'); return; }
+    showToast('You have left the circle.');
+    await loadMyMemberships();
     setActiveCommId('global'); setSection('home');
   };
 
@@ -832,7 +974,7 @@ export default function UserPortal() {
                 setActiveCommId(c.id);
                 setSection(c.id === 'global' ? 'home' : 'circles');
               }}>
-              <i className={c.faIcon || getCategoryIcon(c.category)}></i>
+              <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : 'fa-solid fa-network-wired'}></i>
             </div>
           ))}
           <div className="dock-add-btn" title="Create Node" onClick={() => setShowCreate(true)}>+</div>
@@ -852,6 +994,10 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); }}>
+                  <i className="nav-icon fa-solid fa-message"></i>
+                  <span className="node-name">Global Feed</span>
+                </div>
                 <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
@@ -860,16 +1006,16 @@ export default function UserPortal() {
               <div className="sidebar-label" style={{ marginTop: 12 }}>CATEGORIES</div>
               <div className="nav-links">
                 {[
-                  { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-book' },
-                  { key: 'project',  label: 'Projects',  icon: 'fa-solid fa-diagram-project' },
+                  { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-graduation-cap' },
+                  { key: 'project',  label: 'Projects',  icon: 'fa-solid fa-flask' },
                   { key: 'hobby',    label: 'Hobbies',   icon: 'fa-solid fa-gamepad' },
-                  { key: 'social',   label: 'Social',    icon: 'fa-solid fa-users' },
+                  { key: 'social',   label: 'Social',    icon: 'fa-solid fa-user-group' },
                 ].map(cat => (
                   <div key={cat.key}
                     className={`ls-item ${section === 'activity' && activeCategory === cat.key ? 'active' : ''}`}
                     onClick={() => { setSection('activity'); setActiveCategory(cat.key); }}
                   >
-                    <i className={`nav-icon ${cat.icon}`}></i>
+                    <i className={`nav-icon ${cat.icon}`} style={{ fontStyle: 'normal' }}></i>
                     <span className="node-name">{cat.label}</span>
                   </div>
                 ))}
@@ -892,6 +1038,18 @@ export default function UserPortal() {
 
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
+                {/* Announcements — always first, powered by announcements table */}
+                <div
+                  className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
+                  onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
+                >
+                  <i className="channel-hash">#</i>
+                  <span className="node-name">announcements</span>
+                  {circleAnnouncements.length > 0 && (
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>{circleAnnouncements.length}</span>
+                  )}
+                </div>
+
                 {channels.length === 0 && (
                   <div style={{ padding: '8px 15px', fontSize: 12, color: 'var(--text-muted)' }}>
                     No channels yet.
@@ -901,7 +1059,7 @@ export default function UserPortal() {
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id ? 'active' : ''}`}
-                    onClick={() => { setActiveChannelId(ch.id); setSection('circles'); }}
+                    onClick={() => { setActiveChannelId(ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
                   >
                     <i className="channel-hash">#</i>
                     <span className="node-name">{ch.name}</span>
@@ -971,6 +1129,13 @@ export default function UserPortal() {
               )}
 
               <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(0,240,255,0.08)' }}>
+                {!isOwner && isMember(activeCommId) && activeCommId !== 'global' && (
+                  <div className="ls-item" style={{ color: 'var(--red)', marginBottom: 4 }}
+                    onClick={() => leaveCircle(activeCommId)}>
+                    <i className="nav-icon fa-solid fa-right-from-bracket"></i>
+                    <span className="node-name">Leave Circle</span>
+                  </div>
+                )}
                 <div className="ls-item" onClick={() => { setActiveCommId('global'); setSection('home'); }}>
                   <i className="nav-icon fa-solid fa-arrow-left"></i>
                   <span className="node-name">Back to Home</span>
@@ -1065,6 +1230,44 @@ export default function UserPortal() {
             </div>
           )}
 
+          {/* ── GLOBAL FEED — campus-wide chat ── */}
+          {section === 'global' && (
+            <>
+              <div className="c-feed fade-in">
+                <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
+                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+                    <i className="fa-solid fa-network-wired" style={{ marginRight: 10 }}></i>GLOBAL FEED
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
+                    Campus-wide chat — open to all verified students and faculty.
+                  </p>
+                </div>
+
+                {messages.map(m => {
+                  const isOwnerMsg = m.student_id === user?.student_id;
+                  return (
+                    <MessageItem key={m.id} m={m}
+                      tagColor="var(--cyber-cyan)"
+                      isOwnerMsg={isOwnerMsg}
+                      canDelete={user?.user_type === 'Admin'}
+                      onDelete={deleteMessage}
+                      onEdit={editMessage}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="composer">
+                <div className="c-input-wrap">
+                  <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sendPost()}
+                    placeholder="Say something to the campus..." />
+                  <button className="cyber-btn" onClick={sendPost}>SEND</button>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* ── ACTIVITY HUB — discover & join circles ── */}
           {section === 'activity' && (
             <div className="c-feed fade-in">
@@ -1090,6 +1293,7 @@ export default function UserPortal() {
                       const owned = c.creator_id === user?.id;
                       const joined = isMember(c.id);
                       const pending = isPending(c.id);
+                      const myAudition = getMyAudition(c.id);
                       return (
                         <div key={c.id} className="post" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
@@ -1097,7 +1301,8 @@ export default function UserPortal() {
                               <i className={getCategoryIcon(c.category)} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
                               <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
-                            {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR NODE</span>}
+                            {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
+                            {c.audition_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Audition Required</span>}
                           </div>
                           <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.description || 'No description provided.'}</p>
                         </div>
@@ -1111,10 +1316,26 @@ export default function UserPortal() {
                             <span style={{ fontSize: 11, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '5px 12px', borderRadius: 20 }}>
                               <i className="fa-solid fa-clock" style={{ marginRight: 5 }}></i>PENDING
                             </span>
+                          ) : myAudition ? (
+                            // User already has an audition response — show its status, block reapply
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
+                              color: auditionStatusColor(myAudition.status, myAudition.phase2_result),
+                              border: `1px solid ${auditionStatusColor(myAudition.status, myAudition.phase2_result)}`,
+                            }}>
+                              <i className="fa-solid fa-microphone" style={{ marginRight: 5 }}></i>
+                              {auditionStatusLabel(myAudition.status, myAudition.phase2_result)}
+                            </span>
                           ) : (
-                            <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
-                              <i className="fa-solid fa-paper-plane"></i> REQUEST
-                            </button>
+                            c.audition_enabled ? (
+                              <button className="group-action-btn manage" onClick={() => setShowAuditionForm(c)}>
+                                <i className="fa-solid fa-microphone"></i> APPLY
+                              </button>
+                            ) : (
+                              <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
+                                <i className="fa-solid fa-paper-plane"></i> REQUEST
+                              </button>
+                            )
                           )}
                         </div>
                       </div>
@@ -1159,9 +1380,50 @@ export default function UserPortal() {
                         <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Join request pending approval...
                       </span>
                     ) : (
-                      <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
-                        <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
-                      </button>
+                      activeComm.audition_enabled ? (
+                        <button className="group-action-btn manage" onClick={() => setShowAuditionForm(activeComm)}>
+                          <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
+                        </button>
+                      ) : (
+                        <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
+                          <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
+                        </button>
+                      )
+                    )}
+                  </div>
+                ) : showCircleAnnouncements ? (
+                  /* ── CIRCLE ANNOUNCEMENTS VIEW ── */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Post composer — leader and co-leader only */}
+                    {canModerate && (
+                      <div className="announcement-composer">
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'white', marginBottom: 12 }}>
+                          <i className="fa-solid fa-thumbtack" style={{ marginRight: 8, color: 'var(--cyber-yellow)' }}></i>
+                          Post Circle Announcement
+                        </div>
+                        <input className="announcement-title-input" placeholder="Title"
+                          value={newCirclePost.title}
+                          onChange={e => setNewCirclePost(p => ({ ...p, title: e.target.value }))} />
+                        <textarea className="announcement-body-input" placeholder="Write your announcement..."
+                          value={newCirclePost.content}
+                          onChange={e => setNewCirclePost(p => ({ ...p, content: e.target.value }))} />
+                        <button className="cyber-btn" onClick={() => postCircleAnnouncement(activeCommId)}
+                          disabled={postingAnnouncement} style={{ width: 'auto', padding: '8px 20px', marginTop: 8 }}>
+                          {postingAnnouncement ? 'Posting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
+                        </button>
+                      </div>
+                    )}
+                    {circleAnnouncements.length === 0 ? (
+                      <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                        <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}></i>
+                        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No announcements yet.</p>
+                      </div>
+                    ) : (
+                      circleAnnouncements.map(a => (
+                        <AnnouncementCard key={a.id} a={a} user={user}
+                          onPin={togglePin}
+                          onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }} />
+                      ))
                     )}
                   </div>
                 ) : (
@@ -1183,7 +1445,7 @@ export default function UserPortal() {
                 )}
               </div>
 
-              {isMember(activeCommId) && (
+              {isMember(activeCommId) && !showCircleAnnouncements && (
                 <div className="composer">
                   <div className="c-input-wrap">
                     <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
@@ -1208,6 +1470,14 @@ export default function UserPortal() {
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
       {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} />}
+      {showAuditionForm && (
+        <AuditionApplicationForm
+          comm={showAuditionForm}
+          applicantId={user?.id}
+          onSubmitted={() => { setShowAuditionForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyAuditions(); }}
+          onCancel={() => setShowAuditionForm(null)}
+        />
+      )}
       <Toast message={toast} />
     </div>
   );

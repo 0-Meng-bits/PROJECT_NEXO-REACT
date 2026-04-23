@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const SECTIONS = [
-  { key: 'verification', label: 'Verification Queue', icon: 'fa-solid fa-user-check' },
-  { key: 'users',        label: 'All Users',          icon: 'fa-solid fa-users' },
-  { key: 'communities',  label: 'Communities',         icon: 'fa-solid fa-circle-nodes' },
-  { key: 'reports',      label: 'Reports',             icon: 'fa-solid fa-flag' },
+  { key: 'verification',  label: 'Verification Queue',   icon: 'fa-solid fa-user-check' },
+  { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
+  { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
+  { key: 'announcements', label: 'Global Feed',           icon: 'fa-solid fa-message' },
+  { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
 ];
 
 function StatCard({ label, value, color, icon }) {
@@ -25,28 +26,31 @@ function StatCard({ label, value, color, icon }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const admin = JSON.parse(localStorage.getItem('currentUser'));
   const [section, setSection] = useState('verification');
   const [students, setStudents] = useState([]);
   const [communities, setCommunities] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [auditions, setAuditions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [studRes, commRes] = await Promise.all([
+      const [studRes, commRes, annRes, audRes] = await Promise.all([
         fetch('/api/students'),
         supabase.from('communities').select('*, profiles(full_name)').order('created_at', { ascending: false }),
+        supabase.from('announcements').select('*, profiles(full_name)').is('community_id', null).order('created_at', { ascending: false }),
+        supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
       ]);
-      const studData = await studRes.json();
-      setStudents(studData);
+      setStudents(await studRes.json());
       setCommunities(commRes.data || []);
+      setAnnouncements(annRes.data || []);
+      setAuditions(audRes.data || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
@@ -74,16 +78,37 @@ export default function AdminDashboard() {
     else showToast('Failed to delete.');
   };
 
-  const pending   = students.filter(s => !s.is_verified);
-  const verified  = students.filter(s => s.is_verified);
-  const filtered  = students.filter(s =>
+  const deleteAnnouncement = async (id) => {
+    if (!confirm('Delete this post?')) return;
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (!error) { showToast('Post deleted.'); fetchData(); }
+  };
+
+  const togglePin = async (id, pinned) => {
+    await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
+    fetchData();
+  };
+
+  const pending  = students.filter(s => !s.is_verified);
+  const verified = students.filter(s => s.is_verified);
+  const filtered = students.filter(s =>
     s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     s.student_id?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const auditionStatusLabel = (status, phase2Result) => {
+    if (status === 'phase2') return phase2Result ? (phase2Result === 'accepted' ? 'Accepted (P2)' : 'Rejected (P2)') : 'Phase 2';
+    return { pending: 'Under Review', accepted: 'Accepted', rejected: 'Rejected' }[status] || status;
+  };
+  const auditionStatusColor = (status, phase2Result) => {
+    if (status === 'accepted' || phase2Result === 'accepted') return 'var(--green)';
+    if (status === 'rejected' || phase2Result === 'rejected') return 'var(--red)';
+    if (status === 'phase2') return 'var(--cyber-yellow)';
+    return 'var(--text-muted)';
+  };
+
   return (
     <div className="adm-layout">
-
       {/* SIDEBAR */}
       <div className="adm-sidebar">
         <div className="adm-brand">
@@ -103,11 +128,17 @@ export default function AdminDashboard() {
             {s.key === 'verification' && pending.length > 0 && (
               <span className="adm-badge">{pending.length}</span>
             )}
+            {s.key === 'auditions' && auditions.filter(a => a.status === 'pending').length > 0 && (
+              <span className="adm-badge">{auditions.filter(a => a.status === 'pending').length}</span>
+            )}
           </div>
         ))}
 
         <div style={{ marginTop: 'auto' }}>
           <div className="adm-sidebar-label">ACCOUNT</div>
+          <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--text-muted)' }}>
+            {admin?.full_name}
+          </div>
           <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); navigate('/'); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
@@ -117,13 +148,9 @@ export default function AdminDashboard() {
 
       {/* MAIN */}
       <div className="adm-main">
-
-        {/* TOP BAR */}
         <div className="adm-topbar">
           <div>
-            <h1 className="adm-page-title">
-              {SECTIONS.find(s => s.key === section)?.label}
-            </h1>
+            <h1 className="adm-page-title">{SECTIONS.find(s => s.key === section)?.label}</h1>
             <p className="adm-page-sub">NEXO Connect — Admin Control Panel</p>
           </div>
           <button className="adm-refresh-btn" onClick={fetchData}>
@@ -133,10 +160,10 @@ export default function AdminDashboard() {
 
         {/* STAT CARDS */}
         <div className="adm-stats-row">
-          <StatCard label="Total Users"    value={students.length}    color="var(--cyber-cyan)"   icon="fa-solid fa-users" />
-          <StatCard label="Verified"       value={verified.length}    color="var(--green)"         icon="fa-solid fa-circle-check" />
-          <StatCard label="Pending"        value={pending.length}     color="var(--orange)"        icon="fa-solid fa-clock" />
-          <StatCard label="Communities"    value={communities.length} color="var(--cyber-yellow)"  icon="fa-solid fa-circle-nodes" />
+          <StatCard label="Total Users"    value={students.length}    color="var(--cyber-cyan)"  icon="fa-solid fa-users" />
+          <StatCard label="Verified"       value={verified.length}    color="var(--green)"        icon="fa-solid fa-circle-check" />
+          <StatCard label="Pending"        value={pending.length}     color="var(--orange)"       icon="fa-solid fa-clock" />
+          <StatCard label="Circles"        value={communities.length} color="var(--cyber-yellow)" icon="fa-solid fa-network-wired" />
         </div>
 
         {/* ── VERIFICATION QUEUE ── */}
@@ -146,9 +173,8 @@ export default function AdminDashboard() {
               <span>Pending Enrollments</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pending.length} awaiting review</span>
             </div>
-            {loading ? (
-              <div className="adm-empty">Loading...</div>
-            ) : pending.length === 0 ? (
+            {loading ? <div className="adm-empty">Loading...</div>
+            : pending.length === 0 ? (
               <div className="adm-empty">
                 <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: 'var(--green)', marginBottom: 12, display: 'block' }}></i>
                 All caught up — no pending verifications.
@@ -187,12 +213,8 @@ export default function AdminDashboard() {
           <div className="adm-card">
             <div className="adm-card-head">
               <span>All Registered Users</span>
-              <input
-                className="adm-search"
-                placeholder="Search by name or ID..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+              <input className="adm-search" placeholder="Search by name or ID..."
+                value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             {loading ? <div className="adm-empty">Loading...</div> : (
               <table className="adm-table">
@@ -204,11 +226,7 @@ export default function AdminDashboard() {
                       <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
-                      <td>
-                        <span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>
-                          {s.is_verified ? 'Verified' : 'Pending'}
-                        </span>
-                      </td>
+                      <td><span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span></td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
@@ -218,23 +236,29 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── COMMUNITIES ── */}
+        {/* ── CIRCLES ── */}
         {section === 'communities' && (
           <div className="adm-card">
             <div className="adm-card-head">
               <span>All Circles</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{communities.length} total</span>
             </div>
-            {loading ? <div className="adm-empty">Loading...</div> : communities.length === 0 ? (
-              <div className="adm-empty">No communities found.</div>
-            ) : (
+            {loading ? <div className="adm-empty">Loading...</div>
+            : communities.length === 0 ? <div className="adm-empty">No circles found.</div>
+            : (
               <table className="adm-table">
-                <thead><tr><th>Name</th><th>Category</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Category</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
                 <tbody>
                   {communities.map(c => (
                     <tr key={c.id}>
                       <td style={{ color: 'white', fontWeight: 600 }}>{c.name}</td>
                       <td><span className="adm-tag">{c.category}</span></td>
+                      <td>
+                        <span style={{ fontSize: 11, color: c.audition_enabled ? 'var(--green)' : 'var(--text-muted)' }}>
+                          <i className={`fa-solid ${c.audition_enabled ? 'fa-microphone' : 'fa-microphone-slash'}`} style={{ marginRight: 4 }}></i>
+                          {c.audition_enabled ? 'On' : 'Off'}
+                        </span>
+                      </td>
                       <td style={{ color: 'var(--text-muted)' }}>{c.profiles?.full_name || '—'}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString()}</td>
                       <td>
@@ -250,19 +274,82 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── REPORTS (placeholder) ── */}
-        {section === 'reports' && (
+        {/* ── GLOBAL FEED MODERATION ── */}
+        {section === 'announcements' && (
           <div className="adm-card">
-            <div className="adm-card-head"><span>Reports</span></div>
-            <div className="adm-empty">
-              <i className="fa-solid fa-flag" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 12, display: 'block' }}></i>
-              No reports submitted yet.
+            <div className="adm-card-head">
+              <span>Global Feed Posts</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
             </div>
+            {loading ? <div className="adm-empty">Loading...</div>
+            : announcements.length === 0 ? <div className="adm-empty">No posts yet.</div>
+            : (
+              <table className="adm-table">
+                <thead><tr><th>Title</th><th>Author</th><th>Type</th><th>Pinned</th><th>Posted</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {announcements.map(a => (
+                    <tr key={a.id}>
+                      <td style={{ color: 'white', fontWeight: 600 }}>{a.title}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.author_name}</td>
+                      <td><span className="adm-tag">{a.post_type || 'general'}</span></td>
+                      <td>
+                        <button className="adm-btn" style={{ color: a.pinned ? 'var(--cyber-yellow)' : 'var(--text-muted)', borderColor: a.pinned ? 'var(--cyber-yellow)' : '#333' }}
+                          onClick={() => togglePin(a.id, a.pinned)}>
+                          <i className="fa-solid fa-thumbtack"></i> {a.pinned ? 'Unpin' : 'Pin'}
+                        </button>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(a.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <button className="adm-btn reject" onClick={() => deleteAnnouncement(a.id)}>
+                          <i className="fa-solid fa-trash-can"></i> Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* ── AUDITION APPLICATIONS ── */}
+        {section === 'auditions' && (
+          <div className="adm-card">
+            <div className="adm-card-head">
+              <span>All Audition Applications</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{auditions.length} total</span>
+            </div>
+            {loading ? <div className="adm-empty">Loading...</div>
+            : auditions.length === 0 ? <div className="adm-empty">No audition applications yet.</div>
+            : (
+              <table className="adm-table">
+                <thead><tr><th>Applicant</th><th>Student ID</th><th>Circle</th><th>Status</th><th>Submitted</th></tr></thead>
+                <tbody>
+                  {auditions.map(a => (
+                    <tr key={a.id}>
+                      <td style={{ color: 'white', fontWeight: 600 }}>{a.profiles?.full_name || '—'}</td>
+                      <td><span className="adm-mono">{a.profiles?.student_id || '—'}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '—'}</td>
+                      <td>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          color: auditionStatusColor(a.status, a.phase2_result),
+                          border: `1px solid ${auditionStatusColor(a.status, a.phase2_result)}`,
+                          background: `${auditionStatusColor(a.status, a.phase2_result)}15`
+                        }}>
+                          {auditionStatusLabel(a.status, a.phase2_result)}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(a.submitted_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
 
-      {/* TOAST */}
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
   );
