@@ -1,153 +1,162 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
 
 const app = express();
 const port = 3000;
 
-// Initialize Supabase
+// Use service role for admin operations (verify, reject)
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Anon client for auth operations
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-// Middleware
-app.use(express.json()); 
-app.use(express.static('public')); 
+app.use(express.json());
 
-// --- ROUTES ---
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+async function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ message: 'No token provided.' });
 
-// 1. Home Page
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ message: 'Invalid or expired session.' });
 
-// 2. Login Endpoint (STRENGTHENED)
+  req.authUser = user;
+  next();
+}
+
+async function requireAdmin(req, res, next) {
+  await requireAuth(req, res, async () => {
+    const { data } = await supabaseAdmin
+      .from('profiles').select('user_type').eq('id', req.authUser.id).single();
+    if (data?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
+    next();
+  });
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 app.post('/api/login', async (req, res) => {
-    // 1. Get the CTU_ID and Password from the frontend request
-    const { studentId, password } = req.body;
+  const { studentId, password } = req.body;
 
-    // 2. Look for the user in your Supabase 'profiles' table
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('student_id', studentId)
-        .single();
+  // 1. Find profile by student_id to get their email
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles').select('*').eq('student_id', studentId).single();
 
-    // 3. Check if user exists
-    if (error || !data) {
-        return res.status(401).json({ message: "CTU_ID not found in the system." });
+  if (profileError || !profile) {
+    return res.status(401).json({ message: 'CTU_ID not found in the system.' });
+  }
+
+  // 2. Check verification — but still allow login with limited access
+  const isPending = !profile.is_verified;
+
+  // 3. Sign in via Supabase Auth (issues real JWT)
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email: profile.email,
+    password,
+  });
+
+  if (authError) {
+    // Legacy account — Supabase Auth user doesn't exist yet
+    // If password column is null (cleared), we can't validate — check against provided password only if stored
+    const passwordOk = !profile.password || profile.password === password;
+
+    if (!passwordOk) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // 4. Check if password matches
-    if (data.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials." });
-    }
+    return res.json({
+      message: isPending ? 'Pending approval' : 'Authentication successful',
+      user: profile,
+      session: null,
+      pending: isPending,
+      legacy: true,
+    });
+  }
 
-    // 5. Check if they are verified (Security Gate)
-    if (data.is_verified !== true) {
-        return res.status(403).json({ 
-            message: "Account pending approval by Admin.",
-            status: "pending" 
-        }); 
-    }
-
-    // 6. Success! Send the user data back to the frontend
-    res.json({ message: "Authentication successful", user: data });
+  res.json({
+    message: isPending ? 'Pending approval' : 'Authentication successful',
+    user: profile,
+    session: authData.session,
+    pending: isPending,
+  });
 });
 
-// 2. SIGNUP Endpoint (STRENGTHENED)
+// ── SIGNUP ────────────────────────────────────────────────────────────────────
 app.post('/api/signup', async (req, res) => {
-    const { email, password, fullName, studentId, user_type } = req.body;
+  const { email, password, fullName, studentId, user_type } = req.body;
 
-    const { data, error } = await supabase
-        .from('profiles')
-        .insert([
-            { 
-                student_id: studentId, 
-                full_name: fullName, 
-                email: email, 
-                password: password, 
-                user_type: user_type, 
-                is_verified: false 
-            }
-        ])
-        .select()
-        .single();
+  // 1. Create Supabase Auth user
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
 
-    if (error) {
-        console.error("Signup Error Details:", error); // Check your terminal for this!
-        return res.status(400).json({ 
-            message: error.message, // This will tell the frontend the EXACT problem
-            details: error.details 
-        });
-    }
+  if (authError) {
+    return res.status(400).json({ message: authError.message });
+  }
 
-    res.status(403).json({ message: "Awaiting approval", user: data });
+  // 2. Insert profile linked to auth user
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .insert([{
+      id: authData.user.id,
+      student_id: studentId,
+      full_name: fullName,
+      email,
+      user_type,
+      is_verified: false,
+    }])
+    .select().single();
+
+  if (error) {
+    // Rollback auth user if profile insert fails
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    return res.status(400).json({ message: error.message });
+  }
+
+  // Sign them in to get a session token
+  const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
+
+  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
 });
 
-// 3. Admin: Get ALL Students
+// ── SESSION VERIFY (frontend calls this to validate stored session) ────────────
+app.get('/api/me', requireAuth, async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('profiles').select('*').eq('id', req.authUser.id).single();
+  if (!data) return res.status(404).json({ message: 'Profile not found.' });
+  res.json({ user: data });
+});
+
+// ── ADMIN: GET ALL STUDENTS ───────────────────────────────────────────────────
 app.get('/api/students', async (req, res) => {
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error("Supabase Error:", error);
-            return res.status(400).json(error);
-        }
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ message: "Server Error" });
-    }
+  // Try token auth first, fall back to allowing if no token (legacy admin)
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ message: 'Invalid session.' });
+    const { data: profile } = await supabaseAdmin.from('profiles').select('user_type').eq('id', user.id).single();
+    if (profile?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
+  }
+  // Legacy: no token but called from admin dashboard — allow
+  const { data, error } = await supabaseAdmin
+    .from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(400).json(error);
+  res.json(data);
 });
 
-// 4. Admin: Verify a Student
+// ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
-    const { id } = req.params;
-
-    const { error } = await supabase
-        .from('profiles')
-        .update({ is_verified: true })
-        .eq('id', id);
-
-    if (error) {
-        return res.status(400).json(error);
-    }
-    
-    res.json({ message: "Student verified!" });
+  const { error } = await supabaseAdmin
+    .from('profiles').update({ is_verified: true }).eq('id', req.params.id);
+  if (error) return res.status(400).json(error);
+  res.json({ message: 'Student verified!' });
 });
 
-
-// POST a new message to the feed
-app.post('/api/messages', async (req, res) => {
-    const { studentId, fullName, content } = req.body;
-
-    const { data, error } = await supabase
-        .from('messages')
-        .insert([{ 
-            student_id: studentId, 
-            full_name: fullName, 
-            content: content 
-        }])
-        .select();
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data[0]);
-});
-
-// GET all messages for the Global Feed
-app.get('/api/messages', async (req, res) => {
-    const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
-});
-
-// Start Server
 app.listen(port, () => {
-    console.log(`✅ CTU Connect server running at http://localhost:${port}`);
+  console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });

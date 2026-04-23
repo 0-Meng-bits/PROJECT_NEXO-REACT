@@ -21,11 +21,10 @@ export default function Auth() {
           body: JSON.stringify({ studentId: form.ctuId, password: form.password }),
         });
 
-        if (res.status === 403) { navigate('/pending'); return; }
-
         const data = await res.json();
         if (res.ok) {
           localStorage.setItem('currentUser', JSON.stringify(data.user));
+          if (data.session) localStorage.setItem('accessToken', data.session.access_token);
           navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
         } else {
           alert('SYSTEM_ALERT: ' + data.message);
@@ -43,9 +42,15 @@ export default function Auth() {
           }),
         });
 
-        if (res.status === 403) { navigate('/pending'); return; }
         const data = await res.json();
-        if (!res.ok) alert('SYSTEM_ALERT: ' + data.message);
+        if (!res.ok) {
+          alert('SYSTEM_ALERT: ' + data.message);
+        } else {
+          // Signup successful — store session and go to portal (limited access)
+          localStorage.setItem('currentUser', JSON.stringify(data.user));
+          if (data.session) localStorage.setItem('accessToken', data.session.access_token);
+          navigate('/portal');
+        }
       }
     } catch {
       alert('TERMINAL_OFFLINE: Connection failed.');

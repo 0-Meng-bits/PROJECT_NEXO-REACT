@@ -14,6 +14,28 @@ function getCategoryIcon(category) {
   return map[category] || 'fa-solid fa-network-wired';
 }
 
+function notifIcon(type) {
+  const map = {
+    join_approved:    'fa-solid fa-circle-check',
+    join_denied:      'fa-solid fa-circle-xmark',
+    kicked:           'fa-solid fa-user-xmark',
+    promoted:         'fa-solid fa-arrow-up',
+    audition_update:  'fa-solid fa-microphone',
+    new_announcement: 'fa-solid fa-bullhorn',
+  };
+  return map[type] || 'fa-solid fa-bell';
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 function categoryGradient(category) {
   const map = {
     academic: 'linear-gradient(135deg, #1a1a4e, #0d3b6e)',
@@ -106,7 +128,10 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
         <div className="chat-avatar" style={{ background: tagColor }}>{initials}</div>
       )}
 
-      <div className="chat-body">
+      <div className="chat-body"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         {!isOwnerMsg && (
           <div className="chat-meta">
             <span className="chat-name">{m.full_name}</span>
@@ -125,11 +150,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
             <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
           </div>
         ) : (
-          <div
-            className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-          >
+          <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
             {m.content}
           </div>
         )}
@@ -343,34 +364,77 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   };
 
   const approveRequest = async (memberId) => {
+    const member = requests.find(r => r.id === memberId);
     const { error } = await supabase.from('memberships')
       .update({ status: 'active' }).eq('id', memberId);
-    if (!error) fetchMembers();
+    if (!error) {
+      // Send notification to the applicant
+      if (member?.user_id) {
+        await supabase.from('notifications').insert([{
+          user_id: member.user_id,
+          type: 'join_approved',
+          message: `Your request to join "${comm.name}" has been approved!`,
+          link_comm_id: comm.id,
+        }]);
+      }
+      fetchMembers();
+    }
   };
 
   const denyRequest = async (memberId) => {
-    const { error } = await supabase.from('memberships')
-      .delete().eq('id', memberId);
-    if (!error) fetchMembers();
+    const member = requests.find(r => r.id === memberId);
+    const { error } = await supabase.from('memberships').delete().eq('id', memberId);
+    if (!error) {
+      if (member?.user_id) {
+        await supabase.from('notifications').insert([{
+          user_id: member.user_id,
+          type: 'join_denied',
+          message: `Your request to join "${comm.name}" was not approved.`,
+          link_comm_id: comm.id,
+        }]);
+      }
+      fetchMembers();
+    }
   };
 
   const kickMember = async (memberId, name) => {
     if (!confirm(`Remove ${name} from this group?`)) return;
+    const member = members.find(m => m.id === memberId);
     const { error } = await supabase.from('memberships').delete().eq('id', memberId);
-    if (!error) fetchMembers();
+    if (!error) {
+      if (member?.user_id) {
+        await supabase.from('notifications').insert([{
+          user_id: member.user_id,
+          type: 'kicked',
+          message: `You have been removed from "${comm.name}".`,
+        }]);
+      }
+      fetchMembers();
+    }
   };
 
   const setRank = async (memberId, level) => {
-    // Enforce caps before writing
     if (level === 2 && members.filter(m => m.rank_level === 2).length >= 2) {
       alert('This circle already has 2 Co-Leaders. Demote one first.'); return;
     }
     if (level === 1 && members.filter(m => m.rank_level === 1).length >= 3) {
       alert('This circle already has 3 Moderators. Demote one first.'); return;
     }
+    const member = members.find(m => m.id === memberId);
     const { error } = await supabase.from('memberships')
       .update({ rank_level: level }).eq('id', memberId);
-    if (!error) fetchMembers();
+    if (!error) {
+      if (member?.user_id && level > (member.rank_level ?? 0)) {
+        const labels = ['Member', 'Moderator', 'Co-Leader'];
+        await supabase.from('notifications').insert([{
+          user_id: member.user_id,
+          type: 'promoted',
+          message: `You've been promoted to ${labels[level]} in "${comm.name}"!`,
+          link_comm_id: comm.id,
+        }]);
+      }
+      fetchMembers();
+    }
   };
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -570,6 +634,79 @@ function ProfileModal({ user, communities, onClose, onLogout }) {
   );
 }
 
+// ── AUDITION DETAIL MODAL (applicant view) ───────────────────────────────────
+function AuditionDetailModal({ data, onClose }) {
+  const { response: r, community: c, questions } = data;
+  const statusColor = auditionStatusColor(r.status, r.phase2_result);
+  const statusLabel = auditionStatusLabel(r.status, r.phase2_result);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 500, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application — {c.name}</h3>
+
+        {/* Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: `${statusColor}10`, border: `1px solid ${statusColor}40`, borderRadius: 8 }}>
+          <i className="fa-solid fa-circle-info" style={{ color: statusColor }}></i>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: statusColor }}>{statusLabel}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+              Submitted {new Date(r.submitted_at).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
+        </div>
+
+        {/* Phase 2 details */}
+        {r.status === 'phase2' && r.phase2_details && (
+          <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--cyber-yellow)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
+              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 — LIVE SCREENING
+            </div>
+            <p style={{ fontSize: 13, color: 'white', lineHeight: 1.6 }}>{r.phase2_details}</p>
+          </div>
+        )}
+
+        {/* Leader feedback */}
+        {r.feedback && (
+          <div style={{ background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
+              <i className="fa-solid fa-comment" style={{ marginRight: 6 }}></i>FEEDBACK FROM LEADER
+            </div>
+            <p style={{ fontSize: 13, color: 'white', lineHeight: 1.6 }}>{r.feedback}</p>
+          </div>
+        )}
+
+        {/* Submitted answers */}
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12, textTransform: 'uppercase' }}>
+          Your Submitted Answers
+        </div>
+        {questions.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No questions on record.</p>
+        ) : (
+          questions.map(q => (
+            <div key={q.id} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{q.question}</div>
+              {q.type === 'file' ? (
+                r.answers[q.id]
+                  ? <a href={r.answers[q.id]} target="_blank" rel="noreferrer" style={{ color: 'var(--cyber-cyan)', fontSize: 13 }}>
+                      <i className="fa-solid fa-file" style={{ marginRight: 6 }}></i>View uploaded file
+                    </a>
+                  : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
+              ) : (
+                <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'white' }}>
+                  {r.answers?.[q.id] || '—'}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+
+        <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>CLOSE</button>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function UserPortal() {
   const navigate = useNavigate();
@@ -585,7 +722,8 @@ export default function UserPortal() {
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showAuditionForm, setShowAuditionForm] = useState(null);
-  const [myAuditions, setMyAuditions] = useState([]); // audition_responses for this user
+  const [myAuditions, setMyAuditions] = useState([]);
+  const [viewingAudition, setViewingAudition] = useState(null); // { response, community, questions }
   const [search, setSearch] = useState('');
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
@@ -599,11 +737,21 @@ export default function UserPortal() {
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '' });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef(null);
   const toastTimer = useRef(null);
+  const feedBottomRef = useRef(null);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const showToast = useCallback((msg) => {
@@ -710,6 +858,24 @@ export default function UserPortal() {
     loadAnnouncements();
   };
 
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await supabase.from('notifications')
+      .select('*').eq('user_id', user.id)
+      .order('created_at', { ascending: false }).limit(20);
+    setNotifications(data || []);
+  }, [user?.id]);
+
+  const markAllRead = async () => {
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  };
+
+  const markRead = async (id) => {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  };
+
   const loadMessages = useCallback(async (commId, channelId) => {
     if (commId === 'global') {
       const { data } = await supabase.from('messages').select('*')
@@ -771,14 +937,54 @@ export default function UserPortal() {
     return () => { supabase.removeChannel(subscription); };
   }, [activeCommId, activeChannelId, loadMessages]);
 
-  useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements]);
+  useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
+
+  // Realtime notifications
+  useEffect(() => {
+    if (!user?.id) return;
+    const sub = supabase.channel('notifications:' + user.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => setNotifications(prev => [payload.new, ...prev])
+      ).subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [user?.id]);
+
+  // Realtime circle announcements
+  useEffect(() => {
+    if (!activeCommId || activeCommId === 'global') return;
+    const sub = supabase.channel('announcements:' + activeCommId)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'announcements', filter: `community_id=eq.${activeCommId}` },
+        (payload) => setCircleAnnouncements(prev => [payload.new, ...prev])
+      )
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'announcements' },
+        (payload) => setCircleAnnouncements(prev => prev.filter(a => a.id !== payload.old.id))
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'announcements' },
+        (payload) => setCircleAnnouncements(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a))
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [activeCommId]);
+
   useEffect(() => { loadChannels(activeCommId); loadCircleAnnouncements(activeCommId); }, [activeCommId, loadChannels, loadCircleAnnouncements]);
+
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const initials = user?.full_name
     ? user.full_name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
   const logout = () => {
-    if (confirm('TERMINATE_SESSION?')) { localStorage.removeItem('currentUser'); navigate('/'); }
+    if (confirm('TERMINATE_SESSION?')) {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('accessToken');
+      navigate('/');
+    }
   };
 
   // Membership helpers
@@ -894,6 +1100,14 @@ export default function UserPortal() {
 
   return (
     <div className="portal-layout">
+      {/* PENDING BANNER */}
+      {!user?.is_verified && (
+        <div className="pending-banner">
+          <i className="fa-solid fa-clock" style={{ marginRight: 8 }}></i>
+          Your account is pending admin verification. You can browse but cannot post, message, or join circles yet.
+        </div>
+      )}
+
       {/* TOP NAV */}
       <nav className="top-nav-bar">
         {/* LEFT — date & time */}
@@ -952,8 +1166,55 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT — user hud */}
+        {/* RIGHT — notifications + user hud */}
         <div className="user-hud">
+          {/* Notification Bell */}
+          <div className="notif-wrap" ref={notifRef}>
+            <button className="notif-bell" onClick={() => { setShowNotifications(o => !o); markAllRead(); }}>
+              <i className="fa-solid fa-bell"></i>
+              {notifications.filter(n => !n.is_read).length > 0 && (
+                <span className="notif-dot">{notifications.filter(n => !n.is_read).length}</span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="notif-dropdown">
+                <div className="notif-header">
+                  <span>Notifications</span>
+                  {notifications.length > 0 && (
+                    <button onClick={markAllRead} style={{ background: 'none', border: 'none', color: 'var(--cyber-cyan)', fontSize: 11, cursor: 'pointer' }}>
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="notif-empty">
+                    <i className="fa-solid fa-bell-slash"></i>
+                    <p>No notifications yet</p>
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                      onClick={() => {
+                        markRead(n.id);
+                        if (n.link_comm_id) { setActiveCommId(n.link_comm_id); setSection('circles'); }
+                        setShowNotifications(false);
+                      }}>
+                      <div className="notif-icon">
+                        <i className={notifIcon(n.type)}></i>
+                      </div>
+                      <div className="notif-content">
+                        <p className="notif-msg">{n.message}</p>
+                        <span className="notif-time">{timeAgo(n.created_at)}</span>
+                      </div>
+                      {!n.is_read && <div className="notif-unread-dot"></div>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="hud-chip">
             <span className="hud-label">USER_ID:</span>
             <span className="hud-value">{user?.student_id}</span>
@@ -977,7 +1238,9 @@ export default function UserPortal() {
               <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : 'fa-solid fa-network-wired'}></i>
             </div>
           ))}
-          <div className="dock-add-btn" title="Create Node" onClick={() => setShowCreate(true)}>+</div>
+          {user?.is_verified && (
+            <div className="dock-add-btn" title="Create Circle" onClick={() => setShowCreate(true)}>+</div>
+          )}
         </div>
 
         {/* SIDEBAR — context aware */}
@@ -1190,42 +1453,59 @@ export default function UserPortal() {
                 <span>Featured Circles</span>
                 <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
               </div>
-              <div className="featured-grid">
-                {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
-                  <div key={c.id} className="featured-card"
-                    onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                    <div className="featured-card-bg" style={{ background: categoryGradient(c.category) }}></div>
-                    <div className="featured-card-body">
-                      <div className="featured-card-icon">
-                        <i className={getCategoryIcon(c.category)}></i>
+              {communities.filter(c => c.id !== 'global').length === 0 ? (
+                <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                  <i className="fa-solid fa-network-wired" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles yet. Be the first to create one!</p>
+                  {user?.is_verified && (
+                    <button className="cyber-btn" style={{ width: 'auto', padding: '8px 20px', marginTop: 12 }}
+                      onClick={() => setShowCreate(true)}>
+                      <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Create a Circle
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="featured-grid">
+                  {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
+                    <div key={c.id} className="featured-card"
+                      onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                      <div className="featured-card-bg" style={{ background: categoryGradient(c.category) }}></div>
+                      <div className="featured-card-body">
+                        <div className="featured-card-icon">
+                          <i className={getCategoryIcon(c.category)}></i>
+                        </div>
+                        <div className="featured-card-name">{c.name}</div>
+                        <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
                       </div>
-                      <div className="featured-card-name">{c.name}</div>
-                      <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Popular by category */}
-              <div className="home-section-header" style={{ marginTop: 8 }}>
-                <span>Popular Right Now</span>
-                <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
-                  <div key={c.id} className="popular-row"
-                    onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                    <div className="popular-row-icon" style={{ background: categoryGradient(c.category) }}>
-                      <i className={getCategoryIcon(c.category)}></i>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
-                    </div>
-                    <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
+              {communities.filter(c => c.id !== 'global').length > 0 && (
+                <>
+                  <div className="home-section-header" style={{ marginTop: 8 }}>
+                    <span>Popular Right Now</span>
+                    <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
                   </div>
-                ))}
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
+                      <div key={c.id} className="popular-row"
+                        onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                        <div className="popular-row-icon" style={{ background: categoryGradient(c.category) }}>
+                          <i className={getCategoryIcon(c.category)}></i>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
+                        </div>
+                        <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
             </div>
           )}
@@ -1249,22 +1529,25 @@ export default function UserPortal() {
                     <MessageItem key={m.id} m={m}
                       tagColor="var(--cyber-cyan)"
                       isOwnerMsg={isOwnerMsg}
-                      canDelete={user?.user_type === 'Admin'}
+                      canDelete={isOwnerMsg || user?.user_type === 'Admin'}
                       onDelete={deleteMessage}
                       onEdit={editMessage}
                     />
                   );
                 })}
+                <div ref={feedBottomRef} />
               </div>
 
-              <div className="composer">
-                <div className="c-input-wrap">
-                  <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && sendPost()}
-                    placeholder="Say something to the campus..." />
-                  <button className="cyber-btn" onClick={sendPost}>SEND</button>
+              {user?.is_verified && (
+                <div className="composer">
+                  <div className="c-input-wrap">
+                    <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendPost()}
+                      placeholder="Say something to the campus..." />
+                    <button className="cyber-btn" onClick={sendPost}>SEND</button>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
@@ -1312,19 +1595,33 @@ export default function UserPortal() {
                               onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
                               <i className="fa-solid fa-arrow-right-to-bracket"></i> ENTER
                             </button>
+                          ) : !user?.is_verified ? (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', border: '1px solid #333', padding: '5px 12px', borderRadius: 20 }}>
+                              <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>Verify to join
+                            </span>
                           ) : pending ? (
                             <span style={{ fontSize: 11, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '5px 12px', borderRadius: 20 }}>
                               <i className="fa-solid fa-clock" style={{ marginRight: 5 }}></i>PENDING
                             </span>
                           ) : myAudition ? (
-                            // User already has an audition response — show its status, block reapply
-                            <span style={{
-                              fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
-                              color: auditionStatusColor(myAudition.status, myAudition.phase2_result),
-                              border: `1px solid ${auditionStatusColor(myAudition.status, myAudition.phase2_result)}`,
-                            }}>
+                            <span
+                              style={{
+                                fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
+                                color: auditionStatusColor(myAudition.status, myAudition.phase2_result),
+                                border: `1px solid ${auditionStatusColor(myAudition.status, myAudition.phase2_result)}`,
+                                cursor: 'pointer',
+                              }}
+                              onClick={async () => {
+                                const [rRes, qRes] = await Promise.all([
+                                  supabase.from('audition_responses').select('*').eq('id', myAudition.id).single(),
+                                  supabase.from('audition_questions').select('*').eq('community_id', c.id).order('order_index'),
+                                ]);
+                                setViewingAudition({ response: rRes.data, community: c, questions: qRes.data || [] });
+                              }}
+                            >
                               <i className="fa-solid fa-microphone" style={{ marginRight: 5 }}></i>
                               {auditionStatusLabel(myAudition.status, myAudition.phase2_result)}
+                              <i className="fa-solid fa-eye" style={{ marginLeft: 6, fontSize: 9 }}></i>
                             </span>
                           ) : (
                             c.audition_enabled ? (
@@ -1443,9 +1740,10 @@ export default function UserPortal() {
                     );
                   })
                 )}
+                <div ref={feedBottomRef} />
               </div>
 
-              {isMember(activeCommId) && !showCircleAnnouncements && (
+              {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && (
                 <div className="composer">
                   <div className="c-input-wrap">
                     <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
@@ -1477,6 +1775,9 @@ export default function UserPortal() {
           onSubmitted={() => { setShowAuditionForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyAuditions(); }}
           onCancel={() => setShowAuditionForm(null)}
         />
+      )}
+      {viewingAudition && (
+        <AuditionDetailModal data={viewingAudition} onClose={() => setViewingAudition(null)} />
       )}
       <Toast message={toast} />
     </div>

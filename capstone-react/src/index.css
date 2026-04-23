@@ -26,6 +26,21 @@ body {
   min-height: 100vh;
 }
 
+/* PENDING BANNER */
+.pending-banner {
+  width: 100%;
+  background: rgba(247, 169, 79, 0.1);
+  border-bottom: 1px solid rgba(247, 169, 79, 0.3);
+  color: var(--orange);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 24px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  z-index: 999;
+}
+
 /* ===================== AUTH PAGE ===================== */
 .auth-page {
   display: flex;
@@ -955,6 +970,106 @@ body {
 .msg-delete-btn:hover {
   color: var(--red);
   background: rgba(247, 95, 95, 0.1);
+}
+
+/* NOTIFICATION BELL */
+.notif-wrap { position: relative; }
+
+.notif-bell {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  position: relative;
+  transition: 0.2s;
+}
+.notif-bell:hover { background: rgba(0,240,255,0.08); color: var(--cyber-cyan); border-color: rgba(0,240,255,0.2); }
+
+.notif-dot {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--red);
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  min-width: 16px; height: 16px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+  border: 2px solid #000;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  background: #0d0d12;
+  border: 1px solid rgba(0,240,255,0.15);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+}
+
+.notif-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.notif-empty i { font-size: 24px; display: block; margin-bottom: 8px; }
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.15s;
+  position: relative;
+}
+.notif-item:hover { background: rgba(0,240,255,0.04); }
+.notif-item.unread { background: rgba(0,240,255,0.03); }
+.notif-item:last-child { border-bottom: none; }
+
+.notif-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(0,240,255,0.1);
+  border: 1px solid rgba(0,240,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  color: var(--cyber-cyan);
+  flex-shrink: 0;
+}
+
+.notif-content { flex: 1; min-width: 0; }
+.notif-msg { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4; margin-bottom: 3px; }
+.notif-time { font-size: 10px; color: var(--text-muted); }
+
+.notif-unread-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--cyber-cyan);
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
 /* CHAT BUBBLES */
