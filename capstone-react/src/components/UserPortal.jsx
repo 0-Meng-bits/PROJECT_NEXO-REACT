@@ -193,23 +193,59 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
   );
 }
 
+// Icon options per category
+const CATEGORY_ICONS = {
+  academic: [
+    { icon: 'fa-solid fa-graduation-cap', label: 'Graduation' },
+    { icon: 'fa-solid fa-book-open',      label: 'Book' },
+    { icon: 'fa-solid fa-flask',          label: 'Science' },
+    { icon: 'fa-solid fa-chalkboard',     label: 'Chalkboard' },
+  ],
+  project: [
+    { icon: 'fa-solid fa-diagram-project', label: 'Diagram' },
+    { icon: 'fa-solid fa-code',            label: 'Code' },
+    { icon: 'fa-solid fa-rocket',          label: 'Rocket' },
+    { icon: 'fa-solid fa-lightbulb',       label: 'Idea' },
+  ],
+  hobby: [
+    { icon: 'fa-solid fa-gamepad',         label: 'Gaming' },
+    { icon: 'fa-solid fa-music',           label: 'Music' },
+    { icon: 'fa-solid fa-palette',         label: 'Art' },
+    { icon: 'fa-solid fa-camera',          label: 'Photo' },
+  ],
+  social: [
+    { icon: 'fa-solid fa-user-group',      label: 'Group' },
+    { icon: 'fa-solid fa-heart',           label: 'Heart' },
+    { icon: 'fa-solid fa-star',            label: 'Star' },
+    { icon: 'fa-solid fa-fire',            label: 'Fire' },
+  ],
+};
+
 // ── CREATE MODAL ──────────────────────────────────────────────────────────────
 function CreateModal({ onClose, onCreated, userId }) {
-  const [form, setForm] = useState({ name: '', description: '', category: 'academic' });
+  const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap' });
   const [loading, setLoading] = useState(false);
+
+  const handleCategoryChange = (cat) => {
+    // Auto-select first icon of new category
+    const firstIcon = CATEGORY_ICONS[cat]?.[0]?.icon || 'fa-solid fa-graduation-cap';
+    setForm(f => ({ ...f, category: cat, icon: firstIcon }));
+  };
 
   const submit = async () => {
     if (!form.name.trim()) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('communities')
-      .insert([{ name: form.name.trim(), description: form.description.trim(), category: form.category, creator_id: userId, is_official: false }])
+      .insert([{ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon, creator_id: userId, is_official: false }])
       .select();
     setLoading(false);
-    if (error) { alert('Failed to create node.'); return; }
+    if (error) { alert('Failed to create circle.'); return; }
     onCreated(data[0]);
     onClose();
   };
+
+  const icons = CATEGORY_ICONS[form.category] || [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -221,22 +257,42 @@ function CreateModal({ onClose, onCreated, userId }) {
         </div>
         <div className="input-group">
           <label>CLASSIFICATION</label>
-          <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
             <option value="academic">Academic / Study Group</option>
             <option value="project">Special Project / Capstone</option>
             <option value="hobby">Hobby / Interest</option>
             <option value="social">Social / Hangout</option>
           </select>
         </div>
+
+        {/* Icon picker */}
         <div className="input-group">
-          <label>TRANSMISSION_GOAL</label>
-          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this node's purpose..." />
+          <label>CIRCLE ICON</label>
+          <div className="icon-picker">
+            {icons.map(opt => (
+              <button
+                key={opt.icon}
+                type="button"
+                className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
+                onClick={() => setForm(f => ({ ...f, icon: opt.icon }))}
+                title={opt.label}
+              >
+                <i className={opt.icon}></i>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="input-group">
+          <label>DESCRIPTION</label>
+          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
         </div>
         <div className="modal-actions">
           <button className="cyber-btn" onClick={submit} disabled={loading} style={{ flex: 1 }}>
-            {loading ? 'CREATING...' : 'CREATE_NODE'}
+            {loading ? 'CREATING...' : 'CREATE CIRCLE'}
           </button>
-          <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>ABORT</button>
+          <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
         </div>
       </div>
     </div>
@@ -618,9 +674,15 @@ function ProfileModal({ user, communities, onClose, onLogout }) {
           {initials}
         </div>
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
-        <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
-          <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified Student ✓
-        </div>
+        {user.is_verified ? (
+          <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
+            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user.user_type || 'Student'} ✓
+          </div>
+        ) : (
+          <div className="verified-badge" style={{ margin: '0 auto 20px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
+            <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i> Pending Verification
+          </div>
+        )}
         <div className="stats-card" style={{ textAlign: 'left', marginBottom: 20 }}>
           <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
           <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.length}</span></div>
@@ -742,6 +804,7 @@ export default function UserPortal() {
   const notifRef = useRef(null);
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -844,7 +907,29 @@ export default function UserPortal() {
       community_id: commId,
     }]);
     setPostingAnnouncement(false);
-    if (!error) { setNewCirclePost({ title: '', content: '' }); loadCircleAnnouncements(commId); }
+    if (!error) {
+      setNewCirclePost({ title: '', content: '' });
+      loadCircleAnnouncements(commId);
+
+      // Notify all active members of this circle
+      const { data: members } = await supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('community_id', commId)
+        .eq('status', 'active')
+        .neq('user_id', user.id); // don't notify yourself
+
+      if (members && members.length > 0) {
+        const comm = communities.find(c => c.id === commId);
+        const notifications = members.map(m => ({
+          user_id: m.user_id,
+          type: 'new_announcement',
+          message: `New announcement in "${comm?.name || 'a circle'}": ${newCirclePost.title.trim()}`,
+          link_comm_id: commId,
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+    }
   };
 
   const deleteAnnouncement = async (id) => {
@@ -1110,14 +1195,19 @@ export default function UserPortal() {
 
       {/* TOP NAV */}
       <nav className="top-nav-bar">
-        {/* LEFT — date & time */}
-        <div className="nav-clock">
+        {/* LEFT — hamburger (mobile) + date & time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(o => !o)}>
+            <i className="fa-solid fa-bars"></i>
+          </button>
+          <div className="nav-clock">
           <span className="nav-clock-time">
             {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
           <span className="nav-clock-date">
             {clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
+        </div>
         </div>
 
         {/* CENTER — search */}
@@ -1148,7 +1238,7 @@ export default function UserPortal() {
                       <div key={c.id} className="search-result-item" onClick={() => {
                         setActiveCommId(c.id); setSection('circles'); setSearch('');
                       }}>
-                        <i className={getCategoryIcon(c.category)} style={{ color: 'var(--cyber-cyan)', marginRight: 10 }}></i>
+                        <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', marginRight: 10 }}></i>
                         <div>
                           <div style={{ fontSize: 13, color: 'white' }}>{c.name}</div>
                           <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{c.category}</div>
@@ -1235,7 +1325,7 @@ export default function UserPortal() {
                 setActiveCommId(c.id);
                 setSection(c.id === 'global' ? 'home' : 'circles');
               }}>
-              <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : 'fa-solid fa-network-wired'}></i>
+              <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : (c.icon || (c.icon || getCategoryIcon(c.category)))}></i>
             </div>
           ))}
           {user?.is_verified && (
@@ -1243,8 +1333,13 @@ export default function UserPortal() {
           )}
         </div>
 
+        {/* SIDEBAR BACKDROP (mobile) */}
+        {mobileSidebarOpen && (
+          <div className="sidebar-backdrop show" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+
         {/* SIDEBAR — context aware */}
-        <div className="sidebar">
+        <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
           {activeCommId === 'global' ? (
             /* ── GLOBAL / HOME sidebar ── */
             <>
@@ -1253,11 +1348,11 @@ export default function UserPortal() {
               </div>
               <div className="sidebar-label">MAIN</div>
               <div className="nav-links">
-                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => setSection('home')}>
+                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); }}>
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); }}>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); setMobileSidebarOpen(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
                 </div>
@@ -1290,7 +1385,7 @@ export default function UserPortal() {
               <div className="sidebar-brand-area" style={{ paddingBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
-                    <i className={activeComm.faIcon || getCategoryIcon(activeComm.category)} style={{ color: 'var(--cyber-cyan)' }}></i>
+                    <i className={activeComm.icon || activeComm.faIcon || getCategoryIcon(activeComm.category)} style={{ color: 'var(--cyber-cyan)' }}></i>
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'white', letterSpacing: 1 }}>{activeComm.name}</div>
@@ -1433,9 +1528,15 @@ export default function UserPortal() {
                   <h2 style={{ fontSize: 18, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
                     WELCOME, {user?.full_name?.toUpperCase() || 'TECHNOLOGIST'}!
                   </h2>
-                  <div className="verified-badge">
-                    <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified Technologist ✓
-                  </div>
+                  {user?.is_verified ? (
+                    <div className="verified-badge">
+                      <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user?.user_type || 'Student'} ✓
+                    </div>
+                  ) : (
+                    <div className="verified-badge" style={{ borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
+                      <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i> Pending Verification
+                    </div>
+                  )}
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 15 }}>
                     Monitoring real-time network activity across all CTU circles.
                   </p>
@@ -1472,7 +1573,7 @@ export default function UserPortal() {
                       <div className="featured-card-bg" style={{ background: categoryGradient(c.category) }}></div>
                       <div className="featured-card-body">
                         <div className="featured-card-icon">
-                          <i className={getCategoryIcon(c.category)}></i>
+                          <i className={(c.icon || getCategoryIcon(c.category))}></i>
                         </div>
                         <div className="featured-card-name">{c.name}</div>
                         <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
@@ -1494,7 +1595,7 @@ export default function UserPortal() {
                       <div key={c.id} className="popular-row"
                         onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
                         <div className="popular-row-icon" style={{ background: categoryGradient(c.category) }}>
-                          <i className={getCategoryIcon(c.category)}></i>
+                          <i className={(c.icon || getCategoryIcon(c.category))}></i>
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
@@ -1581,7 +1682,7 @@ export default function UserPortal() {
                         <div key={c.id} className="post" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                              <i className={getCategoryIcon(c.category)} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
+                              <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
                               <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
                             {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
@@ -1591,10 +1692,19 @@ export default function UserPortal() {
                         </div>
                         <div style={{ flexShrink: 0, marginLeft: 20 }}>
                           {owned || joined ? (
-                            <button className="group-action-btn manage"
-                              onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                              <i className="fa-solid fa-arrow-right-to-bracket"></i> ENTER
-                            </button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="group-action-btn manage"
+                                onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                                <i className="fa-solid fa-arrow-right-to-bracket"></i> ENTER
+                              </button>
+                              {!owned && (
+                                <button className="group-action-btn terminate"
+                                  onClick={() => leaveCircle(c.id)}
+                                  title="Leave circle">
+                                  <i className="fa-solid fa-right-from-bracket"></i>
+                                </button>
+                              )}
+                            </div>
                           ) : !user?.is_verified ? (
                             <span style={{ fontSize: 11, color: 'var(--text-muted)', border: '1px solid #333', padding: '5px 12px', borderRadius: 20 }}>
                               <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>Verify to join
@@ -1783,5 +1893,6 @@ export default function UserPortal() {
     </div>
   );
 }
+
 
 

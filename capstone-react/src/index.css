@@ -1716,6 +1716,37 @@ body {
   white-space: pre-wrap;
 }
 
+/* ICON PICKER */
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.icon-pick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  transition: 0.2s;
+}
+.icon-pick-btn i { font-size: 18px; }
+.icon-pick-btn:hover { background: rgba(0,240,255,0.06); border-color: rgba(0,240,255,0.3); color: white; }
+.icon-pick-btn.selected {
+  background: rgba(0,240,255,0.1);
+  border-color: var(--cyber-cyan);
+  color: var(--cyber-cyan);
+  box-shadow: 0 0 10px rgba(0,240,255,0.15);
+}
+
 /* AUDITION SYSTEM */
 .audition-builder { padding: 4px 0; }
 
@@ -1863,3 +1894,134 @@ body {
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn 0.4s ease-out; }
+
+/* ===================== MOBILE RESPONSIVENESS ===================== */
+
+/* Tablet — hide dock, collapse sidebar */
+@media (max-width: 900px) {
+  .circle-dock { display: none; }
+
+  .sidebar {
+    width: 220px;
+    margin: 10px;
+    height: calc(100vh - 85px);
+  }
+
+  .c-feed { margin: 10px 10px 10px 0; }
+  .composer { margin-right: 10px; }
+
+  .nav-clock { display: none; }
+  .nav-search-wrap { max-width: 100%; }
+
+  .welcome-grid { grid-template-columns: 1fr; }
+  .featured-grid { grid-template-columns: repeat(2, 1fr); }
+
+  .adm-stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Mobile — full screen single panel */
+@media (max-width: 640px) {
+  /* Portal layout stacks vertically */
+  .portal-layout { flex-direction: column; }
+
+  .main { flex-direction: column; position: relative; }
+
+  /* Hide sidebar by default on mobile — toggled via hamburger */
+  .sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    width: 260px;
+    height: calc(100vh - 60px);
+    margin: 0;
+    border-radius: 0;
+    z-index: 500;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  .content { width: 100%; }
+  .c-feed { margin: 10px; border-radius: 10px; }
+  .composer { margin: 0 10px 10px; border-radius: 0 0 10px 10px; }
+
+  /* Top nav */
+  .top-nav-bar { padding: 0 12px; gap: 8px; }
+  .hud-chip { display: none; }
+  .nav-clock { display: none; }
+  .nav-search-wrap { max-width: none; flex: 1; }
+
+  /* Auth */
+  .auth-card { margin: 16px; padding: 28px 20px; }
+  .logo-text { font-size: 1.6rem; }
+
+  /* Home feed */
+  .welcome-grid { grid-template-columns: 1fr; }
+  .featured-grid { grid-template-columns: 1fr; }
+  .home-hero { padding: 24px 20px; }
+  .home-hero-text h1 { font-size: 22px; }
+
+  /* Admin */
+  .adm-layout { flex-direction: column; }
+  .adm-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 12px;
+    gap: 4px;
+    border-right: none;
+    border-bottom: 1px solid rgba(0,240,255,0.1);
+    height: auto;
+  }
+  .adm-brand { display: none; }
+  .adm-sidebar-label { display: none; }
+  .adm-nav-item { padding: 8px 10px; font-size: 11px; flex: 1; justify-content: center; min-width: 80px; }
+  .adm-nav-item span { display: none; }
+  .adm-nav-item i { width: auto; font-size: 16px; }
+  .adm-main { padding: 16px; }
+  .adm-stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .adm-table { font-size: 11px; }
+  .adm-table th, .adm-table td { padding: 8px 10px; }
+
+  /* Modals */
+  .modal-box { margin: 16px; max-width: calc(100vw - 32px); }
+  .manage-modal-box { margin: 16px; max-width: calc(100vw - 32px); }
+
+  /* Notification dropdown */
+  .notif-dropdown { width: calc(100vw - 32px); right: -60px; }
+
+  /* Chat bubbles */
+  .chat-body { max-width: 80%; }
+
+  /* Members table */
+  .members-table { font-size: 11px; }
+}
+
+/* Hamburger button — shown only on mobile */
+.mobile-menu-btn {
+  display: none;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  align-items: center; justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .mobile-menu-btn { display: flex; }
+}
+
+/* Sidebar overlay backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 499;
+}
+@media (max-width: 640px) {
+  .sidebar-backdrop.show { display: block; }
+}

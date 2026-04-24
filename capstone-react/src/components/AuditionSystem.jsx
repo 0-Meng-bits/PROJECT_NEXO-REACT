@@ -311,9 +311,10 @@ export function AuditionReviewPanel({ comm }) {
     const update = { status, reviewed_at: new Date().toISOString(), ...extra };
     const { error } = await supabase.from('audition_responses').update(update).eq('id', responseId);
     if (!error) {
-      // If accepted, also create the membership
+      const resp = responses.find(r => r.id === responseId);
+
+      // If accepted, create membership
       if (status === 'accepted' || extra.phase2_result === 'accepted') {
-        const resp = responses.find(r => r.id === responseId);
         if (resp) {
           await supabase.from('memberships').insert([{
             community_id: comm.id, user_id: resp.applicant_id,
@@ -321,6 +322,31 @@ export function AuditionReviewPanel({ comm }) {
           }]);
         }
       }
+
+      // Send notification to applicant
+      if (resp?.applicant_id) {
+        let message = '';
+        if (status === 'phase2') {
+          message = `Your audition for "${comm.name}" passed Phase 1! Check your application for live screening details.`;
+        } else if (status === 'accepted') {
+          message = `Congratulations! Your audition for "${comm.name}" has been accepted.`;
+        } else if (status === 'rejected') {
+          message = `Your audition application for "${comm.name}" was not accepted this time.`;
+        } else if (extra.phase2_result === 'accepted') {
+          message = `Congratulations! You passed the live screening for "${comm.name}" and are now a member.`;
+        } else if (extra.phase2_result === 'rejected') {
+          message = `Your live screening for "${comm.name}" was not successful this time.`;
+        }
+        if (message) {
+          await supabase.from('notifications').insert([{
+            user_id: resp.applicant_id,
+            type: 'audition_update',
+            message,
+            link_comm_id: comm.id,
+          }]);
+        }
+      }
+
       await load();
       setSelected(null);
       setFeedback('');
