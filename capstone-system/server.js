@@ -157,6 +157,6 @@ app.post('/api/verify-student/:id', async (req, res) => {
   res.json({ message: 'Student verified!' });
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
