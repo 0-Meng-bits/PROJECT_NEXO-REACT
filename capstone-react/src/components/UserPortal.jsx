@@ -66,6 +66,10 @@ const POST_TYPE = {
 
 function AnnouncementCard({ a, user, onPin, onDelete }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
+  const isAnon = a.author_name === 'Anonymous';
+  const displayName = isAnon ? 'Anonymous' : a.author_name;
+  const avatarChar = isAnon ? '?' : (a.author_name || 'A')[0].toUpperCase();
+
   return (
     <div className={`announcement-card ${a.pinned ? 'pinned' : ''}`}>
       {a.pinned && (
@@ -74,19 +78,29 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
         </div>
       )}
       <div className="announcement-header">
-        <div className="announcement-author-avatar">{(a.author_name || 'A')[0].toUpperCase()}</div>
+        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`}>
+          {isAnon ? <i className="fa-solid fa-user-secret"></i> : avatarChar}
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: 'white' }}>{a.author_name}</span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'white' }}>
+              {displayName}
+            </span>
+            {isAnon && (
+              <span style={{ fontSize: 10, color: '#666', border: '1px solid #333', padding: '1px 7px', borderRadius: 10, fontStyle: 'italic' }}>
+                anonymous
+              </span>
+            )}
             <span style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10 }}>
               <i className={type.icon} style={{ marginRight: 4 }}></i>{type.label}
             </span>
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-        {(user?.user_type === 'Admin' || a.author_id === user?.id) && (
+        {/* Own post: author_id matches. Anon posts: only admin can delete */}
+        {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
           <div style={{ display: 'flex', gap: 6 }}>
             {user?.user_type === 'Admin' && (
               <button className="chat-action-btn" onClick={() => onPin(a.id, a.pinned)}
@@ -795,7 +809,7 @@ export default function UserPortal() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
-  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general' });
+  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false });
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '' });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
@@ -876,22 +890,24 @@ export default function UserPortal() {
 
   const postAnnouncement = async () => {
     if (!newPost.title.trim() || !newPost.content.trim()) return;
-    // Only admins can post 'announcement' type
-    const type = user?.user_type === 'Admin' || user?.user_type === 'Faculty'
-      ? newPost.post_type
-      : (communities.some(c => c.creator_id === user?.id) ? 'shoutout' : 'general');
+    // All verified users can pick announcement, shoutout, or general
+    // Only admins/faculty can also pick 'event'
+    const allowedTypes = (user?.user_type === 'Admin' || user?.user_type === 'Faculty')
+      ? ['announcement', 'event', 'shoutout', 'general']
+      : ['announcement', 'shoutout', 'general'];
+    const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'general';
     setPostingAnnouncement(true);
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
-      author_name: user.full_name,
-      author_type: user.user_type,
+      author_name: newPost.anonymous ? 'Anonymous' : user.full_name,
+      author_type: newPost.anonymous ? 'Anonymous' : user.user_type,
       title: newPost.title.trim(),
       content: newPost.content.trim(),
       post_type: type,
       community_id: null,
     }]);
     setPostingAnnouncement(false);
-    if (!error) { setNewPost({ title: '', content: '', post_type: 'general' }); loadAnnouncements(); }
+    if (!error) { setNewPost({ title: '', content: '', post_type: 'general', anonymous: false }); loadAnnouncements(); }
   };
 
   const postCircleAnnouncement = async (commId) => {
@@ -1024,6 +1040,34 @@ export default function UserPortal() {
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
 
+  // Realtime home feed (campus-wide announcements)
+  useEffect(() => {
+    const sub = supabase.channel('rt:announcements:global')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' },
+        (payload) => {
+          if (!payload.new.community_id) {
+            setAnnouncements(prev => {
+              if (prev.find(a => a.id === payload.new.id)) return prev;
+              const updated = [payload.new, ...prev];
+              return updated.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+            });
+          }
+        }
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'announcements' },
+        (payload) => setAnnouncements(prev => prev.filter(a => a.id !== payload.old.id))
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' },
+        (payload) => {
+          if (!payload.new.community_id) {
+            setAnnouncements(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a));
+          }
+        }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, []);
+
   // Realtime notifications
   useEffect(() => {
     if (!user?.id) return;
@@ -1053,8 +1097,6 @@ export default function UserPortal() {
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [activeCommId]);
-
-  useEffect(() => { loadChannels(activeCommId); loadCircleAnnouncements(activeCommId); }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -1549,8 +1591,91 @@ export default function UserPortal() {
                 </div>
               </div>
 
+              {/* ── POST COMPOSER — verified users only ── */}
+              {user?.is_verified && (
+                <div className="home-post-composer">
+                  <div className="home-composer-header">
+                    <div className="home-composer-avatar">{initials}</div>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'white' }}>Share something with the campus</span>
+                  </div>
+                  <input
+                    className="home-composer-title"
+                    placeholder="Title"
+                    value={newPost.title}
+                    onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
+                  />
+                  <textarea
+                    className="home-composer-body"
+                    placeholder="What's on your mind? Share news, events, shoutouts..."
+                    value={newPost.content}
+                    onChange={e => setNewPost(p => ({ ...p, content: e.target.value }))}
+                    rows={3}
+                  />
+                  <div className="home-composer-footer">
+                    {/* Post type selector — all verified users get announcement/shoutout/general, admin/faculty also get event */}
+                    <div className="home-composer-types">
+                      {(user?.user_type === 'Admin' || user?.user_type === 'Faculty'
+                        ? ['announcement', 'event', 'shoutout', 'general']
+                        : ['announcement', 'shoutout', 'general']
+                      ).map(t => {
+                        const cfg = POST_TYPE[t];
+                        return (
+                          <button key={t}
+                            className={`home-type-btn ${newPost.post_type === t ? 'active' : ''}`}
+                            style={{ '--type-color': cfg.color }}
+                            onClick={() => setNewPost(p => ({ ...p, post_type: t }))}>
+                            <i className={cfg.icon}></i> {cfg.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {/* Anonymous toggle */}
+                      <button
+                        className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
+                        onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
+                        title={newPost.anonymous ? 'Posting anonymously — click to use your name' : 'Post anonymously'}>
+                        <i className="fa-solid fa-user-secret"></i>
+                        <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
+                      </button>
+                      <button className="cyber-btn"
+                        style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
+                        disabled={postingAnnouncement || !newPost.title.trim() || !newPost.content.trim()}
+                        onClick={postAnnouncement}>
+                        {postingAnnouncement
+                          ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
+                          : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── CAMPUS FEED ── */}
+              <div className="home-section-header" style={{ marginTop: 4 }}>
+                <span><i className="fa-solid fa-bullhorn" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>Campus Feed</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
+              </div>
+
+              {announcements.length === 0 ? (
+                <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                  <i className="fa-solid fa-bullhorn" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                    {user?.is_verified ? 'No posts yet. Be the first to share something!' : 'No posts yet. Verify your account to post.'}
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {announcements.map(a => (
+                    <AnnouncementCard key={a.id} a={a} user={user}
+                      onPin={togglePin}
+                      onDelete={deleteAnnouncement} />
+                  ))}
+                </div>
+              )}
+
               {/* Featured Communities */}
-              <div className="home-section-header">
+              <div className="home-section-header" style={{ marginTop: 16 }}>
                 <span>Featured Circles</span>
                 <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
               </div>
