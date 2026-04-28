@@ -21,8 +21,9 @@ export default async function handler(req, res) {
   });
 
   if (authError) {
-    // Legacy fallback — check stored password
-    const passwordOk = !profile.password || profile.password === password;
+    // Legacy fallback — if password column has a value, check it
+    // If password is null (cleared), allow login since we can't verify
+    const passwordOk = profile.password === null || profile.password === password;
     if (!passwordOk) return res.status(401).json({ message: 'Invalid credentials.' });
 
     return res.json({
