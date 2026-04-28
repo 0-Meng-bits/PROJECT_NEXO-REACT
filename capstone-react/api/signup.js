@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     email_confirm: true,
   });
 
-  if (authError) return res.status(400).json({ message: authError.message });
+  if (authError) return res.status(400).json({ message: authError.message, details: authError });
 
   // Insert profile
   const { data, error } = await supabaseAdmin
