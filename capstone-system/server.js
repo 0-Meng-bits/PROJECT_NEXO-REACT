@@ -59,6 +59,7 @@ app.post('/api/login', async (req, res) => {
   });
 
   if (authError) {
+    console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
     // Legacy account — Supabase Auth user doesn't exist yet
     // If password column is null (cleared), we can't validate — check against provided password only if stored
     const passwordOk = !profile.password || profile.password === password;
@@ -96,6 +97,7 @@ app.post('/api/signup', async (req, res) => {
   });
 
   if (authError) {
+    console.error('[SIGNUP] createUser error:', authError.message, authError.status);
     return res.status(400).json({ message: authError.message });
   }
 

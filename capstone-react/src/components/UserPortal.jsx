@@ -1346,6 +1346,7 @@ export default function UserPortal() {
               <div className="sidebar-brand-area">
                 <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
               </div>
+              <div className="sidebar-scroll">
               <div className="sidebar-label">MAIN</div>
               <div className="nav-links">
                 <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); }}>
@@ -1378,6 +1379,7 @@ export default function UserPortal() {
                   </div>
                 ))}
               </div>
+              </div>
             </>
           ) : (
             /* ── CIRCLE sidebar ── */
@@ -1394,6 +1396,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
+              <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
                 {/* Announcements — always first, powered by announcements table */}
@@ -1486,7 +1489,9 @@ export default function UserPortal() {
                 </>
               )}
 
-              <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(0,240,255,0.08)' }}>
+              </div>{/* end sidebar-scroll */}
+
+              <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(0,240,255,0.08)', flexShrink: 0 }}>
                 {!isOwner && isMember(activeCommId) && activeCommId !== 'global' && (
                   <div className="ls-item" style={{ color: 'var(--red)', marginBottom: 4 }}
                     onClick={() => leaveCircle(activeCommId)}>

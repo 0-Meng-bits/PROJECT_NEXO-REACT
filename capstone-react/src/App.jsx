@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
+import Onboarding from './components/Onboarding';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/AdminDashboard';
 
@@ -64,6 +65,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Auth />} />
+      <Route path="/onboarding" element={
+        <ProtectedRoute>
+          <Onboarding />
+        </ProtectedRoute>
+      } />
       <Route path="/portal" element={
         <ProtectedRoute>
           <UserPortal />

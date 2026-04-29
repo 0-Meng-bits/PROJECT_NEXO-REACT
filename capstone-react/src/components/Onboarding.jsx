@@ -1,0 +1,275 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+
+const COURSES = [
+  'BSIT', 'BSCS', 'BSCE', 'BSEd', 'BSME', 'BSEE',
+  'BSN', 'BSBA', 'BSARCH', 'BSCRIM', 'BSHM', 'Other',
+];
+
+const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'Graduate'];
+
+const INTEREST_BUBBLES = [
+  { id: 'coding',      label: '💻 Coding',        color: '#00f0ff' },
+  { id: 'design',      label: '🎨 Design',         color: '#a855f7' },
+  { id: 'gaming',      label: '🎮 Gaming',         color: '#22c55e' },
+  { id: 'music',       label: '🎵 Music',          color: '#f59e0b' },
+  { id: 'sports',      label: '⚽ Sports',         color: '#ef4444' },
+  { id: 'research',    label: '🔬 Research',       color: '#3b82f6' },
+  { id: 'art',         label: '🖼️ Art',            color: '#ec4899' },
+  { id: 'photography', label: '📷 Photography',    color: '#14b8a6' },
+  { id: 'writing',     label: '✍️ Writing',        color: '#f97316' },
+  { id: 'robotics',    label: '🤖 Robotics',       color: '#8b5cf6' },
+  { id: 'business',    label: '💼 Business',       color: '#fcee0a' },
+  { id: 'cooking',     label: '🍳 Cooking',        color: '#84cc16' },
+  { id: 'travel',      label: '✈️ Travel',         color: '#06b6d4' },
+  { id: 'anime',       label: '🌸 Anime',          color: '#f43f5e' },
+  { id: 'fitness',     label: '💪 Fitness',        color: '#10b981' },
+  { id: 'debate',      label: '🗣️ Debate',         color: '#6366f1' },
+];
+
+export default function Onboarding() {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  const [step, setStep] = useState(1); // 1=avatar, 2=course/year, 3=interests
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [course, setCourse] = useState('');
+  const [yearLevel, setYearLevel] = useState('');
+  const [selectedInterests, setSelectedInterests] = useState([]);
+  const [auraMatch, setAuraMatch] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // Fetch aura match when interests change
+  useEffect(() => {
+    if (selectedInterests.length === 0) { setAuraMatch(null); return; }
+    const fetchAura = async () => {
+      // Count students with at least one matching interest
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .overlaps('interests', selectedInterests)
+        .neq('id', user.id || '');
+
+      // Find top matching community
+      const { data: comms } = await supabase
+        .from('communities')
+        .select('name, icon')
+        .limit(1);
+
+      setAuraMatch({
+        count: count || 0,
+        topCommunity: comms?.[0]?.name || null,
+      });
+    };
+    fetchAura();
+  }, [selectedInterests, user.id]);
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const toggleInterest = (id) => {
+    setSelectedInterests(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleFinish = async () => {
+    if (!user?.id) { navigate('/portal'); return; }
+    setSaving(true);
+
+    let avatarUrl = null;
+
+    // Upload avatar if provided
+    if (avatarFile) {
+      const ext = avatarFile.name.split('.').pop();
+      const path = `avatars/${user.id}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, avatarFile, { upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        avatarUrl = urlData.publicUrl;
+      }
+    }
+
+    // Update profile
+    const updates = {
+      course,
+      year_level: yearLevel,
+      interests: selectedInterests,
+      onboarding_complete: true,
+      ...(avatarUrl && { avatar_url: avatarUrl }),
+    };
+
+    const { data: updatedProfile } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (updatedProfile) {
+      localStorage.setItem('currentUser', JSON.stringify(updatedProfile));
+    }
+
+    setSaving(false);
+    navigate('/portal');
+  };
+
+  const initials = user.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  return (
+    <div className="onboarding-page">
+      <div className="onboarding-orb orb-1" />
+      <div className="onboarding-orb orb-2" />
+
+      <div className="onboarding-card">
+        {/* Progress bar */}
+        <div className="onboarding-progress">
+          {[1, 2, 3].map(s => (
+            <div key={s} className={`ob-step ${step >= s ? 'active' : ''} ${step > s ? 'done' : ''}`}>
+              <div className="ob-step-dot">
+                {step > s ? <i className="fa-solid fa-check" /> : s}
+              </div>
+              <span className="ob-step-label">
+                {s === 1 ? 'Profile' : s === 2 ? 'Details' : 'Interests'}
+              </span>
+            </div>
+          ))}
+          <div className="ob-progress-line">
+            <div className="ob-progress-fill" style={{ width: `${((step - 1) / 2) * 100}%` }} />
+          </div>
+        </div>
+
+        {/* ── STEP 1: Avatar ── */}
+        {step === 1 && (
+          <div className="ob-step-content fade-in">
+            <h2 className="ob-title">Set Your Profile Picture</h2>
+            <p className="ob-subtitle">Put a face to your name — or skip for now</p>
+
+            <div className="ob-avatar-wrap">
+              <div className="ob-avatar">
+                {avatarPreview
+                  ? <img src={avatarPreview} alt="avatar" className="ob-avatar-img" />
+                  : <span className="ob-avatar-initials">{initials}</span>
+                }
+                <label className="ob-avatar-edit" htmlFor="avatar-upload">
+                  <i className="fa-solid fa-camera" />
+                </label>
+                <input id="avatar-upload" type="file" accept="image/*"
+                  onChange={handleAvatarChange} style={{ display: 'none' }} />
+              </div>
+              <p className="ob-avatar-hint">Click the camera icon to upload</p>
+            </div>
+
+            <div className="ob-actions">
+              <button className="cyber-btn" onClick={() => setStep(2)}>
+                {avatarPreview ? 'NEXT →' : 'SKIP FOR NOW →'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 2: Course + Year ── */}
+        {step === 2 && (
+          <div className="ob-step-content fade-in">
+            <h2 className="ob-title">Your Academic Identity</h2>
+            <p className="ob-subtitle">Help us connect you with the right people</p>
+
+            <div className="input-group">
+              <label>COURSE / PROGRAM</label>
+              <select value={course} onChange={e => setCourse(e.target.value)}>
+                <option value="">Select your course...</option>
+                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="input-group">
+              <label>YEAR LEVEL</label>
+              <div className="ob-year-grid">
+                {YEAR_LEVELS.map(y => (
+                  <button
+                    key={y}
+                    type="button"
+                    className={`ob-year-btn ${yearLevel === y ? 'selected' : ''}`}
+                    onClick={() => setYearLevel(y)}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="ob-actions">
+              <button className="cyber-btn secondary" onClick={() => setStep(1)}>← BACK</button>
+              <button className="cyber-btn" onClick={() => setStep(3)}
+                disabled={!course || !yearLevel}>
+                NEXT →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 3: Interests + Aura Match ── */}
+        {step === 3 && (
+          <div className="ob-step-content fade-in">
+            <h2 className="ob-title">What Are You Into?</h2>
+            <p className="ob-subtitle">Select your interests — pick as many as you like</p>
+
+            <div className="ob-bubbles">
+              {INTEREST_BUBBLES.map(b => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`ob-bubble ${selectedInterests.includes(b.id) ? 'selected' : ''}`}
+                  style={selectedInterests.includes(b.id) ? {
+                    borderColor: b.color,
+                    background: `${b.color}18`,
+                    color: b.color,
+                  } : {}}
+                  onClick={() => toggleInterest(b.id)}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Aura Match Preview */}
+            {auraMatch && selectedInterests.length > 0 && (
+              <div className="aura-match-card fade-in">
+                <div className="aura-match-icon">
+                  <i className="fa-solid fa-bolt" />
+                </div>
+                <div className="aura-match-text">
+                  <div className="aura-match-title">AURA MATCH</div>
+                  <div className="aura-match-body">
+                    You share interests with{' '}
+                    <strong style={{ color: 'var(--cyber-cyan)' }}>{auraMatch.count} students</strong>
+                    {auraMatch.topCommunity && (
+                      <> · Top match: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="ob-actions">
+              <button className="cyber-btn secondary" onClick={() => setStep(2)}>← BACK</button>
+              <button className="cyber-btn" onClick={handleFinish} disabled={saving}>
+                {saving ? 'SAVING...' : 'ENTER NEXO →'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
