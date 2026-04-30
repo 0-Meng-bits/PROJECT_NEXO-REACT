@@ -18,9 +18,6 @@ export default function Auth() {
   // Called when signup form is submitted — go to ID verify step first
   const handleSignupFormSubmit = (e) => {
     e.preventDefault();
-    // Auto-generate email from CTU ID so user doesn't need to enter it
-    const autoEmail = `${form.ctuId.toLowerCase().replace(/[^a-z0-9]/g, '')}@ctu.edu.ph`;
-    setForm(f => ({ ...f, email: autoEmail }));
     setSignupStep('id-verify');
   };
 
@@ -47,11 +44,8 @@ export default function Auth() {
         alert('SYSTEM_ALERT: ' + data.message);
         setSignupStep('form');
       } else {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        if (data.session) localStorage.setItem('accessToken', data.session.access_token);
-        navigate('/onboarding');
+        // Don't store session yet — user needs to confirm email first
+        setMode('email-sent');
       }
     } catch {
       alert('TERMINAL_OFFLINE: Connection failed.');
@@ -86,6 +80,25 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  // ── EMAIL SENT ──
+  if (mode === 'email-sent') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+          <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>CHECK YOUR EMAIL</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+            A confirmation link has been sent to <strong style={{ color: 'white' }}>{form.email}</strong>.
+            Click the link to verify your email, then wait for admin approval before logging in.
+          </p>
+          <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
+            BACK TO LOGIN
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── SPLASH ──
   if (mode === 'splash') {
@@ -149,6 +162,11 @@ export default function Auth() {
                 <label>FULL_NAME</label>
                 <input name="fullName" value={form.fullName} onChange={update}
                   placeholder="Juan Dela Cruz" required disabled={loading} />
+              </div>
+              <div className="input-group">
+                <label>EMAIL (for password recovery)</label>
+                <input name="email" type="email" value={form.email} onChange={update}
+                  placeholder="your.real@email.com" required disabled={loading} />
               </div>
               <div className="input-group">
                 <label>USER_TYPE</label>

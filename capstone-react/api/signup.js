@@ -5,11 +5,11 @@ export default async function handler(req, res) {
 
   const { email, password, fullName, studentId, user_type } = req.body;
 
-  // Create Supabase Auth user
+  // Create Supabase Auth user — Supabase will send confirmation email
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false, // require email confirmation
   });
 
   if (authError) return res.status(400).json({ message: authError.message, details: authError });

@@ -93,7 +93,7 @@ app.post('/api/signup', async (req, res) => {
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false, // require email confirmation
   });
 
   if (authError) {
