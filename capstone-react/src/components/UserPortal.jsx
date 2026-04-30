@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
+import ThemePicker from './ThemePicker';
+import { loadTheme } from '../lib/theme';
 
 function getCategoryIcon(category) {
   const map = {
@@ -819,6 +821,8 @@ export default function UserPortal() {
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(loadTheme);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -986,6 +990,13 @@ export default function UserPortal() {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
+    } else if (commId) {
+      // No channel selected — load all messages for this community
+      const { data } = await supabase.from('messages').select('*')
+        .eq('community_id', commId)
+        .is('channel_id', null)
+        .order('created_at', { ascending: true });
+      setMessages(data || []);
     } else {
       setMessages([]);
     }
@@ -1010,7 +1021,8 @@ export default function UserPortal() {
           // Only add if it belongs to the current view
           const isGlobal = activeCommId === 'global' && !msg.community_id;
           const isChannel = msg.channel_id === activeChannelId;
-          if (isGlobal || isChannel) {
+          const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId && !msg.channel_id;
+          if (isGlobal || isChannel || isCommunityNoChannel) {
             setMessages(prev => {
               // Avoid duplicates (our own sent message is already in state)
               if (prev.find(m => m.id === msg.id)) return prev;
@@ -1300,6 +1312,16 @@ export default function UserPortal() {
 
         {/* RIGHT — notifications + user hud */}
         <div className="user-hud">
+          {/* Theme Picker Button */}
+          <button
+            className="notif-bell"
+            onClick={() => setShowThemePicker(true)}
+            title="Change Theme"
+            style={{ marginRight: 4 }}
+          >
+            <i className="fa-solid fa-palette"></i>
+          </button>
+
           {/* Notification Bell */}
           <div className="notif-wrap" ref={notifRef}>
             <button className="notif-bell" onClick={() => { setShowNotifications(o => !o); markAllRead(); }}>
@@ -2020,6 +2042,15 @@ export default function UserPortal() {
         <AuditionDetailModal data={viewingAudition} onClose={() => setViewingAudition(null)} />
       )}
       <Toast message={toast} />
+
+      {/* Theme Picker Modal */}
+      {showThemePicker && (
+        <ThemePicker
+          currentTheme={currentTheme}
+          onClose={() => setShowThemePicker(false)}
+          onThemeChange={(t) => setCurrentTheme(t)}
+        />
+      )}
     </div>
   );
 }

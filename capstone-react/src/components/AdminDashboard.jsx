@@ -526,14 +526,29 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Registered</th><th>Actions</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
                     <tr key={s.id}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
-                      <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
+                      <td>
+                        {s.id_photo_url ? (
+                          <a href={s.id_photo_url} target="_blank" rel="noreferrer">
+                            <img
+                              src={s.id_photo_url}
+                              alt="School ID"
+                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(0,240,255,0.3)', cursor: 'pointer' }}
+                            />
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--red)' }}>
+                            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
+                            No photo
+                          </span>
+                        )}
+                      </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>

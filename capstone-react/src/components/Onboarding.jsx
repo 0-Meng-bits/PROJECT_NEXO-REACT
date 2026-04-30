@@ -3,29 +3,43 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const COURSES = [
-  'BSIT', 'BSCS', 'BSCE', 'BSEd', 'BSME', 'BSEE',
-  'BSN', 'BSBA', 'BSARCH', 'BSCRIM', 'BSHM', 'Other',
+  'BEED',
+  'BIT AUTO TECH',
+  'BIT COM TECH',
+  'BIT ELEC TECH',
+  'BSED MATH',
+  'BSFI',
+  'BSHM',
+  'BSIE',
+  'BSIT',
+  'BTLED-HE',
 ];
 
-const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year', 'Graduate'];
+const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th', 'Graduate'];
 
 const INTEREST_BUBBLES = [
-  { id: 'coding',      label: '💻 Coding',        color: '#00f0ff' },
-  { id: 'design',      label: '🎨 Design',         color: '#a855f7' },
-  { id: 'gaming',      label: '🎮 Gaming',         color: '#22c55e' },
-  { id: 'music',       label: '🎵 Music',          color: '#f59e0b' },
-  { id: 'sports',      label: '⚽ Sports',         color: '#ef4444' },
-  { id: 'research',    label: '🔬 Research',       color: '#3b82f6' },
-  { id: 'art',         label: '🖼️ Art',            color: '#ec4899' },
-  { id: 'photography', label: '📷 Photography',    color: '#14b8a6' },
-  { id: 'writing',     label: '✍️ Writing',        color: '#f97316' },
-  { id: 'robotics',    label: '🤖 Robotics',       color: '#8b5cf6' },
-  { id: 'business',    label: '💼 Business',       color: '#fcee0a' },
-  { id: 'cooking',     label: '🍳 Cooking',        color: '#84cc16' },
-  { id: 'travel',      label: '✈️ Travel',         color: '#06b6d4' },
-  { id: 'anime',       label: '🌸 Anime',          color: '#f43f5e' },
-  { id: 'fitness',     label: '💪 Fitness',        color: '#10b981' },
-  { id: 'debate',      label: '🗣️ Debate',         color: '#6366f1' },
+  { id: 'coding',            label: '💻 Coding',             color: '#00f0ff' },
+  { id: 'design',            label: '🎨 Design',              color: '#a855f7' },
+  { id: 'gaming',            label: '🎮 Gaming',              color: '#22c55e' },
+  { id: 'music',             label: '🎵 Music',               color: '#f59e0b' },
+  { id: 'sports',            label: '⚽ Sports',              color: '#ef4444' },
+  { id: 'research',          label: '🔬 Research',            color: '#3b82f6' },
+  { id: 'art',               label: '🖼️ Art',                 color: '#ec4899' },
+  { id: 'photography',       label: '📷 Photography',         color: '#14b8a6' },
+  { id: 'writing',           label: '✍️ Writing',             color: '#f97316' },
+  { id: 'robotics',          label: '🤖 Robotics',            color: '#8b5cf6' },
+  { id: 'business',          label: '💼 Business',            color: '#fcee0a' },
+  { id: 'cooking',           label: '🍳 Cooking',             color: '#84cc16' },
+  { id: 'travel',            label: '✈️ Travel',              color: '#06b6d4' },
+  { id: 'anime',             label: '🌸 Anime',               color: '#f43f5e' },
+  { id: 'fitness',           label: '💪 Fitness',             color: '#10b981' },
+  { id: 'debate',            label: '🗣️ Debate',              color: '#6366f1' },
+  { id: 'reading',           label: '📚 Reading',             color: '#0ea5e9' },
+  { id: 'podcasting',        label: '🎙️ Podcasting',          color: '#d946ef' },
+  { id: 'language_learning', label: '🌐 Language Learning',   color: '#f59e0b' },
+  { id: 'bl_gl',             label: '🏳️‍🌈 Watching BL/GL',    color: '#fb7185' },
+  { id: 'esports',           label: '🏆 E-Sports',            color: '#4ade80' },
+  { id: 'dancing',           label: '💃 Dancing',             color: '#c084fc' },
 ];
 
 export default function Onboarding() {
@@ -45,22 +59,39 @@ export default function Onboarding() {
   useEffect(() => {
     if (selectedInterests.length === 0) { setAuraMatch(null); return; }
     const fetchAura = async () => {
-      // Count students with at least one matching interest
+      // Count students with at least one matching interest (only works after migration)
       const { count } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .overlaps('interests', selectedInterests)
         .neq('id', user.id || '');
 
-      // Find top matching community
-      const { data: comms } = await supabase
-        .from('communities')
-        .select('name, icon')
-        .limit(1);
+      // Find top community whose category matches selected interests
+      // Map interests to community categories
+      const categoryMap = {
+        coding: 'project', design: 'hobby', gaming: 'hobby',
+        music: 'hobby', sports: 'social', research: 'academic',
+        art: 'hobby', photography: 'hobby', writing: 'hobby',
+        robotics: 'project', business: 'academic', cooking: 'hobby',
+        travel: 'social', anime: 'hobby', fitness: 'social', debate: 'academic',
+        reading: 'hobby', podcasting: 'hobby', language_learning: 'academic',
+        bl_gl: 'social', esports: 'hobby', dancing: 'social',
+      };
+      const matchedCategories = [...new Set(selectedInterests.map(i => categoryMap[i]).filter(Boolean))];
+
+      let topCommunity = null;
+      if (matchedCategories.length > 0) {
+        const { data: comms } = await supabase
+          .from('communities')
+          .select('name')
+          .in('category', matchedCategories)
+          .limit(1);
+        topCommunity = comms?.[0]?.name || null;
+      }
 
       setAuraMatch({
         count: count || 0,
-        topCommunity: comms?.[0]?.name || null,
+        topCommunity,
       });
     };
     fetchAura();
@@ -251,10 +282,21 @@ export default function Onboarding() {
                 <div className="aura-match-text">
                   <div className="aura-match-title">AURA MATCH</div>
                   <div className="aura-match-body">
-                    You share interests with{' '}
-                    <strong style={{ color: 'var(--cyber-cyan)' }}>{auraMatch.count} students</strong>
-                    {auraMatch.topCommunity && (
-                      <> · Top match: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                    {auraMatch.count > 0 ? (
+                      <>
+                        You share interests with{' '}
+                        <strong style={{ color: 'var(--cyber-cyan)' }}>{auraMatch.count} student{auraMatch.count !== 1 ? 's' : ''}</strong>
+                        {auraMatch.topCommunity && (
+                          <> · Suggested circle: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Be the first with these interests!
+                        {auraMatch.topCommunity && (
+                          <> · Check out: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
