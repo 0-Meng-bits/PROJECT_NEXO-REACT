@@ -166,7 +166,9 @@ export default function Auth() {
               <div className="input-group">
                 <label>EMAIL (for password recovery)</label>
                 <input name="email" type="email" value={form.email} onChange={update}
-                  placeholder="your.real@email.com" required disabled={loading} />
+                  placeholder="your.real@email.com" required disabled={loading}
+                  pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
+                  title="Please enter a valid email address (e.g. name@gmail.com)" />
               </div>
               <div className="input-group">
                 <label>USER_TYPE</label>
