@@ -41,12 +41,12 @@ export default function Landing({ onEnter }) {
   }, []);
 
   const features = [
-    { icon: 'fa-solid fa-users',      title: 'Campus Circles',     desc: 'Join student-led groups, clubs, and organizations. Find your people and build lasting connections within CTU.', accent: 'var(--lnd-blue)' },
-    { icon: 'fa-solid fa-bullhorn',   title: 'Live Announcements', desc: 'Stay updated with real-time campus news, event posts, and important notices from faculty and orgs.',           accent: 'var(--lnd-teal)' },
-    { icon: 'fa-solid fa-comments',   title: 'Group Messaging',    desc: 'Chat with classmates and org members in dedicated channels. Collaborate, plan, and stay in sync.',              accent: 'var(--lnd-blue)' },
-    { icon: 'fa-solid fa-microphone', title: 'Audition System',    desc: 'Organizations post auditions and accept applications directly — no more paper forms or missed tryouts.',         accent: 'var(--lnd-teal)' },
-    { icon: 'fa-solid fa-id-card',    title: 'Verified Identity',  desc: 'Every account is verified using your CTU school ID, keeping the community safe and trusted.',                   accent: 'var(--lnd-blue)' },
-    { icon: 'fa-solid fa-chart-bar',  title: 'Admin Dashboard',    desc: 'Faculty and admins get powerful tools to manage students, review verifications, and monitor activity.',          accent: 'var(--lnd-teal)' },
+    { icon: 'fa-solid fa-users',      title: 'Campus Circles',     desc: 'Join student-led groups, clubs, and organizations. Find your people and build lasting connections within CTU.' },
+    { icon: 'fa-solid fa-bullhorn',   title: 'Live Announcements', desc: 'Stay updated with real-time campus news, event posts, and important notices from faculty and orgs.' },
+    { icon: 'fa-solid fa-comments',   title: 'Group Messaging',    desc: 'Chat with classmates and org members in dedicated channels. Collaborate, plan, and stay in sync.' },
+    { icon: 'fa-solid fa-microphone', title: 'Audition System',    desc: 'Organizations post auditions and accept applications directly — no more paper forms or missed tryouts.' },
+    { icon: 'fa-solid fa-id-card',    title: 'Verified Identity',  desc: 'Every account is verified using your CTU school ID, keeping the community safe and trusted.' },
+    { icon: 'fa-solid fa-chart-bar',  title: 'Admin Dashboard',    desc: 'Faculty and admins get powerful tools to manage students, review verifications, and monitor activity.' },
   ];
 
   const steps = [
@@ -146,12 +146,12 @@ export default function Landing({ onEnter }) {
           </p>
           <div className="lnd-about-grid">
             {[
-              { icon: 'fa-solid fa-graduation-cap',  title: 'For Students',      desc: 'Discover clubs, join groups, chat with peers, and never miss a campus event again.',     c: 'var(--lnd-blue)' },
-              { icon: 'fa-solid fa-chalkboard-user', title: 'For Faculty',       desc: 'Post announcements, manage student communities, and monitor campus engagement.',         c: 'var(--lnd-teal)' },
-              { icon: 'fa-solid fa-people-group',    title: 'For Organizations', desc: 'Run auditions, manage members, create channels, and grow your org on campus.',          c: 'var(--lnd-blue)' },
+              { icon: 'fa-solid fa-graduation-cap',  title: 'For Students',      desc: 'Discover clubs, join groups, chat with peers, and never miss a campus event again.' },
+              { icon: 'fa-solid fa-chalkboard-user', title: 'For Faculty',       desc: 'Post announcements, manage student communities, and monitor campus engagement.' },
+              { icon: 'fa-solid fa-people-group',    title: 'For Organizations', desc: 'Run auditions, manage members, create channels, and grow your org on campus.' },
             ].map((card, i) => (
               <div className="lnd-about-card" key={i}>
-                <div className="lnd-about-icon" style={{ color: card.c, borderColor: card.c }}>
+                <div className="lnd-about-icon">
                   <i className={card.icon} />
                 </div>
                 <h3>{card.title}</h3>
@@ -176,7 +176,7 @@ export default function Landing({ onEnter }) {
           <div className="lnd-features-grid">
             {features.map((f, i) => (
               <div className="lnd-feature-card" key={i}>
-                <div className="lnd-feature-icon" style={{ color: f.accent, borderColor: f.accent }}>
+                <div className="lnd-feature-icon">
                   <i className={f.icon} />
                 </div>
                 <h3 className="lnd-feature-title">{f.title}</h3>
@@ -214,7 +214,7 @@ export default function Landing({ onEnter }) {
         <div className="lnd-container">
           <div className="lnd-cta-box">
             <div className="lnd-cta-grid" />
-            <p className="lnd-eyebrow" style={{ color: 'var(--lnd-teal)' }}>JOIN THE COMMUNITY</p>
+            <p className="lnd-eyebrow">JOIN THE COMMUNITY</p>
             <h2 className="lnd-cta-title">Ready to connect with CTU?</h2>
             <p className="lnd-cta-body">
               Create your verified account today and start connecting with
