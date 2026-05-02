@@ -2325,7 +2325,7 @@ body {
 .home-section-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; color: white; margin: 20px 0 12px; }
 .home-see-all { font-size: 12px; color: var(--cyber-cyan); cursor: pointer; font-weight: 400; }
 .home-see-all:hover { text-decoration: underline; }
-.featured-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.featured-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
 .featured-card { border-radius: 12px; overflow: hidden; cursor: pointer; position: relative; min-height: 140px; border: 1px solid rgba(255,255,255,0.06); transition: transform 0.2s, box-shadow 0.2s; }
 .featured-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
 .featured-card-bg { position: absolute; inset: 0; opacity: 0.9; }

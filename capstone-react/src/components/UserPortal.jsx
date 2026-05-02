@@ -812,7 +812,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         )}
         <div className="stats-card" style={{ textAlign: 'left', marginBottom: 20 }}>
           <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
-          <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.length}</span></div>
+          <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
@@ -1746,7 +1746,7 @@ export default function UserPortal() {
                 </div>
                 <div className="stats-card">
                   <h4 style={{ fontSize: 11, color: 'var(--cyber-yellow)', marginBottom: 15, letterSpacing: 2 }}>QUICK_STATS</h4>
-                  <div className="stat-line">My Circles <span className="stat-val">{myCircles.length}</span></div>
+                  <div className="stat-line">My Circles <span className="stat-val">{myCircles.filter(c => c.id !== 'global').length}</span></div>
                   <div className="stat-line">Network Status <span className="stat-val" style={{ color: '#00ff00' }}>ONLINE</span></div>
                   <div className="stat-line">Clearance <span className="stat-val">{user?.user_type?.toUpperCase()}</span></div>
                 </div>
