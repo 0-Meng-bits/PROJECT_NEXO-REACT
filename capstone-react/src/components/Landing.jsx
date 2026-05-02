@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadTheme } from '../lib/theme';
 
 // ── LANDING PAGE ──────────────────────────────────────────────────────────────
 export default function Landing({ onEnter }) {
@@ -9,6 +10,7 @@ export default function Landing({ onEnter }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    loadTheme(); // Apply saved theme on mount
     const t = setTimeout(() => setVisible(true), 80);
     return () => clearTimeout(t);
   }, []);
