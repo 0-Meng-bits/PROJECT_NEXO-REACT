@@ -123,10 +123,77 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
 }
 
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onViewProfile }) {
+const REACTIONS = [
+  { type: 'heart', emoji: '❤️' },
+  { type: 'laugh', emoji: '😂' },
+  { type: 'sad',   emoji: '😢' },
+];
+
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onViewProfile, currentStudentId }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
+  const [showReactPicker, setShowReactPicker] = useState(false);
+  const [reactions, setReactions] = useState({}); // { heart: [{student_id,...}], laugh: [...], sad: [...] }
+  const reactPickerRef = useRef(null);
+
+  // Load reactions for this message
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from('message_reactions')
+        .select('reaction, student_id, user_id')
+        .eq('message_id', m.id);
+      if (cancelled || !data) return;
+      const grouped = {};
+      data.forEach(r => {
+        if (!grouped[r.reaction]) grouped[r.reaction] = [];
+        grouped[r.reaction].push(r);
+      });
+      setReactions(grouped);
+    };
+    load();
+
+    // Realtime updates for this message's reactions
+    const sub = supabase.channel(`reactions:${m.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `message_id=eq.${m.id}` },
+        () => { if (!cancelled) load(); }
+      ).subscribe();
+
+    return () => { cancelled = true; supabase.removeChannel(sub); };
+  }, [m.id]);
+
+  // Close picker on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (reactPickerRef.current && !reactPickerRef.current.contains(e.target)) {
+        setShowReactPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggleReaction = async (type) => {
+    setShowReactPicker(false);
+    const existing = reactions[type]?.find(r => r.student_id === currentStudentId);
+    if (existing) {
+      // Remove reaction
+      await supabase.from('message_reactions')
+        .delete()
+        .eq('message_id', m.id)
+        .eq('student_id', currentStudentId)
+        .eq('reaction', type);
+    } else {
+      // Add reaction
+      await supabase.from('message_reactions').insert([{
+        message_id: m.id,
+        student_id: currentStudentId,
+        reaction: type,
+      }]);
+    }
+  };
 
   const handleEdit = async () => {
     if (!editVal.trim() || editVal === m.content) { setEditing(false); return; }
@@ -137,6 +204,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
   const initials = (m.full_name || 'U')[0].toUpperCase();
   const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const showActions = (isOwnerMsg || canDelete) && hovered && !editing;
+  const hasReactions = REACTIONS.some(r => reactions[r.type]?.length > 0);
 
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
@@ -146,7 +214,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
 
       <div className="chat-body"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseLeave={() => { setHovered(false); }}
       >
         {!isOwnerMsg && (
           <div className="chat-meta">
@@ -156,22 +224,66 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
           </div>
         )}
 
-        {editing ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input className="msg-edit-input" value={editVal}
-              onChange={e => setEditVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
-              autoFocus />
-            <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
-            <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
-          </div>
-        ) : (
-          <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
-            {m.content}
+        {/* Bubble + reaction picker trigger */}
+        <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+          {editing ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input className="msg-edit-input" value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
+                autoFocus />
+              <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
+              <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
+            </div>
+          ) : (
+            <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
+              {m.content}
+            </div>
+          )}
+
+          {/* Floating reaction picker — appears on hover */}
+          {hovered && !editing && (
+            <div ref={reactPickerRef} className={`react-trigger ${isOwnerMsg ? 'own' : 'other'}`}>
+              <button className="react-trigger-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
+                <i className="fa-regular fa-face-smile" />
+              </button>
+              {showReactPicker && (
+                <div className={`react-picker ${isOwnerMsg ? 'own' : 'other'}`}>
+                  {REACTIONS.map(r => {
+                    const mine = reactions[r.type]?.some(x => x.student_id === currentStudentId);
+                    return (
+                      <button key={r.type} className={`react-option ${mine ? 'active' : ''}`}
+                        onClick={() => toggleReaction(r.type)} title={r.type}>
+                        {r.emoji}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Reaction counts below bubble */}
+        {hasReactions && (
+          <div className={`reaction-bar ${isOwnerMsg ? 'own' : 'other'}`}>
+            {REACTIONS.map(r => {
+              const count = reactions[r.type]?.length || 0;
+              if (!count) return null;
+              const mine = reactions[r.type]?.some(x => x.student_id === currentStudentId);
+              return (
+                <button key={r.type}
+                  className={`reaction-chip ${mine ? 'mine' : ''}`}
+                  onClick={() => toggleReaction(r.type)}
+                  title={`${count} ${r.type}`}>
+                  {r.emoji} <span>{count}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* Inline action bar — appears below bubble on hover */}
+        {/* Inline action bar */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
             {isOwnerMsg && (
@@ -2087,6 +2199,7 @@ export default function UserPortal() {
                       onDelete={deleteMessage}
                       onEdit={editMessage}
                       onViewProfile={(sid) => setViewingProfile(sid)}
+                      currentStudentId={user?.student_id}
                     />
                   );
                 })}
@@ -2374,6 +2487,7 @@ export default function UserPortal() {
                         onDelete={deleteMessage}
                         onEdit={editMessage}
                         onViewProfile={(sid) => setViewingProfile(sid)}
+                        currentStudentId={user?.student_id}
                       />
                     );
                   })
