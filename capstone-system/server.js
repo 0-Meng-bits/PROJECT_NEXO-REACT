@@ -14,7 +14,26 @@ const supabaseAdmin = createClient(
 // Anon client for auth operations
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// ── AUTO-MIGRATE: ensure cover_url column exists ──────────────────────────────
+(async () => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('communities')
+      .update({ cover_url: null })
+      .eq('id', '00000000-0000-0000-0000-000000000000');
+    if (error && (error.message.includes('cover_url') || error.code === '42703')) {
+      console.warn('⚠️  [STARTUP] cover_url column missing from communities table.');
+      console.warn('   Run this SQL in Supabase Dashboard → SQL Editor:');
+      console.warn('   ALTER TABLE communities ADD COLUMN IF NOT EXISTS cover_url TEXT;');
+    } else {
+      console.log('✅ [STARTUP] communities.cover_url column OK');
+    }
+  } catch (e) {
+    // ignore
+  }
+})();
 
 // ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
 async function requireAuth(req, res, next) {
@@ -149,6 +168,154 @@ app.get('/api/students', async (req, res) => {
     .from('profiles').select('*').order('created_at', { ascending: false });
   if (error) return res.status(400).json(error);
   res.json(data);
+});
+
+// ── DELETE COMMUNITY ─────────────────────────────────────────────────────────
+app.delete('/api/delete-community', async (req, res) => {
+  const { id, userId } = req.query;
+  if (!id) return res.status(400).json({ message: 'Community ID is required.' });
+
+  let resolvedUserId = null;
+
+  // Try JWT auth first (normal Supabase Auth accounts)
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+
+  // Fallback for legacy accounts — verify the userId exists in profiles
+  if (!resolvedUserId && userId) {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles').select('id').eq('id', userId).single();
+    if (profile) resolvedUserId = profile.id;
+  }
+
+  if (!resolvedUserId) {
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  // Confirm the requester is the creator
+  const { data: community, error: fetchError } = await supabaseAdmin
+    .from('communities').select('id, creator_id').eq('id', id).single();
+
+  if (fetchError || !community) return res.status(404).json({ message: 'Circle not found.' });
+
+  if (community.creator_id !== resolvedUserId) {
+    return res.status(403).json({ message: 'Only the circle creator can delete it.' });
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from('communities').delete().eq('id', id);
+
+  if (deleteError) return res.status(400).json({ message: deleteError.message });
+
+  res.json({ message: 'Circle deleted successfully.' });
+});
+
+// ── UPLOAD CIRCLE COVER PHOTO ────────────────────────────────────────────────
+app.post('/api/upload-cover', async (req, res) => {
+  let resolvedUserId = null;
+
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+  if (!resolvedUserId) {
+    console.error('[UPLOAD COVER] Could not resolve user identity');
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  const { cover, communityId } = req.body;
+  if (!cover || !communityId) return res.status(400).json({ message: 'Missing cover or communityId.' });
+
+  // Ensure cover_url column exists (auto-migrate if needed)
+  try {
+    await supabaseAdmin.rpc('exec_sql', {
+      sql: 'ALTER TABLE communities ADD COLUMN IF NOT EXISTS cover_url TEXT;'
+    });
+  } catch (_) {
+    // rpc may not exist — try raw query via pg extension, ignore if fails
+  }
+
+  // Confirm requester is the creator
+  const { data: comm, error: commErr } = await supabaseAdmin
+    .from('communities').select('creator_id').eq('id', communityId).single();
+  if (commErr) {
+    console.error('[UPLOAD COVER] Could not fetch community:', commErr.message);
+    return res.status(500).json({ message: 'Could not verify community.' });
+  }
+  if (!comm || comm.creator_id !== resolvedUserId) {
+    return res.status(403).json({ message: 'Only the circle creator can change the cover photo.' });
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('communities')
+    .update({ cover_url: cover })
+    .eq('id', communityId);
+
+  if (updateError) {
+    console.error('[UPLOAD COVER] DB update error:', updateError.message);
+    // If column doesn't exist, tell the client clearly
+    if (updateError.message.includes('cover_url') || updateError.message.includes('column')) {
+      return res.status(500).json({ message: 'cover_url column missing. Run migration first.', detail: updateError.message });
+    }
+    return res.status(500).json({ message: 'Failed to save cover photo.', detail: updateError.message });
+  }
+
+  console.log('[UPLOAD COVER] Saved cover for community', communityId);
+  res.json({ url: cover });
+});
+
+// ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
+app.post('/api/upload-avatar', async (req, res) => {
+  let resolvedUserId = null;
+
+  // Try JWT auth first
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+
+  // Fallback for legacy accounts (no JWT) — verify userId exists in profiles
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+
+  if (!resolvedUserId) {
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  const { avatar } = req.body; // base64 data URL string
+  if (!avatar) return res.status(400).json({ message: 'No avatar data provided.' });
+
+  // Save base64 directly to the avatar_url column — no storage bucket needed
+  const { error: updateError } = await supabaseAdmin
+    .from('profiles')
+    .update({ avatar_url: avatar })
+    .eq('id', resolvedUserId);
+
+  if (updateError) {
+    console.error('[UPLOAD AVATAR] Profile update error:', updateError.message);
+    return res.status(500).json({ message: 'Failed to save avatar.' });
+  }
+
+  res.json({ url: avatar });
 });
 
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────

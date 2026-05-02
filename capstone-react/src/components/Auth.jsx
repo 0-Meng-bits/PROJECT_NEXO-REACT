@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Splash from './Splash';
+import Landing from './Landing';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
@@ -47,9 +47,15 @@ export default function Auth() {
         alert('SYSTEM_ALERT: ' + data.message);
         setSignupStep('form');
       } else {
+        // Preserve any locally-stored avatar before wiping currentUser
+        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const mergedUser = {
+          ...data.user,
+          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
+        };
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
         navigate('/onboarding');
       }
@@ -72,9 +78,16 @@ export default function Auth() {
       });
       const data = await res.json();
       if (res.ok) {
+        // Preserve any locally-stored avatar before wiping currentUser,
+        // in case the DB doesn't have it yet (e.g. storage upload failed)
+        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const mergedUser = {
+          ...data.user,
+          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
+        };
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
         navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
       } else {
@@ -87,9 +100,9 @@ export default function Auth() {
     }
   };
 
-  // ── SPLASH ──
+  // ── LANDING ──
   if (mode === 'splash') {
-    return <Splash onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
+    return <Landing onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
   }
 
   // ── ID VERIFY STEP ──
