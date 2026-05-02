@@ -2,15 +2,117 @@ import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 import { supabase } from '../lib/supabase';
 
+// Common OCR misreads for digits
+const OCR_DIGIT_VARIANTS = {
+  '0': ['0', 'O', 'o', 'Q', 'D'],
+  '1': ['1', 'l', 'I', 'i', '|', '!'],
+  '2': ['2', 'Z', 'z'],
+  '3': ['3', 'B'],
+  '4': ['4', 'A'],
+  '5': ['5', 'S', 's'],
+  '6': ['6', 'b', 'G'],
+  '7': ['7', 'T'],
+  '8': ['8', 'B'],
+  '9': ['9', 'g', 'q'],
+};
+
+// Build all fuzzy variants of the ID number to match against OCR output
+function buildIdVariants(id) {
+  const digits = id.replace(/[-\s]/g, '').toUpperCase().split('');
+  // Generate combinations of common misreads
+  const variants = new Set();
+  variants.add(digits.join(''));
+
+  // Replace each digit with its OCR variants one at a time
+  digits.forEach((ch, i) => {
+    const alts = OCR_DIGIT_VARIANTS[ch] || [ch];
+    alts.forEach(alt => {
+      const variant = [...digits];
+      variant[i] = alt;
+      variants.add(variant.join(''));
+    });
+  });
+
+  // Also add version with spaces stripped and common separators removed
+  variants.add(id.replace(/[\s\-\.]/g, '').toUpperCase());
+  return [...variants];
+}
+
 function extractIdFromText(text, typedId) {
-  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
-  const typedNorm = typedId.replace(/\s+/g, '').toUpperCase();
-  const ocrClean = normalized.replace(/\s/g, '');
-  if (ocrClean.includes(typedNorm)) return { found: true };
-  const typedStripped = typedNorm.replace(/[-\s]/g, '');
-  const ocrStripped = ocrClean.replace(/[-\s]/g, '');
-  if (ocrStripped.includes(typedStripped) && typedStripped.length >= 4) return { found: true };
+  // Normalize OCR text — remove all whitespace and punctuation for comparison
+  const ocrRaw = text.toUpperCase();
+  const ocrStripped = ocrRaw.replace(/[\s\-\.]/g, '');
+
+  const idClean = typedId.replace(/[\s\-\.]/g, '').toUpperCase();
+
+  // 1. Direct match
+  if (ocrStripped.includes(idClean)) return { found: true };
+
+  // 2. Match with spaces allowed between digits (OCR sometimes inserts spaces)
+  const spacedPattern = idClean.split('').join('[\\s\\-\\.]*');
+  if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true };
+
+  // 3. Fuzzy match — try all OCR misread variants
+  const variants = buildIdVariants(typedId);
+  for (const variant of variants) {
+    if (ocrStripped.includes(variant)) return { found: true };
+    // Also try spaced version of each variant
+    const spacedVar = variant.split('').join('[\\s\\-\\.]*');
+    if (new RegExp(spacedVar).test(ocrRaw)) return { found: true };
+  }
+
+  // 4. Partial match — if at least 5 consecutive digits match (handles partial OCR reads)
+  if (idClean.length >= 5) {
+    for (let i = 0; i <= idClean.length - 5; i++) {
+      const chunk = idClean.slice(i, i + 5);
+      if (ocrStripped.includes(chunk)) return { found: true };
+    }
+  }
+
   return { found: false };
+}
+
+// Preprocess image on canvas to improve OCR accuracy:
+// - Upscale, increase contrast, convert to grayscale
+async function preprocessImage(imageFile) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(imageFile);
+    img.onload = () => {
+      const scale = Math.max(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+
+      // Draw scaled image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Apply grayscale + contrast boost via pixel manipulation
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // Grayscale
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        // Contrast stretch: push darks darker, lights lighter
+        const contrast = 1.5;
+        const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+        const adjusted = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
+        data[i] = data[i + 1] = data[i + 2] = adjusted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        resolve(new File([blob], 'processed.png', { type: 'image/png' }));
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(imageFile); // fallback to original
+    };
+    img.src = url;
+  });
 }
 
 // Upload photo to Supabase storage and return public URL
@@ -85,13 +187,25 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
+      // Preprocess image for better OCR accuracy
+      const processedFile = await preprocessImage(imageFile);
+
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
         },
       });
-      const { data: { text } } = await worker.recognize(imageFile);
+
+      // Configure Tesseract for ID number detection
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
+        tessedit_pageseg_mode: '6', // Assume uniform block of text
+      });
+
+      const { data: { text } } = await worker.recognize(processedFile);
       await worker.terminate();
+
+      console.log('[OCR] Raw text:', text); // helpful for debugging
       setResult(extractIdFromText(text, ctuId));
       setStage('done');
     } catch (err) {
