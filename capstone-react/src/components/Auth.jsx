@@ -122,7 +122,12 @@ export default function Auth() {
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
         navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
       } else {
-        alert('SYSTEM_ALERT: ' + data.message);
+        // Check if it's an email verification error
+        if (data.message?.includes('Email not confirmed') || data.message?.includes('email')) {
+          alert('SYSTEM_ALERT: Please verify your email first. Check your inbox for the verification link.');
+        } else {
+          alert('SYSTEM_ALERT: ' + data.message);
+        }
       }
     } catch {
       alert('TERMINAL_OFFLINE: Connection failed.');
@@ -136,10 +141,11 @@ export default function Auth() {
     return (
       <div className="auth-page">
         <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>ACCOUNT CREATED</h2>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+          <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>CHECK YOUR EMAIL</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
-            Your account has been created successfully. Please wait for admin approval before you can access the system.
+            We've sent a verification link to <strong style={{ color: 'var(--cyber-yellow)' }}>{form.email}</strong>.
+            Click the link in the email to verify your account, then wait for admin approval.
           </p>
           <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
             BACK TO LOGIN
