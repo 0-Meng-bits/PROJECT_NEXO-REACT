@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Landing from './Landing';
+import Splash from './Splash';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
@@ -18,16 +18,29 @@ export default function Auth() {
   // Called when signup form is submitted — go to ID verify step first
   const handleSignupFormSubmit = (e) => {
     e.preventDefault();
-    // Auto-generate email from CTU ID so user doesn't need to enter it
-    const autoEmail = `${form.ctuId.toLowerCase().replace(/[^a-z0-9]/g, '')}@ctu.edu.ph`;
-    setForm(f => ({ ...f, email: autoEmail }));
+    if (form.password.length < 6) {
+      alert('SYSTEM_ALERT: Password must be at least 6 characters.');
+      return;
+    }
     setSignupStep('id-verify');
   };
 
   // Called after ID photo is submitted — do the actual signup
-  const doSignup = async (verified, idPhotoUrl) => {
+  const doSignup = async (verified, idPhotoFile) => {
     setLoading(true);
     try {
+      // Convert photo file to base64 to upload server-side (avoids storage auth issues)
+      let id_photo_base64 = null;
+      let id_photo_ext = null;
+      if (idPhotoFile instanceof File) {
+        const buf = await idPhotoFile.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        id_photo_base64 = btoa(binary);
+        id_photo_ext = idPhotoFile.name?.split('.').pop() || 'jpg';
+      }
+
       const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,30 +51,49 @@ export default function Auth() {
           email: form.email,
           user_type: form.userType,
           id_verified: verified,
-          id_photo_url: idPhotoUrl || null,
+          id_photo_base64,
+          id_photo_ext,
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text || `Server error ${res.status}` }; }
       if (!res.ok) {
         alert('SYSTEM_ALERT: ' + data.message);
         setSignupStep('form');
       } else {
-        // Preserve any locally-stored avatar before wiping currentUser
-        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const mergedUser = {
-          ...data.user,
-          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
-        };
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
-        if (data.session) localStorage.setItem('accessToken', data.session.access_token);
-        navigate('/onboarding');
+        // Don't store session yet — user needs to confirm email first
+        setMode('email-sent');
       }
-    } catch {
-      alert('TERMINAL_OFFLINE: Connection failed.');
+    } catch (err) {
+      console.error('[SIGNUP ERROR]', err);
+      alert('TERMINAL_OFFLINE: ' + (err?.message || 'Connection failed.'));
       setSignupStep('form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: form.ctuId }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text || `Server error ${res.status}` }; }
+      if (res.ok) {
+        setMode('reset-sent');
+      } else {
+        alert('SYSTEM_ALERT: ' + data.message);
+      }
+    } catch (err) {
+      alert('TERMINAL_OFFLINE: ' + (err?.message || 'Connection failed.'));
     } finally {
       setLoading(false);
     }
@@ -78,8 +110,7 @@ export default function Auth() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Preserve any locally-stored avatar before wiping currentUser,
-        // in case the DB doesn't have it yet (e.g. storage upload failed)
+        // Preserve locally-stored avatar in case DB doesn't have it yet
         const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         const mergedUser = {
           ...data.user,
@@ -100,9 +131,72 @@ export default function Auth() {
     }
   };
 
-  // ── LANDING ──
+  // ── EMAIL SENT ──
+  if (mode === 'email-sent') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>ACCOUNT CREATED</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+            Your account has been created successfully. Please wait for admin approval before you can access the system.
+          </p>
+          <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
+            BACK TO LOGIN
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RESET SENT ──
+  if (mode === 'reset-sent') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔑</div>
+          <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>CHECK YOUR EMAIL</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+            A password reset link has been sent to your registered email. Click the link to set a new password.
+          </p>
+          <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
+            BACK TO LOGIN
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── FORGOT PASSWORD ──
+  if (mode === 'forgot') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in">
+          <div className="auth-header">
+            <button className="auth-back-btn" onClick={() => setMode('login')} type="button">
+              <i className="fa-solid fa-arrow-left" /> Back
+            </button>
+            <h1 className="logo-text">NEXO<span>CONNECT</span></h1>
+            <p className="auth-subtitle">RECOVERING_ACCESS...</p>
+          </div>
+          <form onSubmit={handleForgotPassword}>
+            <div className="input-group">
+              <label>CTU_ID</label>
+              <input name="ctuId" value={form.ctuId} onChange={update}
+                placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
+            </div>
+            <button type="submit" className="cyber-btn" disabled={loading} style={{ marginTop: 8 }}>
+              {loading ? 'SENDING...' : 'SEND RESET LINK'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SPLASH ──
   if (mode === 'splash') {
-    return <Landing onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
+    return <Splash onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
   }
 
   // ── ID VERIFY STEP ──
@@ -124,8 +218,7 @@ export default function Auth() {
           ) : (
             <IdVerifier
               ctuId={form.ctuId}
-              onVerified={() => doSignup(true)}
-              onSkip={() => doSignup(false)}
+              onVerified={(verified, photoFile) => doSignup(verified, photoFile)}
             />
           )}
         </div>
@@ -164,6 +257,13 @@ export default function Auth() {
                   placeholder="Juan Dela Cruz" required disabled={loading} />
               </div>
               <div className="input-group">
+                <label>EMAIL (for password recovery)</label>
+                <input name="email" type="email" value={form.email} onChange={update}
+                  placeholder="your.real@email.com" required disabled={loading}
+                  pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
+                  title="Please enter a valid email address (e.g. name@gmail.com)" />
+              </div>
+              <div className="input-group">
                 <label>USER_TYPE</label>
                 <select name="userType" value={form.userType} onChange={update} disabled={loading}>
                   <option value="Student">STUDENT</option>
@@ -176,24 +276,27 @@ export default function Auth() {
           <div className="input-group">
             <label>PASSWORD</label>
             <input name="password" type="password" value={form.password} onChange={update}
-              placeholder="••••••••" required disabled={loading} />
+              placeholder="••••••••" required disabled={loading} minLength={6} />
           </div>
 
           {!isLogin && (
             <div className="id-verify-notice">
               <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
-              Next step: verify your school ID photo
+              You will verify your ID in the next step
             </div>
           )}
 
           <button type="submit" className="cyber-btn" disabled={loading}>
-            {loading ? 'PROCESSING...' : isLogin ? 'LOGIN' : 'NEXT: VERIFY ID →'}
+            {loading ? 'PROCESSING...' : isLogin ? 'LOGIN' : 'CREATE ACCOUNT'}
           </button>
         </form>
 
         <div className="auth-footer">
           {isLogin
-            ? <p>New student? <a href="#" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); }}>Create an Account</a></p>
+            ? <>
+                <p>New student? <a href="#" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); }}>Create an Account</a></p>
+                <p><a href="#" onClick={(e) => { e.preventDefault(); setMode('forgot'); }}>Forgot password?</a></p>
+              </>
             : <p>Already registered? <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>Login here</a></p>
           }
         </div>

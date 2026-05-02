@@ -4,6 +4,7 @@ import Auth from './components/Auth';
 import Onboarding from './components/Onboarding';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/AdminDashboard';
+import ResetPassword from './components/ResetPassword';
 
 function ProtectedRoute({ children, allowedType }) {
   const [status, setStatus] = useState('checking');
@@ -87,6 +88,7 @@ export default function App() {
           <AdminDashboard />
         </ProtectedRoute>
       } />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
