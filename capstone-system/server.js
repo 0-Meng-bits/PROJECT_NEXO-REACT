@@ -14,7 +14,7 @@ const supabaseAdmin = createClient(
 // Anon client for auth operations
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
 async function requireAuth(req, res, next) {
@@ -60,21 +60,17 @@ app.post('/api/login', async (req, res) => {
 
   if (authError) {
     console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
-    // Legacy account — Supabase Auth user doesn't exist yet
-    // If password column is null (cleared), we can't validate — check against provided password only if stored
-    const passwordOk = !profile.password || profile.password === password;
-
-    if (!passwordOk) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+    
+    if (authError.message?.includes('Email not confirmed')) {
+      return res.status(401).json({ message: 'Please confirm your email before logging in.' });
     }
 
-    return res.json({
-      message: isPending ? 'Pending approval' : 'Authentication successful',
-      user: profile,
-      session: null,
-      pending: isPending,
-      legacy: true,
-    });
+    return res.status(401).json({ message: 'Invalid credentials.' });
+  }
+
+  // Check if email is confirmed
+  if (!authData.user.email_confirmed_at) {
+    return res.status(401).json({ message: 'Please confirm your email before logging in.' });
   }
 
   res.json({
@@ -87,21 +83,50 @@ app.post('/api/login', async (req, res) => {
 
 // ── SIGNUP ────────────────────────────────────────────────────────────────────
 app.post('/api/signup', async (req, res) => {
-  const { email, password, fullName, studentId, user_type } = req.body;
+  const { email, password, fullName, studentId, user_type, id_photo_base64, id_photo_ext } = req.body;
 
-  // 1. Create Supabase Auth user
+  if (!email || !password || !fullName || !studentId || !user_type) {
+    return res.status(400).json({ message: 'Missing required fields.' });
+  }
+
+  // Create user with email auto-confirmed (to avoid rate limits in development)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: false, // require email confirmation
+    email_confirm: true,
   });
 
   if (authError) {
-    console.error('[SIGNUP] createUser error:', authError.message, authError.status);
+    console.error('[SIGNUP] signUp error:', authError.message);
     return res.status(400).json({ message: authError.message });
   }
 
-  // 2. Insert profile linked to auth user
+  if (!authData.user) {
+    return res.status(400).json({ message: 'Signup failed.' });
+  }
+
+  // Upload ID photo if provided
+  let id_photo_url = null;
+  if (id_photo_base64 && id_photo_ext) {
+    try {
+      const buffer = Buffer.from(id_photo_base64, 'base64');
+      const path = `id-photos/${studentId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${id_photo_ext}`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('id-photos')
+        .upload(path, buffer, { contentType: `image/${id_photo_ext}`, upsert: true });
+      
+      if (!uploadError) {
+        const { data: urlData } = supabaseAdmin.storage.from('id-photos').getPublicUrl(path);
+        id_photo_url = urlData.publicUrl;
+      } else {
+        console.error('[SIGNUP] Photo upload error:', uploadError.message);
+      }
+    } catch (err) {
+      console.error('[SIGNUP] Photo processing error:', err.message);
+    }
+  }
+
+  // Insert profile linked to auth user
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .insert([{
@@ -111,19 +136,80 @@ app.post('/api/signup', async (req, res) => {
       email,
       user_type,
       is_verified: false,
+      id_photo_url,
     }])
     .select().single();
 
   if (error) {
-    // Rollback auth user if profile insert fails
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    console.error('[SIGNUP] Profile insert error:', error.message);
     return res.status(400).json({ message: error.message });
   }
 
-  // Sign them in to get a session token
-  const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
+  res.status(200).json({ message: 'Check your email to confirm your account.', user: data, session: null });
+});
 
-  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
+// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+app.post('/api/forgot-password', async (req, res) => {
+  const { studentId } = req.body;
+  if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
+
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles').select('email').eq('student_id', studentId).single();
+
+  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
+
+  // Generate password reset link via Supabase Admin
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'recovery',
+    email: profile.email,
+    options: {
+      redirectTo: process.env.SITE_URL
+        ? `${process.env.SITE_URL}/reset-password`
+        : 'http://localhost:5173/reset-password',
+    },
+  });
+
+  if (linkError) {
+    console.error('[FORGOT PASSWORD] Link generation error:', linkError.message);
+    return res.status(400).json({ message: linkError.message });
+  }
+
+  console.log('[FORGOT PASSWORD] Generated link:', linkData.properties.action_link);
+
+  // Send email via Gmail SMTP
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+      to: profile.email,
+      subject: 'Reset your NEXO Connect password',
+      html: `
+        <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+          <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+          <p>You requested a password reset. Click the link below to set a new password:</p>
+          <a href="${linkData.properties.action_link}"
+             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
+            RESET PASSWORD
+          </a>
+          <p style="color:#666;font-size:12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+        </div>
+      `,
+    });
+  } catch (emailErr) {
+    console.error('[FORGOT PASSWORD] Email send error:', emailErr.message);
+    return res.status(400).json({ message: 'Failed to send reset email.' });
+  }
+
+  res.json({ message: 'Password reset email sent.' });
 });
 
 // ── SESSION VERIFY (frontend calls this to validate stored session) ────────────

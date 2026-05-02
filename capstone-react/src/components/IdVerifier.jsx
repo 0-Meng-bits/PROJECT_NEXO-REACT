@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
-import { supabase } from '../lib/supabase';
 
 function extractIdFromText(text, typedId) {
   const normalized = text.replace(/\s+/g, ' ').toUpperCase();
@@ -13,29 +12,12 @@ function extractIdFromText(text, typedId) {
   return { found: false };
 }
 
-// Upload photo to Supabase storage and return public URL
-async function uploadIdPhoto(file, ctuId) {
-  try {
-    const ext = file.name?.split('.').pop() || 'jpg';
-    const path = `id-photos/${ctuId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from('id-photos')
-      .upload(path, file, { upsert: true });
-    if (error) return null;
-    const { data } = supabase.storage.from('id-photos').getPublicUrl(path);
-    return data.publicUrl;
-  } catch {
-    return null;
-  }
-}
-
 export default function IdVerifier({ ctuId, onVerified }) {
   const [stage, setStage] = useState('idle'); // idle | camera | scanning | done | error
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -73,6 +55,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
     canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
     stopCamera();
     canvas.toBlob((blob) => {
+      if (!blob) { setCameraError('Capture failed. Try uploading a photo instead.'); setStage('idle'); return; }
       const file = new File([blob], 'id-capture.jpg', { type: 'image/jpeg' });
       capturedFileRef.current = file;
       setPreview(URL.createObjectURL(blob));
@@ -109,12 +92,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
   };
 
   const handleContinue = async () => {
-    setUploading(true);
-    const photoUrl = capturedFileRef.current
-      ? await uploadIdPhoto(capturedFileRef.current, ctuId)
-      : null;
-    setUploading(false);
-    onVerified(result?.found || false, photoUrl);
+    onVerified(result?.found || false, capturedFileRef.current || null);
   };
 
   const reset = () => {
@@ -252,11 +230,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
                   Retake
                 </button>
                 <button className="cyber-btn" onClick={handleContinue} type="button"
-                  style={{ flex: 1 }} disabled={uploading}>
-                  {uploading
-                    ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />Uploading...</>
-                    : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Submit</>
-                  }
+                  style={{ flex: 1 }}>
+                  <i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Submit
                 </button>
               </div>
             </div>
