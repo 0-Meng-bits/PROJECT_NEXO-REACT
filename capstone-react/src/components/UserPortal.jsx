@@ -134,37 +134,33 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
   const [showReactPicker, setShowReactPicker] = useState(false);
-  const [reactions, setReactions] = useState({}); // { heart: [{student_id,...}], laugh: [...], sad: [...] }
+  const [reactions, setReactions] = useState({});
   const reactPickerRef = useRef(null);
 
-  // Load reactions for this message
+  // Load reactions
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('message_reactions')
-        .select('reaction, student_id, user_id')
+        .select('reaction, student_id')
         .eq('message_id', m.id);
-      if (cancelled || !data) return;
+      if (cancelled || error || !data) return;
       const grouped = {};
       data.forEach(r => {
         if (!grouped[r.reaction]) grouped[r.reaction] = [];
-        grouped[r.reaction].push(r);
+        grouped[r.reaction].push(r.student_id);
       });
       setReactions(grouped);
     };
     load();
-
-    // Realtime updates for this message's reactions
     const sub = supabase.channel(`reactions:${m.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `message_id=eq.${m.id}` },
         () => { if (!cancelled) load(); }
       ).subscribe();
-
     return () => { cancelled = true; supabase.removeChannel(sub); };
   }, [m.id]);
 
-  // Close picker on outside click
   useEffect(() => {
     const handler = (e) => {
       if (reactPickerRef.current && !reactPickerRef.current.contains(e.target)) {
@@ -177,16 +173,26 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
 
   const toggleReaction = async (type) => {
     setShowReactPicker(false);
-    const existing = reactions[type]?.find(r => r.student_id === currentStudentId);
-    if (existing) {
-      // Remove reaction
+    const alreadyReacted = reactions[type]?.includes(currentStudentId);
+
+    // Optimistic update — show immediately
+    setReactions(prev => {
+      const current = prev[type] || [];
+      return {
+        ...prev,
+        [type]: alreadyReacted
+          ? current.filter(s => s !== currentStudentId)
+          : [...current, currentStudentId],
+      };
+    });
+
+    if (alreadyReacted) {
       await supabase.from('message_reactions')
         .delete()
         .eq('message_id', m.id)
         .eq('student_id', currentStudentId)
         .eq('reaction', type);
     } else {
-      // Add reaction
       await supabase.from('message_reactions').insert([{
         message_id: m.id,
         student_id: currentStudentId,
@@ -203,19 +209,19 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
 
   const initials = (m.full_name || 'U')[0].toUpperCase();
   const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const showActions = (isOwnerMsg || canDelete) && hovered && !editing;
-  const hasReactions = REACTIONS.some(r => reactions[r.type]?.length > 0);
+  const hasReactions = REACTIONS.some(r => (reactions[r.type]?.length || 0) > 0);
 
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
       {!isOwnerMsg && (
-        <div className="chat-avatar" style={{ background: tagColor, cursor: 'pointer' }} onClick={() => onViewProfile?.(m.student_id)}>{initials}</div>
+        <div className="chat-avatar" style={{ background: tagColor, cursor: 'pointer' }}
+          onClick={() => onViewProfile?.(m.student_id)}>{initials}</div>
       )}
 
       <div className="chat-body"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => { if (!showReactPicker) { setHovered(false); } }}
-        style={{ paddingBottom: 14 }}
+        onMouseLeave={() => { if (!showReactPicker) setHovered(false); }}
+        style={{ paddingBottom: hasReactions ? 4 : 14 }}
       >
         {!isOwnerMsg && (
           <div className="chat-meta">
@@ -225,16 +231,40 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
           </div>
         )}
 
-        {/* Bubble + reaction picker trigger */}
-        <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+        {/* Bubble row — bubble + action buttons side by side */}
+        <div className={`bubble-row ${isOwnerMsg ? 'own' : 'other'}`}>
+
+          {/* For OTHER messages: buttons appear to the RIGHT of the bubble */}
+          {!isOwnerMsg && hovered && !editing && (
+            <div className="bubble-actions" ref={reactPickerRef}>
+              <div style={{ position: 'relative' }}>
+                <button className="chat-action-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
+                  <i className="fa-regular fa-face-smile" />
+                </button>
+                {showReactPicker && (
+                  <div className="react-picker other">
+                    {REACTIONS.map(r => {
+                      const mine = reactions[r.type]?.includes(currentStudentId);
+                      return (
+                        <button key={r.type} className={`react-option ${mine ? 'active' : ''}`}
+                          onClick={() => toggleReaction(r.type)}>{r.emoji}</button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Bubble */}
           {editing ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input className="msg-edit-input" value={editVal}
                 onChange={e => setEditVal(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
                 autoFocus />
-              <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
-              <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
+              <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check" /></button>
+              <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark" /></button>
             </div>
           ) : (
             <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
@@ -242,68 +272,58 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
             </div>
           )}
 
-          {/* Floating reaction picker — appears on hover */}
-          {hovered && !editing && (
-            <div ref={reactPickerRef} className={`react-trigger ${isOwnerMsg ? 'own' : 'other'}`}>
-              <button className="react-trigger-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
-                <i className="fa-regular fa-face-smile" />
+          {/* For OWN messages: buttons appear to the RIGHT of the bubble (bottom-right corner) */}
+          {isOwnerMsg && hovered && !editing && (
+            <div className="bubble-actions" ref={reactPickerRef}>
+              <div style={{ position: 'relative' }}>
+                <button className="chat-action-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
+                  <i className="fa-regular fa-face-smile" />
+                </button>
+                {showReactPicker && (
+                  <div className="react-picker own">
+                    {REACTIONS.map(r => {
+                      const mine = reactions[r.type]?.includes(currentStudentId);
+                      return (
+                        <button key={r.type} className={`react-option ${mine ? 'active' : ''}`}
+                          onClick={() => toggleReaction(r.type)}>{r.emoji}</button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
+                <i className="fa-solid fa-pen" />
               </button>
-              {showReactPicker && (
-                <div className={`react-picker ${isOwnerMsg ? 'own' : 'other'}`}>
-                  {REACTIONS.map(r => {
-                    const mine = reactions[r.type]?.some(x => x.student_id === currentStudentId);
-                    return (
-                      <button key={r.type} className={`react-option ${mine ? 'active' : ''}`}
-                        onClick={() => toggleReaction(r.type)} title={r.type}>
-                        {r.emoji}
-                      </button>
-                    );
-                  })}
-                </div>
+              {!canDelete && (
+                <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Unsend"
+                  style={{ color: 'var(--cyber-yellow)' }}>
+                  <i className="fa-solid fa-rotate-left" />
+                </button>
+              )}
+              {canDelete && (
+                <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Delete"
+                  style={{ color: 'var(--red)' }}>
+                  <i className="fa-solid fa-trash-can" />
+                </button>
               )}
             </div>
           )}
         </div>
 
-        {/* Reaction counts below bubble */}
+        {/* Reaction chips below bubble */}
         {hasReactions && (
           <div className={`reaction-bar ${isOwnerMsg ? 'own' : 'other'}`}>
             {REACTIONS.map(r => {
               const count = reactions[r.type]?.length || 0;
               if (!count) return null;
-              const mine = reactions[r.type]?.some(x => x.student_id === currentStudentId);
+              const mine = reactions[r.type]?.includes(currentStudentId);
               return (
-                <button key={r.type}
-                  className={`reaction-chip ${mine ? 'mine' : ''}`}
-                  onClick={() => toggleReaction(r.type)}
-                  title={`${count} ${r.type}`}>
+                <button key={r.type} className={`reaction-chip ${mine ? 'mine' : ''}`}
+                  onClick={() => toggleReaction(r.type)} title={`${count} ${r.type}`}>
                   {r.emoji} <span>{count}</span>
                 </button>
               );
             })}
-          </div>
-        )}
-
-        {/* Inline action bar */}
-        {showActions && (
-          <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
-            {isOwnerMsg && (
-              <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
-                <i className="fa-solid fa-pen"></i>
-              </button>
-            )}
-            {isOwnerMsg && !canDelete && (
-              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Unsend"
-                style={{ color: 'var(--cyber-yellow)' }}>
-                <i className="fa-solid fa-rotate-left"></i>
-              </button>
-            )}
-            {canDelete && (
-              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Delete"
-                style={{ color: 'var(--red)' }}>
-                <i className="fa-solid fa-trash-can"></i>
-              </button>
-            )}
           </div>
         )}
 
