@@ -232,7 +232,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
         )}
 
         {/* Bubble row — bubble + action buttons side by side */}
-        <div className={`bubble-row ${isOwnerMsg ? 'own' : 'other'}`}>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
 
           {/* For OTHER messages: buttons appear to the RIGHT of the bubble */}
           {!isOwnerMsg && hovered && !editing && (
@@ -312,7 +312,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
 
         {/* Reaction chips below bubble */}
         {hasReactions && (
-          <div className={`reaction-bar ${isOwnerMsg ? 'own' : 'other'}`}>
+          <div className="reaction-bar">
             {REACTIONS.map(r => {
               const count = reactions[r.type]?.length || 0;
               if (!count) return null;
