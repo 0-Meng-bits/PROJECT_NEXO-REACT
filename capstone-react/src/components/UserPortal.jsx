@@ -214,7 +214,8 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
 
       <div className="chat-body"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => { setHovered(false); }}
+        onMouseLeave={() => { if (!showReactPicker) { setHovered(false); } }}
+        style={{ paddingBottom: 14 }}
       >
         {!isOwnerMsg && (
           <div className="chat-meta">

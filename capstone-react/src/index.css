@@ -1393,31 +1393,32 @@ body {
 /* ── MESSAGE REACTIONS ── */
 .react-trigger {
   position: absolute;
-  bottom: -10px;
+  bottom: -12px;
   display: flex;
   align-items: center;
   z-index: 10;
 }
-.react-trigger.own   { right: 100%; margin-right: 6px; }
-.react-trigger.other { left: 100%; margin-left: 6px; }
+.react-trigger.own   { left: 4px; }
+.react-trigger.other { right: 4px; }
 .react-trigger-btn {
-  width: 26px; height: 26px; border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.15);
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
   background: var(--surface); color: var(--text-muted);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 13px; transition: color 0.15s, border-color 0.15s, transform 0.15s;
+  font-size: 12px; transition: color 0.15s, border-color 0.15s, transform 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 .react-trigger-btn:hover { color: var(--cyber-yellow); border-color: var(--cyber-yellow); transform: scale(1.15); }
 .react-picker {
-  position: absolute; bottom: 32px;
+  position: absolute; bottom: 28px;
   display: flex; gap: 4px;
   background: var(--surface); border: 1px solid rgba(255,255,255,0.12);
   border-radius: 24px; padding: 5px 8px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
   white-space: nowrap; animation: popIn 0.15s ease;
 }
-.react-picker.own   { right: 0; }
-.react-picker.other { left: 0; }
+.react-picker.own   { left: 0; }
+.react-picker.other { right: 0; }
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.8) translateY(6px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
