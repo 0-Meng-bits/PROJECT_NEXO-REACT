@@ -380,6 +380,15 @@ app.post('/api/verify-student/:id', async (req, res) => {
   res.json({ message: 'Student verified!' });
 });
 
+// ── ADMIN: FORCE VERIFY EMAIL ─────────────────────────────────────────────────
+app.post('/api/force-verify-email/:id', async (req, res) => {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+    email_confirm: true,
+  });
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: 'Email confirmed.' });
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
