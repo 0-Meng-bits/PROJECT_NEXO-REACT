@@ -60,17 +60,36 @@ app.post('/api/login', async (req, res) => {
 
   if (authError) {
     console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
-    
+
+    // Auto-confirm email and retry — this is a school system, email confirmation
+    // is not required since admin verifies identity via ID photo instead
     if (authError.message?.includes('Email not confirmed')) {
-      return res.status(401).json({ message: 'Please confirm your email before logging in.' });
+      try {
+        // Force-confirm the email using admin client
+        await supabaseAdmin.auth.admin.updateUserById(profile.id, {
+          email_confirm: true,
+        });
+        // Retry sign in
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password,
+        });
+        if (retryError) {
+          return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+        return res.json({
+          message: isPending ? 'Pending approval' : 'Authentication successful',
+          user: profile,
+          session: retryData.session,
+          pending: isPending,
+        });
+      } catch (confirmErr) {
+        console.error('[LOGIN] Auto-confirm error:', confirmErr.message);
+        return res.status(401).json({ message: 'Login failed. Please contact admin.' });
+      }
     }
 
     return res.status(401).json({ message: 'Invalid credentials.' });
-  }
-
-  // Check if email is confirmed
-  if (!authData.user.email_confirmed_at) {
-    return res.status(401).json({ message: 'Please confirm your email before logging in.' });
   }
 
   res.json({
