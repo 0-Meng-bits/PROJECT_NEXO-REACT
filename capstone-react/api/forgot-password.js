@@ -12,7 +12,11 @@ export default async function handler(req, res) {
 
   if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
 
-  const siteUrl = process.env.SITE_URL || 'https://project-nexo-react.vercel.app';
+  const siteUrl = process.env.SITE_URL;
+  if (!siteUrl) {
+    console.error('[FORGOT PASSWORD] SITE_URL env var not set');
+    return res.status(500).json({ message: 'Server configuration error.' });
+  }
 
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'recovery',
