@@ -123,7 +123,7 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
 }
 
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onViewProfile }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -150,7 +150,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
       >
         {!isOwnerMsg && (
           <div className="chat-meta">
-            <span className="chat-name">{m.full_name}</span>
+            <span className="chat-name" style={{ cursor: 'pointer' }} onClick={() => onViewProfile?.(m.student_id)}>{m.full_name}</span>
             {m.role && <span className="chat-role">{m.role}</span>}
             <span className="chat-time">{time}</span>
           </div>
@@ -679,13 +679,112 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   );
 }
 
+// ── INTEREST LABELS (shared) ─────────────────────────────────────────────────
+const INTEREST_LABELS = {
+  coding: '💻 Coding', design: '🎨 Design', gaming: '🎮 Gaming',
+  music: '🎵 Music', sports: '⚽ Sports', research: '🔬 Research',
+  art: '🖼️ Art', photography: '📷 Photography', writing: '✍️ Writing',
+  robotics: '🤖 Robotics', business: '💼 Business', cooking: '🍳 Cooking',
+  travel: '✈️ Travel', anime: '🌸 Anime', fitness: '💪 Fitness',
+  debate: '🗣️ Debate', reading: '📚 Reading', podcasting: '🎙️ Podcasting',
+  language_learning: '🌐 Language Learning', bl_gl: '🏳️‍🌈 Watching BL/GL',
+  esports: '🏆 E-Sports', dancing: '💃 Dancing',
+};
+
+const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
+
+const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
+const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th', 'Graduate'];
+
+// ── VIEW PROFILE MODAL (other users) ─────────────────────────────────────────
+function ViewProfileModal({ studentId, onClose }) {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch_ = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, student_id, user_type, is_verified, avatar_url, course, year_level, interests')
+        .eq('student_id', studentId)
+        .single();
+      setProfile(data);
+      setLoading(false);
+    };
+    fetch_();
+  }, [studentId]);
+
+  const initials = profile?.full_name
+    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: 360 }}>
+        {loading ? (
+          <div style={{ padding: 40, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 12, display: 'block' }} />
+            LOADING...
+          </div>
+        ) : !profile ? (
+          <p style={{ color: 'var(--text-muted)', padding: 32 }}>Profile not found.</p>
+        ) : (
+          <>
+            {/* Avatar */}
+            <div style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid var(--cyber-cyan)', margin: '0 auto 14px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 'bold', color: 'var(--cyber-cyan)', background: 'rgba(0,240,255,0.05)' }}>
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : initials}
+            </div>
+            <h2 style={{ fontSize: 17, marginBottom: 6 }}>{profile.full_name?.toUpperCase()}</h2>
+            {profile.is_verified ? (
+              <div className="verified-badge" style={{ margin: '0 auto 16px' }}>
+                <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }} /> Verified {profile.user_type} ✓
+              </div>
+            ) : (
+              <div className="verified-badge" style={{ margin: '0 auto 16px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
+                <i className="fa-solid fa-clock" style={{ marginRight: 6 }} /> Pending Verification
+              </div>
+            )}
+            <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
+              <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{profile.student_id}</span></div>
+              {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
+              {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
+            </div>
+            {profile.interests?.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {profile.interests.map(id => (
+                    <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                      {INTEREST_LABELS[id] || id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── PROFILE MODAL ─────────────────────────────────────────────────────────────
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, onProfileUpdate }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
   const fileInputRef = useRef(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    course: user.course || '',
+    year_level: user.year_level || '',
+    interests: user.interests || [],
+  });
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
@@ -693,7 +792,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     setUploading(true);
 
     try {
-      // Resize + compress to ≤200px JPEG before uploading
       const compressed = await new Promise((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
@@ -713,7 +811,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.src = objectUrl;
       });
 
-      // Show preview immediately
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
 
@@ -731,19 +828,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error('Avatar upload failed:', err);
-        // Save to localStorage as fallback so it survives the session
         const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
         localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: compressed }));
         return;
       }
 
       const { url } = await res.json();
-      // Saved to DB — update localStorage with the persisted value
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
     } catch (err) {
       console.error('Avatar upload error:', err);
-      // Save locally as last resort
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: stored.avatar_url || null }));
     } finally {
@@ -751,73 +845,130 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     }
   };
 
+  const toggleInterest = (id) => {
+    setEditForm(f => ({
+      ...f,
+      interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id],
+    }));
+  };
+
+  const saveProfile = async () => {
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests })
+      .eq('id', user.id);
+    setSaving(false);
+    if (!error) {
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const updated = { ...stored, ...editForm };
+      localStorage.setItem('currentUser', JSON.stringify(updated));
+      onProfileUpdate?.(updated);
+      setEditing(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
-        {/* Avatar with edit button */}
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: 380, maxHeight: '90vh', overflowY: 'auto' }}>
+        {/* Avatar */}
         <div style={{ position: 'relative', width: 90, height: 90, margin: '0 auto 15px' }}>
-          <div style={{
-            width: 90, height: 90,
-            border: '2px solid var(--cyber-cyan)',
-            borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32, fontWeight: 'bold',
-            color: 'var(--cyber-cyan)',
-            overflow: 'hidden',
-            background: 'rgba(0,240,255,0.05)',
-          }}>
+          <div style={{ width: 90, height: 90, border: '2px solid var(--cyber-cyan)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'var(--cyber-cyan)', overflow: 'hidden', background: 'rgba(0,240,255,0.05)' }}>
             {avatarUrl
               ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : initials
-            }
+              : initials}
           </div>
-          {/* Camera edit button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            title="Change profile picture"
-            style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'var(--cyber-cyan)', color: '#000',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            {uploading
-              ? <i className="fa-solid fa-spinner fa-spin" />
-              : <i className="fa-solid fa-camera" />
-            }
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change profile picture"
+            style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', background: 'var(--cyber-cyan)', color: '#000', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+            {uploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-camera" />}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleAvatarChange}
-          />
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
         </div>
 
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
         {user.is_verified ? (
-          <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
-            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user.user_type || 'Student'} ✓
+          <div className="verified-badge" style={{ margin: '0 auto 16px' }}>
+            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }} /> Verified {user.user_type || 'Student'} ✓
           </div>
         ) : (
-          <div className="verified-badge" style={{ margin: '0 auto 20px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
-            <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i> Pending Verification
+          <div className="verified-badge" style={{ margin: '0 auto 16px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
+            <i className="fa-solid fa-clock" style={{ marginRight: 6 }} /> Pending Verification
           </div>
         )}
-        <div className="stats-card" style={{ textAlign: 'left', marginBottom: 20 }}>
-          <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
-          <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
-          <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
-        </div>
+
+        {!editing ? (
+          <>
+            {/* View mode */}
+            <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
+              <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
+              <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
+              {user.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{user.course}</span></div>}
+              {user.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{user.year_level}</span></div>}
+            </div>
+            {user.interests?.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 16 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {user.interests.map(id => (
+                    <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                      {INTEREST_LABELS[id] || id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="cyber-btn secondary" onClick={() => setEditing(true)} style={{ width: '100%' }}>
+                <i className="fa-solid fa-pen" style={{ marginRight: 6 }} />EDIT PROFILE
+              </button>
+              <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Edit mode */}
+            <div style={{ textAlign: 'left' }}>
+              <div className="input-group">
+                <label>COURSE / PROGRAM</label>
+                <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}>
+                  <option value="">Select course...</option>
+                  {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="input-group">
+                <label>YEAR LEVEL</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {YEAR_LEVELS.map(y => (
+                    <button key={y} type="button"
+                      onClick={() => setEditForm(f => ({ ...f, year_level: y }))}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${editForm.year_level === y ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.15)'}`, background: editForm.year_level === y ? 'rgba(0,240,255,0.12)' : 'transparent', color: editForm.year_level === y ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+                      {y}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="input-group">
+                <label>INTERESTS</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 160, overflowY: 'auto' }}>
+                  {INTEREST_BUBBLES.map(b => (
+                    <button key={b.id} type="button"
+                      onClick={() => toggleInterest(b.id)}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: `1px solid ${editForm.interests.includes(b.id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.15)'}`, background: editForm.interests.includes(b.id) ? 'rgba(0,240,255,0.12)' : 'transparent', color: editForm.interests.includes(b.id) ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}>
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ flex: 1 }}>
+                {saving ? 'SAVING...' : <><i className="fa-solid fa-floppy-disk" style={{ marginRight: 6 }} />SAVE</>}
+              </button>
+              <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ flex: 1 }}>CANCEL</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -909,6 +1060,7 @@ export default function UserPortal() {
   const [toast, setToast] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [viewingProfile, setViewingProfile] = useState(null); // student_id string
   const [showManage, setShowManage] = useState(false);
   const [showAuditionForm, setShowAuditionForm] = useState(null);
   const [myAuditions, setMyAuditions] = useState([]);
@@ -1934,6 +2086,7 @@ export default function UserPortal() {
                       canDelete={isOwnerMsg || user?.user_type === 'Admin'}
                       onDelete={deleteMessage}
                       onEdit={editMessage}
+                      onViewProfile={(sid) => setViewingProfile(sid)}
                     />
                   );
                 })}
@@ -2220,6 +2373,7 @@ export default function UserPortal() {
                         canDelete={canDelete}
                         onDelete={deleteMessage}
                         onEdit={editMessage}
+                        onViewProfile={(sid) => setViewingProfile(sid)}
                       />
                     );
                   })
@@ -2251,7 +2405,8 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} onProfileUpdate={(updated) => { const u = JSON.parse(localStorage.getItem('currentUser') || '{}'); localStorage.setItem('currentUser', JSON.stringify({ ...u, ...updated })); }} />}
+      {viewingProfile && <ViewProfileModal studentId={viewingProfile} onClose={() => setViewingProfile(null)} />}
       {showAuditionForm && (
         <AuditionApplicationForm
           comm={showAuditionForm}
