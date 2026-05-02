@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Splash from './Splash';
+import Landing from './Landing';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
@@ -196,7 +196,7 @@ export default function Auth() {
 
   // ── SPLASH ──
   if (mode === 'splash') {
-    return <Splash onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
+    return <Landing onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
   }
 
   // ── ID VERIFY STEP ──
