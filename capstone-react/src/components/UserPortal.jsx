@@ -141,7 +141,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
       {!isOwnerMsg && (
-        <div className="chat-avatar" style={{ background: tagColor }}>{initials}</div>
+        <div className="chat-avatar" style={{ background: tagColor, cursor: 'pointer' }} onClick={() => onViewProfile?.(m.student_id)}>{initials}</div>
       )}
 
       <div className="chat-body"
@@ -150,7 +150,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
       >
         {!isOwnerMsg && (
           <div className="chat-meta">
-            <span className="chat-name" style={{ cursor: 'pointer' }} onClick={() => onViewProfile?.(m.student_id)}>{m.full_name}</span>
+            <span className="chat-name">{m.full_name}</span>
             {m.role && <span className="chat-role">{m.role}</span>}
             <span className="chat-time">{time}</span>
           </div>
