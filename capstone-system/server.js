@@ -16,6 +16,25 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANO
 
 app.use(express.json({ limit: '10mb' }));
 
+// ── AUTO-MIGRATE: ensure cover_url column exists ──────────────────────────────
+(async () => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('communities')
+      .update({ cover_url: null })
+      .eq('id', '00000000-0000-0000-0000-000000000000');
+    if (error && (error.message.includes('cover_url') || error.code === '42703')) {
+      console.warn('⚠️  [STARTUP] cover_url column missing from communities table.');
+      console.warn('   Run this SQL in Supabase Dashboard → SQL Editor:');
+      console.warn('   ALTER TABLE communities ADD COLUMN IF NOT EXISTS cover_url TEXT;');
+    } else {
+      console.log('✅ [STARTUP] communities.cover_url column OK');
+    }
+  } catch (e) {
+    // ignore
+  }
+})();
+
 // ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
 async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
@@ -65,11 +84,9 @@ app.post('/api/login', async (req, res) => {
     // is not required since admin verifies identity via ID photo instead
     if (authError.message?.includes('Email not confirmed')) {
       try {
-        // Force-confirm the email using admin client
         await supabaseAdmin.auth.admin.updateUserById(profile.id, {
           email_confirm: true,
         });
-        // Retry sign in
         const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
           email: profile.email,
           password,
@@ -89,7 +106,19 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    // Legacy account — Supabase Auth user doesn't exist yet
+    const passwordOk = !profile.password || profile.password === password;
+    if (!passwordOk) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    return res.json({
+      message: isPending ? 'Pending approval' : 'Authentication successful',
+      user: profile,
+      session: null,
+      pending: isPending,
+      legacy: true,
+    });
   }
 
   res.json({
@@ -102,13 +131,9 @@ app.post('/api/login', async (req, res) => {
 
 // ── SIGNUP ────────────────────────────────────────────────────────────────────
 app.post('/api/signup', async (req, res) => {
-  const { email, password, fullName, studentId, user_type, id_photo_base64, id_photo_ext } = req.body;
+  const { email, password, fullName, studentId, user_type } = req.body;
 
-  if (!email || !password || !fullName || !studentId || !user_type) {
-    return res.status(400).json({ message: 'Missing required fields.' });
-  }
-
-  // Create user with email auto-confirmed (to avoid rate limits in development)
+  // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -116,36 +141,11 @@ app.post('/api/signup', async (req, res) => {
   });
 
   if (authError) {
-    console.error('[SIGNUP] signUp error:', authError.message);
+    console.error('[SIGNUP] createUser error:', authError.message, authError.status);
     return res.status(400).json({ message: authError.message });
   }
 
-  if (!authData.user) {
-    return res.status(400).json({ message: 'Signup failed.' });
-  }
-
-  // Upload ID photo if provided
-  let id_photo_url = null;
-  if (id_photo_base64 && id_photo_ext) {
-    try {
-      const buffer = Buffer.from(id_photo_base64, 'base64');
-      const path = `id-photos/${studentId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${id_photo_ext}`;
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('id-photos')
-        .upload(path, buffer, { contentType: `image/${id_photo_ext}`, upsert: true });
-      
-      if (!uploadError) {
-        const { data: urlData } = supabaseAdmin.storage.from('id-photos').getPublicUrl(path);
-        id_photo_url = urlData.publicUrl;
-      } else {
-        console.error('[SIGNUP] Photo upload error:', uploadError.message);
-      }
-    } catch (err) {
-      console.error('[SIGNUP] Photo processing error:', err.message);
-    }
-  }
-
-  // Insert profile linked to auth user
+  // 2. Insert profile linked to auth user
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .insert([{
@@ -155,80 +155,19 @@ app.post('/api/signup', async (req, res) => {
       email,
       user_type,
       is_verified: false,
-      id_photo_url,
     }])
     .select().single();
 
   if (error) {
+    // Rollback auth user if profile insert fails
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    console.error('[SIGNUP] Profile insert error:', error.message);
     return res.status(400).json({ message: error.message });
   }
 
-  res.status(200).json({ message: 'Check your email to confirm your account.', user: data, session: null });
-});
+  // Sign them in to get a session token
+  const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
 
-// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
-app.post('/api/forgot-password', async (req, res) => {
-  const { studentId } = req.body;
-  if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
-
-  const { data: profile, error } = await supabaseAdmin
-    .from('profiles').select('email').eq('student_id', studentId).single();
-
-  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
-
-  // Generate password reset link via Supabase Admin
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'recovery',
-    email: profile.email,
-    options: {
-      redirectTo: process.env.SITE_URL
-        ? `${process.env.SITE_URL}/reset-password`
-        : 'http://localhost:5173/reset-password',
-    },
-  });
-
-  if (linkError) {
-    console.error('[FORGOT PASSWORD] Link generation error:', linkError.message);
-    return res.status(400).json({ message: linkError.message });
-  }
-
-  console.log('[FORGOT PASSWORD] Generated link:', linkData.properties.action_link);
-
-  // Send email via Gmail SMTP
-  const nodemailer = require('nodemailer');
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
-
-  try {
-    await transporter.sendMail({
-      from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-      to: profile.email,
-      subject: 'Reset your NEXO Connect password',
-      html: `
-        <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
-          <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
-          <p>You requested a password reset. Click the link below to set a new password:</p>
-          <a href="${linkData.properties.action_link}"
-             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
-            RESET PASSWORD
-          </a>
-          <p style="color:#666;font-size:12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
-        </div>
-      `,
-    });
-  } catch (emailErr) {
-    console.error('[FORGOT PASSWORD] Email send error:', emailErr.message);
-    return res.status(400).json({ message: 'Failed to send reset email.' });
-  }
-
-  res.json({ message: 'Password reset email sent.' });
+  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
 });
 
 // ── SESSION VERIFY (frontend calls this to validate stored session) ────────────
@@ -254,6 +193,154 @@ app.get('/api/students', async (req, res) => {
     .from('profiles').select('*').order('created_at', { ascending: false });
   if (error) return res.status(400).json(error);
   res.json(data);
+});
+
+// ── DELETE COMMUNITY ─────────────────────────────────────────────────────────
+app.delete('/api/delete-community', async (req, res) => {
+  const { id, userId } = req.query;
+  if (!id) return res.status(400).json({ message: 'Community ID is required.' });
+
+  let resolvedUserId = null;
+
+  // Try JWT auth first (normal Supabase Auth accounts)
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+
+  // Fallback for legacy accounts — verify the userId exists in profiles
+  if (!resolvedUserId && userId) {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles').select('id').eq('id', userId).single();
+    if (profile) resolvedUserId = profile.id;
+  }
+
+  if (!resolvedUserId) {
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  // Confirm the requester is the creator
+  const { data: community, error: fetchError } = await supabaseAdmin
+    .from('communities').select('id, creator_id').eq('id', id).single();
+
+  if (fetchError || !community) return res.status(404).json({ message: 'Circle not found.' });
+
+  if (community.creator_id !== resolvedUserId) {
+    return res.status(403).json({ message: 'Only the circle creator can delete it.' });
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from('communities').delete().eq('id', id);
+
+  if (deleteError) return res.status(400).json({ message: deleteError.message });
+
+  res.json({ message: 'Circle deleted successfully.' });
+});
+
+// ── UPLOAD CIRCLE COVER PHOTO ────────────────────────────────────────────────
+app.post('/api/upload-cover', async (req, res) => {
+  let resolvedUserId = null;
+
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+  if (!resolvedUserId) {
+    console.error('[UPLOAD COVER] Could not resolve user identity');
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  const { cover, communityId } = req.body;
+  if (!cover || !communityId) return res.status(400).json({ message: 'Missing cover or communityId.' });
+
+  // Ensure cover_url column exists (auto-migrate if needed)
+  try {
+    await supabaseAdmin.rpc('exec_sql', {
+      sql: 'ALTER TABLE communities ADD COLUMN IF NOT EXISTS cover_url TEXT;'
+    });
+  } catch (_) {
+    // rpc may not exist — try raw query via pg extension, ignore if fails
+  }
+
+  // Confirm requester is the creator
+  const { data: comm, error: commErr } = await supabaseAdmin
+    .from('communities').select('creator_id').eq('id', communityId).single();
+  if (commErr) {
+    console.error('[UPLOAD COVER] Could not fetch community:', commErr.message);
+    return res.status(500).json({ message: 'Could not verify community.' });
+  }
+  if (!comm || comm.creator_id !== resolvedUserId) {
+    return res.status(403).json({ message: 'Only the circle creator can change the cover photo.' });
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('communities')
+    .update({ cover_url: cover })
+    .eq('id', communityId);
+
+  if (updateError) {
+    console.error('[UPLOAD COVER] DB update error:', updateError.message);
+    // If column doesn't exist, tell the client clearly
+    if (updateError.message.includes('cover_url') || updateError.message.includes('column')) {
+      return res.status(500).json({ message: 'cover_url column missing. Run migration first.', detail: updateError.message });
+    }
+    return res.status(500).json({ message: 'Failed to save cover photo.', detail: updateError.message });
+  }
+
+  console.log('[UPLOAD COVER] Saved cover for community', communityId);
+  res.json({ url: cover });
+});
+
+// ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
+app.post('/api/upload-avatar', async (req, res) => {
+  let resolvedUserId = null;
+
+  // Try JWT auth first
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+
+  // Fallback for legacy accounts (no JWT) — verify userId exists in profiles
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+
+  if (!resolvedUserId) {
+    return res.status(401).json({ message: 'Unable to verify identity.' });
+  }
+
+  const { avatar } = req.body; // base64 data URL string
+  if (!avatar) return res.status(400).json({ message: 'No avatar data provided.' });
+
+  // Save base64 directly to the avatar_url column — no storage bucket needed
+  const { error: updateError } = await supabaseAdmin
+    .from('profiles')
+    .update({ avatar_url: avatar })
+    .eq('id', resolvedUserId);
+
+  if (updateError) {
+    console.error('[UPLOAD AVATAR] Profile update error:', updateError.message);
+    return res.status(500).json({ message: 'Failed to save avatar.' });
+  }
+
+  res.json({ url: avatar });
 });
 
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────

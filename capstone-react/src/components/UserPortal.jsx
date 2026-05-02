@@ -680,15 +680,126 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 }
 
 // ── PROFILE MODAL ─────────────────────────────────────────────────────────────
-function ProfileModal({ user, communities, onClose, onLogout }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
+  const [uploading, setUploading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
+  const fileInputRef = useRef(null);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+
+    try {
+      // Resize + compress to ≤200px JPEG before uploading
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const MAX = 200;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      // Show preview immediately
+      setAvatarUrl(compressed);
+      onAvatarUpdate(compressed);
+
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/upload-avatar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+        },
+        body: JSON.stringify({ avatar: compressed }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('Avatar upload failed:', err);
+        // Save to localStorage as fallback so it survives the session
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: compressed }));
+        return;
+      }
+
+      const { url } = await res.json();
+      // Saved to DB — update localStorage with the persisted value
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      // Save locally as last resort
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: stored.avatar_url || null }));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
-        <div style={{ width: 80, height: 80, border: '2px solid var(--cyber-cyan)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', margin: '0 auto 15px', color: 'var(--cyber-cyan)' }}>
-          {initials}
+        {/* Avatar with edit button */}
+        <div style={{ position: 'relative', width: 90, height: 90, margin: '0 auto 15px' }}>
+          <div style={{
+            width: 90, height: 90,
+            border: '2px solid var(--cyber-cyan)',
+            borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, fontWeight: 'bold',
+            color: 'var(--cyber-cyan)',
+            overflow: 'hidden',
+            background: 'rgba(0,240,255,0.05)',
+          }}>
+            {avatarUrl
+              ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : initials
+            }
+          </div>
+          {/* Camera edit button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            title="Change profile picture"
+            style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'var(--cyber-cyan)', color: '#000',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}
+          >
+            {uploading
+              ? <i className="fa-solid fa-spinner fa-spin" />
+              : <i className="fa-solid fa-camera" />
+            }
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleAvatarChange}
+          />
         </div>
+
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
         {user.is_verified ? (
           <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
@@ -823,6 +934,10 @@ export default function UserPortal() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
+  const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
+    const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    return stored?.avatar_url || null;
+  });
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -1052,6 +1167,8 @@ export default function UserPortal() {
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
 
+  // Avatar is persisted in localStorage — no DB sync needed on mount
+
   // Realtime home feed (campus-wide announcements)
   useEffect(() => {
     const sub = supabase.channel('rt:announcements:global')
@@ -1169,11 +1286,22 @@ export default function UserPortal() {
 
   const deleteCircle = async (id) => {
     if (!confirm('Delete this circle? This cannot be undone.')) return;
-    const { error } = await supabase.from('communities').delete().eq('id', id);
-    if (error) { showToast('Failed to delete circle.'); return; }
-    showToast('Circle deleted.');
-    await loadCommunities();
-    setActiveCommId('global'); setSection('home');
+    const token = localStorage.getItem('accessToken');
+    const params = new URLSearchParams({ id });
+    if (user?.id) params.set('userId', user.id);
+    try {
+      const res = await fetch(`/api/delete-community?${params}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.message || 'Failed to delete circle.'); return; }
+      showToast('Circle deleted.');
+      await loadCommunities();
+      setActiveCommId('global'); setSection('home');
+    } catch (err) {
+      showToast('Network error — could not delete circle.');
+    }
   };
 
   const leaveCircle = async (commId) => {
@@ -1373,7 +1501,12 @@ export default function UserPortal() {
             <span className="hud-label">USER_ID:</span>
             <span className="hud-value">{user?.student_id}</span>
           </div>
-          <div className="hud-avatar" onClick={() => setShowProfile(true)}>{initials}</div>
+          <div className="hud-avatar" onClick={() => setShowProfile(true)}>
+            {navAvatarUrl
+              ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : initials
+            }
+          </div>
         </div>
       </nav>
 
@@ -1582,6 +1715,7 @@ export default function UserPortal() {
               {/* Hero banner */}
               <div className="home-hero">
                 <div className="home-hero-text">
+                  <p className="home-hero-welcome">Welcome, Technologist.</p>
                   <h1>Find Your Circle<br/>at CTU</h1>
                   <p>Discover communities built around your interests, join the conversation, and make your campus experience count.</p>
                   <button className="cyber-btn" style={{ width: 'auto', padding: '10px 24px', marginTop: 16 }}
@@ -1622,8 +1756,13 @@ export default function UserPortal() {
               {user?.is_verified && (
                 <div className="home-post-composer">
                   <div className="home-composer-header">
-                    <div className="home-composer-avatar">{initials}</div>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'white' }}>Share something with the campus</span>
+                    <div className="home-composer-avatar">
+                      {navAvatarUrl
+                        ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : initials
+                      }
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary, white)' }}>Share something with the campus</span>
                   </div>
                   <input
                     className="home-composer-title"
@@ -1722,7 +1861,12 @@ export default function UserPortal() {
                   {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
                     <div key={c.id} className="featured-card"
                       onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                      <div className="featured-card-bg" style={{ background: categoryGradient(c.category) }}></div>
+                      <div className="featured-card-bg" style={{
+                        background: c.cover_url ? undefined : categoryGradient(c.category),
+                        backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}></div>
                       <div className="featured-card-body">
                         <div className="featured-card-icon">
                           <i className={(c.icon || getCategoryIcon(c.category))}></i>
@@ -1746,8 +1890,13 @@ export default function UserPortal() {
                     {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
                       <div key={c.id} className="popular-row"
                         onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                        <div className="popular-row-icon" style={{ background: categoryGradient(c.category) }}>
-                          <i className={(c.icon || getCategoryIcon(c.category))}></i>
+                        <div className="popular-row-icon" style={{
+                          background: c.cover_url ? undefined : categoryGradient(c.category),
+                          backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }}>
+                          {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
@@ -1910,23 +2059,96 @@ export default function UserPortal() {
           {section === 'circles' && (
             <>
               <div className="c-feed fade-in">
-                <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)' }}>
-                  <h2 style={{ fontSize: 20, letterSpacing: 1 }}>
-                    {activeComm.name.toUpperCase()}
-                    {activeChannelId && channels.find(c => c.id === activeChannelId) && (
-                      <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 16, marginLeft: 10 }}>
-                        # {channels.find(c => c.id === activeChannelId)?.name}
-                      </span>
-                    )}
-                  </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                    <div className="verified-badge">
-                      GROUP: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
+                {/* ── CIRCLE COVER BANNER ── */}
+                <div className="circle-cover-banner" style={{
+                  backgroundImage: activeComm.cover_url ? `url(${activeComm.cover_url})` : 'none',
+                  background: activeComm.cover_url ? undefined : categoryGradient(activeComm.category),
+                }}>
+                  {/* Cover photo edit button — top-right, only for creator */}
+                  {isOwner && (
+                    <label className="circle-cover-edit-btn" title="Change circle cover photo">
+                      <i className="fa-solid fa-image"></i>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          const compressed = await new Promise((resolve, reject) => {
+                            const img = new Image();
+                            const objUrl = URL.createObjectURL(file);
+                            img.onload = () => {
+                              URL.revokeObjectURL(objUrl);
+                              const MAX_W = 900, MAX_H = 300;
+                              const scale = Math.min(1, MAX_W / img.width, MAX_H / img.height);
+                              const w = Math.round(img.width * scale);
+                              const h = Math.round(img.height * scale);
+                              const canvas = document.createElement('canvas');
+                              canvas.width = w; canvas.height = h;
+                              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                              resolve(canvas.toDataURL('image/jpeg', 0.82));
+                            };
+                            img.onerror = reject;
+                            img.src = objUrl;
+                          });
+
+                          // Optimistically update UI immediately
+                          setCommunities(prev => prev.map(c =>
+                            c.id === activeComm.id ? { ...c, cover_url: compressed } : c
+                          ));
+
+                          // Save via server (uses service role key, bypasses RLS)
+                          let saved = false;
+                          try {
+                            const token = localStorage.getItem('accessToken');
+                            const serverRes = await fetch('/api/upload-cover', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+                              },
+                              body: JSON.stringify({ cover: compressed, communityId: activeComm.id }),
+                            });
+                            if (serverRes.ok) {
+                              saved = true;
+                            } else {
+                              const errBody = await serverRes.json().catch(() => ({}));
+                              console.error('[cover upload] server error:', serverRes.status, errBody);
+                            }
+                          } catch (fetchErr) {
+                            console.error('[cover upload] fetch failed:', fetchErr);
+                          }
+
+                          showToast(saved ? 'COVER_PHOTO_UPDATED' : 'UPLOAD_FAILED');
+                        }}
+                      />
+                    </label>
+                  )}
+                  <div className="circle-cover-overlay">
+                    <div className="circle-cover-icon">
+                      <i className={activeComm.icon || getCategoryIcon(activeComm.category)}></i>
+                    </div>
+                    <div>
+                      <h2 className="circle-cover-title">
+                        {activeComm.name.toUpperCase()}
+                        {activeChannelId && channels.find(c => c.id === activeChannelId) && (
+                          <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 400, fontSize: 15, marginLeft: 10 }}>
+                            # {channels.find(c => c.id === activeChannelId)?.name}
+                          </span>
+                        )}
+                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                        <div className="verified-badge" style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.3)' }}>
+                          GROUP: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
+                        </div>
+                      </div>
+                      <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.5 }}>
+                        {activeComm.description || 'No description provided.'}
+                      </p>
                     </div>
                   </div>
-                  <p style={{ marginTop: 15, color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6 }}>
-                    {activeComm.description || 'No description provided.'}
-                  </p>
                 </div>
 
                 {/* Access gate for non-members */}
@@ -2029,7 +2251,7 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} />}
+      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {showAuditionForm && (
         <AuditionApplicationForm
           comm={showAuditionForm}

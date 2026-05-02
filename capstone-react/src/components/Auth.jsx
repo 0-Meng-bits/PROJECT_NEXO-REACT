@@ -110,9 +110,15 @@ export default function Auth() {
       });
       const data = await res.json();
       if (res.ok) {
+        // Preserve locally-stored avatar in case DB doesn't have it yet
+        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const mergedUser = {
+          ...data.user,
+          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
+        };
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
         navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
       } else {

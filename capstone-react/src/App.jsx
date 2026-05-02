@@ -36,7 +36,14 @@ function ProtectedRoute({ children, allowedType }) {
         return res.json();
       })
       .then(data => {
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        // Preserve locally-stored avatar if the DB doesn't have one yet
+        // (user may have uploaded a base64 avatar that hasn't synced to storage)
+        const existing = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const merged = {
+          ...data.user,
+          avatar_url: data.user.avatar_url || existing.avatar_url || null,
+        };
+        localStorage.setItem('currentUser', JSON.stringify(merged));
         if (allowedType && data.user.user_type !== allowedType) {
           setStatus('fail');
         } else {

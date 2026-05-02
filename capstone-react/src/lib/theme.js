@@ -30,6 +30,12 @@ export const THEMES = [
     description: 'Dark green nature theme',
     preview: ['#0a1a0e', '#3ecf8e', '#86efac'],
   },
+  {
+    id: 'retro-earthy',
+    name: 'Retro Earthy',
+    description: 'Warm retro palette with earthy tones',
+    preview: ['#F5EFE0', '#B5706A', '#C4963A', '#4A7A8A'],
+  },
 ];
 
 export function applyTheme(themeId) {

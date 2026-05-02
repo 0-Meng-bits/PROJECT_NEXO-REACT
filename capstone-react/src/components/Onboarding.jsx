@@ -285,16 +285,16 @@ export default function Onboarding() {
                     {auraMatch.count > 0 ? (
                       <>
                         You share interests with{' '}
-                        <strong style={{ color: 'var(--cyber-cyan)' }}>{auraMatch.count} student{auraMatch.count !== 1 ? 's' : ''}</strong>
+                        <strong style={{ color: '#7C2D2D' }}>{auraMatch.count} student{auraMatch.count !== 1 ? 's' : ''}</strong>
                         {auraMatch.topCommunity && (
-                          <> · Suggested circle: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                          <> · Suggested circle: <strong style={{ color: '#9B3A3A' }}>{auraMatch.topCommunity}</strong></>
                         )}
                       </>
                     ) : (
                       <>
                         Be the first with these interests!
                         {auraMatch.topCommunity && (
-                          <> · Check out: <strong style={{ color: 'var(--cyber-yellow)' }}>{auraMatch.topCommunity}</strong></>
+                          <> · Check out: <strong style={{ color: '#9B3A3A' }}>{auraMatch.topCommunity}</strong></>
                         )}
                       </>
                     )}
