@@ -79,6 +79,12 @@ app.post('/api/login', async (req, res) => {
 
   if (authError) {
     console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
+    
+    // Check if it's an email verification error
+    if (authError.message?.includes('Email not confirmed') || authError.message?.includes('email')) {
+      return res.status(401).json({ message: 'Please verify your email first. Check your inbox for the verification link.' });
+    }
+    
     // Legacy account — Supabase Auth user doesn't exist yet
     // If password column is null (cleared), we can't validate — check against provided password only if stored
     const passwordOk = !profile.password || profile.password === password;
@@ -108,11 +114,11 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/signup', async (req, res) => {
   const { email, password, fullName, studentId, user_type } = req.body;
 
-  // 1. Create Supabase Auth user
+  // 1. Create Supabase Auth user with email_confirm: false (requires verification)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false, // User must verify email
   });
 
   if (authError) {
@@ -146,10 +152,58 @@ app.post('/api/signup', async (req, res) => {
     return res.status(400).json({ message: error.message });
   }
 
-  // Sign them in to get a session token
-  const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
+  // 3. Generate email verification link
+  const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'signup',
+    email: email,
+    options: { redirectTo: `${siteUrl}/portal` },
+  });
 
-  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
+  if (linkError) {
+    console.error('[SIGNUP] Link generation error:', linkError.message);
+  }
+
+  // 4. Send verification email via Gmail SMTP (if configured)
+  if (linkData?.properties?.action_link && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+        to: email,
+        subject: 'Verify your NEXO Connect account',
+        html: `
+          <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+            <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+            <p>Welcome, <strong>${fullName}</strong>!</p>
+            <p>Click the link below to verify your email and activate your account:</p>
+            <a href="${linkData.properties.action_link}"
+               style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
+              VERIFY EMAIL
+            </a>
+            <p style="color:#666;font-size:12px;">This link expires in 24 hours. After verification, your account will be reviewed by an admin.</p>
+          </div>
+        `,
+      });
+      console.log('[SIGNUP] Verification email sent to', email);
+    } catch (emailErr) {
+      console.error('[SIGNUP] Email send error:', emailErr.message);
+    }
+  }
+
+  res.status(200).json({ 
+    message: 'Account created! Check your email to verify your account.', 
+    user: data, 
+    session: null 
+  });
 });
 
 // ── SESSION VERIFY (frontend calls this to validate stored session) ────────────
@@ -325,12 +379,79 @@ app.post('/api/upload-avatar', async (req, res) => {
   res.json({ url: avatar });
 });
 
+// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+app.post('/api/forgot-password', async (req, res) => {
+  const { studentId } = req.body;
+  if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
+
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles').select('email').eq('student_id', studentId).single();
+
+  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
+
+  const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'recovery',
+    email: profile.email,
+    options: { redirectTo: `${siteUrl}/reset-password` },
+  });
+
+  if (linkError) {
+    console.error('[FORGOT PASSWORD] Link error:', linkError.message);
+    return res.status(400).json({ message: linkError.message });
+  }
+
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+      to: profile.email,
+      subject: 'Reset your NEXO Connect password',
+      html: `
+        <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+          <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+          <p>You requested a password reset. Click the link below to set a new password:</p>
+          <a href="${linkData.properties.action_link}"
+             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
+            RESET PASSWORD
+          </a>
+          <p style="color:#666;font-size:12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+        </div>
+      `,
+    });
+    console.log('[FORGOT PASSWORD] Reset email sent to', profile.email);
+  } catch (emailErr) {
+    console.error('[FORGOT PASSWORD] Email send error:', emailErr.message);
+    return res.status(400).json({ message: 'Failed to send reset email.' });
+  }
+
+  res.status(200).json({ message: 'Password reset email sent.' });
+});
+
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
   const { error } = await supabaseAdmin
     .from('profiles').update({ is_verified: true }).eq('id', req.params.id);
   if (error) return res.status(400).json(error);
   res.json({ message: 'Student verified!' });
+});
+
+// ── ADMIN: FORCE VERIFY EMAIL ─────────────────────────────────────────────────
+app.post('/api/force-verify-email/:id', async (req, res) => {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
+    email_confirm: true,
+  });
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: 'Email confirmed.' });
 });
 
 app.listen(port, '0.0.0.0', () => {

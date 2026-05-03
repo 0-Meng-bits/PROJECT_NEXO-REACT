@@ -102,6 +102,14 @@ export default function AdminDashboard() {
   const [circleMembers, setCircleMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
+  // ── User detail modal ────────────────────────────────────────────────────
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  // ── Circle messages ──────────────────────────────────────────────────────
+  const [circleMessages, setCircleMessages] = useState([]);
+  const [loadingCircleMsgs, setLoadingCircleMsgs] = useState(false);
+  const [circleMsgTab, setCircleMsgTab] = useState('members'); // 'members' | 'messages'
+
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
   const [customStart, setCustomStart] = useState('');
@@ -161,12 +169,14 @@ export default function AdminDashboard() {
 
   const viewCircleMembers = async (circle) => {
     setSelectedCircle(circle);
+    setCircleMsgTab('members');
     setLoadingMembers(true);
     const { data } = await supabase.from('memberships')
       .select('*, profiles(full_name, student_id)')
       .eq('community_id', circle.id);
     setCircleMembers(data || []);
     setLoadingMembers(false);
+    viewCircleMessages(circle);
   };
 
   const approveStudent = async (id, name) => {
@@ -213,6 +223,49 @@ export default function AdminDashboard() {
     if (!confirm('Delete this message?')) return;
     const { error } = await supabase.from('messages').delete().eq('id', id);
     if (!error) setGlobalMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  // ── Delete verified user ─────────────────────────────────────────────────
+  const deleteUser = async (id, name) => {
+    if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
+    // Delete profile (cascade should handle related data)
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    if (!error) {
+      showToast(`${name} deleted.`);
+      setSelectedUser(null);
+      fetchData();
+    } else showToast('Failed to delete user.');
+  };
+
+  // ── Force verify email (mark email_confirmed in auth) ────────────────────
+  const forceVerifyEmail = async (id, name) => {
+    if (!confirm(`Force-verify email for "${name}"?`)) return;
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(`/api/force-verify-email/${id}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) showToast(`Email verified for ${name}.`);
+    else showToast('Failed — check server logs.');
+  };
+
+  // ── Load circle messages ─────────────────────────────────────────────────
+  const viewCircleMessages = async (circle) => {
+    setLoadingCircleMsgs(true);
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('community_id', circle.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    setCircleMessages(data || []);
+    setLoadingCircleMsgs(false);
+  };
+
+  const deleteCircleMessage = async (id) => {
+    if (!confirm('Delete this message?')) return;
+    const { error } = await supabase.from('messages').delete().eq('id', id);
+    if (!error) setCircleMessages(prev => prev.filter(m => m.id !== id));
   };
 
   const rankLabel = (level) => ['Member', 'Moderator', 'Co-Leader', 'Leader'][level ?? 0] || 'Member';
@@ -569,7 +622,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ── ALL USERS ── */}
-        {section === 'users' && (
+        {section === 'users' && !selectedUser && (
           <div className="adm-card">
             <div className="adm-card-head">
               <span>All Registered Users</span>
@@ -578,21 +631,83 @@ export default function AdminDashboard() {
             </div>
             {loading ? <div className="adm-empty">Loading...</div> : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Joined</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filtered.map(s => (
-                    <tr key={s.id}>
+                    <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(s)}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
                       <td><span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span></td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
+                      <td onClick={e => e.stopPropagation()}>
+                        <button className="adm-btn reject" onClick={() => deleteUser(s.id, s.full_name)} title="Delete user">
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+          </div>
+        )}
+
+        {/* ── USER DETAIL VIEW ── */}
+        {section === 'users' && selectedUser && (
+          <div>
+            <button className="adm-refresh-btn" style={{ marginBottom: 16 }} onClick={() => setSelectedUser(null)}>
+              <i className="fa-solid fa-arrow-left"></i> Back to Users
+            </button>
+            <div className="adm-card" style={{ marginBottom: 16 }}>
+              <div className="adm-card-head">
+                <span>User Profile</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="adm-btn" style={{ color: 'var(--cyber-cyan)', borderColor: 'var(--cyber-cyan)' }}
+                    onClick={() => forceVerifyEmail(selectedUser.id, selectedUser.full_name)}
+                    title="Force-confirm their email in Supabase Auth">
+                    <i className="fa-solid fa-envelope-circle-check"></i> Force Verify Email
+                  </button>
+                  <button className="adm-btn reject" onClick={() => deleteUser(selectedUser.id, selectedUser.full_name)}>
+                    <i className="fa-solid fa-trash-can"></i> Delete User
+                  </button>
+                </div>
+              </div>
+              <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                {/* Left — info */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { label: 'Full Name',   value: selectedUser.full_name },
+                    { label: 'CTU ID',      value: selectedUser.student_id },
+                    { label: 'Email',       value: selectedUser.email },
+                    { label: 'User Type',   value: selectedUser.user_type },
+                    { label: 'Status',      value: selectedUser.is_verified ? '✅ Verified' : '⏳ Pending' },
+                    { label: 'ID Verified', value: selectedUser.id_verified ? '✅ Yes' : '❌ No' },
+                    { label: 'Joined',      value: new Date(selectedUser.created_at).toLocaleString() },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', minWidth: 100, paddingTop: 2 }}>{label}</span>
+                      <span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{value || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Right — ID photo */}
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>School ID Photo</div>
+                  {selectedUser.id_photo_url ? (
+                    <a href={selectedUser.id_photo_url} target="_blank" rel="noreferrer">
+                      <img src={selectedUser.id_photo_url} alt="School ID"
+                        style={{ width: '100%', maxWidth: 320, borderRadius: 10, border: '1px solid rgba(0,240,255,0.3)', cursor: 'pointer' }} />
+                    </a>
+                  ) : (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      <i className="fa-solid fa-image-slash" style={{ marginRight: 8 }} />No ID photo submitted
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -647,25 +762,59 @@ export default function AdminDashboard() {
         {section === 'communities' && selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>Members of {selectedCircle.name}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{circleMembers.length} members</span>
+              <span>{selectedCircle.name}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className={`adm-btn ${circleMsgTab === 'members' ? 'approve' : ''}`} onClick={() => setCircleMsgTab('members')}>
+                  <i className="fa-solid fa-users"></i> Members ({circleMembers.length})
+                </button>
+                <button className={`adm-btn ${circleMsgTab === 'messages' ? 'approve' : ''}`} onClick={() => setCircleMsgTab('messages')}>
+                  <i className="fa-solid fa-message"></i> Messages ({circleMessages.length})
+                </button>
+              </div>
             </div>
-            {loadingMembers ? <div className="adm-empty">Loading...</div>
-            : circleMembers.length === 0 ? <div className="adm-empty">No members yet.</div>
-            : (
-              <table className="adm-table">
-                <thead><tr><th>Full Name</th><th>Student ID</th><th>Rank</th><th>Status</th></tr></thead>
-                <tbody>
-                  {circleMembers.map(m => (
-                    <tr key={m.id}>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{m.profiles?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{m.profiles?.student_id || '—'}</span></td>
-                      <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
-                      <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {circleMsgTab === 'members' && (
+              loadingMembers ? <div className="adm-empty">Loading...</div>
+              : circleMembers.length === 0 ? <div className="adm-empty">No members yet.</div>
+              : (
+                <table className="adm-table">
+                  <thead><tr><th>Full Name</th><th>Student ID</th><th>Rank</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {circleMembers.map(m => (
+                      <tr key={m.id}>
+                        <td style={{ color: 'white', fontWeight: 600 }}>{m.profiles?.full_name || '—'}</td>
+                        <td><span className="adm-mono">{m.profiles?.student_id || '—'}</span></td>
+                        <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
+                        <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            )}
+
+            {circleMsgTab === 'messages' && (
+              loadingCircleMsgs ? <div className="adm-empty">Loading...</div>
+              : circleMessages.length === 0 ? <div className="adm-empty">No messages in this circle yet.</div>
+              : (
+                <table className="adm-table">
+                  <thead><tr><th>Author</th><th>Message</th><th>Sent</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {circleMessages.map(m => (
+                      <tr key={m.id}>
+                        <td style={{ color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
+                        <td style={{ color: 'var(--text-muted)', maxWidth: 300 }}>{m.content}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(m.created_at).toLocaleString()}</td>
+                        <td>
+                          <button className="adm-btn reject" onClick={() => deleteCircleMessage(m.id)}>
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
             )}
           </div>
         )}
