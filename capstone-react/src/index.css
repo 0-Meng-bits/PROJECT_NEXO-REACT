@@ -2449,6 +2449,46 @@ body {
   padding: 14px 16px;
 }
 
+/* ── MINI CALENDAR ── */
+.mini-cal { margin-top: 4px; }
+.mini-cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.mini-cal-title { font-size: 13px; font-weight: 700; color: white; letter-spacing: 1px; }
+.mini-cal-nav {
+  background: none; border: 1px solid rgba(255,255,255,0.15); color: var(--text-muted);
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; transition: 0.15s;
+}
+.mini-cal-nav:hover { border-color: var(--cyber-cyan); color: var(--cyber-cyan); }
+.mini-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+}
+.mini-cal-dow {
+  text-align: center; font-size: 10px; color: var(--text-muted);
+  font-weight: 700; padding: 4px 0; letter-spacing: 0.5px;
+}
+.mini-cal-day {
+  position: relative; text-align: center; font-size: 12px;
+  padding: 5px 2px; border-radius: 6px; cursor: pointer;
+  color: var(--text-muted); transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.mini-cal-day:hover { background: rgba(255,255,255,0.07); color: white; }
+.mini-cal-day.today { color: var(--cyber-cyan); font-weight: 800; }
+.mini-cal-day.has-event { color: white; }
+.mini-cal-day.selected { background: rgba(0,240,255,0.15); color: var(--cyber-cyan); font-weight: 700; }
+.mini-cal-dot {
+  position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--cyber-cyan);
+}
+.mini-cal-day.today .mini-cal-dot { background: var(--cyber-yellow); }
+.mini-cal-day-events {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
 /* ── CIRCLE COVER BANNER ── */
 .circle-cover-banner {
   position: relative;

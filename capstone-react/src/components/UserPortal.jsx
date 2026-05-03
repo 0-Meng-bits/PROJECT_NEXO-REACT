@@ -1334,6 +1334,41 @@ function CampusEvents({ user, showToast }) {
 
   const catInfo = (key) => EVENT_CATEGORIES.find(c => c.key === key) || EVENT_CATEGORIES[0];
 
+  // Mini calendar state
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const calDays = (() => {
+    const { year, month } = calMonth;
+    const first = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < first; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    return cells;
+  })();
+
+  const eventDaysInMonth = new Set(
+    events
+      .filter(e => {
+        const d = new Date(e.event_date + 'T00:00:00');
+        return d.getFullYear() === calMonth.year && d.getMonth() === calMonth.month;
+      })
+      .map(e => new Date(e.event_date + 'T00:00:00').getDate())
+  );
+
+  const eventsOnDay = selectedDay
+    ? events.filter(e => {
+        const d = new Date(e.event_date + 'T00:00:00');
+        return d.getFullYear() === calMonth.year && d.getMonth() === calMonth.month && d.getDate() === selectedDay;
+      })
+    : [];
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const todayDate = new Date();
+
   return (
     <div className="c-feed fade-in">
       {/* Header */}
@@ -1345,7 +1380,7 @@ function CampusEvents({ user, showToast }) {
               CAMPUS EVENTS
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-              CTU–Daanbantayan activities, seminars, and campus happenings.
+              CTU–Daanbantayan AY 2025-2026 activities, seminars, and campus happenings.
             </p>
           </div>
           {canPost && (
@@ -1354,6 +1389,57 @@ function CampusEvents({ user, showToast }) {
               <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />
               {showForm ? 'CANCEL' : 'POST EVENT'}
             </button>
+          )}
+        </div>
+
+        {/* ── MINI CALENDAR ── */}
+        <div className="mini-cal" style={{ marginTop: 16 }}>
+          <div className="mini-cal-header">
+            <button className="mini-cal-nav" onClick={() => setCalMonth(m => {
+              const d = new Date(m.year, m.month - 1, 1);
+              return { year: d.getFullYear(), month: d.getMonth() };
+            })}>‹</button>
+            <span className="mini-cal-title">{monthNames[calMonth.month]} {calMonth.year}</span>
+            <button className="mini-cal-nav" onClick={() => setCalMonth(m => {
+              const d = new Date(m.year, m.month + 1, 1);
+              return { year: d.getFullYear(), month: d.getMonth() };
+            })}>›</button>
+          </div>
+          <div className="mini-cal-grid">
+            {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+              <div key={d} className="mini-cal-dow">{d}</div>
+            ))}
+            {calDays.map((day, i) => {
+              if (!day) return <div key={`e${i}`} />;
+              const isToday = day === todayDate.getDate() && calMonth.month === todayDate.getMonth() && calMonth.year === todayDate.getFullYear();
+              const hasEvent = eventDaysInMonth.has(day);
+              const isSelected = day === selectedDay;
+              return (
+                <div key={day}
+                  className={`mini-cal-day ${isToday ? 'today' : ''} ${hasEvent ? 'has-event' : ''} ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setSelectedDay(isSelected ? null : day)}>
+                  {day}
+                  {hasEvent && <span className="mini-cal-dot" />}
+                </div>
+              );
+            })}
+          </div>
+          {/* Events on selected day */}
+          {selectedDay && (
+            <div className="mini-cal-day-events">
+              {eventsOnDay.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No events on this day.</p>
+              ) : eventsOnDay.map(e => {
+                const cat = catInfo(e.category);
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <i className={cat.icon} style={{ color: cat.color, fontSize: 12, width: 14 }} />
+                    <span style={{ fontSize: 12, color: 'white', flex: 1 }}>{e.title}</span>
+                    {e.is_official && <i className="fa-solid fa-shield-halved" style={{ color: 'var(--cyber-yellow)', fontSize: 10 }} />}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -1456,9 +1542,11 @@ function EventCard({ e, user, onDelete, catInfo, isPast }) {
   const dateObj = new Date(e.event_date + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString([], { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
   const canDelete = user?.user_type === 'Admin' || user?.id === e.poster_id;
+  const isMultiDay = e.event_end_date && e.event_end_date !== e.event_date;
+  const endObj = isMultiDay ? new Date(e.event_end_date + 'T00:00:00') : null;
 
   return (
-    <div className="event-card" style={{ opacity: isPast ? 0.6 : 1 }}>
+    <div className="event-card" style={{ opacity: isPast ? 0.65 : 1 }}>
       <div className="event-card-left" style={{ borderColor: cat.color }}>
         <div className="event-date-box">
           <span className="event-day">{dateObj.getDate()}</span>
@@ -1468,15 +1556,23 @@ function EventCard({ e, user, onDelete, catInfo, isPast }) {
       <div className="event-card-body">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: `1px solid ${cat.color}`, color: cat.color, fontWeight: 700 }}>
                 <i className={cat.icon} style={{ marginRight: 4 }} />{cat.label.toUpperCase()}
               </span>
+              {e.is_official && (
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: '1px solid var(--cyber-yellow)', color: 'var(--cyber-yellow)', fontWeight: 700 }}>
+                  <i className="fa-solid fa-shield-halved" style={{ marginRight: 4 }} />OFFICIAL
+                </span>
+              )}
               {isPast && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Past</span>}
             </div>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'white', marginBottom: 4 }}>{e.title}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <span><i className="fa-solid fa-calendar" style={{ marginRight: 4 }} />{dateStr}</span>
+              <span>
+                <i className="fa-solid fa-calendar" style={{ marginRight: 4 }} />
+                {dateStr}{isMultiDay ? ` → ${endObj.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+              </span>
               {e.event_time && <span><i className="fa-solid fa-clock" style={{ marginRight: 4 }} />{e.event_time}</span>}
               {e.location && <span><i className="fa-solid fa-location-dot" style={{ marginRight: 4 }} />{e.location}</span>}
             </div>
