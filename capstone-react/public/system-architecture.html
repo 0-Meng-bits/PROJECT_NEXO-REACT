@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXO Connect – System Architecture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .diagram {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px 40px;
+      max-width: 1100px;
+      width: 100%;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+    }
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 40px;
+      letter-spacing: 1px;
+    }
+
+    /* ── FLOW ROW ── */
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      justify-content: center;
+    }
+
+    /* ── ARROW ── */
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 36px;
+      color: #aab;
+      font-size: 22px;
+      margin-top: -24px; /* align with card body, not badge */
+    }
+
+    /* ── CARD ── */
+    .card {
+      border-radius: 12px;
+      border: 2px solid;
+      padding: 0;
+      width: 170px;
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-header {
+      padding: 10px 14px 8px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .card-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 10px 10px;
+      font-size: 42px;
+    }
+    .card-title {
+      text-align: center;
+      font-size: 11px;
+      color: #555;
+      padding: 0 12px 6px;
+      line-height: 1.5;
+      min-height: 36px;
+    }
+    .card-stack {
+      margin: 8px 12px 14px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .card-stack .stack-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .card-stack .stack-items {
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.7;
+      color: #333;
+    }
+
+    /* ── COLORS ── */
+    /* USER */
+    .card-user { border-color: #93c5fd; }
+    .card-user .card-header { background: #dbeafe; color: #1d4ed8; }
+    .card-user .card-stack { background: #eff6ff; }
+    .card-user .stack-label { color: #1d4ed8; }
+
+    /* FRONTEND */
+    .card-frontend { border-color: #86efac; }
+    .card-frontend .card-header { background: #dcfce7; color: #15803d; }
+    .card-frontend .card-stack { background: #f0fdf4; }
+    .card-frontend .stack-label { color: #15803d; }
+
+    /* BACKEND */
+    .card-backend { border-color: #c4b5fd; }
+    .card-backend .card-header { background: #ede9fe; color: #6d28d9; }
+    .card-backend .card-stack { background: #f5f3ff; }
+    .card-backend .stack-label { color: #6d28d9; }
+
+    /* DATABASE */
+    .card-database { border-color: #fcd34d; }
+    .card-database .card-header { background: #fef9c3; color: #b45309; }
+    .card-database .card-stack { background: #fffbeb; }
+    .card-database .stack-label { color: #b45309; }
+
+    /* ADMIN */
+    .card-admin { border-color: #fca5a5; }
+    .card-admin .card-header { background: #fee2e2; color: #b91c1c; }
+    .card-admin .card-stack { background: #fef2f2; }
+    .card-admin .stack-label { color: #b91c1c; }
+
+    /* ── REALTIME BAND ── */
+    .realtime-band {
+      margin-top: 28px;
+      border: 2px dashed #38bdf8;
+      border-radius: 10px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #f0f9ff;
+    }
+    .realtime-band .rt-icon { font-size: 24px; }
+    .realtime-band .rt-text { font-size: 12px; color: #0369a1; font-weight: 700; }
+    .realtime-band .rt-sub { font-size: 11px; color: #0284c7; margin-top: 2px; }
+
+    /* ── WHY BOX ── */
+    .why-box {
+      margin-top: 20px;
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .why-box .star { font-size: 18px; }
+    .why-box .why-text { font-size: 12px; color: #e2e8f0; line-height: 1.6; }
+    .why-box strong { color: #38bdf8; }
+
+    /* ── FEEDBACK LOOP ── */
+    .feedback {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 10px;
+      color: #aaa;
+      letter-spacing: 1px;
+    }
+    .feedback span {
+      display: inline-block;
+      border: 1px dashed #ccc;
+      border-radius: 20px;
+      padding: 4px 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="diagram">
+    <h1>System Architecture</h1>
+    <p class="subtitle">NEXO Connect · CTU–Daanbantayan Campus Social Platform</p>
+
+    <div class="flow">
+
+      <!-- USER -->
+      <div class="card card-user">
+        <div class="card-header">User</div>
+        <div class="card-icon">👥</div>
+        <div class="card-title">Students, Faculty,<br/>Administrators</div>
+        <div class="card-stack">
+          <div class="stack-label">Devices</div>
+          <div class="stack-items">Desktop<br/>Mobile / Tablet</div>
+        </div>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <!-- FRONTEND -->
+      <div class="card card-frontend">
+        <div class="card-header">Frontend</div>
+        <div class="card-icon">🖥️</div>
+        <div class="card-title">Web Interface<br/>(Responsive SPA)</div>
+        <div class="card-stack">
+          <div class="stack-label">Tech Stack</div>
+          <div class="stack-items">
+            React 19<br/>
+            Vite<br/>
+            React Router v7<br/>
+            Custom CSS<br/>
+            Font Awesome
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <!-- BACKEND -->
+      <div class="card card-backend">
+        <div class="card-header">Backend / API</div>
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">Business Logic<br/>RESTful API</div>
+        <div class="card-stack">
+          <div class="stack-label">Tech Stack</div>
+          <div class="stack-items">
+            Node.js<br/>
+            Express<br/>
+            Nodemailer<br/>
+            Tesseract.js<br/>
+            Vercel Functions
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <!-- DATABASE -->
+      <div class="card card-database">
+        <div class="card-header">Database</div>
+        <div class="card-icon">🗄️</div>
+        <div class="card-title">Relational DB<br/>+ Auth + Storage</div>
+        <div class="card-stack">
+          <div class="stack-label">Tech Stack</div>
+          <div class="stack-items">
+            Supabase<br/>
+            PostgreSQL<br/>
+            Supabase Auth<br/>
+            Supabase Storage<br/>
+            Row Level Security
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <!-- ADMIN -->
+      <div class="card card-admin">
+        <div class="card-header">Admin Panel</div>
+        <div class="card-icon">📊</div>
+        <div class="card-title">System Management,<br/>Users, Content,<br/>Analytics</div>
+        <div class="card-stack">
+          <div class="stack-label">Features</div>
+          <div class="stack-items">
+            Verification Queue<br/>
+            Analytics Charts<br/>
+            Circle Management<br/>
+            Audit Controls
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- REALTIME BAND -->
+    <div class="realtime-band">
+      <div class="rt-icon">⚡</div>
+      <div>
+        <div class="rt-text">Supabase Realtime — WebSocket Layer</div>
+        <div class="rt-sub">Live chat messages · Notifications · Announcements · Reaction updates — all without page refresh</div>
+      </div>
+    </div>
+
+    <!-- WHY BOX -->
+    <div class="why-box">
+      <div class="star">⭐</div>
+      <div class="why-text">
+        <strong>Why this stack?</strong> &nbsp;
+        React + Vite for fast, component-based UI · Node/Express for flexible server-side logic ·
+        Supabase replaces a full backend team — handles auth, database, realtime, and storage in one platform ·
+        Vercel for zero-config deployment · All tools are free-tier friendly and production-ready.
+      </div>
+    </div>
+
+    <div class="feedback">
+      <span>↩ &nbsp; Feedback loop: Admin actions reflect instantly to all users via Supabase Realtime &nbsp; ↩</span>
+    </div>
+
+  </div>
+</body>
+</html>
