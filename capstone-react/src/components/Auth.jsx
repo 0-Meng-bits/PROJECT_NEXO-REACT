@@ -63,15 +63,10 @@ export default function Auth() {
         alert('SYSTEM_ALERT: ' + data.message);
         setSignupStep('form');
       } else {
-        // Store session and go to onboarding to complete profile setup
-        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const mergedUser = {
-          ...data.user,
-          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
-        };
+        // New account — never inherit avatar from a previous account
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
-        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
+        localStorage.setItem('currentUser', JSON.stringify({ ...data.user, avatar_url: null }));
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
         navigate('/onboarding');
       }
@@ -119,11 +114,12 @@ export default function Auth() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Preserve locally-stored avatar in case DB doesn't have it yet
+        // Only preserve locally-stored avatar if it belongs to THIS same account
         const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const isSameUser = prevUser.student_id === data.user.student_id;
         const mergedUser = {
           ...data.user,
-          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
+          avatar_url: data.user.avatar_url || (isSameUser ? prevUser.avatar_url : null) || null,
         };
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
