@@ -337,6 +337,42 @@ app.post('/api/upload-cover', async (req, res) => {
   res.json({ url: cover });
 });
 
+// ── UPLOAD ID PHOTO (for verification) ───────────────────────────────────────
+app.post('/api/upload-id-photo', async (req, res) => {
+  let resolvedUserId = null;
+
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) resolvedUserId = user.id;
+  }
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+  if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
+
+  const { photo } = req.body;
+  if (!photo) return res.status(400).json({ message: 'No photo provided.' });
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ id_photo_url: photo })
+    .eq('id', resolvedUserId);
+
+  if (error) {
+    console.error('[UPLOAD ID PHOTO] DB error:', error.message);
+    return res.status(500).json({ message: 'Failed to save ID photo.' });
+  }
+
+  console.log('[UPLOAD ID PHOTO] Saved for user', resolvedUserId);
+  res.json({ message: 'ID photo uploaded successfully.' });
+});
+
 // ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
 app.post('/api/upload-avatar', async (req, res) => {
   let resolvedUserId = null;

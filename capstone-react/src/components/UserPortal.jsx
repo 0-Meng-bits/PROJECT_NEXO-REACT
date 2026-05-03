@@ -891,13 +891,64 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
   const fileInputRef = useRef(null);
+  const idPhotoRef = useRef(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [idUploading, setIdUploading] = useState(false);
+  const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
   const [editForm, setEditForm] = useState({
     course: user.course || '',
     year_level: user.year_level || '',
     interests: user.interests || [],
   });
+
+  const handleIdPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIdUploading(true);
+    try {
+      // Compress to max 800px wide
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objUrl);
+          const MAX = 800;
+          const scale = Math.min(1, MAX / img.width);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = objUrl;
+      });
+
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/upload-id-photo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+        },
+        body: JSON.stringify({ photo: compressed }),
+      });
+
+      if (res.ok) {
+        setIdUploaded(true);
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        localStorage.setItem('currentUser', JSON.stringify({ ...stored, id_photo_url: compressed }));
+        onProfileUpdate?.({ ...stored, id_photo_url: compressed });
+      }
+    } catch (err) {
+      console.error('ID photo upload error:', err);
+    } finally {
+      setIdUploading(false);
+    }
+  };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
@@ -1030,6 +1081,37 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 </div>
               </div>
             )}
+
+            {/* ID upload for unverified users */}
+            {!user.is_verified && (
+              <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
+                <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+                  <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
+                </div>
+                {idUploaded ? (
+                  <div style={{ fontSize: 12, color: 'var(--green)' }}>
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
+                    ID photo submitted — awaiting admin review
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                      Upload a clear photo of your CTU school ID so the admin can verify your account.
+                    </p>
+                    <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
+                      disabled={idUploading}
+                      style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
+                      {idUploading
+                        ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
+                        : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />UPLOAD SCHOOL ID</>
+                      }
+                    </button>
+                    <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
+                  </>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button className="cyber-btn secondary" onClick={() => setEditing(true)} style={{ width: '100%' }}>
                 <i className="fa-solid fa-pen" style={{ marginRight: 6 }} />EDIT PROFILE
