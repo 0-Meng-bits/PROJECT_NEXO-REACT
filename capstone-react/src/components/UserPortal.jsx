@@ -2690,46 +2690,75 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* Featured Communities */}
-              <div className="home-section-header" style={{ marginTop: 16 }}>
-                <span>Featured Circles</span>
-                <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
-              </div>
-              {communities.filter(c => c.id !== 'global').length === 0 ? (
-                <div className="post" style={{ textAlign: 'center', padding: 32 }}>
-                  <i className="fa-solid fa-network-wired" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles yet. Be the first to create one!</p>
-                  {user?.is_verified && (
-                    <button className="cyber-btn" style={{ width: 'auto', padding: '8px 20px', marginTop: 12 }}
-                      onClick={() => setShowCreate(true)}>
-                      <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Create a Circle
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="featured-grid">
-                  {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
-                    <div key={c.id} className="featured-card"
-                      onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                      <div className="featured-card-bg" style={{
-                        background: c.cover_url ? undefined : categoryGradient(c.category),
-                        backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}></div>
-                      <div className="featured-card-body">
-                        <div className="featured-card-icon">
-                          <i className={(c.icon || getCategoryIcon(c.category))}></i>
-                        </div>
-                        <div className="featured-card-name">{c.name}</div>
-                        <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Featured Communities — based on user interests */}
+              {(() => {
+                const categoryMap = {
+                  coding: 'project', design: 'hobby', gaming: 'hobby',
+                  music: 'hobby', sports: 'social', research: 'academic',
+                  art: 'hobby', photography: 'hobby', writing: 'hobby',
+                  robotics: 'project', business: 'academic', cooking: 'hobby',
+                  travel: 'social', anime: 'hobby', fitness: 'social', debate: 'academic',
+                  reading: 'hobby', podcasting: 'hobby', language_learning: 'academic',
+                  bl_gl: 'social', esports: 'hobby', dancing: 'social',
+                };
+                const userInterests = user?.interests || [];
+                const matchedCategories = [...new Set(userInterests.map(i => categoryMap[i]).filter(Boolean))];
+                const allCircles = communities.filter(c => c.id !== 'global');
 
-              {/* Popular by category */}
+                // If user has interests, show matching circles first; fallback to newest
+                const featuredCircles = matchedCategories.length > 0
+                  ? [
+                      ...allCircles.filter(c => matchedCategories.includes(c.category)),
+                      ...allCircles.filter(c => !matchedCategories.includes(c.category)),
+                    ].slice(0, 4)
+                  : allCircles.slice(0, 4);
+
+                const sectionLabel = matchedCategories.length > 0 ? 'Recommended for You' : 'Featured Circles';
+
+                return (
+                  <>
+                    <div className="home-section-header" style={{ marginTop: 16 }}>
+                      <span>{sectionLabel}</span>
+                      <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
+                    </div>
+                    {allCircles.length === 0 ? (
+                      <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                        <i className="fa-solid fa-network-wired" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles yet. Be the first to create one!</p>
+                        {user?.is_verified && (
+                          <button className="cyber-btn" style={{ width: 'auto', padding: '8px 20px', marginTop: 12 }}
+                            onClick={() => setShowCreate(true)}>
+                            <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Create a Circle
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="featured-grid">
+                        {featuredCircles.map(c => (
+                          <div key={c.id} className="featured-card"
+                            onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                            <div className="featured-card-bg" style={{
+                              background: c.cover_url ? undefined : categoryGradient(c.category),
+                              backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }}></div>
+                            <div className="featured-card-body">
+                              <div className="featured-card-icon">
+                                <i className={(c.icon || getCategoryIcon(c.category))}></i>
+                              </div>
+                              <div className="featured-card-name">{c.name}</div>
+                              <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Popular Right Now — sorted by member count */}
               {communities.filter(c => c.id !== 'global').length > 0 && (
                 <>
                   <div className="home-section-header" style={{ marginTop: 8 }}>
@@ -2737,24 +2766,38 @@ export default function UserPortal() {
                     <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
-                      <div key={c.id} className="popular-row"
-                        onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                        <div className="popular-row-icon" style={{
-                          background: c.cover_url ? undefined : categoryGradient(c.category),
-                          backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}>
-                          {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
+                    {communities
+                      .filter(c => c.id !== 'global')
+                      .map(c => ({
+                        ...c,
+                        memberCount: myMemberships.filter(m => m.community_id === c.id && m.status === 'active').length
+                          + (c.creator_id ? 1 : 0), // count creator too
+                      }))
+                      .sort((a, b) => b.memberCount - a.memberCount)
+                      .slice(0, 4)
+                      .map(c => (
+                        <div key={c.id} className="popular-row"
+                          onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                          <div className="popular-row-icon" style={{
+                            background: c.cover_url ? undefined : categoryGradient(c.category),
+                            backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }}>
+                            {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'monospace' }}>
+                              <i className="fa-solid fa-users" style={{ marginRight: 4 }} />{c.memberCount}
+                            </span>
+                            <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
+                          </div>
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>{c.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
-                        </div>
-                        <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </>
               )}
