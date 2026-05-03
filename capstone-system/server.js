@@ -136,6 +136,13 @@ app.post('/api/signup', async (req, res) => {
   if (error) {
     // Rollback auth user if profile insert fails
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    // Give a friendly message for common constraint violations
+    if (error.code === '23505' || error.message.includes('profiles_student_id_key')) {
+      return res.status(400).json({ message: 'This CTU ID is already registered. Try logging in instead.' });
+    }
+    if (error.message.includes('profiles_email_key') || error.message.includes('email')) {
+      return res.status(400).json({ message: 'This email is already in use. Try logging in instead.' });
+    }
     return res.status(400).json({ message: error.message });
   }
 
