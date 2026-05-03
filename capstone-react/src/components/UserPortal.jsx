@@ -1265,8 +1265,69 @@ function AuditionDetailModal({ data, onClose }) {
   );
 }
 
-// ── CAMPUS EVENTS ─────────────────────────────────────────────────────────────
-// Color scheme mirrors the CTU academic calendar
+// ── HARDCODED CTU AY 2025-2026 CALENDAR DATA ─────────────────────────────────
+// Used as fallback when campus_events table doesn't exist yet
+const CTU_CALENDAR = [
+  // SEMESTER
+  { id:'s1',  title:'First Day of Actual Service',        event_date:'2025-08-04', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s2',  title:'Classes Start – 1st Semester',       event_date:'2025-08-11', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s3',  title:'Classes End – 1st Semester',         event_date:'2025-12-11', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s4',  title:'Classes Start – 2nd Semester',       event_date:'2026-01-12', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s5',  title:'Classes End – 2nd Semester',         event_date:'2026-03-26', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s6',  title:'Summer Classes Start',               event_date:'2026-06-03', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s7',  title:'Summer Classes End',                 event_date:'2026-07-11', event_end_date:null,         category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s8',  title:'Graduation',                         event_date:'2026-05-01', event_end_date:'2026-07-01', category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s9',  title:'Christmas Break',                    event_date:'2025-12-15', event_end_date:'2026-01-04', category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  { id:'s10', title:'Summer Vacation',                    event_date:'2026-05-25', event_end_date:'2026-07-31', category:'semester',   is_official:true, poster_name:'CTU Administration' },
+  // ENROLLMENT
+  { id:'e1',  title:'Enrollment – 1st Year (1st Batch)',  event_date:'2025-05-12', event_end_date:'2025-05-30', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e2',  title:'Enrollment – 2nd Year',              event_date:'2025-05-13', event_end_date:'2025-05-23', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e3',  title:'Enrollment – 3rd Year',              event_date:'2025-06-16', event_end_date:'2025-06-27', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e4',  title:'Enrollment – 4th Year',              event_date:'2025-06-30', event_end_date:'2025-07-11', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e5',  title:'Enrollment – 5th/6th Year',          event_date:'2025-07-14', event_end_date:'2025-07-25', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e6',  title:'Enrollment – 1st Year (2nd Batch)',  event_date:'2025-07-21', event_end_date:'2025-08-01', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e7',  title:'Late Enrollment / Adding-Dropping',  event_date:'2025-07-28', event_end_date:'2025-08-01', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  { id:'e8',  title:'2nd Semester Enrollment',            event_date:'2026-01-05', event_end_date:'2026-01-09', category:'enrollment', is_official:true, poster_name:'CTU Administration' },
+  // EXAMS
+  { id:'x1',  title:'Preliminary Exams – 1st Sem',        event_date:'2025-09-15', event_end_date:'2025-09-21', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x2',  title:'Midterm Exams – 1st Sem',            event_date:'2025-10-20', event_end_date:'2025-10-26', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x3',  title:'Semi-Final Exams – 1st Sem',         event_date:'2025-11-23', event_end_date:'2025-11-29', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x4',  title:'Final Exams – 1st Sem',              event_date:'2025-12-01', event_end_date:'2025-12-07', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x5',  title:'Preliminary Exams – 2nd Sem',        event_date:'2026-02-16', event_end_date:'2026-02-22', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x6',  title:'Midterm Exams – 2nd Sem',            event_date:'2026-03-23', event_end_date:'2026-03-29', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x7',  title:'Semi-Final Exams – 2nd Sem',         event_date:'2026-04-27', event_end_date:'2026-05-03', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x8',  title:'Final Exams – 2nd Sem (Graduating)', event_date:'2026-04-27', event_end_date:'2026-05-08', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  { id:'x9',  title:'Final Exams – 2nd Sem (Non-Grad)',   event_date:'2026-05-09', event_end_date:'2026-05-15', category:'exam',       is_official:true, poster_name:'CTU Administration' },
+  // SPORTS
+  { id:'sp1', title:'Intramural Week',                    event_date:'2025-11-03', event_end_date:'2025-11-09', category:'sports',     is_official:true, poster_name:'CTU Administration' },
+  { id:'sp2', title:'Cell Meet',                          event_date:'2025-11-14', event_end_date:null,         category:'sports',     is_official:true, poster_name:'CTU Administration' },
+  { id:'sp3', title:'Tri-Meet',                           event_date:'2025-11-26', event_end_date:'2025-11-28', category:'sports',     is_official:true, poster_name:'CTU Administration' },
+  // HOLIDAYS
+  { id:'h1',  title:'Independence Day',                   event_date:'2025-06-12', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h2',  title:'Cebu Provincial Charter Day',        event_date:'2025-08-06', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h3',  title:'Ninoy Aquino Day',                   event_date:'2025-08-21', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h4',  title:'National Heroes Day',                event_date:'2025-08-25', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h5',  title:'Osmeña Day',                         event_date:'2025-09-09', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h6',  title:'All Saints Day',                     event_date:'2025-11-01', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h7',  title:'CTU Foundation Anniversary',         event_date:'2025-11-03', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h8',  title:'Bonifacio Day',                      event_date:'2025-11-30', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h9',  title:'Feast of the Immaculate Conception', event_date:'2025-12-08', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h10', title:'Christmas Eve',                      event_date:'2025-12-24', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h11', title:'Christmas Day',                      event_date:'2025-12-25', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h12', title:'Rizal Day',                          event_date:'2025-12-30', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h13', title:'Last Day of the Year',               event_date:'2025-12-31', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h14', title:"New Year's Day",                     event_date:'2026-01-01', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h15', title:'Maundy Thursday',                    event_date:'2026-04-02', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h16', title:'Good Friday',                        event_date:'2026-04-03', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h17', title:'Black Saturday',                     event_date:'2026-04-04', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h18', title:'Araw ng Kagitingan',                 event_date:'2026-04-09', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  { id:'h19', title:'Labor Day',                          event_date:'2026-05-01', event_end_date:null,         category:'holiday',    is_official:true, poster_name:'CTU Administration' },
+  // CULTURAL
+  { id:'c1',  title:'Sto. Niño Fiesta (Sinulog)',         event_date:'2026-01-18', event_end_date:null,         category:'cultural',   is_official:true, poster_name:'CTU Administration' },
+  { id:'c2',  title:'Chinese New Year',                   event_date:'2026-01-29', event_end_date:null,         category:'cultural',   is_official:true, poster_name:'CTU Administration' },
+  { id:'c3',  title:'Cebu City Charter Day',              event_date:'2026-02-24', event_end_date:null,         category:'cultural',   is_official:true, poster_name:'CTU Administration' },
+  { id:'c4',  title:'Easter Sunday',                      event_date:'2026-04-05', event_end_date:null,         category:'cultural',   is_official:true, poster_name:'CTU Administration' },
+].sort((a, b) => a.event_date.localeCompare(b.event_date));
 const EVENT_CATEGORIES = [
   { key: 'all',       label: 'All Events',        icon: 'fa-solid fa-calendar-days',   color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
   { key: 'semester',  label: 'Semester',           icon: 'fa-solid fa-book-open',       color: '#facc15', bg: 'rgba(250,204,21,0.12)' },
@@ -1297,11 +1358,18 @@ function CampusEvents({ user, showToast }) {
       .select('*')
       .order('event_date', { ascending: true });
     if (error) {
-      console.error('[CampusEvents] load error:', error.message);
+      // Table doesn't exist — use hardcoded CTU calendar
       setTableReady(false);
+      setEvents(CTU_CALENDAR);
     } else {
       setTableReady(true);
-      setEvents(data || []);
+      // Merge: hardcoded events + any custom DB events (avoid duplicates by id)
+      const dbIds = new Set((data || []).map(e => e.id));
+      const merged = [
+        ...CTU_CALENDAR.filter(e => !dbIds.has(e.id)),
+        ...(data || []),
+      ].sort((a, b) => a.event_date.localeCompare(b.event_date));
+      setEvents(merged);
     }
     setLoading(false);
   }, []);
@@ -1573,14 +1641,7 @@ function CampusEvents({ user, showToast }) {
         ))}
       </div>
 
-      {!tableReady ? (
-        <div className="post" style={{ textAlign: 'center', padding: 32 }}>
-          <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 28, color: 'var(--orange)', display: 'block', marginBottom: 12 }} />
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 8 }}>
-            Campus events table not set up yet. Run the migration SQL in your Supabase dashboard to enable this feature.
-          </p>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
           <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: 10 }} />
           LOADING EVENTS...
