@@ -2185,7 +2185,17 @@ export default function UserPortal() {
 
   // Reload communities when entering a circle to ensure cover_url is fresh
   useEffect(() => {
-    if (section === 'circles') loadCommunities();
+    if (section === 'circles' && activeCommId && activeCommId !== 'global') {
+      // Fetch cover_url specifically for the active community
+      supabase.from('communities').select('id, cover_url').eq('id', activeCommId).single()
+        .then(({ data }) => {
+          if (data?.cover_url) {
+            setCommunities(prev => prev.map(c =>
+              c.id === activeCommId ? { ...c, cover_url: data.cover_url } : c
+            ));
+          }
+        });
+    }
   }, [section, activeCommId]);
   const isOwner = activeComm.creator_id === user?.id;
   const myRankLevel = getMembership(activeCommId)?.rank_level ?? (isOwner ? 3 : 0);
