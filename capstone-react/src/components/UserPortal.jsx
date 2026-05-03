@@ -1288,13 +1288,21 @@ function CampusEvents({ user, showToast }) {
   const [posting, setPosting] = useState(false);
   const canPost = user?.user_type === 'Admin' || user?.user_type === 'Faculty';
 
+  const [tableReady, setTableReady] = useState(true);
+
   const loadEvents = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('campus_events')
       .select('*')
       .order('event_date', { ascending: true });
-    setEvents(data || []);
+    if (error) {
+      console.error('[CampusEvents] load error:', error.message);
+      setTableReady(false);
+    } else {
+      setTableReady(true);
+      setEvents(data || []);
+    }
     setLoading(false);
   }, []);
 
@@ -1565,7 +1573,14 @@ function CampusEvents({ user, showToast }) {
         ))}
       </div>
 
-      {loading ? (
+      {!tableReady ? (
+        <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+          <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 28, color: 'var(--orange)', display: 'block', marginBottom: 12 }} />
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 8 }}>
+            Campus events table not set up yet. Run the migration SQL in your Supabase dashboard to enable this feature.
+          </p>
+        </div>
+      ) : loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
           <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: 10 }} />
           LOADING EVENTS...
