@@ -2182,6 +2182,11 @@ export default function UserPortal() {
   };
 
   const activeComm = communities.find(c => c.id === activeCommId) || GLOBAL_COMM;
+
+  // Reload communities when entering a circle to ensure cover_url is fresh
+  useEffect(() => {
+    if (section === 'circles') loadCommunities();
+  }, [section, activeCommId]);
   const isOwner = activeComm.creator_id === user?.id;
   const myRankLevel = getMembership(activeCommId)?.rank_level ?? (isOwner ? 3 : 0);
   const myRole = isOwner ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER');
