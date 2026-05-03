@@ -231,11 +231,27 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
           </div>
         )}
 
-        {/* Bubble row — bubble + action buttons side by side */}
+        {/* Bubble row — bubble first, then action buttons to the RIGHT */}
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
 
-          {/* For OTHER messages: buttons appear to the RIGHT of the bubble */}
-          {!isOwnerMsg && hovered && !editing && (
+          {/* Bubble always first in DOM */}
+          {editing ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input className="msg-edit-input" value={editVal}
+                onChange={e => setEditVal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
+                autoFocus />
+              <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check" /></button>
+              <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark" /></button>
+            </div>
+          ) : (
+            <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
+              {m.content}
+            </div>
+          )}
+
+          {/* Action buttons always to the RIGHT of the bubble */}
+          {hovered && !editing && (
             <div className="bubble-actions" ref={reactPickerRef}>
               <div style={{ position: 'relative' }}>
                 <button className="chat-action-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
@@ -253,48 +269,12 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onV
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Bubble */}
-          {editing ? (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input className="msg-edit-input" value={editVal}
-                onChange={e => setEditVal(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
-                autoFocus />
-              <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check" /></button>
-              <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark" /></button>
-            </div>
-          ) : (
-            <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}>
-              {m.content}
-            </div>
-          )}
-
-          {/* For OWN messages: buttons appear to the RIGHT of the bubble (bottom-right corner) */}
-          {isOwnerMsg && hovered && !editing && (
-            <div className="bubble-actions" ref={reactPickerRef}>
-              <div style={{ position: 'relative' }}>
-                <button className="chat-action-btn" onClick={() => setShowReactPicker(o => !o)} title="React">
-                  <i className="fa-regular fa-face-smile" />
+              {isOwnerMsg && (
+                <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
+                  <i className="fa-solid fa-pen" />
                 </button>
-                {showReactPicker && (
-                  <div className="react-picker own">
-                    {REACTIONS.map(r => {
-                      const mine = reactions[r.type]?.includes(currentStudentId);
-                      return (
-                        <button key={r.type} className={`react-option ${mine ? 'active' : ''}`}
-                          onClick={() => toggleReaction(r.type)}>{r.emoji}</button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
-                <i className="fa-solid fa-pen" />
-              </button>
-              {!canDelete && (
+              )}
+              {isOwnerMsg && !canDelete && (
                 <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Unsend"
                   style={{ color: 'var(--cyber-yellow)' }}>
                   <i className="fa-solid fa-rotate-left" />
@@ -1180,6 +1160,240 @@ function AuditionDetailModal({ data, onClose }) {
   );
 }
 
+// ── CAMPUS EVENTS ─────────────────────────────────────────────────────────────
+const EVENT_CATEGORIES = [
+  { key: 'all',      label: 'All',       icon: 'fa-solid fa-calendar-days',   color: 'var(--cyber-cyan)' },
+  { key: 'seminar',  label: 'Seminar',   icon: 'fa-solid fa-chalkboard-user', color: 'var(--cyber-yellow)' },
+  { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-graduation-cap',  color: '#60a5fa' },
+  { key: 'sports',   label: 'Sports',    icon: 'fa-solid fa-trophy',          color: '#4ade80' },
+  { key: 'cultural', label: 'Cultural',  icon: 'fa-solid fa-masks-theater',   color: '#f472b6' },
+  { key: 'general',  label: 'General',   icon: 'fa-solid fa-star',            color: '#a78bfa' },
+];
+
+function CampusEvents({ user, showToast }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general' });
+  const [posting, setPosting] = useState(false);
+  const canPost = user?.user_type === 'Admin' || user?.user_type === 'Faculty';
+
+  const loadEvents = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('campus_events')
+      .select('*')
+      .order('event_date', { ascending: true });
+    setEvents(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  const postEvent = async () => {
+    if (!form.title.trim() || !form.event_date) return;
+    setPosting(true);
+    const { error } = await supabase.from('campus_events').insert([{
+      title: form.title.trim(),
+      description: form.description.trim(),
+      event_date: form.event_date,
+      event_time: form.event_time,
+      location: form.location.trim(),
+      category: form.category,
+      poster_id: user.id,
+      poster_name: user.full_name,
+      poster_type: user.user_type,
+    }]);
+    setPosting(false);
+    if (!error) {
+      setForm({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general' });
+      setShowForm(false);
+      loadEvents();
+      showToast('EVENT_POSTED');
+    }
+  };
+
+  const deleteEvent = async (id) => {
+    if (!confirm('Delete this event?')) return;
+    await supabase.from('campus_events').delete().eq('id', id);
+    loadEvents();
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const filtered = events.filter(e => filter === 'all' || e.category === filter);
+  const upcoming = filtered.filter(e => new Date(e.event_date) >= today);
+  const past     = filtered.filter(e => new Date(e.event_date) < today);
+
+  const catInfo = (key) => EVENT_CATEGORIES.find(c => c.key === key) || EVENT_CATEGORIES[0];
+
+  return (
+    <div className="c-feed fade-in">
+      {/* Header */}
+      <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+              <i className="fa-solid fa-calendar-days" style={{ marginRight: 10 }} />
+              CAMPUS EVENTS
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
+              CTU–Daanbantayan activities, seminars, and campus happenings.
+            </p>
+          </div>
+          {canPost && (
+            <button className="cyber-btn" style={{ padding: '8px 18px', fontSize: 12 }}
+              onClick={() => setShowForm(o => !o)}>
+              <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />
+              {showForm ? 'CANCEL' : 'POST EVENT'}
+            </button>
+          )}
+        </div>
+
+        {/* Post form */}
+        {showForm && canPost && (
+          <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,240,255,0.1)', paddingTop: 16 }}>
+            <div className="input-group">
+              <label>EVENT TITLE</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. BSIT Seminar on AI" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="input-group">
+                <label>DATE</label>
+                <input type="date" value={form.event_date} onChange={e => setForm(f => ({ ...f, event_date: e.target.value }))} />
+              </div>
+              <div className="input-group">
+                <label>TIME (optional)</label>
+                <input type="time" value={form.event_time} onChange={e => setForm(f => ({ ...f, event_time: e.target.value }))} />
+              </div>
+            </div>
+            <div className="input-group">
+              <label>LOCATION</label>
+              <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. AVR, Gymnasium, Online" />
+            </div>
+            <div className="input-group">
+              <label>CATEGORY</label>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {EVENT_CATEGORIES.filter(c => c.key !== 'all').map(c => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="input-group">
+              <label>DESCRIPTION</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Details about the event..." rows={3} />
+            </div>
+            <button className="cyber-btn" onClick={postEvent} disabled={posting || !form.title.trim() || !form.event_date}>
+              {posting ? 'POSTING...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />POST EVENT</>}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Category filter pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+        {EVENT_CATEGORIES.map(c => (
+          <button key={c.key}
+            onClick={() => setFilter(c.key)}
+            style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              border: `1px solid ${filter === c.key ? c.color : 'rgba(255,255,255,0.12)'}`,
+              background: filter === c.key ? `${c.color}18` : 'transparent',
+              color: filter === c.key ? c.color : 'var(--text-muted)',
+              transition: 'all 0.15s',
+            }}>
+            <i className={c.icon} style={{ marginRight: 5 }} />{c.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+          <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: 10 }} />
+          LOADING EVENTS...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+          <i className="fa-solid fa-calendar-xmark" style={{ fontSize: 32, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }} />
+          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No events yet. {canPost ? 'Be the first to post one!' : 'Check back later.'}</p>
+        </div>
+      ) : (
+        <>
+          {/* Upcoming */}
+          {upcoming.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
+                Upcoming · {upcoming.length}
+              </div>
+              {upcoming.map(e => <EventCard key={e.id} e={e} user={user} onDelete={deleteEvent} catInfo={catInfo} isPast={false} />)}
+            </>
+          )}
+          {/* Past */}
+          {past.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, margin: '16px 0 10px', textTransform: 'uppercase' }}>
+                Past Events · {past.length}
+              </div>
+              {past.map(e => <EventCard key={e.id} e={e} user={user} onDelete={deleteEvent} catInfo={catInfo} isPast={true} />)}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function EventCard({ e, user, onDelete, catInfo, isPast }) {
+  const cat = catInfo(e.category);
+  const dateObj = new Date(e.event_date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString([], { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+  const canDelete = user?.user_type === 'Admin' || user?.id === e.poster_id;
+
+  return (
+    <div className="event-card" style={{ opacity: isPast ? 0.6 : 1 }}>
+      <div className="event-card-left" style={{ borderColor: cat.color }}>
+        <div className="event-date-box">
+          <span className="event-day">{dateObj.getDate()}</span>
+          <span className="event-month">{dateObj.toLocaleDateString([], { month: 'short' }).toUpperCase()}</span>
+        </div>
+      </div>
+      <div className="event-card-body">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: `1px solid ${cat.color}`, color: cat.color, fontWeight: 700 }}>
+                <i className={cat.icon} style={{ marginRight: 4 }} />{cat.label.toUpperCase()}
+              </span>
+              {isPast && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Past</span>}
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'white', marginBottom: 4 }}>{e.title}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <span><i className="fa-solid fa-calendar" style={{ marginRight: 4 }} />{dateStr}</span>
+              {e.event_time && <span><i className="fa-solid fa-clock" style={{ marginRight: 4 }} />{e.event_time}</span>}
+              {e.location && <span><i className="fa-solid fa-location-dot" style={{ marginRight: 4 }} />{e.location}</span>}
+            </div>
+            {e.description && (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>{e.description}</p>
+            )}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+              Posted by {e.poster_name} · {e.poster_type}
+            </div>
+          </div>
+          {canDelete && (
+            <button className="chat-action-btn" onClick={() => onDelete(e.id)} title="Delete event"
+              style={{ color: 'var(--red)', flexShrink: 0 }}>
+              <i className="fa-solid fa-trash-can" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function UserPortal() {
   const navigate = useNavigate();
@@ -1861,6 +2075,14 @@ export default function UserPortal() {
                   </div>
                 ))}
               </div>
+              <div className="sidebar-label" style={{ marginTop: 12 }}>CAMPUS LIFE</div>
+              <div className="nav-links">
+                <div className={`ls-item ${section === 'events' ? 'active' : ''}`}
+                  onClick={() => { setSection('events'); setMobileSidebarOpen(false); }}>
+                  <i className="nav-icon fa-solid fa-calendar-days"></i>
+                  <span className="node-name">Campus Events</span>
+                </div>
+              </div>
               </div>
             </>
           ) : (
@@ -2340,6 +2562,11 @@ export default function UserPortal() {
                 );
               })()}
             </div>
+          )}
+
+          {/* ── CAMPUS EVENTS ── */}
+          {section === 'events' && (
+            <CampusEvents user={user} showToast={showToast} />
           )}
 
           {/* ── MY CIRCLES / CIRCLE FEED ── */}

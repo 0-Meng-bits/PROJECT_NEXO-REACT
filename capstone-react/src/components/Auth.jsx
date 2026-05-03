@@ -63,8 +63,17 @@ export default function Auth() {
         alert('SYSTEM_ALERT: ' + data.message);
         setSignupStep('form');
       } else {
-        // Don't store session yet — user needs to confirm email first
-        setMode('email-sent');
+        // Store session and go to onboarding to complete profile setup
+        const prevUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const mergedUser = {
+          ...data.user,
+          avatar_url: data.user.avatar_url || prevUser.avatar_url || null,
+        };
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('accessToken');
+        localStorage.setItem('currentUser', JSON.stringify(mergedUser));
+        if (data.session) localStorage.setItem('accessToken', data.session.access_token);
+        navigate('/onboarding');
       }
     } catch (err) {
       console.error('[SIGNUP ERROR]', err);
