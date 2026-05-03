@@ -1366,6 +1366,25 @@ function CampusEvents({ user, showToast }) {
     }
   });
 
+  // For active filter: collect all days in this month that have events of that category
+  // Also expand multi-day events to fill the range
+  const activeCatColor = EVENT_CATEGORIES.find(c => c.key === filter)?.color;
+  const activeCatBg = EVENT_CATEGORIES.find(c => c.key === filter)?.bg;
+  const highlightedDays = new Set();
+  if (filter !== 'all') {
+    events.filter(e => e.category === filter).forEach(e => {
+      const start = new Date(e.event_date + 'T00:00:00');
+      const end = e.event_end_date ? new Date(e.event_end_date + 'T00:00:00') : start;
+      const cur = new Date(start);
+      while (cur <= end) {
+        if (cur.getFullYear() === calMonth.year && cur.getMonth() === calMonth.month) {
+          highlightedDays.add(cur.getDate());
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+  }
+
   const eventsOnDay = selectedDay
     ? events.filter(e => {
         const d = new Date(e.event_date + 'T00:00:00');
@@ -1422,18 +1441,26 @@ function CampusEvents({ user, showToast }) {
               const dayColors = eventsByDay[day] || [];
               const hasEvent = dayColors.length > 0;
               const isSelected = day === selectedDay;
-              // Color the number by the first event's category color
-              const numColor = hasEvent ? dayColors[0] : undefined;
+              const isHighlighted = highlightedDays.has(day);
+              // Color the number: highlighted category color > first event color > default
+              const numColor = isHighlighted ? activeCatColor : (hasEvent ? dayColors[0] : undefined);
               return (
                 <div key={day}
                   className={`mini-cal-day ${isToday ? 'today' : ''} ${hasEvent ? 'has-event' : ''} ${isSelected ? 'selected' : ''}`}
-                  style={numColor && !isSelected ? { color: numColor, fontWeight: 700 } : {}}
+                  style={{
+                    ...(isHighlighted && !isSelected ? {
+                      background: activeCatBg,
+                      color: activeCatColor,
+                      fontWeight: 800,
+                      borderRadius: 8,
+                      outline: `1.5px solid ${activeCatColor}`,
+                    } : numColor && !isSelected ? { color: numColor, fontWeight: 700 } : {}),
+                  }}
                   onClick={() => setSelectedDay(isSelected ? null : day)}>
                   {day}
-                  {/* Up to 3 colored dots */}
                   {hasEvent && (
                     <div className="mini-cal-dots">
-                      {dayColors.slice(0, 3).map((col, ci) => (
+                      {(isHighlighted ? [activeCatColor] : dayColors).slice(0, 3).map((col, ci) => (
                         <span key={ci} className="mini-cal-dot" style={{ background: col }} />
                       ))}
                     </div>
@@ -1508,7 +1535,20 @@ function CampusEvents({ user, showToast }) {
           <button key={c.key}
             className={`event-filter-btn ${filter === c.key ? 'active' : ''}`}
             style={filter === c.key ? { borderColor: c.color, background: c.bg, color: c.color } : {}}
-            onClick={() => setFilter(c.key)}>
+            onClick={() => {
+              setFilter(c.key);
+              setSelectedDay(null);
+              // Jump calendar to the month of the first upcoming event in this category
+              const now = new Date();
+              const categoryEvents = c.key === 'all' ? events : events.filter(e => e.category === c.key);
+              // Prefer upcoming, fall back to first ever
+              const upcoming = categoryEvents.filter(e => new Date(e.event_date + 'T00:00:00') >= now);
+              const target = upcoming[0] || categoryEvents[0];
+              if (target) {
+                const d = new Date(target.event_date + 'T00:00:00');
+                setCalMonth({ year: d.getFullYear(), month: d.getMonth() });
+              }
+            }}>
             <i className={c.icon} style={{ marginRight: 5, fontSize: 11 }} />
             {c.label}
           </button>
