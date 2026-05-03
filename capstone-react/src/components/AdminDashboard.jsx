@@ -7,6 +7,7 @@ const SECTIONS = [
   { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
   { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
   { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
+  { key: 'events',        label: 'Campus Events',         icon: 'fa-solid fa-calendar-days' },
   { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
@@ -120,6 +121,63 @@ export default function AdminDashboard() {
   const [newAdminPost, setNewAdminPost] = useState({ title: '', content: '', post_type: 'announcement' });
   const [postingAdminPost, setPostingAdminPost] = useState(false);
 
+  // ── Campus Events state ───────────────────────────────────────────────────
+  const [campusEvents, setCampusEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventForm, setEventForm] = useState({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general', event_end_date: '' });
+  const [postingEvent, setPostingEvent] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false);
+
+  const EVENT_CATS = [
+    { key: 'semester',   label: 'Semester',            color: '#facc15' },
+    { key: 'exam',       label: 'Exam Schedules',       color: '#f87171' },
+    { key: 'enrollment', label: 'Enrollment',           color: '#34d399' },
+    { key: 'holiday',    label: 'Holidays',             color: '#fb923c' },
+    { key: 'sports',     label: 'Sports / Intramural',  color: '#a78bfa' },
+    { key: 'cultural',   label: 'Cultural',             color: '#f472b6' },
+    { key: 'seminar',    label: 'Seminar',              color: '#22d3ee' },
+    { key: 'general',    label: 'General',              color: '#94a3b8' },
+  ];
+
+  const fetchEvents = useCallback(async () => {
+    setEventsLoading(true);
+    const { data } = await supabase.from('campus_events').select('*').order('event_date', { ascending: true });
+    setCampusEvents(data || []);
+    setEventsLoading(false);
+  }, []);
+
+  const postEvent = async () => {
+    if (!eventForm.title.trim() || !eventForm.event_date) return;
+    setPostingEvent(true);
+    const { error } = await supabase.from('campus_events').insert([{
+      title: eventForm.title.trim(),
+      description: eventForm.description.trim(),
+      event_date: eventForm.event_date,
+      event_end_date: eventForm.event_end_date || null,
+      event_time: eventForm.event_time || null,
+      location: eventForm.location.trim(),
+      category: eventForm.category,
+      poster_id: admin?.id,
+      poster_name: admin?.full_name || 'Admin',
+      poster_type: 'Admin',
+      is_official: true,
+    }]);
+    setPostingEvent(false);
+    if (!error) {
+      setEventForm({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general', event_end_date: '' });
+      setShowEventForm(false);
+      showToast('Event posted.');
+      fetchEvents();
+    } else showToast('Failed to post event.');
+  };
+
+  const deleteEvent = async (id) => {
+    if (!confirm('Delete this event?')) return;
+    await supabase.from('campus_events').delete().eq('id', id);
+    showToast('Event deleted.');
+    fetchEvents();
+  };
+
   const submitAdminPost = async () => {
     if (!newAdminPost.title.trim() || !newAdminPost.content.trim()) return;
     setPostingAdminPost(true);
@@ -166,6 +224,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { if (section === 'events') fetchEvents(); }, [section, fetchEvents]);
 
   const viewCircleMembers = async (circle) => {
     setSelectedCircle(circle);
@@ -816,6 +875,114 @@ export default function AdminDashboard() {
                 </table>
               )
             )}
+          </div>
+        )}
+
+        {/* ── CAMPUS EVENTS ── */}
+        {section === 'events' && (
+          <div>
+            {/* Post form */}
+            <div className="adm-card" style={{ marginBottom: 16 }}>
+              <div className="adm-card-head">
+                <span><i className="fa-solid fa-calendar-plus" style={{ marginRight: 8 }}></i>Campus Events</span>
+                <button className="adm-btn approve" onClick={() => setShowEventForm(o => !o)}>
+                  <i className={`fa-solid ${showEventForm ? 'fa-xmark' : 'fa-plus'}`}></i>
+                  {showEventForm ? 'Cancel' : 'New Event'}
+                </button>
+              </div>
+              {showEventForm && (
+                <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>TITLE *</div>
+                      <input className="adm-search" style={{ width: '100%' }} placeholder="Event title"
+                        value={eventForm.title} onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>CATEGORY</div>
+                      <select className="adm-search" style={{ width: '100%' }}
+                        value={eventForm.category} onChange={e => setEventForm(f => ({ ...f, category: e.target.value }))}>
+                        {EVENT_CATS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>START DATE *</div>
+                      <input type="date" className="adm-search" style={{ width: '100%' }}
+                        value={eventForm.event_date} onChange={e => setEventForm(f => ({ ...f, event_date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>END DATE</div>
+                      <input type="date" className="adm-search" style={{ width: '100%' }}
+                        value={eventForm.event_end_date} onChange={e => setEventForm(f => ({ ...f, event_end_date: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>TIME</div>
+                      <input type="time" className="adm-search" style={{ width: '100%' }}
+                        value={eventForm.event_time} onChange={e => setEventForm(f => ({ ...f, event_time: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>LOCATION</div>
+                    <input className="adm-search" style={{ width: '100%' }} placeholder="e.g. AVR, Gymnasium, Online"
+                      value={eventForm.location} onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>DESCRIPTION</div>
+                    <textarea style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'white', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 70 }}
+                      placeholder="Details about the event..."
+                      value={eventForm.description} onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))} />
+                  </div>
+                  <button className="adm-btn approve" style={{ alignSelf: 'flex-start' }}
+                    disabled={postingEvent || !eventForm.title.trim() || !eventForm.event_date}
+                    onClick={postEvent}>
+                    {postingEvent ? <><i className="fa-solid fa-spinner fa-spin"></i> Posting...</> : <><i className="fa-solid fa-paper-plane"></i> Post Event</>}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Events list */}
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <span>All Campus Events</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{campusEvents.length} custom events</span>
+              </div>
+              {eventsLoading ? <div className="adm-empty">Loading...</div>
+              : campusEvents.length === 0 ? (
+                <div className="adm-empty">
+                  <i className="fa-solid fa-calendar-xmark" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 12, display: 'block' }}></i>
+                  No custom events yet. The hardcoded CTU calendar is shown to users by default.
+                </div>
+              ) : (
+                <table className="adm-table">
+                  <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Location</th><th>Posted By</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    {campusEvents.map(e => {
+                      const cat = EVENT_CATS.find(c => c.key === e.category) || { label: e.category, color: '#94a3b8' };
+                      return (
+                        <tr key={e.id}>
+                          <td style={{ color: 'white', fontWeight: 600 }}>{e.title}</td>
+                          <td><span style={{ fontSize: 11, color: cat.color, border: `1px solid ${cat.color}`, padding: '2px 8px', borderRadius: 10 }}>{cat.label}</span></td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                            {new Date(e.event_date).toLocaleDateString()}
+                            {e.event_end_date && e.event_end_date !== e.event_date && ` → ${new Date(e.event_end_date).toLocaleDateString()}`}
+                          </td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.location || '—'}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.poster_name || '—'}</td>
+                          <td>
+                            <button className="adm-btn reject" onClick={() => deleteEvent(e.id)}>
+                              <i className="fa-solid fa-trash-can"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 
