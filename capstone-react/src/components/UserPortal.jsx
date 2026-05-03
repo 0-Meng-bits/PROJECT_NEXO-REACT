@@ -1266,13 +1266,17 @@ function AuditionDetailModal({ data, onClose }) {
 }
 
 // ── CAMPUS EVENTS ─────────────────────────────────────────────────────────────
+// Color scheme mirrors the CTU academic calendar
 const EVENT_CATEGORIES = [
-  { key: 'all',      label: 'All',       icon: 'fa-solid fa-calendar-days',   color: 'var(--cyber-cyan)' },
-  { key: 'seminar',  label: 'Seminar',   icon: 'fa-solid fa-chalkboard-user', color: 'var(--cyber-yellow)' },
-  { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-graduation-cap',  color: '#60a5fa' },
-  { key: 'sports',   label: 'Sports',    icon: 'fa-solid fa-trophy',          color: '#4ade80' },
-  { key: 'cultural', label: 'Cultural',  icon: 'fa-solid fa-masks-theater',   color: '#f472b6' },
-  { key: 'general',  label: 'General',   icon: 'fa-solid fa-star',            color: '#a78bfa' },
+  { key: 'all',       label: 'All Events',        icon: 'fa-solid fa-calendar-days',   color: '#38bdf8', bg: 'rgba(56,189,248,0.12)' },
+  { key: 'semester',  label: 'Semester',           icon: 'fa-solid fa-book-open',       color: '#facc15', bg: 'rgba(250,204,21,0.12)' },
+  { key: 'exam',      label: 'Exam Schedules',     icon: 'fa-solid fa-pen-to-square',   color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  { key: 'enrollment',label: 'Enrollment',         icon: 'fa-solid fa-user-plus',       color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  { key: 'holiday',   label: 'Holidays',           icon: 'fa-solid fa-flag',            color: '#fb923c', bg: 'rgba(251,146,60,0.12)' },
+  { key: 'sports',    label: 'Sports / Intramural',icon: 'fa-solid fa-trophy',          color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
+  { key: 'cultural',  label: 'Cultural',           icon: 'fa-solid fa-masks-theater',   color: '#f472b6', bg: 'rgba(244,114,182,0.12)' },
+  { key: 'seminar',   label: 'Seminar',            icon: 'fa-solid fa-chalkboard-user', color: '#22d3ee', bg: 'rgba(34,211,238,0.12)' },
+  { key: 'general',   label: 'General',            icon: 'fa-solid fa-star',            color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
 ];
 
 function CampusEvents({ user, showToast }) {
@@ -1332,7 +1336,7 @@ function CampusEvents({ user, showToast }) {
   const upcoming = filtered.filter(e => new Date(e.event_date) >= today);
   const past     = filtered.filter(e => new Date(e.event_date) < today);
 
-  const catInfo = (key) => EVENT_CATEGORIES.find(c => c.key === key) || EVENT_CATEGORIES[0];
+  const catInfo = (key) => EVENT_CATEGORIES.find(c => c.key === key) || EVENT_CATEGORIES[EVENT_CATEGORIES.length - 1];
 
   // Mini calendar state
   const [calMonth, setCalMonth] = useState(() => {
@@ -1350,14 +1354,17 @@ function CampusEvents({ user, showToast }) {
     return cells;
   })();
 
-  const eventDaysInMonth = new Set(
-    events
-      .filter(e => {
-        const d = new Date(e.event_date + 'T00:00:00');
-        return d.getFullYear() === calMonth.year && d.getMonth() === calMonth.month;
-      })
-      .map(e => new Date(e.event_date + 'T00:00:00').getDate())
-  );
+  // Map day → list of category colors for that day
+  const eventsByDay = {};
+  events.forEach(e => {
+    const d = new Date(e.event_date + 'T00:00:00');
+    if (d.getFullYear() === calMonth.year && d.getMonth() === calMonth.month) {
+      const day = d.getDate();
+      if (!eventsByDay[day]) eventsByDay[day] = [];
+      const cat = EVENT_CATEGORIES.find(c => c.key === e.category);
+      if (cat && !eventsByDay[day].includes(cat.color)) eventsByDay[day].push(cat.color);
+    }
+  });
 
   const eventsOnDay = selectedDay
     ? events.filter(e => {
@@ -1372,15 +1379,15 @@ function CampusEvents({ user, showToast }) {
   return (
     <div className="c-feed fade-in">
       {/* Header */}
-      <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
+      <div className="post" style={{ borderLeft: '4px solid #38bdf8', marginBottom: 4, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+            <h2 style={{ fontSize: 16, letterSpacing: 2, color: '#38bdf8' }}>
               <i className="fa-solid fa-calendar-days" style={{ marginRight: 10 }} />
               CAMPUS EVENTS
             </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-              CTU–Daanbantayan AY 2025-2026 activities, seminars, and campus happenings.
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>
+              CTU–Daanbantayan AY 2025-2026 · Official Academic Calendar
             </p>
           </div>
           {canPost && (
@@ -1412,14 +1419,25 @@ function CampusEvents({ user, showToast }) {
             {calDays.map((day, i) => {
               if (!day) return <div key={`e${i}`} />;
               const isToday = day === todayDate.getDate() && calMonth.month === todayDate.getMonth() && calMonth.year === todayDate.getFullYear();
-              const hasEvent = eventDaysInMonth.has(day);
+              const dayColors = eventsByDay[day] || [];
+              const hasEvent = dayColors.length > 0;
               const isSelected = day === selectedDay;
+              // Color the number by the first event's category color
+              const numColor = hasEvent ? dayColors[0] : undefined;
               return (
                 <div key={day}
                   className={`mini-cal-day ${isToday ? 'today' : ''} ${hasEvent ? 'has-event' : ''} ${isSelected ? 'selected' : ''}`}
+                  style={numColor && !isSelected ? { color: numColor, fontWeight: 700 } : {}}
                   onClick={() => setSelectedDay(isSelected ? null : day)}>
                   {day}
-                  {hasEvent && <span className="mini-cal-dot" />}
+                  {/* Up to 3 colored dots */}
+                  {hasEvent && (
+                    <div className="mini-cal-dots">
+                      {dayColors.slice(0, 3).map((col, ci) => (
+                        <span key={ci} className="mini-cal-dot" style={{ background: col }} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1484,20 +1502,26 @@ function CampusEvents({ user, showToast }) {
         )}
       </div>
 
-      {/* Category filter pills */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      {/* ── FILTER TABS ── */}
+      <div className="event-filter-wrap">
         {EVENT_CATEGORIES.map(c => (
           <button key={c.key}
-            onClick={() => setFilter(c.key)}
-            style={{
-              padding: '5px 14px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-              border: `1px solid ${filter === c.key ? c.color : 'rgba(255,255,255,0.12)'}`,
-              background: filter === c.key ? `${c.color}18` : 'transparent',
-              color: filter === c.key ? c.color : 'var(--text-muted)',
-              transition: 'all 0.15s',
-            }}>
-            <i className={c.icon} style={{ marginRight: 5 }} />{c.label}
+            className={`event-filter-btn ${filter === c.key ? 'active' : ''}`}
+            style={filter === c.key ? { borderColor: c.color, background: c.bg, color: c.color } : {}}
+            onClick={() => setFilter(c.key)}>
+            <i className={c.icon} style={{ marginRight: 5, fontSize: 11 }} />
+            {c.label}
           </button>
+        ))}
+      </div>
+
+      {/* ── COLOR LEGEND ── */}
+      <div className="event-legend">
+        {EVENT_CATEGORIES.filter(c => c.key !== 'all').map(c => (
+          <div key={c.key} className="event-legend-item">
+            <span className="event-legend-dot" style={{ background: c.color }} />
+            <span>{c.label}</span>
+          </div>
         ))}
       </div>
 
