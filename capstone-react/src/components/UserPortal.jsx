@@ -2987,7 +2987,14 @@ export default function UserPortal() {
                               const canvas = document.createElement('canvas');
                               canvas.width = w; canvas.height = h;
                               canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                              resolve(canvas.toDataURL('image/jpeg', 0.82));
+                              // Try progressively lower quality until under 500KB
+                              let quality = 0.75;
+                              let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                              while (dataUrl.length > 500000 && quality > 0.3) {
+                                quality -= 0.1;
+                                dataUrl = canvas.toDataURL('image/jpeg', quality);
+                              }
+                              resolve(dataUrl);
                             };
                             img.onerror = reject;
                             img.src = objUrl;
