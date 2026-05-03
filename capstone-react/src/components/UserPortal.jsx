@@ -885,7 +885,7 @@ function ViewProfileModal({ studentId, onClose }) {
 }
 
 // ── PROFILE MODAL ─────────────────────────────────────────────────────────────
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, onProfileUpdate }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, onProfileUpdate, showToast }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
@@ -926,22 +926,45 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.src = objUrl;
       });
 
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/upload-id-photo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
-        },
-        body: JSON.stringify({ photo: compressed }),
-      });
+      let saved = false;
 
-      if (res.ok) {
+      // Try server route first
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('/api/upload-id-photo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+          },
+          body: JSON.stringify({ photo: compressed }),
+        });
+        if (res.ok) saved = true;
+        else console.error('[ID upload] server error:', res.status, await res.text().catch(() => ''));
+      } catch (fetchErr) {
+        console.error('[ID upload] fetch failed:', fetchErr);
+      }
+
+      // Fallback: save directly via Supabase client
+      if (!saved) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ id_photo_url: compressed })
+          .eq('id', user.id);
+        if (!error) saved = true;
+        else console.error('[ID upload] supabase fallback error:', error.message);
+      }
+
+      if (saved) {
         setIdUploaded(true);
         const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        localStorage.setItem('currentUser', JSON.stringify({ ...stored, id_photo_url: compressed }));
-        onProfileUpdate?.({ ...stored, id_photo_url: compressed });
+        const updated = { ...stored, id_photo_url: compressed };
+        localStorage.setItem('currentUser', JSON.stringify(updated));
+        onProfileUpdate?.(updated);
+        showToast?.('ID photo submitted for review');
+      } else {
+        showToast?.('Upload failed — please try again');
       }
     } catch (err) {
       console.error('ID photo upload error:', err);
@@ -2849,7 +2872,7 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} onProfileUpdate={(updated) => { const u = JSON.parse(localStorage.getItem('currentUser') || '{}'); localStorage.setItem('currentUser', JSON.stringify({ ...u, ...updated })); }} />}
+      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} showToast={showToast} onProfileUpdate={(updated) => { const u = JSON.parse(localStorage.getItem('currentUser') || '{}'); localStorage.setItem('currentUser', JSON.stringify({ ...u, ...updated })); }} />}
       {viewingProfile && <ViewProfileModal studentId={viewingProfile} onClose={() => setViewingProfile(null)} />}
       {showAuditionForm && (
         <AuditionApplicationForm
