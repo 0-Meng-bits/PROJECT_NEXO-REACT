@@ -1463,8 +1463,10 @@ function CampusEvents({ user, showToast }) {
 
   const eventsOnDay = selectedDay
     ? events.filter(e => {
-        const d = new Date(e.event_date + 'T00:00:00');
-        return d.getFullYear() === calMonth.year && d.getMonth() === calMonth.month && d.getDate() === selectedDay;
+        const start = new Date(e.event_date + 'T00:00:00');
+        const end = e.event_end_date ? new Date(e.event_end_date + 'T00:00:00') : start;
+        const clicked = new Date(calMonth.year, calMonth.month, selectedDay);
+        return clicked >= start && clicked <= end;
       })
     : [];
 
