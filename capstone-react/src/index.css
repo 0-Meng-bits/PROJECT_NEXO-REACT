@@ -175,13 +175,44 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: var(--bg-black);
+  background: var(--cyber-bg);
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 30px 30px;
   font-family: 'Outfit', sans-serif;
   color: var(--text-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Glow blobs — same as landing hero */
+.auth-page::before,
+.auth-page::after {
+  content: '';
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-page::before {
+  background: var(--cyber-cyan);
+  top: -180px;
+  left: -180px;
+}
+.auth-page::after {
+  background: var(--cyber-yellow);
+  bottom: -180px;
+  right: -180px;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
 }
 
 .auth-card {
