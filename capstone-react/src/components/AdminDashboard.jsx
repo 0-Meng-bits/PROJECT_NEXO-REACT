@@ -287,13 +287,19 @@ export default function AdminDashboard() {
   // ── Delete verified user ─────────────────────────────────────────────────
   const deleteUser = async (id, name) => {
     if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
-    // Delete profile (cascade should handle related data)
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
-    if (!error) {
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(`/api/delete-user/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
       showToast(`${name} deleted.`);
       setSelectedUser(null);
       fetchData();
-    } else showToast('Failed to delete user.');
+    } else {
+      const body = await res.json().catch(() => ({}));
+      showToast(body.message || 'Failed to delete user.');
+    }
   };
 
   // ── Force verify email (mark email_confirmed in auth) ────────────────────
