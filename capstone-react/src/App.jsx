@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
+import LandingPage from './components/LandingPage';
 import Onboarding from './components/Onboarding';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/AdminDashboard';
@@ -65,14 +66,15 @@ function ProtectedRoute({ children, allowedType }) {
     );
   }
 
-  if (status === 'fail') return <Navigate to="/" replace />;
+  if (status === 'fail') return <Navigate to="/auth" replace />;
   return children;
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Auth />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={
         <ProtectedRoute>
           <Onboarding />

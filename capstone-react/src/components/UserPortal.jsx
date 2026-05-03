@@ -24,6 +24,7 @@ function notifIcon(type) {
     promoted:         'fa-solid fa-arrow-up',
     audition_update:  'fa-solid fa-microphone',
     new_announcement: 'fa-solid fa-bullhorn',
+    invite_accepted:  'fa-solid fa-envelope-open-text',
   };
   return map[type] || 'fa-solid fa-bell';
 }
@@ -64,13 +65,24 @@ const POST_TYPE = {
   event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
   shoutout:     { label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
   general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
+  poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
 };
 
-function AnnouncementCard({ a, user, onPin, onDelete }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
   const avatarChar = isAnon ? '?' : (a.author_name || 'A')[0].toUpperCase();
+
+  // Poll state
+  const isPoll = a.post_type === 'poll';
+  const pollOptions = isPoll ? (a.poll_options || []) : [];
+  const pollVotes = isPoll ? (a.poll_votes || {}) : {};
+  const totalVotes = Object.values(pollVotes).reduce((s, v) => s + (v?.length || 0), 0);
+  const myVote = isPoll ? pollOptions.find(opt => (pollVotes[opt] || []).includes(user?.id)) : null;
+
+  // Detect audition announcements by title pattern
+  const isAuditionPost = a.title?.includes('Audition Open') || a.title?.includes('Internal Audition Open');
 
   return (
     <div className={`announcement-card ${a.pinned ? 'pinned' : ''}`}>
@@ -85,7 +97,7 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'white' }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'var(--text-primary)' }}>
               {displayName}
             </span>
             {isAnon && (
@@ -101,7 +113,6 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
             {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-        {/* Own post: author_id matches. Anon posts: only admin can delete */}
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
           <div style={{ display: 'flex', gap: 6 }}>
             {user?.user_type === 'Admin' && (
@@ -115,15 +126,96 @@ function AnnouncementCard({ a, user, onPin, onDelete }) {
             </button>
           </div>
         )}
+        {/* Report button — shown to non-owners who aren't admin */}
+        {onReport && user?.user_type !== 'Admin' && a.author_id !== user?.id && (
+          <button className="chat-action-btn" onClick={() => onReport({ type: 'announcement', id: a.id, preview: a.title, reportedUserId: a.author_id })}
+            title="Report this post" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>
+            <i className="fa-solid fa-flag"></i>
+          </button>
+        )}
       </div>
       <h3 className="announcement-title">{a.title}</h3>
-      <p className="announcement-body">{a.content}</p>
+      {a.content && <p className="announcement-body">{a.content}</p>}
+
+      {/* ── AUDITION APPLY BUTTON ── */}
+      {isAuditionPost && onApply && (
+        <div style={{ marginTop: 14 }}>
+          <button
+            onClick={() => onApply(a)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'rgba(252,238,10,0.1)',
+              border: '1px solid var(--cyber-yellow)',
+              color: 'var(--cyber-yellow)',
+              borderRadius: 8, padding: '9px 20px',
+              fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+              letterSpacing: 1, cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(252,238,10,0.2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(252,238,10,0.1)'}
+          >
+            <i className="fa-solid fa-microphone"></i>
+            APPLY NOW
+          </button>
+        </div>
+      )}
+
+      {/* ── POLL OPTIONS ── */}
+      {isPoll && pollOptions.length > 0 && (
+        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {pollOptions.map((opt, i) => {
+            const votes = (pollVotes[opt] || []).length;
+            const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+            const isMyChoice = myVote === opt;
+            return (
+              <button
+                key={i}
+                onClick={() => onVote && onVote(a.id, opt, pollVotes)}
+                disabled={!!myVote}
+                style={{
+                  position: 'relative', overflow: 'hidden',
+                  width: '100%', textAlign: 'left',
+                  background: isMyChoice ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${isMyChoice ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: 8, padding: '10px 14px',
+                  cursor: myVote ? 'default' : 'pointer',
+                  fontFamily: 'inherit', fontSize: 13,
+                  color: 'var(--text-primary)',
+                  transition: 'border-color 0.2s',
+                }}
+              >
+                {/* Progress bar fill */}
+                {myVote && (
+                  <div style={{
+                    position: 'absolute', left: 0, top: 0, bottom: 0,
+                    width: `${pct}%`,
+                    background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)',
+                    transition: 'width 0.4s ease',
+                    borderRadius: 8,
+                  }} />
+                )}
+                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>
+                    {isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}
+                    {opt}
+                  </span>
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
+                </div>
+              </button>
+            );
+          })}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` · You voted "${myVote}"` : ' · Click to vote'}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -189,6 +281,13 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit }) {
               <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Delete"
                 style={{ color: 'var(--red)' }}>
                 <i className="fa-solid fa-trash-can"></i>
+              </button>
+            )}
+            {!isOwnerMsg && onReport && (
+              <button className="chat-action-btn" title="Report"
+                onClick={() => onReport({ type: 'message', id: m.id, preview: m.content, reportedUserId: m.student_id })}
+                style={{ color: 'var(--text-muted)' }}>
+                <i className="fa-solid fa-flag"></i>
               </button>
             )}
           </div>
@@ -399,6 +498,10 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState(viewerIsOwner ? 'settings' : 'members');
+  const [inviteSearch, setInviteSearch] = useState('');
+  const [inviteResult, setInviteResult] = useState(null); // { id, full_name, student_id }
+  const [inviteSearching, setInviteSearching] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     setLoadingMembers(true);
@@ -508,6 +611,56 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
       fetchMembers();
     }
   };
+
+  const searchInviteStudent = async () => {
+    if (!inviteSearch.trim()) return;
+    setInviteSearching(true);
+    setInviteResult(null);
+    const { data } = await supabase.from('profiles')
+      .select('id, full_name, student_id')
+      .ilike('student_id', `%${inviteSearch.trim()}%`)
+      .limit(1)
+      .single();
+    setInviteResult(data || null);
+    setInviteSearching(false);
+  };
+
+  const inviteMember = async () => {
+    if (!inviteResult) return;
+    setInviting(true);
+    // Check if already a member
+    const { data: existing } = await supabase.from('memberships')
+      .select('id, status')
+      .eq('community_id', comm.id)
+      .eq('user_id', inviteResult.id)
+      .maybeSingle();
+    if (existing) {
+      alert(existing.status === 'active' ? 'This student is already a member.' : 'This student already has a pending request.');
+      setInviting(false);
+      return;
+    }
+    const { error } = await supabase.from('memberships').insert([{
+      community_id: comm.id,
+      user_id: inviteResult.id,
+      rank_level: 0,
+      status: 'active',
+    }]);
+    if (!error) {
+      await supabase.from('notifications').insert([{
+        user_id: inviteResult.id,
+        type: 'invite_accepted',
+        message: `You have been personally invited to join "${comm.name}"!`,
+        link_comm_id: comm.id,
+      }]);
+      setInviteSearch('');
+      setInviteResult(null);
+      fetchMembers();
+      alert(`${inviteResult.full_name} has been invited and added to the circle!`);
+    } else {
+      alert('Failed to invite member.');
+    }
+    setInviting(false);
+  };
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="manage-modal-box" onClick={e => e.stopPropagation()}>
@@ -533,6 +686,11 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           {viewerIsOwner && (
             <button className={`manage-tab ${tab === 'audition' ? 'active' : ''}`} onClick={() => setTab('audition')}>
               <i className="fa-solid fa-microphone"></i> Audition
+            </button>
+          )}
+          {viewerIsOwner && (
+            <button className={`manage-tab ${tab === 'invite' ? 'active' : ''}`} onClick={() => setTab('invite')}>
+              <i className="fa-solid fa-user-plus"></i> Invite
             </button>
           )}
         </div>
@@ -642,7 +800,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 <tbody>
                   {requests.map(r => (
                     <tr key={r.id}>
-                      <td style={{ color: 'white' }}>{r.profiles?.full_name || '—'}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '—'}</td>
                       <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -671,6 +829,58 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 </div>
                 <AuditionReviewPanel comm={comm} />
               </>
+            )}
+          </div>
+        )}
+
+        {tab === 'invite' && viewerIsOwner && (
+          <div className="manage-tab-content">
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--cyber-cyan)', marginBottom: 6 }}>
+                <i className="fa-solid fa-user-plus" style={{ marginRight: 8 }}></i>Personal Invite
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                Search for a CTU student by their Student ID and invite them directly into the circle, bypassing the audition process.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input
+                className="channel-name-input"
+                style={{ flex: 1, padding: '10px 12px', fontSize: 13 }}
+                placeholder="Enter Student ID (e.g. 2024-CTU-DB-001)"
+                value={inviteSearch}
+                onChange={e => setInviteSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchInviteStudent()}
+              />
+              <button className="cyber-btn" style={{ padding: '8px 16px', fontSize: 12 }}
+                onClick={searchInviteStudent} disabled={inviteSearching}>
+                {inviteSearching ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
+              </button>
+            </div>
+
+            {inviteResult === null && inviteSearch.trim() && !inviteSearching && (
+              <p style={{ fontSize: 12, color: 'var(--red)', padding: '10px 0' }}>
+                <i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>No student found with that ID.
+              </p>
+            )}
+
+            {inviteResult && (
+              <div style={{
+                background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)',
+                borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 14,
+              }}>
+                <div className="member-card-avatar" style={{ width: 44, height: 44, fontSize: 16 }}>
+                  {(inviteResult.full_name || 'U')[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{inviteResult.full_name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'monospace', marginTop: 2 }}>{inviteResult.student_id}</div>
+                </div>
+                <button className="cyber-btn" style={{ padding: '8px 18px', fontSize: 12 }}
+                  onClick={inviteMember} disabled={inviting}>
+                  {inviting ? 'Inviting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Invite</>}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -896,6 +1106,106 @@ function AuditionDetailModal({ data, onClose }) {
   );
 }
 
+// ── BAD WORDS AUTO-DETECTION ─────────────────────────────────────────────────
+const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol', 'tangina', 'pakyu', 'yawa', 'buang'];
+
+function containsBadWord(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return BAD_WORDS.some(w => lower.includes(w));
+}
+
+async function autoFlagContent({ reporterId, reportedUserId, contentType, contentId, contentPreview }) {
+  await supabase.from('reports').insert([{
+    reporter_id: reporterId,
+    reported_user_id: reportedUserId,
+    content_type: contentType,
+    content_id: contentId,
+    content_preview: contentPreview?.slice(0, 200),
+    reason: '⚠️ Auto-detected: inappropriate language',
+    status: 'pending',
+  }]);
+}
+
+// ── REPORT MODAL ─────────────────────────────────────────────────────────────
+function ReportModal({ data, user, onClose }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const REASONS = [
+    'Inappropriate language / profanity',
+    'Harassment or bullying',
+    'Spam or irrelevant content',
+    'Misinformation',
+    'Hate speech or discrimination',
+    'Other',
+  ];
+
+  const submit = async () => {
+    if (!reason.trim()) return;
+    setSubmitting(true);
+    await supabase.from('reports').insert([{
+      reporter_id: user.id,
+      reported_user_id: data.reportedUserId || null,
+      content_type: data.type,
+      content_id: data.id,
+      content_preview: data.preview?.slice(0, 200),
+      reason,
+      status: 'pending',
+    }]);
+    setSubmitting(false);
+    setDone(true);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <i className="fa-solid fa-circle-check" style={{ fontSize: 36, color: 'var(--green)', marginBottom: 14, display: 'block' }}></i>
+            <h3 style={{ color: 'var(--green)', marginBottom: 8 }}>Report Submitted</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
+              Thank you. The admin will review this report.
+            </p>
+            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
+          </div>
+        ) : (
+          <>
+            <h3 style={{ marginBottom: 6 }}>
+              <i className="fa-solid fa-flag" style={{ marginRight: 8, color: 'var(--red)' }}></i>
+              Report {data.type === 'message' ? 'Message' : 'Post'}
+            </h3>
+            {data.preview && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, fontStyle: 'italic' }}>
+                "{data.preview.slice(0, 120)}{data.preview.length > 120 ? '...' : ''}"
+              </div>
+            )}
+            <div className="input-group">
+              <label>REASON FOR REPORT</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {REASONS.map(r => (
+                  <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: reason === r ? 'var(--text-primary)' : 'var(--text-muted)', padding: '8px 12px', borderRadius: 8, border: `1px solid ${reason === r ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: reason === r ? 'rgba(0,240,255,0.06)' : 'transparent', transition: '0.15s' }}>
+                    <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} style={{ accentColor: 'var(--cyber-cyan)' }} />
+                    {r}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="cyber-btn" onClick={submit} disabled={submitting || !reason}
+                style={{ flex: 1, background: 'rgba(247,95,95,0.15)', color: 'var(--red)', border: '1px solid var(--red)' }}>
+                {submitting ? 'Submitting...' : <><i className="fa-solid fa-flag" style={{ marginRight: 6 }}></i>Submit Report</>}
+              </button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function UserPortal() {
   const navigate = useNavigate();
@@ -906,11 +1216,13 @@ export default function UserPortal() {
   const [section, setSection] = useState('home');
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState('');
+  const [circleChatMessages, setCircleChatMessages] = useState([]);
+  const [circleChatInput, setCircleChatInput] = useState('');
   const [toast, setToast] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
-  const [showAuditionForm, setShowAuditionForm] = useState(null);
+  const [showAuditionForm, setShowAuditionForm] = useState(null); // { comm, audition? }
   const [myAuditions, setMyAuditions] = useState([]);
   const [viewingAudition, setViewingAudition] = useState(null); // { response, community, questions }
   const [search, setSearch] = useState('');
@@ -922,8 +1234,8 @@ export default function UserPortal() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
-  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false });
-  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '' });
+  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''] });
+  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''] });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -934,6 +1246,7 @@ export default function UserPortal() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
+  const [showReport, setShowReport] = useState(null); // { type, id, preview, reportedUserId }
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
@@ -1008,14 +1321,18 @@ export default function UserPortal() {
   }, []);
 
   const postAnnouncement = async () => {
-    if (!newPost.title.trim() || !newPost.content.trim()) return;
-    // All verified users can pick announcement, shoutout, or general
-    // Only admins/faculty can also pick 'event'
+    if (!newPost.title.trim()) return;
+    if (newPost.post_type !== 'poll' && !newPost.content.trim()) return;
+    if (newPost.post_type === 'poll') {
+      const validOptions = newPost.pollOptions.filter(o => o.trim());
+      if (validOptions.length < 2) { alert('A poll needs at least 2 options.'); return; }
+    }
     const allowedTypes = (user?.user_type === 'Admin' || user?.user_type === 'Faculty')
-      ? ['announcement', 'event', 'shoutout', 'general']
-      : ['announcement', 'shoutout', 'general'];
+      ? ['announcement', 'event', 'shoutout', 'general', 'poll']
+      : ['announcement', 'shoutout', 'general', 'poll'];
     const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'general';
     setPostingAnnouncement(true);
+    const pollOptions = type === 'poll' ? newPost.pollOptions.filter(o => o.trim()) : null;
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
       author_name: newPost.anonymous ? 'Anonymous' : user.full_name,
@@ -1024,45 +1341,69 @@ export default function UserPortal() {
       content: newPost.content.trim(),
       post_type: type,
       community_id: null,
+      ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
     }]);
     setPostingAnnouncement(false);
-    if (!error) { setNewPost({ title: '', content: '', post_type: 'general', anonymous: false }); loadAnnouncements(); }
+    if (!error) {
+      // Auto-flag if bad word detected in title or content
+      if (containsBadWord(newPost.title) || containsBadWord(newPost.content)) {
+        const { data: inserted } = await supabase.from('announcements')
+          .select('id').order('created_at', { ascending: false }).limit(1).single();
+        if (inserted) {
+          await autoFlagContent({
+            reporterId: user.id, reportedUserId: user.id,
+            contentType: 'announcement', contentId: inserted.id,
+            contentPreview: `${newPost.title}: ${newPost.content}`,
+          });
+        }
+      }
+      setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''] });
+      loadAnnouncements();
+    }
   };
 
   const postCircleAnnouncement = async (commId) => {
-    if (!newCirclePost.title.trim() || !newCirclePost.content.trim()) return;
+    if (!newCirclePost.title.trim()) return;
+    if (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim()) return;
+    if (newCirclePost.post_type === 'poll') {
+      const valid = newCirclePost.pollOptions.filter(o => o.trim());
+      if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
+    }
     setPostingAnnouncement(true);
+    const pollOptions = newCirclePost.post_type === 'poll'
+      ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
       author_name: user.full_name,
       author_type: user.user_type,
       title: newCirclePost.title.trim(),
       content: newCirclePost.content.trim(),
-      post_type: 'announcement',
+      post_type: newCirclePost.post_type,
       community_id: commId,
+      ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
     }]);
     setPostingAnnouncement(false);
     if (!error) {
-      setNewCirclePost({ title: '', content: '' });
+      setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''] });
       loadCircleAnnouncements(commId);
 
-      // Notify all active members of this circle
+      // Notify all active members
       const { data: members } = await supabase
         .from('memberships')
         .select('user_id')
         .eq('community_id', commId)
         .eq('status', 'active')
-        .neq('user_id', user.id); // don't notify yourself
+        .neq('user_id', user.id);
 
       if (members && members.length > 0) {
         const comm = communities.find(c => c.id === commId);
-        const notifications = members.map(m => ({
+        const notifs = members.map(m => ({
           user_id: m.user_id,
           type: 'new_announcement',
-          message: `New announcement in "${comm?.name || 'a circle'}": ${newCirclePost.title.trim()}`,
+          message: `New ${newCirclePost.post_type === 'poll' ? 'poll' : 'announcement'} in "${comm?.name || 'a circle'}": ${newCirclePost.title.trim()}`,
           link_comm_id: commId,
         }));
-        await supabase.from('notifications').insert(notifications);
+        await supabase.from('notifications').insert(notifs);
       }
     }
   };
@@ -1076,6 +1417,29 @@ export default function UserPortal() {
   const togglePin = async (id, pinned) => {
     await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
     loadAnnouncements();
+  };
+
+  const handleVote = async (announcementId, option, currentVotes) => {
+    if (!user?.id) return;
+    // Remove user from any existing option, add to chosen option
+    const updated = { ...currentVotes };
+    Object.keys(updated).forEach(opt => {
+      updated[opt] = (updated[opt] || []).filter(id => id !== user.id);
+    });
+    updated[option] = [...(updated[option] || []), user.id];
+    await supabase.from('announcements').update({ poll_votes: updated }).eq('id', announcementId);
+    loadAnnouncements();
+  };
+
+  const handleCircleVote = async (announcementId, option, currentVotes) => {
+    if (!user?.id) return;
+    const updated = { ...currentVotes };
+    Object.keys(updated).forEach(opt => {
+      updated[opt] = (updated[opt] || []).filter(id => id !== user.id);
+    });
+    updated[option] = [...(updated[option] || []), user.id];
+    await supabase.from('announcements').update({ poll_votes: updated }).eq('id', announcementId);
+    loadCircleAnnouncements(activeCommId);
   };
 
   const loadNotifications = useCallback(async () => {
@@ -1115,6 +1479,15 @@ export default function UserPortal() {
     } else {
       setMessages([]);
     }
+  }, []);
+
+  const loadCircleChatMessages = useCallback(async (commId) => {
+    if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
+    const { data } = await supabase.from('messages').select('*')
+      .eq('community_id', commId)
+      .is('channel_id', null)
+      .order('created_at', { ascending: true });
+    setCircleChatMessages(data || []);
   }, []);
 
   // Initial load + realtime subscription — re-runs when channel/community changes
@@ -1166,6 +1539,15 @@ export default function UserPortal() {
   }, [activeCommId, activeChannelId, loadMessages]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
+
+  // Reload channels and circle announcements whenever the active community changes
+  useEffect(() => {
+    loadChannels(activeCommId);
+    loadCircleAnnouncements(activeCommId);
+    setShowCircleAnnouncements(false);
+    // Reset circle-chat section when switching communities
+    setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
+  }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
   // Avatar is persisted in localStorage — no DB sync needed on mount
 
@@ -1227,6 +1609,35 @@ export default function UserPortal() {
     return () => supabase.removeChannel(sub);
   }, [activeCommId]);
 
+  // Circle chat — load and realtime
+  useEffect(() => {
+    if (!activeCommId || activeCommId === 'global' || section !== 'circle-chat') return;
+    loadCircleChatMessages(activeCommId);
+    const sub = supabase.channel('circle-chat:' + activeCommId)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `community_id=eq.${activeCommId}` },
+        (payload) => {
+          const msg = payload.new;
+          if (!msg.channel_id) {
+            setCircleChatMessages(prev => {
+              if (prev.find(m => m.id === msg.id)) return prev;
+              return [...prev, msg];
+            });
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => setCircleChatMessages(prev => prev.filter(m => m.id !== payload.old.id))
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        (payload) => setCircleChatMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m))
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [activeCommId, section, loadCircleChatMessages]);
+
   // Auto-scroll to bottom when messages update
   useEffect(() => {
     feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1239,7 +1650,7 @@ export default function UserPortal() {
     if (confirm('TERMINATE_SESSION?')) {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('accessToken');
-      navigate('/');
+      navigate('/auth');
     }
   };
 
@@ -1276,7 +1687,49 @@ export default function UserPortal() {
       role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
     };
     const { data, error } = await supabase.from('messages').insert([payload]).select();
-    if (!error && data) { setMessages(prev => [...prev, data[0]]); setMsgInput(''); }
+    if (!error && data) {
+      setMessages(prev => [...prev, data[0]]);
+      setMsgInput('');
+      // Auto-flag if bad word detected
+      if (containsBadWord(msgInput)) {
+        await autoFlagContent({
+          reporterId: user.id,
+          reportedUserId: user.id,
+          contentType: 'message',
+          contentId: data[0].id,
+          contentPreview: msgInput,
+        });
+      }
+    }
+  };
+
+  const sendCircleChatPost = async () => {
+    if (!circleChatInput.trim()) return;
+    const comm = communities.find(c => c.id === activeCommId);
+    const isLeader = comm?.creator_id === user?.id;
+    const payload = {
+      student_id: user.student_id,
+      full_name: user.full_name,
+      content: circleChatInput,
+      community_id: activeCommId,
+      channel_id: null,
+      role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+    };
+    const { data, error } = await supabase.from('messages').insert([payload]).select();
+    if (!error && data) {
+      setCircleChatMessages(prev => [...prev, data[0]]);
+      setCircleChatInput('');
+      if (containsBadWord(circleChatInput)) {
+        await autoFlagContent({
+          reporterId: user.id,
+          reportedUserId: user.id,
+          contentType: 'message',
+          contentId: data[0].id,
+          contentPreview: circleChatInput,
+        });
+      }
+    }
+  };
   };
 
   const handleCommCreated = (newComm) => {
@@ -1608,6 +2061,8 @@ export default function UserPortal() {
                   )}
                 </div>
 
+
+
                 {channels.length === 0 && (
                   <div style={{ padding: '8px 15px', fontSize: 12, color: 'var(--text-muted)' }}>
                     No channels yet.
@@ -1762,7 +2217,7 @@ export default function UserPortal() {
                         : initials
                       }
                     </div>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary, white)' }}>Share something with the campus</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Share something with the campus</span>
                   </div>
                   <input
                     className="home-composer-title"
@@ -1770,19 +2225,52 @@ export default function UserPortal() {
                     value={newPost.title}
                     onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
                   />
-                  <textarea
-                    className="home-composer-body"
-                    placeholder="What's on your mind? Share news, events, shoutouts..."
-                    value={newPost.content}
-                    onChange={e => setNewPost(p => ({ ...p, content: e.target.value }))}
-                    rows={3}
-                  />
+                  {newPost.post_type !== 'poll' && (
+                    <textarea
+                      className="home-composer-body"
+                      placeholder="What's on your mind? Share news, events, shoutouts..."
+                      value={newPost.content}
+                      onChange={e => setNewPost(p => ({ ...p, content: e.target.value }))}
+                      rows={3}
+                    />
+                  )}
+                  {/* Poll options */}
+                  {newPost.post_type === 'poll' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      {newPost.pollOptions.map((opt, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            className="home-composer-title"
+                            style={{ marginBottom: 0, flex: 1 }}
+                            placeholder={`Option ${i + 1}`}
+                            value={opt}
+                            onChange={e => {
+                              const opts = [...newPost.pollOptions];
+                              opts[i] = e.target.value;
+                              setNewPost(p => ({ ...p, pollOptions: opts }));
+                            }}
+                          />
+                          {newPost.pollOptions.length > 2 && (
+                            <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
+                              style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
+                              <i className="fa-solid fa-xmark"></i>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {newPost.pollOptions.length < 6 && (
+                        <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
+                          style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
+                          <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="home-composer-footer">
-                    {/* Post type selector — all verified users get announcement/shoutout/general, admin/faculty also get event */}
                     <div className="home-composer-types">
                       {(user?.user_type === 'Admin' || user?.user_type === 'Faculty'
-                        ? ['announcement', 'event', 'shoutout', 'general']
-                        : ['announcement', 'shoutout', 'general']
+                        ? ['announcement', 'event', 'shoutout', 'general', 'poll']
+                        : ['announcement', 'shoutout', 'general', 'poll']
                       ).map(t => {
                         const cfg = POST_TYPE[t];
                         return (
@@ -1796,7 +2284,6 @@ export default function UserPortal() {
                       })}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {/* Anonymous toggle */}
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
@@ -1806,7 +2293,7 @@ export default function UserPortal() {
                       </button>
                       <button className="cyber-btn"
                         style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
-                        disabled={postingAnnouncement || !newPost.title.trim() || !newPost.content.trim()}
+                        disabled={postingAnnouncement || !newPost.title.trim() || (newPost.post_type !== 'poll' && !newPost.content.trim())}
                         onClick={postAnnouncement}>
                         {postingAnnouncement
                           ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
@@ -1835,7 +2322,20 @@ export default function UserPortal() {
                   {announcements.map(a => (
                     <AnnouncementCard key={a.id} a={a} user={user}
                       onPin={togglePin}
-                      onDelete={deleteAnnouncement} />
+                      onDelete={deleteAnnouncement}
+                      onVote={handleVote}
+                      onReport={(data) => setShowReport(data)}
+                      onApply={(ann) => {
+                        // For home feed audition posts, find community by matching name
+                        // Title format: "Audition Open - [title] ([comm.name])"
+                        const match = ann.title?.match(/\(([^)]+)\)$/);
+                        const commName = match?.[1];
+                        const comm = commName
+                          ? communities.find(c => c.name === commName)
+                          : communities.find(c => ann.title?.includes(c.name));
+                        if (comm) setShowAuditionForm({ comm });
+                        else alert('Could not find the audition circle. Try visiting the circle directly.');
+                      }} />
                   ))}
                 </div>
               )}
@@ -1934,6 +2434,7 @@ export default function UserPortal() {
                       canDelete={isOwnerMsg || user?.user_type === 'Admin'}
                       onDelete={deleteMessage}
                       onEdit={editMessage}
+                      onReport={(data) => setShowReport(data)}
                     />
                   );
                 })}
@@ -2036,9 +2537,16 @@ export default function UserPortal() {
                             </span>
                           ) : (
                             c.audition_enabled ? (
-                              <button className="group-action-btn manage" onClick={() => setShowAuditionForm(c)}>
-                                <i className="fa-solid fa-microphone"></i> APPLY
-                              </button>
+                              // Internal audition: only show apply button to existing members
+                              c.internal_audition && !isMember(c.id) ? (
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)', border: '1px solid #333', padding: '5px 12px', borderRadius: 20 }}>
+                                  <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>Members Only
+                                </span>
+                              ) : (
+                                <button className="group-action-btn manage" onClick={() => setShowAuditionForm({ comm: c })}>
+                                  <i className="fa-solid fa-microphone"></i> APPLY
+                                </button>
+                              )
                             ) : (
                               <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
                                 <i className="fa-solid fa-paper-plane"></i> REQUEST
@@ -2162,9 +2670,15 @@ export default function UserPortal() {
                       </span>
                     ) : (
                       activeComm.audition_enabled ? (
-                        <button className="group-action-btn manage" onClick={() => setShowAuditionForm(activeComm)}>
-                          <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
-                        </button>
+                        activeComm.internal_audition ? (
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>This circle uses internal audition — only current members can apply.
+                          </span>
+                        ) : (
+                          <button className="group-action-btn manage" onClick={() => setShowAuditionForm({ comm: activeComm })}>
+                            <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
+                          </button>
+                        )
                       ) : (
                         <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
                           <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
@@ -2175,23 +2689,83 @@ export default function UserPortal() {
                 ) : showCircleAnnouncements ? (
                   /* ── CIRCLE ANNOUNCEMENTS VIEW ── */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer — leader and co-leader only */}
-                    {canModerate && (
-                      <div className="announcement-composer">
-                        <div style={{ fontWeight: 700, fontSize: 13, color: 'white', marginBottom: 12 }}>
-                          <i className="fa-solid fa-thumbtack" style={{ marginRight: 8, color: 'var(--cyber-yellow)' }}></i>
-                          Post Circle Announcement
+                    {/* Post composer — all members can post */}
+                    {isMember(activeCommId) && user?.is_verified && (
+                      <div className="home-post-composer">
+                        <div className="home-composer-header">
+                          <div className="home-composer-avatar" style={{ background: 'rgba(252,238,10,0.15)', border: '1px solid rgba(252,238,10,0.3)', color: 'var(--cyber-yellow)' }}>
+                            {initials}
+                          </div>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+                            Post to {activeComm.name}
+                          </span>
                         </div>
-                        <input className="announcement-title-input" placeholder="Title"
+                        <input className="home-composer-title" placeholder="Title"
                           value={newCirclePost.title}
                           onChange={e => setNewCirclePost(p => ({ ...p, title: e.target.value }))} />
-                        <textarea className="announcement-body-input" placeholder="Write your announcement..."
-                          value={newCirclePost.content}
-                          onChange={e => setNewCirclePost(p => ({ ...p, content: e.target.value }))} />
-                        <button className="cyber-btn" onClick={() => postCircleAnnouncement(activeCommId)}
-                          disabled={postingAnnouncement} style={{ width: 'auto', padding: '8px 20px', marginTop: 8 }}>
-                          {postingAnnouncement ? 'Posting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
-                        </button>
+                        {newCirclePost.post_type !== 'poll' && (
+                          <textarea className="home-composer-body" placeholder="Write your announcement, event, or shoutout..."
+                            value={newCirclePost.content}
+                            onChange={e => setNewCirclePost(p => ({ ...p, content: e.target.value }))}
+                            rows={3} />
+                        )}
+                        {/* Poll options */}
+                        {newCirclePost.post_type === 'poll' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                            {newCirclePost.pollOptions.map((opt, i) => (
+                              <div key={i} style={{ display: 'flex', gap: 6 }}>
+                                <input
+                                  className="home-composer-title"
+                                  style={{ marginBottom: 0, flex: 1 }}
+                                  placeholder={`Option ${i + 1}`}
+                                  value={opt}
+                                  onChange={e => {
+                                    const opts = [...newCirclePost.pollOptions];
+                                    opts[i] = e.target.value;
+                                    setNewCirclePost(p => ({ ...p, pollOptions: opts }));
+                                  }}
+                                />
+                                {newCirclePost.pollOptions.length > 2 && (
+                                  <button type="button"
+                                    onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
+                                    style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
+                                    <i className="fa-solid fa-xmark"></i>
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            {newCirclePost.pollOptions.length < 6 && (
+                              <button type="button"
+                                onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
+                                style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
+                                <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div className="home-composer-footer">
+                          <div className="home-composer-types">
+                            {['announcement', 'event', 'shoutout', 'general', 'poll'].map(t => {
+                              const cfg = POST_TYPE[t];
+                              return (
+                                <button key={t}
+                                  className={`home-type-btn ${newCirclePost.post_type === t ? 'active' : ''}`}
+                                  style={{ '--type-color': cfg.color }}
+                                  onClick={() => setNewCirclePost(p => ({ ...p, post_type: t }))}>
+                                  <i className={cfg.icon}></i> {cfg.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <button className="cyber-btn"
+                            style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
+                            disabled={postingAnnouncement || !newCirclePost.title.trim() || (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim())}
+                            onClick={() => postCircleAnnouncement(activeCommId)}>
+                            {postingAnnouncement
+                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
+                              : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
+                          </button>
+                        </div>
                       </div>
                     )}
                     {circleAnnouncements.length === 0 ? (
@@ -2203,7 +2777,10 @@ export default function UserPortal() {
                       circleAnnouncements.map(a => (
                         <AnnouncementCard key={a.id} a={a} user={user}
                           onPin={togglePin}
-                          onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }} />
+                          onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
+                          onVote={handleCircleVote}
+                          onReport={(data) => setShowReport(data)}
+                          onApply={() => setShowAuditionForm({ comm: activeComm })} />
                       ))
                     )}
                   </div>
@@ -2220,6 +2797,7 @@ export default function UserPortal() {
                         canDelete={canDelete}
                         onDelete={deleteMessage}
                         onEdit={editMessage}
+                        onReport={(data) => setShowReport(data)}
                       />
                     );
                   })
@@ -2233,6 +2811,64 @@ export default function UserPortal() {
                     <input value={msgInput} onChange={e => setMsgInput(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && sendPost()} placeholder="Write a message..." />
                     <button className="cyber-btn" onClick={sendPost}>SEND</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── CIRCLE CHAT ── */}
+          {section === 'circle-chat' && activeCommId !== 'global' && (
+            <>
+              <div className="c-feed fade-in">
+                <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
+                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+                    <i className="fa-solid fa-comments" style={{ marginRight: 10 }}></i>CIRCLE CHAT
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
+                    Private chat exclusive to members of {activeComm.name}.
+                  </p>
+                </div>
+
+                {!isMember(activeCommId) ? (
+                  <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                    <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 16, display: 'block' }}></i>
+                    <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
+                  </div>
+                ) : (
+                  circleChatMessages.map(m => {
+                    const isOwnerMsg = m.student_id === user?.student_id;
+                    const canDelete = isOwnerMsg || canModerate;
+                    return (
+                      <MessageItem
+                        key={m.id}
+                        m={m}
+                        tagColor={tagColor}
+                        isOwnerMsg={isOwnerMsg}
+                        canDelete={canDelete}
+                        onDelete={async (id) => {
+                          if (!confirm('Delete this message?')) return;
+                          await supabase.from('messages').delete().eq('id', id);
+                          setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
+                        }}
+                        onEdit={async (id, content) => {
+                          await supabase.from('messages').update({ content, edited: true }).eq('id', id);
+                          setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
+                        }}
+                      />
+                    );
+                  })
+                )}
+                <div ref={feedBottomRef} />
+              </div>
+
+              {isMember(activeCommId) && user?.is_verified && (
+                <div className="composer">
+                  <div className="c-input-wrap">
+                    <input value={circleChatInput} onChange={e => setCircleChatInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendCircleChatPost()}
+                      placeholder={`Message ${activeComm.name}...`} />
+                    <button className="cyber-btn" onClick={sendCircleChatPost}>SEND</button>
                   </div>
                 </div>
               )}
@@ -2254,7 +2890,8 @@ export default function UserPortal() {
       {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {showAuditionForm && (
         <AuditionApplicationForm
-          comm={showAuditionForm}
+          comm={showAuditionForm.comm}
+          audition={showAuditionForm.audition || null}
           applicantId={user?.id}
           onSubmitted={() => { setShowAuditionForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyAuditions(); }}
           onCancel={() => setShowAuditionForm(null)}
@@ -2264,6 +2901,10 @@ export default function UserPortal() {
         <AuditionDetailModal data={viewingAudition} onClose={() => setViewingAudition(null)} />
       )}
       <Toast message={toast} />
+
+      {showReport && (
+        <ReportModal data={showReport} user={user} onClose={() => setShowReport(null)} />
+      )}
 
       {/* Theme Picker Modal */}
       {showThemePicker && (

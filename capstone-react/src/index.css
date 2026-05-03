@@ -1281,13 +1281,13 @@ body {
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.08);
   border-bottom-left-radius: 4px;
-  color: rgba(255,255,255,0.9);
+  color: var(--text-primary);
 }
 .chat-bubble.own {
   background: rgba(0,240,255,0.15);
   border: 1px solid rgba(0,240,255,0.25);
   border-bottom-right-radius: 4px;
-  color: white;
+  color: var(--text-primary);
 }
 
 /* keep menu button behavior for chat */
@@ -2145,14 +2145,15 @@ body {
 .announcement-title {
   font-size: 16px;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
   margin-bottom: 10px;
   line-height: 1.3;
 }
 
 .announcement-body {
   font-size: 13px;
-  color: rgba(255,255,255,0.75);
+  color: var(--text-primary);
+  opacity: 0.85;
   line-height: 1.7;
   white-space: pre-wrap;
 }

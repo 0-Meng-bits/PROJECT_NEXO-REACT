@@ -10,6 +10,8 @@ const SECTIONS = [
   { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
+  { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-flag' },
+  { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -85,6 +87,15 @@ function StatCard({ label, value, color, icon }) {
   );
 }
 
+// Inappropriate words filter (basic list — expand as needed)
+const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol'];
+
+function containsBadWord(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return BAD_WORDS.some(w => lower.includes(w));
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const admin = JSON.parse(localStorage.getItem('currentUser'));
@@ -101,6 +112,9 @@ export default function AdminDashboard() {
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [circleMembers, setCircleMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [allMessages, setAllMessages] = useState([]);
+  const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -139,13 +153,16 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [studRes, commRes, annRes, audRes, msgRes, membRes] = await Promise.all([
+      const [studRes, commRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes] = await Promise.all([
         fetch('/api/students'),
         supabase.from('communities').select('*, profiles(full_name)').order('created_at', { ascending: false }),
         supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
         supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
         supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
         supabase.from('memberships').select('community_id, status, created_at'),
+        supabase.from('reports').select('*, reporter:reporter_id(full_name, student_id), reported:reported_user_id(full_name, student_id)').order('created_at', { ascending: false }),
+        supabase.from('messages').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
+        supabase.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       ]);
       setStudents(await studRes.json());
       setCommunities(commRes.data || []);
@@ -153,11 +170,25 @@ export default function AdminDashboard() {
       setAuditions(audRes.data || []);
       setGlobalMessages(msgRes.data || []);
       setMemberships(membRes.data || []);
+      setReports(repRes.data || []);
+      setAllMessages(allMsgRes.data || []);
+      setAllCircleAnnouncements(circAnnRes.data || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Real-time: new reports appear instantly in admin panel
+  useEffect(() => {
+    const sub = supabase.channel('admin:reports')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reports' },
+        (payload) => {
+          setReports(prev => [payload.new, ...prev]);
+        }
+      ).subscribe();
+    return () => supabase.removeChannel(sub);
+  }, []);
 
   const viewCircleMembers = async (circle) => {
     setSelectedCircle(circle);
@@ -213,6 +244,65 @@ export default function AdminDashboard() {
     if (!confirm('Delete this message?')) return;
     const { error } = await supabase.from('messages').delete().eq('id', id);
     if (!error) setGlobalMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  const issueWarning = async (userId, userName, reason) => {
+    const { error } = await supabase.from('user_warnings').insert([{
+      user_id: userId, admin_id: admin?.id, type: 'warning', reason,
+    }]);
+    if (!error) {
+      // Increment warning count
+      await supabase.rpc('increment_warning', { uid: userId }).catch(() =>
+        supabase.from('profiles').select('warning_count').eq('id', userId).single().then(({ data }) =>
+          supabase.from('profiles').update({ warning_count: (data?.warning_count || 0) + 1 }).eq('id', userId)
+        )
+      );
+      await supabase.from('notifications').insert([{
+        user_id: userId, type: 'audition_update',
+        message: `⚠️ Warning issued by admin: ${reason}`,
+      }]);
+      showToast(`Warning issued to ${userName}.`);
+      fetchData();
+    }
+  };
+
+  const banUser = async (userId, userName) => {
+    if (!confirm(`Ban ${userName}? They will lose access to the platform.`)) return;
+    const reason = prompt('Reason for ban:');
+    if (!reason) return;
+    await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
+    await supabase.from('user_warnings').insert([{
+      user_id: userId, admin_id: admin?.id, type: 'ban', reason,
+    }]);
+    await supabase.from('notifications').insert([{
+      user_id: userId, type: 'audition_update',
+      message: `🚫 Your account has been banned: ${reason}`,
+    }]);
+    showToast(`${userName} has been banned.`);
+    fetchData();
+  };
+
+  const unbanUser = async (userId, userName) => {
+    if (!confirm(`Unban ${userName}?`)) return;
+    await supabase.from('profiles').update({ is_banned: false }).eq('id', userId);
+    showToast(`${userName} has been unbanned.`);
+    fetchData();
+  };
+
+  const resolveReport = async (reportId, status, note) => {
+    await supabase.from('reports').update({
+      status, admin_note: note, reviewed_at: new Date().toISOString(), reviewed_by: admin?.id,
+    }).eq('id', reportId);
+    showToast('Report updated.');
+    fetchData();
+  };
+
+  const deleteContent = async (type, id) => {
+    if (!confirm('Delete this content?')) return;
+    if (type === 'message') await supabase.from('messages').delete().eq('id', id);
+    if (type === 'announcement') await supabase.from('announcements').delete().eq('id', id);
+    showToast('Content deleted.');
+    fetchData();
   };
 
   const rankLabel = (level) => ['Member', 'Moderator', 'Co-Leader', 'Leader'][level ?? 0] || 'Member';
@@ -328,6 +418,9 @@ export default function AdminDashboard() {
             )}
             {s.key === 'auditions' && auditions.filter(a => a.status === 'pending').length > 0 && (
               <span className="adm-badge">{auditions.filter(a => a.status === 'pending').length}</span>
+            )}
+            {s.key === 'reports' && reports.filter(r => r.status === 'pending').length > 0 && (
+              <span className="adm-badge">{reports.filter(r => r.status === 'pending').length}</span>
             )}
           </div>
         ))}
@@ -887,6 +980,261 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {/* ── REPORTS ── */}
+        {section === 'reports' && (
+          <div className="adm-card">
+            <div className="adm-card-head">
+              <span>User Reports</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {reports.filter(r => r.status === 'pending').length} pending
+              </span>
+            </div>
+            {loading ? <div className="adm-empty">Loading...</div>
+            : reports.length === 0 ? (
+              <div className="adm-empty">No reports yet.</div>
+            ) : (
+              <table className="adm-table">
+                <thead>
+                  <tr><th>REPORTED BY</th><th>REPORTED USER</th><th>TYPE</th><th>REASON</th><th>CONTENT</th><th>STATUS</th><th>ACTIONS</th></tr>
+                </thead>
+                <tbody>
+                  {reports.map(r => (
+                    <tr key={r.id}>
+                      <td style={{ fontSize: 11 }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
+                      </td>
+                      <td><span className="adm-tag">{r.content_type}</span></td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 160 }}>{r.reason}</td>
+                      <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 180 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.content_preview || '—'}
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          color: r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : 'var(--text-muted)',
+                          border: `1px solid ${r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : '#333'}` }}>
+                          {r.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        {r.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {r.reported_user_id && (
+                              <>
+                                <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
+                                  onClick={() => {
+                                    const reason = prompt('Warning reason:');
+                                    if (reason) issueWarning(r.reported_user_id, r.reported?.full_name, reason);
+                                    resolveReport(r.id, 'reviewed', 'Warning issued');
+                                  }}>
+                                  <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                                </button>
+                                <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                  onClick={() => {
+                                    banUser(r.reported_user_id, r.reported?.full_name);
+                                    resolveReport(r.id, 'reviewed', 'User banned');
+                                  }}>
+                                  <i className="fa-solid fa-ban"></i> Ban
+                                </button>
+                              </>
+                            )}
+                            {r.content_id && (
+                              <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                onClick={() => {
+                                  deleteContent(r.content_type, r.content_id);
+                                  resolveReport(r.id, 'reviewed', 'Content deleted');
+                                }}>
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            )}
+                            <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }}
+                              onClick={() => resolveReport(r.id, 'dismissed', 'Dismissed by admin')}>
+                              Dismiss
+                            </button>
+                          </div>
+                        )}
+                        {r.status !== 'pending' && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || '—'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {/* ── CONTENT MONITOR ── */}
+        {section === 'moderation' && (() => {
+          const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
+          const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
+          const flaggedGlobal = globalMessages.filter(m => containsBadWord(m.content));
+          const allFlagged = [
+            ...flaggedMessages.map(m => ({ ...m, _type: 'circle_message', _circle: m.communities?.name })),
+            ...flaggedAnnouncements.map(a => ({ ...a, _type: 'announcement', _circle: a.communities?.name })),
+            ...flaggedGlobal.map(m => ({ ...m, _type: 'global_message', _circle: 'Global Feed' })),
+          ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Warning stats */}
+              <div className="adm-stats-row">
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(247,169,79,0.15)', color: 'var(--orange)' }}>
+                    <i className="fa-solid fa-triangle-exclamation"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--orange)' }}>{allFlagged.length}</div>
+                    <div className="adm-stat-lbl">Flagged Content</div>
+                  </div>
+                </div>
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(247,95,95,0.15)', color: 'var(--red)' }}>
+                    <i className="fa-solid fa-ban"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--red)' }}>
+                      {students.filter(s => s.is_banned).length}
+                    </div>
+                    <div className="adm-stat-lbl">Banned Users</div>
+                  </div>
+                </div>
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)' }}>
+                    <i className="fa-solid fa-flag"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--cyber-yellow)' }}>
+                      {reports.filter(r => r.status === 'pending').length}
+                    </div>
+                    <div className="adm-stat-lbl">Pending Reports</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flagged content */}
+              <div className="adm-card">
+                <div className="adm-card-head">
+                  <span><i className="fa-solid fa-robot" style={{ marginRight: 8, color: 'var(--orange)' }}></i>Auto-Detected Inappropriate Content</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{allFlagged.length} flagged</span>
+                </div>
+                {allFlagged.length === 0 ? (
+                  <div className="adm-empty">
+                    <i className="fa-solid fa-shield-halved" style={{ fontSize: 28, color: 'var(--green)', marginBottom: 10, display: 'block' }}></i>
+                    No inappropriate content detected.
+                  </div>
+                ) : (
+                  <table className="adm-table">
+                    <thead><tr><th>TYPE</th><th>CIRCLE</th><th>CONTENT</th><th>AUTHOR</th><th>DATE</th><th>ACTION</th></tr></thead>
+                    <tbody>
+                      {allFlagged.map((item, i) => {
+                        const content = item.content || item.title || '';
+                        const highlighted = content.replace(
+                          new RegExp(BAD_WORDS.join('|'), 'gi'),
+                          match => `[${match}]`
+                        );
+                        return (
+                          <tr key={i}>
+                            <td><span className="adm-tag" style={{ color: 'var(--orange)', borderColor: 'var(--orange)' }}>
+                              {item._type === 'global_message' ? 'Global' : item._type === 'announcement' ? 'Post' : 'Message'}
+                            </span></td>
+                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || '—'}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-primary)', maxWidth: 280 }}>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {highlighted}
+                              </div>
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {item.full_name || item.author_name || '—'}
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </td>
+                            <td>
+                              <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                onClick={() => deleteContent(
+                                  item._type === 'announcement' ? 'announcement' : 'message',
+                                  item.id
+                                )}>
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* User warnings history */}
+              <div className="adm-card">
+                <div className="adm-card-head">
+                  <span>Users with Warnings / Bans</span>
+                </div>
+                {(() => {
+                  const warnedUsers = students.filter(s => s.warning_count > 0 || s.is_banned);
+                  return warnedUsers.length === 0 ? (
+                    <div className="adm-empty">No warnings or bans issued yet.</div>
+                  ) : (
+                    <table className="adm-table">
+                      <thead><tr><th>CTU ID</th><th>NAME</th><th>WARNINGS</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                      <tbody>
+                        {warnedUsers.map(s => (
+                          <tr key={s.id}>
+                            <td><span className="adm-mono">{s.student_id}</span></td>
+                            <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
+                            <td>
+                              <span style={{ color: s.warning_count >= 3 ? 'var(--red)' : 'var(--orange)', fontWeight: 700 }}>
+                                {s.warning_count || 0} warning{s.warning_count !== 1 ? 's' : ''}
+                              </span>
+                            </td>
+                            <td>
+                              {s.is_banned
+                                ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
+                                : <span className="adm-status verified">ACTIVE</span>
+                              }
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {!s.is_banned && (
+                                  <>
+                                    <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
+                                      onClick={() => { const r = prompt('Warning reason:'); if (r) issueWarning(s.id, s.full_name, r); }}>
+                                      <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                                    </button>
+                                    <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                      onClick={() => banUser(s.id, s.full_name)}>
+                                      <i className="fa-solid fa-ban"></i> Ban
+                                    </button>
+                                  </>
+                                )}
+                                {s.is_banned && (
+                                  <button className="adm-btn approve" style={{ fontSize: 10 }}
+                                    onClick={() => unbanUser(s.id, s.full_name)}>
+                                    <i className="fa-solid fa-unlock"></i> Unban
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>

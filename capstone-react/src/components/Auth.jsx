@@ -8,6 +8,10 @@ export default function Auth() {
   const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
   const [loading, setLoading] = useState(false);
   const [idVerified, setIdVerified] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [pendingRoute, setPendingRoute] = useState('/portal');
   const [form, setForm] = useState({
     ctuId: '', password: '', fullName: '', email: '', userType: 'Student'
   });
@@ -120,7 +124,13 @@ export default function Auth() {
         localStorage.removeItem('accessToken');
         localStorage.setItem('currentUser', JSON.stringify(mergedUser));
         if (data.session) localStorage.setItem('accessToken', data.session.access_token);
-        navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
+        // Check if user has accepted terms
+        if (!localStorage.getItem('nexo-terms-accepted')) {
+          setPendingRoute(data.user.user_type === 'Admin' ? '/admin' : '/portal');
+          setShowTermsModal(true);
+        } else {
+          navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
+        }
       } else {
         alert('SYSTEM_ALERT: ' + data.message);
       }
@@ -275,8 +285,24 @@ export default function Auth() {
 
           <div className="input-group">
             <label>PASSWORD</label>
-            <input name="password" type="password" value={form.password} onChange={update}
-              placeholder="••••••••" required disabled={loading} minLength={6} />
+            <div style={{ position: 'relative' }}>
+              <input name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update}
+                placeholder="••••••••" required disabled={loading} minLength={6}
+                style={{ paddingRight: 40 }} />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                style={{
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: 14, padding: '4px',
+                  display: 'flex', alignItems: 'center',
+                }}
+                tabIndex={-1}
+              >
+                <i className={showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
+              </button>
+            </div>
           </div>
 
           {!isLogin && (
@@ -301,6 +327,49 @@ export default function Auth() {
           }
         </div>
       </div>
+
+      {/* ── TERMS & CONDITIONS MODAL ── */}
+      {showTermsModal && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="auth-card fade-in" style={{ maxWidth: 480, maxHeight: '85vh', overflowY: 'auto', textAlign: 'left' }}>
+            <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 16, textAlign: 'center' }}>
+              <i className="fa-solid fa-shield-halved" style={{ marginRight: 8 }}></i>TERMS &amp; CONDITIONS
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 11, letterSpacing: 1, marginBottom: 16, textAlign: 'center' }}>
+              Please read and accept before continuing
+            </p>
+            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>1. Responsible Use</p>
+              <p style={{ marginBottom: 12 }}>You agree to use NEXO Connect responsibly and in accordance with CTU's student conduct policies. Any misuse of the platform may result in account suspension.</p>
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>2. Respect for Others</p>
+              <p style={{ marginBottom: 12 }}>You agree to treat all students and faculty with respect. Harassment, bullying, hate speech, or any form of discrimination is strictly prohibited.</p>
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>3. Personal Information</p>
+              <p style={{ marginBottom: 12 }}>Do not share sensitive personal information (home address, financial details, passwords) of yourself or others on the platform.</p>
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>4. Content Policy</p>
+              <p style={{ marginBottom: 12 }}>All content posted must be relevant to academic or campus life. Spam, explicit content, or off-topic material will be removed.</p>
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>5. Privacy</p>
+              <p>Your data is stored securely and used only to provide the NEXO Connect service. We do not sell or share your information with third parties.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="cyber-btn" style={{ flex: 1 }} onClick={() => {
+                localStorage.setItem('nexo-terms-accepted', 'true');
+                setShowTermsModal(false);
+                navigate(pendingRoute);
+              }}>
+                <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>I ACCEPT
+              </button>
+              <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={() => {
+                setShowTermsModal(false);
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('accessToken');
+                setMode('login');
+              }}>
+                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
