@@ -1,10 +1,14 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Splash from './Splash';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
-  const [mode, setMode] = useState('splash'); // 'splash' | 'login' | 'signup'
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const initialMode = params.get('mode') || 'splash';
+
+  const [mode, setMode] = useState(initialMode);
   const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
   const [loading, setLoading] = useState(false);
   const [idVerified, setIdVerified] = useState(false);
