@@ -2404,13 +2404,8 @@ export default function UserPortal() {
           {myCircles.map(c => (
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? 'active' : ''}`}
               title={c.name} onClick={() => {
-                if (c.id === 'global') { setActiveCommId('global'); setSection('home'); }
-                else if (activeCommId === c.id) {
-                  // Already in this circle — reset to main circle view
-                  setSection('circles'); setShowCircleAnnouncements(false); setActiveChannelId(null);
-                } else {
-                  enterCircle(c.id);
-                }
+                setActiveCommId(c.id);
+                setSection(c.id === 'global' ? 'home' : 'circles');
               }}>
               <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : (c.icon || (c.icon || getCategoryIcon(c.category)))}></i>
             </div>
