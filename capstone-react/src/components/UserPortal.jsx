@@ -2128,7 +2128,8 @@ export default function UserPortal() {
 
   const deleteCircle = async (id) => {
     if (!confirm('Delete this circle? This cannot be undone.')) return;
-    const token = localStorage.getItem('accessToken');
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token || localStorage.getItem('accessToken');
     const params = new URLSearchParams({ id });
     if (user?.id) params.set('userId', user.id);
     try {
