@@ -905,37 +905,67 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   // Fetch latest profile data from DB when modal opens
   useEffect(() => {
     if (!user?.id) return;
-    const token = localStorage.getItem('accessToken');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    else headers['x-user-id'] = user.id;
 
-    fetch('/api/get-profile', { headers })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.user) {
+    // Try to get fresh data directly from Supabase using the user's session
+    const fetchProfile = async () => {
+      try {
+        // First try: use the stored session token to authenticate the request
+        const token = localStorage.getItem('accessToken');
+
+        // Direct Supabase query — works if RLS allows users to read own profile
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('course, year_level, interests, avatar_url, id_photo_url')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
           setProfile({
-            course: data.user.course || '',
-            year_level: data.user.year_level || '',
-            interests: data.user.interests || [],
+            course: data.course || '',
+            year_level: data.year_level || '',
+            interests: data.interests || [],
           });
-          if (data.user.avatar_url && !avatarUrl) setAvatarUrl(data.user.avatar_url);
-          if (data.user.id_photo_url) setIdUploaded(true);
+          if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
+          if (data.id_photo_url) setIdUploaded(true);
           const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-          localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data.user }));
+          localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data }));
+          return;
         }
-      })
-      .catch(() => {
-        // Last resort: use whatever is in localStorage
+
+        // Fallback: try /api/get-profile
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        else headers['x-user-id'] = user.id;
+
+        const res = await fetch('/api/get-profile', { headers });
+        if (res.ok) {
+          const result = await res.json();
+          if (result?.user) {
+            setProfile({
+              course: result.user.course || '',
+              year_level: result.user.year_level || '',
+              interests: result.user.interests || [],
+            });
+            if (result.user.avatar_url && !avatarUrl) setAvatarUrl(result.user.avatar_url);
+            if (result.user.id_photo_url) setIdUploaded(true);
+            const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...result.user }));
+          }
+        }
+      } catch (err) {
+        console.error('[ProfileModal] fetch error:', err);
+        // Last resort: use localStorage
         const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        if (stored.course || stored.year_level || stored.interests?.length) {
-          setProfile({
-            course: stored.course || '',
-            year_level: stored.year_level || '',
-            interests: stored.interests || [],
-          });
-        }
-      });
+        setProfile({
+          course: stored.course || '',
+          year_level: stored.year_level || '',
+          interests: stored.interests || [],
+        });
+        if (stored.id_photo_url) setIdUploaded(true);
+      }
+    };
+
+    fetchProfile();
   }, [user.id]);
 
   const handleIdPhotoUpload = async (e) => {
