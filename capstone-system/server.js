@@ -511,6 +511,73 @@ app.post('/api/forgot-password', async (req, res) => {
   res.status(200).json({ message: 'Password reset email sent.' });
 });
 
+// ── SELF: DEACTIVATE ACCOUNT ──────────────────────────────────────────────────
+app.post('/api/deactivate-account', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ message: 'User ID required.' });
+
+  // Verify the requester is the account owner
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token && token !== 'null' && token !== 'undefined') {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ message: 'Invalid session.' });
+    if (user.id !== userId) return res.status(403).json({ message: 'You can only deactivate your own account.' });
+  }
+
+  // Mark as deactivated — set is_verified to false and add a deactivated flag
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ is_verified: false, deactivated: true })
+    .eq('id', userId);
+
+  if (error) {
+    // If deactivated column doesn't exist, just set is_verified false
+    const { error: e2 } = await supabaseAdmin
+      .from('profiles')
+      .update({ is_verified: false })
+      .eq('id', userId);
+    if (e2) return res.status(500).json({ message: 'Failed to deactivate account.' });
+  }
+
+  // Disable the auth user so they can't log in
+  await supabaseAdmin.auth.admin.updateUserById(userId, { ban_duration: '876600h' }); // ~100 years
+
+  console.log('[DEACTIVATE] User deactivated:', userId);
+  res.json({ message: 'Account deactivated successfully.' });
+});
+
+// ── SELF: DELETE ACCOUNT ──────────────────────────────────────────────────────
+app.delete('/api/delete-account', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ message: 'User ID required.' });
+
+  // Verify the requester is the account owner
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token && token !== 'null' && token !== 'undefined') {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ message: 'Invalid session.' });
+    if (user.id !== userId) return res.status(403).json({ message: 'You can only delete your own account.' });
+  }
+
+  // Delete profile (cascades memberships, notifications, etc.)
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles').delete().eq('id', userId);
+  if (profileError) {
+    console.error('[DELETE ACCOUNT] Profile error:', profileError.message);
+    return res.status(500).json({ message: 'Failed to delete profile.' });
+  }
+
+  // Delete from Supabase Auth
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (authError) {
+    console.error('[DELETE ACCOUNT] Auth error:', authError.message);
+    return res.status(207).json({ message: 'Profile deleted but auth removal failed.' });
+  }
+
+  console.log('[DELETE ACCOUNT] User permanently deleted:', userId);
+  res.json({ message: 'Account permanently deleted.' });
+});
+
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
   const { error } = await supabaseAdmin

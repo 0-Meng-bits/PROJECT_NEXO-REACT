@@ -1177,6 +1177,75 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
+
+            {/* ── Account management ── */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textAlign: 'center', textTransform: 'uppercase' }}>Account Management</p>
+
+              {/* Deactivate */}
+              <button
+                style={{
+                  width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(247,169,79,0.4)',
+                  background: 'rgba(247,169,79,0.06)', color: '#f7a94f', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                }}
+                onClick={async () => {
+                  if (!confirm('Deactivate your account? You can reactivate by contacting an admin.')) return;
+                  const token = localStorage.getItem('accessToken');
+                  const res = await fetch('/api/deactivate-account', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ userId: user.id }),
+                  });
+                  if (res.ok) {
+                    alert('Your account has been deactivated. You will now be logged out.');
+                    onLogout();
+                  } else {
+                    const d = await res.json().catch(() => ({}));
+                    alert('Failed to deactivate: ' + (d.message || 'Unknown error'));
+                  }
+                }}>
+                <i className="fa-solid fa-user-slash" style={{ marginRight: 6 }}></i>
+                Deactivate Account
+              </button>
+
+              {/* Delete */}
+              <button
+                style={{
+                  width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(247,95,95,0.4)',
+                  background: 'rgba(247,95,95,0.06)', color: 'var(--red)', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                }}
+                onClick={async () => {
+                  if (!confirm('⚠️ Permanently delete your account? This cannot be undone. All your data will be removed.')) return;
+                  if (!confirm('Are you absolutely sure? Type OK to confirm.')) return;
+                  const token = localStorage.getItem('accessToken');
+                  const res = await fetch('/api/delete-account', {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ userId: user.id }),
+                  });
+                  if (res.ok) {
+                    alert('Your account has been permanently deleted.');
+                    localStorage.removeItem('currentUser');
+                    localStorage.removeItem('accessToken');
+                    window.location.href = '/';
+                  } else {
+                    const d = await res.json().catch(() => ({}));
+                    alert('Failed to delete: ' + (d.message || 'Unknown error'));
+                  }
+                }}>
+                <i className="fa-solid fa-trash-can" style={{ marginRight: 6 }}></i>
+                Delete Account Permanently
+              </button>
+            </div>
+
             <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
           </div>
         </>
