@@ -16,9 +16,8 @@ export default async function handler(req, res) {
     return res.status(403).json({ message: 'Admin access required.' });
   }
 
-  // Vercel routes /api/delete-user/[id] — extract id from URL
-  const parts = req.url.split('/');
-  const targetId = parts[parts.length - 1];
+  // Get target user id from query param
+  const targetId = req.query.id;
   if (!targetId) return res.status(400).json({ message: 'User ID required.' });
 
   // Delete profile first (cascades related data via FK)

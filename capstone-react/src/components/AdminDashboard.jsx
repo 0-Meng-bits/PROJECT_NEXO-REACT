@@ -288,7 +288,7 @@ export default function AdminDashboard() {
   const deleteUser = async (id, name) => {
     if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
     const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/delete-user/${id}`, {
+    const res = await fetch(`/api/delete-user?id=${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -306,7 +306,7 @@ export default function AdminDashboard() {
   const forceVerifyEmail = async (id, name) => {
     if (!confirm(`Force-verify email for "${name}"?`)) return;
     const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/force-verify-email/${id}`, {
+    const res = await fetch(`/api/force-verify-email?id=${id}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
