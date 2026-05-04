@@ -2955,8 +2955,9 @@ export default function UserPortal() {
               <div className="c-feed fade-in">
                 {/* â”€â”€ CIRCLE COVER BANNER â”€â”€ */}
                 <div className="circle-cover-banner" style={{
-                  backgroundImage: activeComm.cover_url ? `url(${activeComm.cover_url})` : 'none',
-                  background: activeComm.cover_url ? undefined : categoryGradient(activeComm.category),
+                  background: activeComm.cover_url
+                    ? `url(${activeComm.cover_url}) center/cover no-repeat`
+                    : categoryGradient(activeComm.category),
                 }}>
                   {/* Cover photo edit button "” top-right, only for creator */}
                   {isOwner && (
