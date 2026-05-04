@@ -2,14 +2,32 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { createWorker } from 'tesseract.js';
 
 function extractIdFromText(text, typedId) {
-  const ocrDigits = text.replace(/\D/g, '');
   const typedDigits = typedId.replace(/\D/g, '');
   if (typedDigits.length < 4) return { found: false };
 
-  // Exact match
+  // Extract ALL digit sequences from OCR text
+  const allDigitSequences = text.match(/\d+/g) || [];
+  const ocrDigits = text.replace(/\D/g, '');
+
+  console.log('[MATCH] Typed:', typedDigits, '| OCR sequences:', allDigitSequences, '| All digits:', ocrDigits);
+
+  // 1. Exact match anywhere in full digit string
   if (ocrDigits.includes(typedDigits)) return { found: true };
 
-  // Fuzzy: allow up to 2 digit differences (OCR commonly misreads 8↔3, 6↔0, 1↔7)
+  // 2. Check each individual digit sequence from OCR
+  for (const seq of allDigitSequences) {
+    if (seq.includes(typedDigits) || typedDigits.includes(seq)) return { found: true };
+    // Fuzzy: allow up to 2 digit differences
+    if (seq.length === typedDigits.length) {
+      let diff = 0;
+      for (let j = 0; j < typedDigits.length; j++) {
+        if (seq[j] !== typedDigits[j]) diff++;
+      }
+      if (diff <= 2) return { found: true };
+    }
+  }
+
+  // 3. Sliding window fuzzy match on full digit string
   for (let i = 0; i <= ocrDigits.length - typedDigits.length; i++) {
     const chunk = ocrDigits.substring(i, i + typedDigits.length);
     let diff = 0;
@@ -19,9 +37,9 @@ function extractIdFromText(text, typedId) {
     if (diff <= 2) return { found: true };
   }
 
-  // Partial match: if at least 5 of 7 digits match in sequence
-  const minMatch = Math.max(4, typedDigits.length - 2);
-  for (let len = typedDigits.length - 1; len >= minMatch; len--) {
+  // 4. Partial: at least 5 consecutive digits match
+  const minMatch = Math.max(5, typedDigits.length - 2);
+  for (let len = typedDigits.length; len >= minMatch; len--) {
     for (let start = 0; start <= typedDigits.length - len; start++) {
       const sub = typedDigits.substring(start, start + len);
       if (ocrDigits.includes(sub)) return { found: true };
@@ -218,8 +236,9 @@ export default function IdVerifier({ ctuId, onVerified }) {
   // stages: idle | camera | crop | scanning | done | error
   const [stage, setStage] = useState('idle');
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState(null);       // shown during scan/result
+  const [preview, setPreview] = useState(null);       // full original ID (shown in result)
   const [originalPreview, setOriginalPreview] = useState(null); // full ID image for re-crop
+  const [cropPreview, setCropPreview] = useState(null); // cropped region (shown during scan)
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const fileRef = useRef(null);
@@ -419,7 +438,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
   const handleCropDone = (croppedFile, croppedUrl) => {
     cropFileRef.current = croppedFile;
-    // Keep showing the original full ID — don't replace preview with the processed crop
+    setCropPreview(croppedUrl); // show cropped image during scanning
     runOCR(croppedFile);
   };
 
@@ -437,6 +456,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
     stopCamera();
     setStage('idle');
     setPreview(null);
+    setOriginalPreview(null);
+    setCropPreview(null);
     setResult(null);
     setProgress(0);
     setCameraError(null);
@@ -532,9 +553,10 @@ export default function IdVerifier({ ctuId, onVerified }) {
       {/* ── SCANNING ── */}
       {stage === 'scanning' && (
         <div className="id-scan-area">
-          {preview && (
+          {/* Show the cropped region during scanning */}
+          {(cropPreview || preview) && (
             <div className="id-preview-wrap">
-              <img src={preview} alt="ID preview" className="id-preview-img" />
+              <img src={cropPreview || preview} alt="ID crop" className="id-preview-img" />
               <div className="id-scan-line" />
             </div>
           )}

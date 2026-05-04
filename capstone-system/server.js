@@ -589,4 +589,5 @@ app.post('/api/force-verify-email/:id', async (req, res) => {
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
+  console.log(`🔍 Google Vision OCR: ${process.env.GOOGLE_VISION_API_KEY ? '✅ ENABLED' : '❌ NOT configured (using Tesseract fallback)'}`);
 });
