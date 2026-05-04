@@ -363,6 +363,47 @@ export default function Auth() {
                 <i className={showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
               </button>
             </div>
+            {/* Password strength indicator — signup only */}
+            {!isLogin && form.password.length > 0 && (() => {
+              const p = form.password;
+              const checks = {
+                length:    p.length >= 8,
+                lowercase: /[a-z]/.test(p),
+                uppercase: /[A-Z]/.test(p),
+                number:    /[0-9]/.test(p),
+                special:   /[^a-zA-Z0-9]/.test(p),
+              };
+              const score = Object.values(checks).filter(Boolean).length;
+              const levels = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG', 'VERY STRONG'];
+              const colors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#00f0ff'];
+              const pct = (score / 5) * 100;
+              return (
+                <div style={{ marginTop: 8 }}>
+                  {/* Bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: colors[score], borderRadius: 4, transition: 'width 0.3s, background 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: colors[score], minWidth: 70, textAlign: 'right' }}>{levels[score]}</span>
+                  </div>
+                  {/* Checklist */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                    {[
+                      { key: 'length',    label: '8+ characters' },
+                      { key: 'uppercase', label: 'Uppercase letter' },
+                      { key: 'lowercase', label: 'Lowercase letter' },
+                      { key: 'number',    label: 'Number' },
+                      { key: 'special',   label: 'Special character' },
+                    ].map(({ key, label }) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: checks[key] ? '#22c55e' : 'var(--text-muted)' }}>
+                        <i className={checks[key] ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'} style={{ fontSize: 10 }}></i>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {!isLogin && (
