@@ -428,6 +428,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
   const [reactions, setReactions] = useState({});
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -510,13 +511,24 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         {/* Inline action bar "” appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
-            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
-              <button key={type} className="chat-action-btn" onClick={() => toggleReaction(type)}
-                title={type}
-                style={{ color: reactions[type]?.includes(currentStudentId) ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 14 }}>
-                {emoji}
+            {/* Emoji reaction button */}
+            <div style={{ position: 'relative' }}>
+              <button className="chat-action-btn" onClick={() => setShowEmojiPicker(p => !p)} title="React">
+                <i className="fa-regular fa-face-smile"></i>
               </button>
-            ))}
+              {showEmojiPicker && (
+                <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                  {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
+                    <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
+                      style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {isOwnerMsg && (
               <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
                 <i className="fa-solid fa-pen"></i>
