@@ -3,13 +3,15 @@ import { supabase, supabaseAdmin } from './_supabase.js';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Resolve user identity — prefer JWT token, fall back to x-user-id header
-  let userId = null;
+  // Resolve user identity — prefer query param, then JWT token, then x-user-id header
+  let userId = req.query.userId || null;
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (!error && user) userId = user.id;
+  if (!userId) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) userId = user.id;
+    }
   }
 
   if (!userId) {

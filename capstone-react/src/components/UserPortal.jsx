@@ -1205,13 +1205,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
 
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/upload-avatar', {
+      const res = await fetch(`/api/upload-avatar?userId=${user.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
         },
         body: JSON.stringify({ avatar: compressed }),
       });
@@ -2998,14 +2995,9 @@ export default function UserPortal() {
                           // Save via server (uses service role key, bypasses RLS)
                           let saved = false;
                           try {
-                            const token = localStorage.getItem('accessToken');
-                            const serverRes = await fetch('/api/upload-cover', {
+                            const serverRes = await fetch(`/api/upload-cover?userId=${user.id}`, {
                               method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
-                              },
+                              headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ cover: compressed, communityId: activeComm.id }),
                             });
                             if (serverRes.ok) {
