@@ -3,6 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import Landing from './Landing';
 import IdVerifier from './IdVerifier';
 
+function getPasswordStrength(password) {
+  if (!password) return null;
+  let score = 0;
+  const checks = {
+    length:    password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number:    /[0-9]/.test(password),
+    special:   /[^A-Za-z0-9]/.test(password),
+  };
+  score = Object.values(checks).filter(Boolean).length;
+  if (score <= 2) return { label: 'WEAK',   color: '#f75f5f', width: '25%',  checks };
+  if (score === 3) return { label: 'FAIR',   color: '#f7a94f', width: '50%',  checks };
+  if (score === 4) return { label: 'GOOD',   color: '#fcee0a', width: '75%',  checks };
+  return              { label: 'STRONG', color: '#3ecf8e', width: '100%', checks };
+}
+
+function PasswordStrength({ password }) {
+  const strength = getPasswordStrength(password);
+  if (!strength) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      {/* Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 4, transition: 'width 0.3s, background 0.3s' }} />
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 800, color: strength.color, fontFamily: 'monospace', letterSpacing: 1, minWidth: 48 }}>
+          {strength.label}
+        </span>
+      </div>
+      {/* Checklist */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
+        {[
+          { key: 'length',    label: '8+ characters' },
+          { key: 'uppercase', label: 'Uppercase letter' },
+          { key: 'lowercase', label: 'Lowercase letter' },
+          { key: 'number',    label: 'Number' },
+          { key: 'special',   label: 'Special character' },
+        ].map(({ key, label }) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: strength.checks[key] ? '#3ecf8e' : 'rgba(255,255,255,0.3)' }}>
+            <i className={`fa-solid ${strength.checks[key] ? 'fa-circle-check' : 'fa-circle'}`} style={{ fontSize: 9 }} />
+            {label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Auth() {
   const [mode, setMode] = useState('splash'); // 'splash' | 'login' | 'signup'
   const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
@@ -18,8 +68,9 @@ export default function Auth() {
   // Called when signup form is submitted — go to ID verify step first
   const handleSignupFormSubmit = (e) => {
     e.preventDefault();
-    if (form.password.length < 6) {
-      alert('SYSTEM_ALERT: Password must be at least 6 characters.');
+    const strength = getPasswordStrength(form.password);
+    if (!strength || strength.label === 'WEAK') {
+      alert('SYSTEM_ALERT: Password is too weak. Use at least 8 characters with uppercase, lowercase, and a number.');
       return;
     }
     setSignupStep('id-verify');
@@ -288,6 +339,7 @@ export default function Auth() {
             <label>PASSWORD</label>
             <input name="password" type="password" value={form.password} onChange={update}
               placeholder="••••••••" required disabled={loading} minLength={6} />
+            {!isLogin && <PasswordStrength password={form.password} />}
           </div>
 
           {!isLogin && (

@@ -211,7 +211,7 @@ export default function AdminDashboard() {
         supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
         supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
         supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
-        supabase.from('memberships').select('community_id, status, created_at'),
+        supabase.from('memberships').select('*'),
       ]);
       setStudents(await studRes.json());
       setCommunities(commRes.data || []);
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
 
   const approveStudent = async (id, name) => {
     if (!confirm('Approve this student?')) return;
-    const res = await fetch(`/api/verify-student/${id}`, { method: 'POST' });
+    const res = await fetch(`/api/verify-student?id=${id}`, { method: 'POST' });
     if (res.ok) {
       // Send notification to the student
       await supabase.from('notifications').insert([{
@@ -287,10 +287,8 @@ export default function AdminDashboard() {
   // ── Delete verified user ─────────────────────────────────────────────────
   const deleteUser = async (id, name) => {
     if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/delete-user/${id}`, {
+    const res = await fetch(`/api/delete-user?id=${id}&adminId=${admin?.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
       showToast(`${name} deleted.`);
@@ -306,7 +304,7 @@ export default function AdminDashboard() {
   const forceVerifyEmail = async (id, name) => {
     if (!confirm(`Force-verify email for "${name}"?`)) return;
     const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/force-verify-email/${id}`, {
+    const res = await fetch(`/api/force-verify-email?id=${id}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
