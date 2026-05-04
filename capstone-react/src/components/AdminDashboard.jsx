@@ -898,15 +898,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
 
         {/* â”€â”€ CIRCLES â”€â”€ */}
         {section === 'communities' && !selectedCircle && (
@@ -1529,6 +1520,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 
 
