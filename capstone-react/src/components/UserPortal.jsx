@@ -1701,12 +1701,10 @@ export default function UserPortal() {
   }, []);
 
   const loadChannels = useCallback(async (commId) => {
-    if (!commId || commId === 'global') { setChannels([]); setActiveChannelId(null); return; }
+    if (!commId || commId === 'global') { setChannels([]); return; }
     const { data } = await supabase.from('channels').select('*')
       .eq('community_id', commId).order('created_at', { ascending: true });
-    const list = data || [];
-    setChannels(list);
-    setActiveChannelId(prev => list.find(c => c.id === prev) ? prev : (list[0]?.id || null));
+    setChannels(data || []);
   }, []);
 
   const loadMyMemberships = useCallback(async () => {
@@ -1894,10 +1892,8 @@ export default function UserPortal() {
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
     } else if (commId) {
-      // No channel selected "� load all messages for this community
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
-        .is('channel_id', null)
         .order('created_at', { ascending: true });
       setMessages(data || []);
     } else {
@@ -1924,53 +1920,43 @@ export default function UserPortal() {
     setCircleChatMessages(data || []);
   }, []);
 
-  // Initial load + realtime subscription "� re-runs when channel/community changes
+  // Initial load + realtime subscription — re-runs when channel/community changes
   useEffect(() => {
     loadMessages(activeCommId, activeChannelId);
+  }, [activeCommId, activeChannelId]); // eslint-disable-line
 
-    // Build a unique channel name per context
+  // Realtime subscription — separate from load so it doesn't cause extra reloads
+  useEffect(() => {
     const channelName = activeCommId === 'global'
       ? 'realtime:messages:global'
       : `realtime:messages:${activeChannelId || activeCommId}`;
 
     const subscription = supabase
       .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const msg = payload.new;
-          // Only add if it belongs to the current view
           const isGlobal = activeCommId === 'global' && !msg.community_id;
           const isChannel = msg.channel_id === activeChannelId;
-          const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId && !msg.channel_id;
+          const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId;
           if (isGlobal || isChannel || isCommunityNoChannel) {
             setMessages(prev => {
-              // Avoid duplicates (our own sent message is already in state)
               if (prev.find(m => m.id === msg.id)) return prev;
               return [...prev, msg];
             });
           }
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'messages' },
-        (payload) => {
-          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
-        }
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => { setMessages(prev => prev.filter(m => m.id !== payload.old.id)); }
       )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages' },
-        (payload) => {
-          setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m));
-        }
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' },
+        (payload) => { setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...m, ...payload.new } : m)); }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(subscription); };
-  }, [activeCommId, activeChannelId, loadMessages]);
+  }, [activeCommId, activeChannelId]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
 
@@ -1979,7 +1965,6 @@ export default function UserPortal() {
     loadChannels(activeCommId);
     loadCircleAnnouncements(activeCommId);
     setShowCircleAnnouncements(false);
-    // Reset circle-chat section when switching communities
     setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
@@ -2301,7 +2286,7 @@ export default function UserPortal() {
                     .slice(0, 4)
                     .map(c => (
                       <div key={c.id} className="search-result-item" onClick={() => {
-                        setActiveCommId(c.id); setSection('circles'); setSearch('');
+                        setActiveCommId(c.id); setActiveChannelId(null); setSection('circles'); setSearch('');
                       }}>
                         <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', marginRight: 10 }}></i>
                         <div>
@@ -2363,7 +2348,7 @@ export default function UserPortal() {
                     <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
                       onClick={() => {
                         markRead(n.id);
-                        if (n.link_comm_id) { setActiveCommId(n.link_comm_id); setSection('circles'); }
+                        if (n.link_comm_id) { setActiveCommId(n.link_comm_id); setActiveChannelId(null); setSection('circles'); }
                         setShowNotifications(false);
                       }}>
                       <div className="notif-icon">
@@ -2405,6 +2390,7 @@ export default function UserPortal() {
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? 'active' : ''}`}
               title={c.name} onClick={() => {
                 setActiveCommId(c.id);
+                setActiveChannelId(null);
                 setSection(c.id === 'global' ? 'home' : 'circles');
               }}>
               <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : (c.icon || (c.icon || getCategoryIcon(c.category)))}></i>
@@ -2481,7 +2467,7 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
-                {/* Announcements "� always first, powered by announcements table */}
+                {/* Announcements — always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
                   onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
@@ -2493,18 +2479,22 @@ export default function UserPortal() {
                   )}
                 </div>
 
+                {/* General — virtual default channel, stores channel_id=null messages */}
+                <div
+                  className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
+                  onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); setSection('circles'); loadMessages(activeCommId, null); }}
+                >
+                  <i className="channel-hash">#</i>
+                  <span className="node-name">general</span>
+                </div>
 
 
-                {channels.length === 0 && (
-                  <div style={{ padding: '8px 15px', fontSize: 12, color: 'var(--text-muted)' }}>
-                    No channels yet.
-                  </div>
-                )}
+
                 {channels.map(ch => (
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
-                    onClick={() => { setActiveChannelId(ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
+                    onClick={() => { setActiveChannelId(prev => prev === ch.id ? null : ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
                   >
                     <i className="channel-hash">#</i>
                     <span className="node-name">{ch.name}</span>
@@ -3384,6 +3374,7 @@ export default function UserPortal() {
     </div>
   );
 }
+
 
 
 
