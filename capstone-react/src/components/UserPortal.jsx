@@ -906,43 +906,36 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   useEffect(() => {
     if (!user?.id) return;
     const token = localStorage.getItem('accessToken');
-    // Use /api/me if token available (service role, bypasses RLS)
-    if (token) {
-      fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (data?.user) {
-            setProfile({
-              course: data.user.course || '',
-              year_level: data.user.year_level || '',
-              interests: data.user.interests || [],
-            });
-            if (data.user.avatar_url && !avatarUrl) setAvatarUrl(data.user.avatar_url);
-            if (data.user.id_photo_url) setIdUploaded(true);
-            const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-            localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data.user }));
-          }
-        })
-        .catch(() => {});
-    } else {
-      // Fallback: direct Supabase query
-      supabase
-        .from('profiles')
-        .select('course, year_level, interests, avatar_url, id_photo_url')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setProfile({
-              course: data.course || '',
-              year_level: data.year_level || '',
-              interests: data.interests || [],
-            });
-            if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
-            if (data.id_photo_url) setIdUploaded(true);
-          }
-        });
-    }
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    else headers['x-user-id'] = user.id;
+
+    fetch('/api/get-profile', { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.user) {
+          setProfile({
+            course: data.user.course || '',
+            year_level: data.user.year_level || '',
+            interests: data.user.interests || [],
+          });
+          if (data.user.avatar_url && !avatarUrl) setAvatarUrl(data.user.avatar_url);
+          if (data.user.id_photo_url) setIdUploaded(true);
+          const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data.user }));
+        }
+      })
+      .catch(() => {
+        // Last resort: use whatever is in localStorage
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        if (stored.course || stored.year_level || stored.interests?.length) {
+          setProfile({
+            course: stored.course || '',
+            year_level: stored.year_level || '',
+            interests: stored.interests || [],
+          });
+        }
+      });
   }, [user.id]);
 
   const handleIdPhotoUpload = async (e) => {
