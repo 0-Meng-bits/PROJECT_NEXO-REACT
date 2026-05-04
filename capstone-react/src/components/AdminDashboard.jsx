@@ -7,6 +7,7 @@ const SECTIONS = [
   { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
   { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
   { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
+  { key: 'events',        label: 'Campus Events',         icon: 'fa-solid fa-calendar-days' },
   { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
@@ -125,6 +126,57 @@ export default function AdminDashboard() {
   // â”€â”€ Campus Feed post composer state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [newAdminPost, setNewAdminPost] = useState({ title: '', content: '', post_type: 'announcement' });
   const [postingAdminPost, setPostingAdminPost] = useState(false);
+  // -- Campus Events state
+  const [campusEvents, setCampusEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+  const [postingEvent, setPostingEvent] = useState(false);
+
+  const EVENT_CATS = [
+    { key: 'semester',   label: 'Semester',           color: '#facc15' },
+    { key: 'exam',       label: 'Exam Schedules',      color: '#f87171' },
+    { key: 'enrollment', label: 'Enrollment',          color: '#34d399' },
+    { key: 'holiday',    label: 'Holidays',            color: '#fb923c' },
+    { key: 'sports',     label: 'Sports / Intramural', color: '#a78bfa' },
+    { key: 'cultural',   label: 'Cultural',            color: '#f472b6' },
+    { key: 'seminar',    label: 'Seminar',             color: '#22d3ee' },
+    { key: 'general',    label: 'General',             color: '#94a3b8' },
+  ];
+
+  const loadCampusEvents = async () => {
+    setEventsLoading(true);
+    const { data } = await supabase.from('campus_events').select('*').order('start_date', { ascending: true });
+    setCampusEvents(data || []);
+    setEventsLoading(false);
+  };
+
+  const submitEvent = async () => {
+    if (!newEvent.title.trim() || !newEvent.start_date) return;
+    setPostingEvent(true);
+    const { error } = await supabase.from('campus_events').insert([{
+      title: newEvent.title.trim(),
+      description: newEvent.description.trim(),
+      category: newEvent.category,
+      start_date: newEvent.start_date,
+      end_date: newEvent.end_date || newEvent.start_date,
+      created_by: admin?.id,
+    }]);
+    setPostingEvent(false);
+    if (!error) {
+      setNewEvent({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+      setShowEventForm(false);
+      loadCampusEvents();
+      showToast('Event added.');
+    }
+  };
+
+  const deleteEvent = async (id) => {
+    if (!confirm('Delete this event?')) return;
+    await supabase.from('campus_events').delete().eq('id', id);
+    loadCampusEvents();
+    showToast('Event deleted.');
+  };
 
   const submitAdminPost = async () => {
     if (!newAdminPost.title.trim() || !newAdminPost.content.trim()) return;
@@ -177,7 +229,7 @@ export default function AdminDashboard() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); loadCampusEvents(); }, [fetchData]);
 
   // Real-time: new reports appear instantly in admin panel
   useEffect(() => {
@@ -1050,7 +1102,73 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* â”€â”€ REPORTS â”€â”€ */}
+        
+        {/* -- CAMPUS EVENTS -- */}
+        {section === 'events' && (
+          <div>
+            <div className="adm-card" style={{ marginBottom: 16 }}>
+              <div className="adm-card-head">
+                <span><i className="fa-solid fa-calendar-plus" style={{ marginRight: 8 }}></i>Campus Events</span>
+                <button className="adm-btn approve" onClick={() => setShowEventForm(o => !o)}>
+                  <i className={`fa-solid ${showEventForm ? 'fa-xmark' : 'fa-plus'}`}></i>
+                  {showEventForm ? ' Cancel' : ' Add Event'}
+                </button>
+              </div>
+              {showEventForm && (
+                <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input className="adm-search" style={{ width: '100%' }} placeholder="Event title"
+                    value={newEvent.title} onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))} />
+                  <textarea style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', height: 60, resize: 'none' }}
+                    placeholder="Description (optional)"
+                    value={newEvent.description} onChange={e => setNewEvent(p => ({ ...p, description: e.target.value }))} />
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <select className="adm-search" style={{ flex: 1 }} value={newEvent.category}
+                      onChange={e => setNewEvent(p => ({ ...p, category: e.target.value }))}>
+                      {EVENT_CATS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
+                      value={newEvent.start_date} onChange={e => setNewEvent(p => ({ ...p, start_date: e.target.value }))} />
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
+                      value={newEvent.end_date} onChange={e => setNewEvent(p => ({ ...p, end_date: e.target.value }))} />
+                  </div>
+                  <button className="adm-btn approve" onClick={submitEvent} disabled={postingEvent || !newEvent.title.trim() || !newEvent.start_date}>
+                    <i className="fa-solid fa-calendar-plus"></i> {postingEvent ? 'Adding...' : 'Add Event'}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <span>All Campus Events</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{campusEvents.length} events</span>
+              </div>
+              {eventsLoading ? <div className="adm-empty">Loading...</div>
+              : campusEvents.length === 0 ? <div className="adm-empty">No events yet. Add one above.</div>
+              : (
+                <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
+                <table className="adm-table">
+                  <thead><tr><th>TITLE</th><th>CATEGORY</th><th>START</th><th>END</th><th>ACTION</th></tr></thead>
+                  <tbody>
+                    {campusEvents.map(ev => {
+                      const cat = EVENT_CATS.find(c => c.key === ev.category) || EVENT_CATS[EVENT_CATS.length - 1];
+                      return (
+                        <tr key={ev.id}>
+                          <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{ev.title}</td>
+                          <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: cat.color, border: `1px solid ${cat.color}`, background: `${cat.color}15` }}>{cat.label}</span></td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(ev.start_date).toLocaleDateString()}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.end_date ? new Date(ev.end_date).toLocaleDateString() : '-'}</td>
+                          <td><button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteEvent(ev.id)}><i className="fa-solid fa-trash"></i></button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+{/* â”€â”€ REPORTS â”€â”€ */}
         {section === 'reports' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1311,4 +1429,6 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
 
