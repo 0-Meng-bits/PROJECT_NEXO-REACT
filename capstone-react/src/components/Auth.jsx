@@ -146,6 +146,7 @@ export default function Auth() {
           alert('SYSTEM_ALERT: ' + data.message);
         }
       }
+    } catch (err) {
       alert('TERMINAL_OFFLINE: Connection failed. Make sure the backend server is running on port 3000.');
     } finally {
       setLoading(false);
