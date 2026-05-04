@@ -165,7 +165,6 @@ export default function Auth() {
           <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
             BACK TO LOGIN
           </button>
-          </div>
         </div>
       </div>
     );
@@ -335,76 +334,93 @@ export default function Auth() {
                   placeholder="••••••••" required disabled={loading} minLength={6} />
               </div>
             </>
-          )}
-
-          <div className="input-group">
-            <label>PASSWORD</label>
-            <div style={{ position: 'relative' }}>
-              <input name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update}
-                placeholder="••••••••" required disabled={loading} minLength={6}
-                style={{ paddingRight: 40 }} />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                style={{
-                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-muted)', fontSize: 14, padding: '4px',
-                  display: 'flex', alignItems: 'center',
-                }}
-                tabIndex={-1}
-              >
-                <i className={showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
-              </button>
-            </div>
-            {/* Password strength indicator — signup only */}
-            {!isLogin && form.password.length > 0 && (() => {
-              const p = form.password;
-              const checks = {
-                length:    p.length >= 8,
-                lowercase: /[a-z]/.test(p),
-                uppercase: /[A-Z]/.test(p),
-                number:    /[0-9]/.test(p),
-                special:   /[^a-zA-Z0-9]/.test(p),
-              };
-              const score = Object.values(checks).filter(Boolean).length;
-              const levels = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG', 'VERY STRONG'];
-              const colors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#00f0ff'];
-              const pct = (score / 5) * 100;
-              return (
-                <div style={{ marginTop: 8 }}>
-                  {/* Bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: colors[score], borderRadius: 4, transition: 'width 0.3s, background 0.3s' }} />
-                    </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: colors[score], minWidth: 70, textAlign: 'right' }}>{levels[score]}</span>
-                  </div>
-                  {/* Checklist */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
-                    {[
-                      { key: 'length',    label: '8+ characters' },
-                      { key: 'uppercase', label: 'Uppercase letter' },
-                      { key: 'lowercase', label: 'Lowercase letter' },
-                      { key: 'number',    label: 'Number' },
-                      { key: 'special',   label: 'Special character' },
-                    ].map(({ key, label }) => (
-                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: checks[key] ? '#22c55e' : 'var(--text-muted)' }}>
-                        <i className={checks[key] ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'} style={{ fontSize: 10 }}></i>
-                        {label}
-                      </div>
-                    ))}
-                  </div>
+          ) : (
+            /* ── SIGNUP — two column grid ── */
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+                <div className="input-group">
+                  <label>CTU_ID</label>
+                  <input name="ctuId" value={form.ctuId} onChange={update}
+                    placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
                 </div>
-              );
-            })()}
-          </div>
+                <div className="input-group">
+                  <label>FULL_NAME</label>
+                  <input name="fullName" value={form.fullName} onChange={update}
+                    placeholder="Juan Dela Cruz" required disabled={loading} />
+                </div>
+                <div className="input-group">
+                  <label>EMAIL (for password recovery)</label>
+                  <input name="email" type="email" value={form.email} onChange={update}
+                    placeholder="your.real@email.com" required disabled={loading}
+                    pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
+                    title="Please enter a valid email address (e.g. name@gmail.com)" />
+                </div>
+                <div className="input-group">
+                  <label>USER_TYPE</label>
+                  <select name="userType" value={form.userType} onChange={update} disabled={loading}>
+                    <option value="Student">STUDENT</option>
+                    <option value="Faculty">FACULTY</option>
+                  </select>
+                </div>
+              </div>
 
-          {!isLogin && (
-            <div className="id-verify-notice">
-              <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
-              You will verify your ID in the next step
-            </div>
+              <div className="input-group">
+                <label>PASSWORD</label>
+                <div style={{ position: 'relative' }}>
+                  <input name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update}
+                    placeholder="••••••••" required disabled={loading} minLength={6}
+                    style={{ paddingRight: 40 }} />
+                  <button type="button" onClick={() => setShowPassword(v => !v)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '4px', display: 'flex', alignItems: 'center' }}
+                    tabIndex={-1}>
+                    <i className={showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
+                  </button>
+                </div>
+                {form.password.length > 0 && (() => {
+                  const p = form.password;
+                  const checks = {
+                    length:    p.length >= 8,
+                    lowercase: /[a-z]/.test(p),
+                    uppercase: /[A-Z]/.test(p),
+                    number:    /[0-9]/.test(p),
+                    special:   /[^a-zA-Z0-9]/.test(p),
+                  };
+                  const score = Object.values(checks).filter(Boolean).length;
+                  const levels = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG', 'VERY STRONG'];
+                  const colors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#00f0ff'];
+                  const pct = (score / 5) * 100;
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: colors[score], borderRadius: 4, transition: 'width 0.3s, background 0.3s' }} />
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: colors[score], minWidth: 70, textAlign: 'right' }}>{levels[score]}</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                        {[
+                          { key: 'length',    label: '8+ characters' },
+                          { key: 'uppercase', label: 'Uppercase letter' },
+                          { key: 'lowercase', label: 'Lowercase letter' },
+                          { key: 'number',    label: 'Number' },
+                          { key: 'special',   label: 'Special character' },
+                        ].map(({ key, label }) => (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: checks[key] ? '#22c55e' : 'var(--text-muted)' }}>
+                            <i className={checks[key] ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'} style={{ fontSize: 10 }}></i>
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="id-verify-notice">
+                <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
+                You will verify your ID in the next step
+              </div>
+            </>
           )}
 
           <button
