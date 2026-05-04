@@ -24,6 +24,10 @@ export default async function handler(req, res) {
     return res.status(403).json({ message: 'Only the circle creator or an admin can delete this circle.' });
   }
 
+  // Delete opportunities first (no ON DELETE CASCADE on this FK)
+  await supabaseAdmin.from('opportunities').delete().eq('community_id', id);
+
+  // Delete the community (all other related tables cascade)
   const { error: deleteError } = await supabaseAdmin
     .from('communities').delete().eq('id', id);
 
