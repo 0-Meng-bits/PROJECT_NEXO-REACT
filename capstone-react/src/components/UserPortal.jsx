@@ -905,13 +905,21 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   // Fetch latest profile data from DB when modal opens
   useEffect(() => {
     if (!user?.id) return;
-    supabase
-      .from('profiles')
-      .select('course, year_level, interests, avatar_url, id_photo_url')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
+
+    // Try to get fresh data directly from Supabase using the user's session
+    const fetchProfile = async () => {
+      try {
+        // First try: use the stored session token to authenticate the request
+        const token = localStorage.getItem('accessToken');
+
+        // Direct Supabase query — works if RLS allows users to read own profile
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('course, year_level, interests, avatar_url, id_photo_url')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
           setProfile({
             course: data.course || '',
             year_level: data.year_level || '',
@@ -919,11 +927,45 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           });
           if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
           if (data.id_photo_url) setIdUploaded(true);
-          // Update localStorage with fresh data
           const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
           localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data }));
+          return;
         }
-      });
+
+        // Fallback: try /api/get-profile
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        else headers['x-user-id'] = user.id;
+
+        const res = await fetch('/api/get-profile', { headers });
+        if (res.ok) {
+          const result = await res.json();
+          if (result?.user) {
+            setProfile({
+              course: result.user.course || '',
+              year_level: result.user.year_level || '',
+              interests: result.user.interests || [],
+            });
+            if (result.user.avatar_url && !avatarUrl) setAvatarUrl(result.user.avatar_url);
+            if (result.user.id_photo_url) setIdUploaded(true);
+            const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...result.user }));
+          }
+        }
+      } catch (err) {
+        console.error('[ProfileModal] fetch error:', err);
+        // Last resort: use localStorage
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        setProfile({
+          course: stored.course || '',
+          year_level: stored.year_level || '',
+          interests: stored.interests || [],
+        });
+        if (stored.id_photo_url) setIdUploaded(true);
+      }
+    };
+
+    fetchProfile();
   }, [user.id]);
 
   const handleIdPhotoUpload = async (e) => {
@@ -1151,27 +1193,26 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
                 <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
               </div>
-              {idUploaded ? (
-                <div style={{ fontSize: 12, color: 'var(--green)' }}>
+              {idUploaded && (
+                <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
                   <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
                   ID photo submitted — awaiting admin review
                 </div>
-              ) : (
-                <>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                    Upload a clear photo of your CTU school ID so the admin can verify your account.
-                  </p>
-                  <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
-                    disabled={idUploading}
-                    style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
-                    {idUploading
-                      ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
-                      : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />UPLOAD SCHOOL ID</>
-                    }
-                  </button>
-                  <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
-                </>
               )}
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                {idUploaded
+                  ? 'Want to send a clearer photo? Upload a new one below.'
+                  : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
+              </p>
+              <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
+                disabled={idUploading}
+                style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
+                {idUploading
+                  ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
+                  : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>
+                }
+              </button>
+              <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
             </div>
           )}
 

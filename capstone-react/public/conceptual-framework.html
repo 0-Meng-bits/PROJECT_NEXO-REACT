@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXO Connect – Conceptual Framework</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .page {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 48px 44px;
+      max-width: 1060px;
+      width: 100%;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+    }
+
+    /* ── HEADER ── */
+    .page-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      text-align: center;
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 36px;
+      font-style: italic;
+    }
+
+    /* ── THREE-COLUMN LAYOUT ── */
+    .framework {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr 40px 1fr;
+      gap: 0;
+      align-items: start;
+    }
+
+    /* ── COLUMN HEADERS ── */
+    .col-header {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 0;
+    }
+    .col-input .col-header  { background: #dbeafe; color: #1d4ed8; border: 2px solid #93c5fd; border-bottom: none; }
+    .col-process .col-header { background: #ede9fe; color: #6d28d9; border: 2px solid #c4b5fd; border-bottom: none; }
+    .col-output .col-header  { background: #dcfce7; color: #15803d; border: 2px solid #86efac; border-bottom: none; }
+
+    /* ── COLUMN BODY ── */
+    .col-body {
+      border: 2px solid;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      padding: 16px 14px 20px;
+      min-height: 520px;
+    }
+    .col-input .col-body  { border-color: #93c5fd; }
+    .col-process .col-body { border-color: #c4b5fd; }
+    .col-output .col-body  { border-color: #86efac; }
+
+    /* ── ARROW ── */
+    .arrow-col {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 60px;
+    }
+    .arrow-col svg { width: 32px; height: 32px; }
+
+    /* ── ITEM CARDS ── */
+    .item {
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid;
+    }
+    .item-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .item-desc {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* INPUT items */
+    .item-input { background: #eff6ff; border-color: #3b82f6; }
+    .item-input .item-title { color: #1d4ed8; }
+
+    /* PROCESS items */
+    .item-process { background: #f5f3ff; border-color: #7c3aed; }
+    .item-process .item-title { color: #6d28d9; }
+
+    /* OUTPUT items */
+    .item-output { background: #f0fdf4; border-color: #16a34a; }
+    .item-output .item-title { color: #15803d; }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin: 14px 0 6px;
+      padding-left: 2px;
+    }
+    .section-label:first-child { margin-top: 0; }
+
+    /* ── BOTTOM BAND ── */
+    .bottom-band {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .band-box {
+      border-radius: 10px;
+      padding: 14px 16px;
+      border: 1.5px solid;
+    }
+    .band-box-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .band-box ul {
+      list-style: none;
+      padding: 0;
+    }
+    .band-box ul li {
+      font-size: 11px;
+      color: #475569;
+      padding: 3px 0;
+      padding-left: 14px;
+      position: relative;
+      line-height: 1.4;
+    }
+    .band-box ul li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      font-weight: 900;
+    }
+
+    .band-theory { background: #fefce8; border-color: #fbbf24; }
+    .band-theory .band-box-title { color: #b45309; }
+    .band-theory ul li::before { color: #f59e0b; }
+
+    .band-outcome { background: #fff1f2; border-color: #fca5a5; }
+    .band-outcome .band-box-title { color: #b91c1c; }
+    .band-outcome ul li::before { color: #ef4444; }
+
+    /* ── CENTRAL CONCEPT ── */
+    .central {
+      text-align: center;
+      margin: 0 0 28px;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-radius: 12px;
+      color: white;
+    }
+    .central-title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }
+    .central-sub {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+    .central-tags {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .central-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(56,189,248,0.4);
+      color: #7dd3fc;
+      background: rgba(56,189,248,0.08);
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-title">Conceptual Framework</div>
+  <p class="page-sub">NEXO Connect — Interest-Based Student Community Platform · CTU–Daanbantayan</p>
+
+  <!-- CENTRAL CONCEPT -->
+  <div class="central">
+    <div class="central-title">NEXO CONNECT</div>
+    <div class="central-sub">
+      A verified, interest-driven digital campus community platform that bridges students,<br/>
+      faculty, and organizations of Cebu Technological University – Daanbantayan Campus.
+    </div>
+    <div class="central-tags">
+      <span class="central-tag">Student Engagement</span>
+      <span class="central-tag">Digital Identity</span>
+      <span class="central-tag">Community Building</span>
+      <span class="central-tag">Real-Time Communication</span>
+      <span class="central-tag">Academic Integration</span>
+    </div>
+  </div>
+
+  <!-- IPO FRAMEWORK -->
+  <div class="framework">
+
+    <!-- INPUT -->
+    <div class="col-input">
+      <div class="col-header">📥 Input</div>
+      <div class="col-body">
+
+        <div class="section-label">User Data</div>
+        <div class="item item-input">
+          <div class="item-title">Student / Faculty Registration</div>
+          <div class="item-desc">CTU ID, full name, email, password, user type (Student / Faculty / Admin)</div>
+        </div>
+        <div class="item item-input">
+          <div class="item-title">School ID Photo (OCR)</div>
+          <div class="item-desc">Uploaded ID image scanned via Tesseract.js to extract and verify CTU ID number</div>
+        </div>
+        <div class="item item-input">
+          <div class="item-title">Onboarding Profile</div>
+          <div class="item-desc">Profile photo, course, year level, and interest selections (22 interest categories)</div>
+        </div>
+
+        <div class="section-label">Community Data</div>
+        <div class="item item-input">
+          <div class="item-title">Circle Creation</div>
+          <div class="item-desc">Circle name, category (Academic / Project / Hobby / Social), icon, description</div>
+        </div>
+        <div class="item item-input">
+          <div class="item-title">Audition Forms</div>
+          <div class="item-desc">Custom questions created by circle leaders for membership screening</div>
+        </div>
+
+        <div class="section-label">Content Data</div>
+        <div class="item item-input">
+          <div class="item-title">Messages & Announcements</div>
+          <div class="item-desc">Real-time chat messages, campus-wide posts, circle announcements, reactions</div>
+        </div>
+        <div class="item item-input">
+          <div class="item-title">Campus Events</div>
+          <div class="item-desc">CTU AY 2025-2026 academic calendar: semester dates, exams, enrollment, holidays</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ARROW 1 -->
+    <div class="arrow-col">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path d="M8 20 H30 M22 12 L30 20 L22 28" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- PROCESS -->
+    <div class="col-process">
+      <div class="col-header">⚙️ Process</div>
+      <div class="col-body">
+
+        <div class="section-label">Authentication & Verification</div>
+        <div class="item item-process">
+          <div class="item-title">Identity Verification</div>
+          <div class="item-desc">OCR scans uploaded school ID → extracts CTU ID → admin reviews and approves account</div>
+        </div>
+        <div class="item item-process">
+          <div class="item-title">JWT Session Management</div>
+          <div class="item-desc">Supabase Auth issues JWT tokens; protected routes validate session on every page load</div>
+        </div>
+
+        <div class="section-label">Matching & Personalization</div>
+        <div class="item item-process">
+          <div class="item-title">Aura Match Algorithm</div>
+          <div class="item-desc">Counts students sharing selected interests; maps interests to circle categories; suggests relevant circles during onboarding</div>
+        </div>
+        <div class="item item-process">
+          <div class="item-title">Interest-Based Discovery</div>
+          <div class="item-desc">Explore page filters circles by category; featured circles surface based on activity</div>
+        </div>
+
+        <div class="section-label">Community Management</div>
+        <div class="item item-process">
+          <div class="item-title">Membership & Rank System</div>
+          <div class="item-desc">Join requests → Leader approval → Member / Moderator / Co-Leader / Leader hierarchy with caps</div>
+        </div>
+        <div class="item item-process">
+          <div class="item-title">Audition System</div>
+          <div class="item-desc">Leaders build custom forms → applicants submit answers → Phase 1 review → optional Phase 2 live screening</div>
+        </div>
+
+        <div class="section-label">Real-Time Engine</div>
+        <div class="item item-process">
+          <div class="item-title">Supabase Realtime</div>
+          <div class="item-desc">WebSocket subscriptions push new messages, reactions, notifications, and announcements instantly to all connected users</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ARROW 2 -->
+    <div class="arrow-col">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path d="M8 20 H30 M22 12 L30 20 L22 28" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="col-output">
+      <div class="col-header">📤 Output</div>
+      <div class="col-body">
+
+        <div class="section-label">For Students</div>
+        <div class="item item-output">
+          <div class="item-title">Verified Digital Identity</div>
+          <div class="item-desc">Authenticated CTU student profile with course, year level, interests, and profile photo</div>
+        </div>
+        <div class="item item-output">
+          <div class="item-title">Circle Membership</div>
+          <div class="item-desc">Access to joined circles, channels, announcements, and ranked roles within communities</div>
+        </div>
+        <div class="item item-output">
+          <div class="item-title">Real-Time Communication</div>
+          <div class="item-desc">Live chat with message reactions (❤️😂😢), edit, delete, and view member profiles</div>
+        </div>
+        <div class="item item-output">
+          <div class="item-title">Campus Awareness</div>
+          <div class="item-desc">Home feed with announcements, campus events calendar, and notifications</div>
+        </div>
+
+        <div class="section-label">For Faculty / Admins</div>
+        <div class="item item-output">
+          <div class="item-title">Admin Dashboard</div>
+          <div class="item-desc">Verification queue, analytics charts, user management, circle oversight, campus feed moderation</div>
+        </div>
+        <div class="item item-output">
+          <div class="item-title">Campus Event Management</div>
+          <div class="item-desc">Post and manage CTU events visible to all students on the color-coded academic calendar</div>
+        </div>
+
+        <div class="section-label">System Outcome</div>
+        <div class="item item-output">
+          <div class="item-title">Connected Campus Community</div>
+          <div class="item-desc">A unified, safe, and verified digital space that reduces campus disconnection and increases student engagement</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- end framework -->
+
+  <!-- BOTTOM BAND -->
+  <div class="bottom-band">
+
+    <div class="band-box band-theory">
+      <div class="band-box-title">🔬 Theoretical Grounding</div>
+      <ul>
+        <li><strong>Social Capital Theory</strong> — digital circles build bonding and bridging capital among CTU students</li>
+        <li><strong>Community of Practice (Wenger)</strong> — shared interest groups foster collaborative learning and identity</li>
+        <li><strong>Uses & Gratifications Theory</strong> — students use the platform to fulfill social, informational, and entertainment needs</li>
+        <li><strong>Self-Determination Theory</strong> — interest-based matching supports autonomy, competence, and relatedness</li>
+      </ul>
+    </div>
+
+    <div class="band-box band-outcome">
+      <div class="band-box-title">🎯 Expected Outcomes</div>
+      <ul>
+        <li>Increased student participation in campus organizations and activities</li>
+        <li>Reduced information gap between students, faculty, and administration</li>
+        <li>Streamlined organization membership through the audition system</li>
+        <li>Stronger sense of campus identity and belonging among CTU students</li>
+        <li>Centralized, verified, and real-time campus communication channel</li>
+      </ul>
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>
