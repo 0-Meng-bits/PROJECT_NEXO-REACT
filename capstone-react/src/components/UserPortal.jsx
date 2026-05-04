@@ -934,10 +934,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
         // Fallback: try /api/get-profile
         const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        else headers['x-user-id'] = user.id;
-
-        const res = await fetch('/api/get-profile', { headers });
+        const res = await fetch(`/api/get-profile?userId=${user.id}`, { headers });
         if (res.ok) {
           const result = await res.json();
           if (result?.user) {
