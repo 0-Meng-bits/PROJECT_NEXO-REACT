@@ -12,6 +12,7 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [pendingRoute, setPendingRoute] = useState('/portal');
+  const [suspendedUntil, setSuspendedUntil] = useState(null);
   const [form, setForm] = useState({
     ctuId: '', password: '', fullName: '', email: '', userType: 'Student'
   });
@@ -132,10 +133,16 @@ export default function Auth() {
           navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
         }
       } else {
-        alert('SYSTEM_ALERT: ' + data.message);
+        if (data.banned) {
+          setMode('banned');
+        } else if (data.suspended) {
+          setSuspendedUntil(data.suspended_until);
+          setMode('suspended');
+        } else {
+          alert('SYSTEM_ALERT: ' + data.message);
+        }
       }
-    } catch {
-      alert('TERMINAL_OFFLINE: Connection failed.');
+      alert('TERMINAL_OFFLINE: Connection failed. Make sure the backend server is running on port 3000.');
     } finally {
       setLoading(false);
     }
@@ -199,6 +206,55 @@ export default function Auth() {
               {loading ? 'SENDING...' : 'SEND RESET LINK'}
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── BANNED ──
+  if (mode === 'banned') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+          <h2 style={{ color: 'var(--red)', letterSpacing: 2, marginBottom: 12 }}>ACCOUNT BANNED</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
+            Your account has been permanently banned due to serious violations of community guidelines.
+            Please contact the administrator if you believe this is a mistake.
+          </p>
+          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%' }}>
+            BACK TO LOGIN
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SUSPENDED ──
+  if (mode === 'suspended') {
+    const until = suspendedUntil
+      ? new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : '7 days';
+    return (
+      <div className="auth-page">
+        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⏸️</div>
+          <h2 style={{ color: 'var(--orange)', letterSpacing: 2, marginBottom: 12 }}>ACCOUNT SUSPENDED</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
+            Your account has been temporarily suspended due to community guideline violations.
+          </p>
+          <div style={{ background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 24 }}>
+            <p style={{ color: 'var(--orange)', fontSize: 13, fontWeight: 700 }}>
+              <i className="fa-solid fa-clock" style={{ marginRight: 8 }}></i>
+              Access restored on: {until}
+            </p>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
+            Please review the community guidelines before your suspension ends.
+          </p>
+          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%' }}>
+            BACK TO LOGIN
+          </button>
         </div>
       </div>
     );

@@ -68,6 +68,24 @@ app.post('/api/login', async (req, res) => {
     return res.status(401).json({ message: 'CTU_ID not found in the system.' });
   }
 
+  // Check if permanently banned
+  if (profile.is_banned) {
+    return res.status(403).json({
+      message: 'Your account has been permanently banned due to serious violations. Contact the administrator if you believe this is a mistake.',
+      banned: true,
+    });
+  }
+
+  // Check if suspended
+  if (profile.suspended_until && new Date(profile.suspended_until) > new Date()) {
+    const until = new Date(profile.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return res.status(403).json({
+      message: `Your account is suspended until ${until} due to community guideline violations.`,
+      suspended: true,
+      suspended_until: profile.suspended_until,
+    });
+  }
+
   // 2. Check verification — but still allow login with limited access
   const isPending = !profile.is_verified;
 

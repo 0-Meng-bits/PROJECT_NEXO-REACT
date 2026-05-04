@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -14,7 +14,7 @@ const SECTIONS = [
   { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
 ];
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function toDateInput(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -37,7 +37,7 @@ function countInRange(items, dateField, start, end) {
   }).length;
 }
 
-// Simple bar chart — no external lib needed
+// Simple bar chart â€” no external lib needed
 function MiniBarChart({ data, color }) {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
@@ -87,7 +87,7 @@ function StatCard({ label, value, color, icon }) {
   );
 }
 
-// Inappropriate words filter (basic list — expand as needed)
+// Inappropriate words filter (basic list â€” expand as needed)
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol'];
 
 function containsBadWord(text) {
@@ -116,13 +116,13 @@ export default function AdminDashboard() {
   const [allMessages, setAllMessages] = useState([]);
   const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
 
-  // ── Analytics state ──────────────────────────────────────────────────────
+  // â”€â”€ Analytics state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [preset, setPreset] = useState('week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]   = useState('');
   const [useCustom, setUseCustom]   = useState(false);
 
-  // ── Campus Feed post composer state ──────────────────────────────────────
+  // â”€â”€ Campus Feed post composer state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [newAdminPost, setNewAdminPost] = useState({ title: '', content: '', post_type: 'announcement' });
   const [postingAdminPost, setPostingAdminPost] = useState(false);
 
@@ -247,23 +247,49 @@ export default function AdminDashboard() {
   };
 
   const issueWarning = async (userId, userName, reason) => {
-    const { error } = await supabase.from('user_warnings').insert([{
+    // Get current trust points
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('warning_count, trust_points, is_banned')
+      .eq('id', userId).single();
+
+    if (profile?.is_banned) { showToast(`${userName} is already banned.`); return; }
+
+    const currentPoints = profile?.trust_points ?? 3;
+    const newPoints = Math.max(0, currentPoints - 1);
+    const newWarnings = (profile?.warning_count || 0) + 1;
+    const willSuspend = newPoints === 0;
+
+    // Insert warning record
+    await supabase.from('user_warnings').insert([{
       user_id: userId, admin_id: admin?.id, type: 'warning', reason,
     }]);
-    if (!error) {
-      // Increment warning count
-      await supabase.rpc('increment_warning', { uid: userId }).catch(() =>
-        supabase.from('profiles').select('warning_count').eq('id', userId).single().then(({ data }) =>
-          supabase.from('profiles').update({ warning_count: (data?.warning_count || 0) + 1 }).eq('id', userId)
-        )
-      );
-      await supabase.from('notifications').insert([{
-        user_id: userId, type: 'audition_update',
-        message: `⚠️ Warning issued by admin: ${reason}`,
-      }]);
-      showToast(`Warning issued to ${userName}.`);
-      fetchData();
-    }
+
+    // Compute suspension end date (7 days from now)
+    const suspendedUntil = willSuspend
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
+    // Update profile
+    await supabase.from('profiles').update({
+      warning_count: newWarnings,
+      trust_points: willSuspend ? 1 : newPoints, // reset to 1 after suspension
+      ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
+    }).eq('id', userId);
+
+    // Send notification to user
+    const notifMsg = willSuspend
+      ? `ðŸš« Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+      : `âš ï¸ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
+
+    await supabase.from('notifications').insert([{
+      user_id: userId,
+      type: 'audition_update',
+      message: notifMsg,
+    }]);
+
+    showToast(willSuspend ? `${userName} suspended for 7 days.` : `Warning issued to ${userName}. ${newPoints} point(s) left.`);
+    fetchData();
   };
 
   const banUser = async (userId, userName) => {
@@ -276,7 +302,7 @@ export default function AdminDashboard() {
     }]);
     await supabase.from('notifications').insert([{
       user_id: userId, type: 'audition_update',
-      message: `🚫 Your account has been banned: ${reason}`,
+      message: `ðŸš« Your account has been banned: ${reason}`,
     }]);
     showToast(`${userName} has been banned.`);
     fetchData();
@@ -320,7 +346,7 @@ export default function AdminDashboard() {
     s.student_id?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Analytics computed values ─────────────────────────────────────────────
+  // â”€â”€ Analytics computed values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { start: rangeStart, end: rangeEnd } = useCustom && customStart && customEnd
     ? { start: new Date(customStart + 'T00:00:00'), end: new Date(customEnd + 'T23:59:59') }
     : getPresetRange(preset);
@@ -332,7 +358,7 @@ export default function AdminDashboard() {
   const newAuditions  = countInRange(auditions,    'submitted_at', rangeStart, rangeEnd);
   const newPosts      = countInRange(announcements,'created_at',   rangeStart, rangeEnd);
 
-  // Build bar chart data — split range into buckets
+  // Build bar chart data â€” split range into buckets
   function buildChartData(items, dateField) {
     const diffDays = Math.round((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
     const buckets = [];
@@ -381,7 +407,7 @@ export default function AdminDashboard() {
   const messageChartData = buildChartData(globalMessages,'created_at');
 
   const rangeLabel = useCustom && customStart && customEnd
-    ? `${customStart} → ${customEnd}`
+    ? `${customStart} â†’ ${customEnd}`
     : { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year' }[preset];
 
   const auditionStatusLabel = (status, phase2Result) => {
@@ -402,7 +428,7 @@ export default function AdminDashboard() {
         <div className="adm-brand">
           <img src="/logoo.png" alt="NEXO" style={{ width: 32, height: 32, borderRadius: 8, marginRight: 10, filter: 'drop-shadow(0 0 6px rgba(0,240,255,0.5))' }} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'white', letterSpacing: 2 }}>NEXO</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 2 }}>NEXO</div>
             <div style={{ fontSize: 9, color: 'var(--cyber-cyan)', letterSpacing: 2 }}>ADMIN PANEL</div>
           </div>
         </div>
@@ -440,9 +466,9 @@ export default function AdminDashboard() {
         <div className="adm-topbar">
           <div>
             <h1 className="adm-page-title">
-              {selectedCircle ? `${selectedCircle.name} — Members` : SECTIONS.find(s => s.key === section)?.label}
+              {selectedCircle ? `${selectedCircle.name} â€” Members` : SECTIONS.find(s => s.key === section)?.label}
             </h1>
-            <p className="adm-page-sub">NEXO Connect — Admin Control Panel</p>
+            <p className="adm-page-sub">NEXO Connect â€” Admin Control Panel</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {selectedCircle && (
@@ -464,7 +490,7 @@ export default function AdminDashboard() {
           <StatCard label="Circles"        value={communities.length} color="var(--cyber-yellow)" icon="fa-solid fa-network-wired" />
         </div>
 
-        {/* ── ANALYTICS ── */}
+        {/* â”€â”€ ANALYTICS â”€â”€ */}
         {section === 'analytics' && (
           <div>
             {/* Date range controls */}
@@ -489,7 +515,7 @@ export default function AdminDashboard() {
                   value={customStart}
                   max={customEnd || toDateInput(new Date())}
                   onChange={e => { setCustomStart(e.target.value); setUseCustom(true); }} />
-                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>→</span>
+                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>â†’</span>
                 <input type="date" className="analytics-date-input"
                   value={customEnd}
                   min={customStart}
@@ -587,7 +613,7 @@ export default function AdminDashboard() {
                           return (
                             <tr key={c.id}>
                               <td style={{ color: 'var(--text-muted)', fontWeight: 700 }}>#{i + 1}</td>
-                              <td style={{ color: 'white', fontWeight: 600 }}>{c.name}</td>
+                              <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{c.name}</td>
                               <td><span className="adm-tag">{c.category}</span></td>
                               <td>
                                 <span style={{ color: 'var(--green)', fontWeight: 700 }}>+{c.joinCount}</span>
@@ -604,7 +630,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── VERIFICATION QUEUE ── */}
+        {/* â”€â”€ VERIFICATION QUEUE â”€â”€ */}
         {section === 'verification' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -615,7 +641,7 @@ export default function AdminDashboard() {
             : pending.length === 0 ? (
               <div className="adm-empty">
                 <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: 'var(--green)', marginBottom: 12, display: 'block' }}></i>
-                All caught up — no pending verifications.
+                All caught up â€” no pending verifications.
               </div>
             ) : (
               <table className="adm-table">
@@ -624,7 +650,7 @@ export default function AdminDashboard() {
                   {pending.map(s => (
                     <tr key={s.id}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
                       <td>
                         {s.id_photo_url ? (
@@ -661,7 +687,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── ALL USERS ── */}
+        {/* â”€â”€ ALL USERS â”€â”€ */}
         {section === 'users' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -671,16 +697,57 @@ export default function AdminDashboard() {
             </div>
             {loading ? <div className="adm-empty">Loading...</div> : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Joined</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filtered.map(s => (
                     <tr key={s.id}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
-                      <td><span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span></td>
+                      <td>
+                        {s.is_banned
+                          ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
+                          : s.suspended_until && new Date(s.suspended_until) > new Date()
+                            ? <span className="adm-status" style={{ background: 'rgba(247,169,79,0.1)', color: 'var(--orange)', border: '1px solid var(--orange)' }}>
+                                SUSPENDED
+                              </span>
+                            : <span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span>
+                        }
+                      </td>
+                      <td>
+                        <div>
+                          <span style={{ fontWeight: 700, color: (s.trust_points ?? 3) <= 1 ? 'var(--red)' : (s.trust_points ?? 3) <= 2 ? 'var(--orange)' : 'var(--green)' }}>
+                            {s.trust_points ?? 3}/3
+                          </span>
+                          {s.suspended_until && new Date(s.suspended_until) > new Date() && (
+                            <div style={{ fontSize: 9, color: 'var(--orange)', marginTop: 2 }}>
+                              Until {new Date(s.suspended_until).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {!s.is_banned && s.is_verified && (
+                            <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
+                              onClick={() => { const r = prompt('Warning reason:'); if (r) issueWarning(s.id, s.full_name, r); }}>
+                              <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                            </button>
+                          )}
+                          {s.is_banned
+                            ? <button className="adm-btn approve" style={{ fontSize: 10 }} onClick={() => unbanUser(s.id, s.full_name)}>
+                                <i className="fa-solid fa-unlock"></i> Unban
+                              </button>
+                            : s.is_verified && (
+                              <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => banUser(s.id, s.full_name)}>
+                                <i className="fa-solid fa-ban"></i> Ban
+                              </button>
+                            )
+                          }
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -689,7 +756,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLES ── */}
+        {/* â”€â”€ CIRCLES â”€â”€ */}
         {section === 'communities' && !selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -704,7 +771,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {communities.map(c => (
                     <tr key={c.id}>
-                      <td style={{ color: 'white', fontWeight: 600, cursor: 'pointer' }}
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
                         onClick={() => viewCircleMembers(c)}>
                         {c.name}
                         <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
@@ -716,7 +783,7 @@ export default function AdminDashboard() {
                           {c.audition_enabled ? 'On' : 'Off'}
                         </span>
                       </td>
-                      <td style={{ color: 'var(--text-muted)' }}>{c.profiles?.full_name || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{c.profiles?.full_name || 'â€”'}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -736,7 +803,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLE MEMBERS DETAIL ── */}
+        {/* â”€â”€ CIRCLE MEMBERS DETAIL â”€â”€ */}
         {section === 'communities' && selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -751,8 +818,8 @@ export default function AdminDashboard() {
                 <tbody>
                   {circleMembers.map(m => (
                     <tr key={m.id}>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{m.profiles?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{m.profiles?.student_id || '—'}</span></td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{m.profiles?.full_name || 'â€”'}</td>
+                      <td><span className="adm-mono">{m.profiles?.student_id || 'â€”'}</span></td>
                       <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
                       <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
                     </tr>
@@ -763,7 +830,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── GLOBAL FEED MESSAGES ── */}
+        {/* â”€â”€ GLOBAL FEED MESSAGES â”€â”€ */}
         {section === 'globalfeed' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -773,12 +840,13 @@ export default function AdminDashboard() {
             {loading ? <div className="adm-empty">Loading...</div>
             : globalMessages.length === 0 ? <div className="adm-empty">No messages yet.</div>
             : (
+              <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
               <table className="adm-table">
                 <thead><tr><th>Author</th><th>Message</th><th>Sent</th><th>Actions</th></tr></thead>
                 <tbody>
                   {globalMessages.map(m => (
                     <tr key={m.id}>
-                      <td style={{ color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
                       <td style={{ color: 'var(--text-muted)', maxWidth: 300 }}>{m.content}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(m.created_at).toLocaleString()}</td>
                       <td>
@@ -790,11 +858,12 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}
 
-        {/* ── CAMPUS FEED POSTS ── */}
+        {/* â”€â”€ CAMPUS FEED POSTS â”€â”€ */}
         {section === 'announcements' && (
           <div>
             {/* Admin post composer */}
@@ -810,7 +879,7 @@ export default function AdminDashboard() {
                   onChange={e => setNewAdminPost(p => ({ ...p, title: e.target.value }))}
                 />
                 <textarea
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'white', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 80 }}
+                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 80 }}
                   placeholder="Write your announcement, event, or shoutout..."
                   value={newAdminPost.content}
                   onChange={e => setNewAdminPost(p => ({ ...p, content: e.target.value }))}
@@ -922,7 +991,7 @@ export default function AdminDashboard() {
                                 {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                               </span>
                             </div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: 'white', marginBottom: 6 }}>{a.title}</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', marginBottom: 6 }}>{a.title}</div>
                             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>{a.content}</p>
                           </div>
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -944,7 +1013,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── AUDITION APPLICATIONS ── */}
+        {/* â”€â”€ AUDITION APPLICATIONS â”€â”€ */}
         {section === 'auditions' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -959,9 +1028,9 @@ export default function AdminDashboard() {
                 <tbody>
                   {auditions.map(a => (
                     <tr key={a.id}>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{a.profiles?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{a.profiles?.student_id || '—'}</span></td>
-                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '—'}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.profiles?.full_name || 'â€”'}</td>
+                      <td><span className="adm-mono">{a.profiles?.student_id || 'â€”'}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || 'â€”'}</td>
                       <td>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
@@ -981,7 +1050,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── REPORTS ── */}
+        {/* â”€â”€ REPORTS â”€â”€ */}
         {section === 'reports' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -994,6 +1063,7 @@ export default function AdminDashboard() {
             : reports.length === 0 ? (
               <div className="adm-empty">No reports yet.</div>
             ) : (
+              <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
               <table className="adm-table">
                 <thead>
                   <tr><th>REPORTED BY</th><th>REPORTED USER</th><th>TYPE</th><th>REASON</th><th>CONTENT</th><th>STATUS</th><th>ACTIONS</th></tr>
@@ -1002,18 +1072,18 @@ export default function AdminDashboard() {
                   {reports.map(r => (
                     <tr key={r.id}>
                       <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || 'â€”'}</div>
                         <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
                       </td>
                       <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || 'â€”'}</div>
                         <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
                       </td>
                       <td><span className="adm-tag">{r.content_type}</span></td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 160 }}>{r.reason}</td>
                       <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 180 }}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {r.content_preview || '—'}
+                          {r.content_preview || 'â€”'}
                         </div>
                       </td>
                       <td>
@@ -1061,18 +1131,18 @@ export default function AdminDashboard() {
                           </div>
                         )}
                         {r.status !== 'pending' && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || '—'}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || 'â€”'}</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}
-
-        {/* ── CONTENT MONITOR ── */}
+        {/* â”€â”€ CONTENT MONITOR â”€â”€ */}
         {section === 'moderation' && (() => {
           const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
           const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
@@ -1146,14 +1216,14 @@ export default function AdminDashboard() {
                             <td><span className="adm-tag" style={{ color: 'var(--orange)', borderColor: 'var(--orange)' }}>
                               {item._type === 'global_message' ? 'Global' : item._type === 'announcement' ? 'Post' : 'Message'}
                             </span></td>
-                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || '—'}</td>
+                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || 'â€”'}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-primary)', maxWidth: 280 }}>
                               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {highlighted}
                               </div>
                             </td>
                             <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                              {item.full_name || item.author_name || '—'}
+                              {item.full_name || item.author_name || 'â€”'}
                             </td>
                             <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                               {new Date(item.created_at).toLocaleDateString()}
@@ -1241,3 +1311,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
