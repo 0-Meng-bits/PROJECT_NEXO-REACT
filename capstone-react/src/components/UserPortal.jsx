@@ -2493,6 +2493,17 @@ export default function UserPortal() {
                   )}
                 </div>
 
+                {/* Circle Chat */}
+                {isMember(activeCommId) && (
+                  <div
+                    className={`ls-item ${section === 'circle-chat' ? 'active' : ''}`}
+                    onClick={() => { setSection('circle-chat'); setShowCircleAnnouncements(false); setActiveChannelId(null); }}
+                  >
+                    <i className="channel-hash fa-solid fa-comments" style={{ fontSize: 11 }}></i>
+                    <span className="node-name">circle chat</span>
+                  </div>
+                )}
+
 
 
                 {channels.length === 0 && (
