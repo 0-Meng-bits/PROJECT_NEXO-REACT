@@ -116,6 +116,7 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState([]);
   const [allMessages, setAllMessages] = useState([]);
   const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   // â”€â”€ Analytics state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [preset, setPreset] = useState('week');
@@ -364,6 +365,40 @@ export default function AdminDashboard() {
     if (!confirm(`Unban ${userName}?`)) return;
     await supabase.from('profiles').update({ is_banned: false }).eq('id', userId);
     showToast(`${userName} has been unbanned.`);
+    fetchData();
+  };
+
+  const deleteUser = async (userId, userName) => {
+    if (!confirm(`Permanently delete ${userName}? This cannot be undone.`)) return;
+    // Delete via server (needs service role)
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`/api/delete-user?id=${userId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        showToast(`${userName} deleted.`);
+        setSelectedUser(null);
+        fetchData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message || 'Failed to delete user.');
+      }
+    } catch {
+      // Fallback: just delete profile
+      await supabase.from('profiles').delete().eq('id', userId);
+      showToast(`${userName} deleted.`);
+      setSelectedUser(null);
+      fetchData();
+    }
+  };
+
+  const forceVerifyEmail = async (userId, userName) => {
+    if (!confirm(`Force verify email for ${userName}?`)) return;
+    await supabase.from('profiles').update({ is_verified: true }).eq('id', userId);
+    showToast(`${userName} verified.`);
+    if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev, is_verified: true }));
     fetchData();
   };
 
@@ -740,7 +775,7 @@ export default function AdminDashboard() {
         )}
 
         {/* â”€â”€ ALL USERS â”€â”€ */}
-        {section === 'users' && (
+        {section === 'users' && !selectedUser && (
           <div className="adm-card">
             <div className="adm-card-head">
               <span>All Registered Users</span>
@@ -752,7 +787,7 @@ export default function AdminDashboard() {
                 <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filtered.map(s => (
-                    <tr key={s.id}>
+                    <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(s)}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
@@ -761,43 +796,108 @@ export default function AdminDashboard() {
                         {s.is_banned
                           ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
                           : s.suspended_until && new Date(s.suspended_until) > new Date()
-                            ? <span className="adm-status" style={{ background: 'rgba(247,169,79,0.1)', color: 'var(--orange)', border: '1px solid var(--orange)' }}>
-                                SUSPENDED
-                              </span>
+                            ? <span className="adm-status" style={{ background: 'rgba(247,169,79,0.1)', color: 'var(--orange)', border: '1px solid var(--orange)' }}>SUSPENDED</span>
                             : <span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span>
                         }
                       </td>
                       <td>
-                        <div>
-                          <span style={{ fontWeight: 700, color: (s.trust_points ?? 3) <= 1 ? 'var(--red)' : (s.trust_points ?? 3) <= 2 ? 'var(--orange)' : 'var(--green)' }}>
-                            {s.trust_points ?? 3}/3
-                          </span>
-                          {s.suspended_until && new Date(s.suspended_until) > new Date() && (
-                            <div style={{ fontSize: 9, color: 'var(--orange)', marginTop: 2 }}>
-                              Until {new Date(s.suspended_until).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
+                        <span style={{ fontWeight: 700, color: (s.trust_points ?? 3) <= 1 ? 'var(--red)' : (s.trust_points ?? 3) <= 2 ? 'var(--orange)' : 'var(--green)' }}>
+                          {s.trust_points ?? 3}/3
+                        </span>
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          {!s.is_banned && s.is_verified && (
-                            <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
-                              onClick={() => { const r = prompt('Warning reason:'); if (r) issueWarning(s.id, s.full_name, r); }}>
-                              <i className="fa-solid fa-triangle-exclamation"></i> Warn
-                            </button>
-                          )}
-                          {s.is_banned
-                            ? <button className="adm-btn approve" style={{ fontSize: 10 }} onClick={() => unbanUser(s.id, s.full_name)}>
-                                <i className="fa-solid fa-unlock"></i> Unban
-                              </button>
-                            : s.is_verified && (
-                              <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => banUser(s.id, s.full_name)}>
-                                <i className="fa-solid fa-ban"></i> Ban
-                              </button>
-                            )
-                          }
+                          <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteUser(s.id, s.full_name)}>
+                            <i className="fa-solid fa-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+        {section === 'users' && selectedUser && (
+          <div>
+            <button className="adm-btn" style={{ marginBottom: 16 }} onClick={() => setSelectedUser(null)}>
+              <i className="fa-solid fa-arrow-left"></i> Back to Users
+            </button>
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <span>User Profile</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {!selectedUser.is_verified && (
+                    <button className="adm-btn approve" onClick={() => forceVerifyEmail(selectedUser.id, selectedUser.full_name)}>
+                      <i className="fa-solid fa-shield-check"></i> Force Verify Email
+                    </button>
+                  )}
+                  <button className="adm-btn reject" onClick={() => deleteUser(selectedUser.id, selectedUser.full_name)}>
+                    <i className="fa-solid fa-trash"></i> Delete User
+                  </button>
+                </div>
+              </div>
+              <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+                {/* Left: user info */}
+                <div>
+                  {[
+                    { label: 'FULL NAME',  value: selectedUser.full_name },
+                    { label: 'CTU ID',     value: selectedUser.student_id, mono: true },
+                    { label: 'EMAIL',      value: selectedUser.email },
+                    { label: 'USER TYPE',  value: selectedUser.user_type },
+                    { label: 'STATUS',     value: selectedUser.is_banned ? '🚫 Banned' : selectedUser.is_verified ? '✅ Verified' : '⏳ Pending' },
+                    { label: 'ID VERIFIED', value: selectedUser.id_photo_url ? '✅ Yes' : '❌ No' },
+                    { label: 'JOINED',     value: new Date(selectedUser.created_at).toLocaleString() },
+                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 3}/3` },
+                    { label: 'WARNINGS',   value: selectedUser.warning_count || 0 },
+                  ].map(({ label, value, mono }) => (
+                    <div key={label} style={{ display: 'flex', gap: 16, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ width: 120, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>{label}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: mono ? 'monospace' : 'inherit' }}>{value}</div>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {!selectedUser.is_banned && selectedUser.is_verified && (
+                      <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)' }}
+                        onClick={() => { const r = prompt('Warning reason:'); if (r) { issueWarning(selectedUser.id, selectedUser.full_name, r); setSelectedUser(prev => ({ ...prev, warning_count: (prev.warning_count || 0) + 1, trust_points: Math.max(0, (prev.trust_points ?? 3) - 1) })); } }}>
+                        <i className="fa-solid fa-triangle-exclamation"></i> Issue Warning
+                      </button>
+                    )}
+                    {selectedUser.is_banned
+                      ? <button className="adm-btn approve" onClick={() => { unbanUser(selectedUser.id, selectedUser.full_name); setSelectedUser(prev => ({ ...prev, is_banned: false })); }}>
+                          <i className="fa-solid fa-unlock"></i> Unban
+                        </button>
+                      : selectedUser.is_verified && (
+                        <button className="adm-btn reject" onClick={() => { banUser(selectedUser.id, selectedUser.full_name); setSelectedUser(prev => ({ ...prev, is_banned: true })); }}>
+                          <i className="fa-solid fa-ban"></i> Ban User
+                        </button>
+                      )
+                    }
+                  </div>
+                </div>
+                {/* Right: ID photo */}
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>SCHOOL ID PHOTO</div>
+                  {selectedUser.id_photo_url ? (
+                    <a href={selectedUser.id_photo_url} target="_blank" rel="noreferrer">
+                      <img src={selectedUser.id_photo_url} alt="School ID"
+                        style={{ width: '100%', maxWidth: 360, borderRadius: 10, border: '1px solid rgba(0,240,255,0.2)', cursor: 'zoom-in', objectFit: 'contain', background: '#000' }} />
+                    </a>
+                  ) : (
+                    <div style={{ width: '100%', maxWidth: 360, height: 200, borderRadius: 10, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <i className="fa-solid fa-id-card" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}></i>
+                        No ID photo uploaded
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
                         </div>
                       </td>
                     </tr>

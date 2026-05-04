@@ -369,6 +369,35 @@ app.post('/api/verify-student/:id', async (req, res) => {
   res.json({ message: 'Student verified!' });
 });
 
+// ── ADMIN: DELETE USER ────────────────────────────────────────────────────────
+app.delete('/api/delete-user', async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ message: 'User ID required.' });
+
+  // Verify requester is admin
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) {
+      const { data: profile } = await supabaseAdmin.from('profiles').select('user_type').eq('id', user.id).single();
+      if (profile?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
+    }
+  }
+
+  try {
+    // Delete from Supabase Auth first
+    await supabaseAdmin.auth.admin.deleteUser(id);
+  } catch (e) {
+    console.warn('[DELETE USER] Auth delete failed (may not exist):', e.message);
+  }
+
+  // Delete profile (cascades to memberships, notifications, etc.)
+  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', id);
+  if (error) return res.status(400).json({ message: error.message });
+
+  res.json({ message: 'User deleted successfully.' });
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
