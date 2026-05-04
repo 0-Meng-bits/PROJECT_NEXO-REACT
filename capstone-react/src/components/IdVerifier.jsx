@@ -419,7 +419,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
   const handleCropDone = (croppedFile, croppedUrl) => {
     cropFileRef.current = croppedFile;
-    setPreview(croppedUrl); // show the cropped image during scanning
+    // Keep showing the original full ID — don't replace preview with the processed crop
     runOCR(croppedFile);
   };
 
