@@ -211,7 +211,7 @@ export default function AdminDashboard() {
         supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
         supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
         supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
-        supabase.from('memberships').select('community_id, status, created_at'),
+        supabase.from('memberships').select('*'),
       ]);
       setStudents(await studRes.json());
       setCommunities(commRes.data || []);
