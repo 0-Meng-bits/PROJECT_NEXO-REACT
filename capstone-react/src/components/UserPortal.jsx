@@ -1105,14 +1105,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const saveProfile = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/update-profile', {
+      const res = await fetch(`/api/update-profile?userId=${user.id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           course: editForm.course,
           year_level: editForm.year_level,
