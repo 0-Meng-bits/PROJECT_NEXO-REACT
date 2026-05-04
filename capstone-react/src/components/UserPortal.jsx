@@ -1944,11 +1944,13 @@ export default function UserPortal() {
         .is('community_id', null).order('created_at', { ascending: true });
       setMessages(data || []);
     } else if (channelId) {
+      // Always filter by BOTH channel_id AND community_id to prevent cross-circle leakage
       const { data } = await supabase.from('messages').select('*')
-        .eq('channel_id', channelId).order('created_at', { ascending: true });
+        .eq('channel_id', channelId)
+        .eq('community_id', commId)
+        .order('created_at', { ascending: true });
       setMessages(data || []);
     } else if (commId) {
-      // No channel selected — load all messages for this community
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
         .is('channel_id', null)
@@ -2051,11 +2053,23 @@ export default function UserPortal() {
 
   // Realtime circle announcements
   useEffect(() => {
-    if (!activeCommId || activeCommId === 'global') return;
+    if (!activeCommId || activeCommId === 'global') {
+      setCircleAnnouncements([]);
+      return;
+    }
+
+    // Load fresh announcements for this specific circle
+    loadCircleAnnouncements(activeCommId);
+
     const sub = supabase.channel('announcements:' + activeCommId)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'announcements', filter: `community_id=eq.${activeCommId}` },
-        (payload) => setCircleAnnouncements(prev => [payload.new, ...prev])
+        (payload) => {
+          // Only add if it belongs to the currently active circle
+          if (payload.new.community_id === activeCommId) {
+            setCircleAnnouncements(prev => [payload.new, ...prev]);
+          }
+        }
       )
       .on('postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'announcements' },
@@ -2063,10 +2077,44 @@ export default function UserPortal() {
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'announcements' },
-        (payload) => setCircleAnnouncements(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a))
+        (payload) => {
+          if (payload.new.community_id === activeCommId) {
+            setCircleAnnouncements(prev => prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a));
+          }
+        }
       )
       .subscribe();
     return () => supabase.removeChannel(sub);
+  }, [activeCommId, loadCircleAnnouncements]);
+
+  // Reload channels when switching circles — ensures each circle only shows its own channels
+  useEffect(() => {
+    // Always clear state first when switching
+    setChannels([]);
+    setActiveChannelId(null);
+    setCircleAnnouncements([]);
+    setShowCircleAnnouncements(false);
+    setMessages([]);
+
+    if (!activeCommId || activeCommId === 'global') return;
+
+    // Load channels strictly filtered to this circle
+    supabase.from('channels').select('*')
+      .eq('community_id', activeCommId)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        const list = data || [];
+        setChannels(list);
+        setActiveChannelId(list[0]?.id || null);
+      });
+
+    // Load announcements strictly filtered to this circle
+    supabase.from('announcements').select('*')
+      .eq('community_id', activeCommId)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setCircleAnnouncements(data || []));
+
   }, [activeCommId]);
 
   // Auto-scroll to bottom when messages update
