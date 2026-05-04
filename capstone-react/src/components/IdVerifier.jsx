@@ -285,42 +285,68 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Prepare just 2 variants: inverted (for white-on-dark) + plain grayscale
-      const variants = await prepareVariants(imageFile);
-
-      let variantIndex = 0;
-      const worker = await createWorker('eng', 1, {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            // Show combined progress: variant 1 = 0-50%, variant 2 = 50-100%
-            setProgress(Math.round(variantIndex * 50 + m.progress * 50));
-          }
-        },
+      // Convert file to base64 for server
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(imageFile);
       });
 
-      // Use PSM 7 (single text line) — best for a cropped number row
-      await worker.setParameters({
-        tessedit_pageseg_mode: '7',
-        tessedit_char_whitelist: '0123456789',
-      });
+      setProgress(30);
 
-      let bestMatch = { found: false };
-      let bestText = '';
-
-      for (const variant of variants) {
-        const { data: { text } } = await worker.recognize(variant);
-        console.log('[OCR] text:', JSON.stringify(text.trim()));
-        const match = extractIdFromText(text, ctuId);
-        if (match.found) { bestMatch = match; break; }
-        if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) {
-          bestText = text;
+      // Try Google Vision via server first
+      let text = '';
+      let usedGoogleVision = false;
+      try {
+        const token = localStorage.getItem('accessToken');
+        const serverRes = await fetch('/api/scan-id', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ image: base64 }),
+        });
+        const data = await serverRes.json();
+        if (serverRes.ok && data.text) {
+          text = data.text;
+          usedGoogleVision = true;
+          setProgress(90);
+          console.log('[OCR] Google Vision text:', JSON.stringify(text));
+        } else if (data.fallback) {
+          console.log('[OCR] Google Vision not configured, using Tesseract fallback');
         }
-        variantIndex++;
+      } catch (fetchErr) {
+        console.log('[OCR] Server unreachable, using Tesseract fallback');
       }
 
-      await worker.terminate();
-      console.log('[OCR] Best digits found:', bestText.replace(/\D/g,''));
-      setResult(bestMatch);
+      // Tesseract fallback if Google Vision unavailable
+      if (!usedGoogleVision) {
+        const variants = await prepareVariants(imageFile);
+        let variantIndex = 0;
+        const worker = await createWorker('eng', 1, {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              setProgress(Math.round(variantIndex * 50 + m.progress * 50));
+            }
+          },
+        });
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7',
+          tessedit_char_whitelist: '0123456789',
+        });
+        for (const variant of variants) {
+          const { data: { text: t } } = await worker.recognize(variant);
+          if ((t || '').replace(/\D/g,'').length > text.replace(/\D/g,'').length) text = t || '';
+          variantIndex++;
+        }
+        await worker.terminate();
+      }
+
+      setProgress(100);
+      console.log('[OCR] Final text:', JSON.stringify(text));
+      const match = extractIdFromText(text, ctuId);
+      setResult(match);
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);

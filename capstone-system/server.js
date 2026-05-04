@@ -312,6 +312,65 @@ app.delete('/api/delete-community', async (req, res) => {
   res.json({ message: 'Circle deleted successfully.' });
 });
 
+// ── OCR: SCAN ID PHOTO ───────────────────────────────────────────────────────
+app.post('/api/scan-id', async (req, res) => {
+  let resolvedUserId = null;
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (!error && user) resolvedUserId = user.id;
+  }
+  if (!resolvedUserId) {
+    const legacyId = req.headers['x-user-id'];
+    if (legacyId) resolvedUserId = legacyId;
+  }
+
+  const { image } = req.body; // base64 data URL
+  if (!image) return res.status(400).json({ message: 'No image provided.' });
+
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ message: 'Google Vision API key not configured.', fallback: true });
+  }
+
+  // Strip data URL prefix to get pure base64
+  const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+
+  try {
+    const https = require('https');
+    const body = JSON.stringify({
+      requests: [{
+        image: { content: base64 },
+        features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+      }]
+    });
+
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'vision.googleapis.com',
+        path: `/v1/images:annotate?key=${apiKey}`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      };
+      const req = https.request(options, (r) => {
+        let data = '';
+        r.on('data', d => data += d);
+        r.on('end', () => resolve(JSON.parse(data)));
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+
+    const text = result.responses?.[0]?.fullTextAnnotation?.text || '';
+    console.log('[SCAN-ID] Google Vision text:', JSON.stringify(text));
+    res.json({ text });
+  } catch (err) {
+    console.error('[SCAN-ID] Google Vision error:', err.message);
+    res.status(500).json({ message: 'OCR failed.', error: err.message });
+  }
+});
+
 // ── UPLOAD CIRCLE COVER PHOTO ────────────────────────────────────────────────
 app.post('/api/upload-cover', async (req, res) => {
   let resolvedUserId = null;
