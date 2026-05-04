@@ -25,15 +25,16 @@ export default async function handler(req, res) {
   }
 
   // Delete opportunities first (no ON DELETE CASCADE on this FK)
-  await supabaseAdmin.from('opportunities').delete().eq('community_id', id);
+  const { error: oppError } = await supabaseAdmin.from('opportunities').delete().eq('community_id', id);
+  if (oppError) console.error('[DELETE COMMUNITY] opportunities error:', JSON.stringify(oppError));
 
   // Delete the community (all other related tables cascade)
   const { error: deleteError } = await supabaseAdmin
     .from('communities').delete().eq('id', id);
 
   if (deleteError) {
-    console.error('[DELETE COMMUNITY]', deleteError.message);
-    return res.status(500).json({ message: 'Failed to delete circle.', detail: deleteError.message });
+    console.error('[DELETE COMMUNITY]', JSON.stringify(deleteError));
+    return res.status(500).json({ message: deleteError.message, detail: deleteError.details, hint: deleteError.hint, code: deleteError.code });
   }
 
   return res.status(200).json({ message: 'Circle deleted successfully.' });
