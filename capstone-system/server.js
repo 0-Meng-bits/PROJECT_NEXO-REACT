@@ -68,6 +68,24 @@ app.post('/api/login', async (req, res) => {
     return res.status(401).json({ message: 'CTU_ID not found in the system.' });
   }
 
+  // Check if permanently banned
+  if (profile.is_banned) {
+    return res.status(403).json({
+      message: 'Your account has been permanently banned due to serious violations. Contact the administrator if you believe this is a mistake.',
+      banned: true,
+    });
+  }
+
+  // Check if suspended
+  if (profile.suspended_until && new Date(profile.suspended_until) > new Date()) {
+    const until = new Date(profile.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return res.status(403).json({
+      message: `Your account is suspended until ${until} due to community guideline violations.`,
+      suspended: true,
+      suspended_until: profile.suspended_until,
+    });
+  }
+
   // 2. Check verification — but still allow login with limited access
   const isPending = !profile.is_verified;
 
@@ -79,16 +97,35 @@ app.post('/api/login', async (req, res) => {
 
   if (authError) {
     console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
-    
-    // Check if it's an email verification error
-    if (authError.message?.includes('Email not confirmed') || authError.message?.includes('email')) {
-      return res.status(401).json({ message: 'Please verify your email first. Check your inbox for the verification link.' });
-    }
-    
-    // Legacy account — Supabase Auth user doesn't exist yet
-    // If password column is null (cleared), we can't validate — check against provided password only if stored
-    const passwordOk = !profile.password || profile.password === password;
 
+    // Auto-confirm email and retry — this is a school system, email confirmation
+    // is not required since admin verifies identity via ID photo instead
+    if (authError.message?.includes('Email not confirmed')) {
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(profile.id, {
+          email_confirm: true,
+        });
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password,
+        });
+        if (retryError) {
+          return res.status(401).json({ message: 'Invalid credentials.' });
+        }
+        return res.json({
+          message: isPending ? 'Pending approval' : 'Authentication successful',
+          user: profile,
+          session: retryData.session,
+          pending: isPending,
+        });
+      } catch (confirmErr) {
+        console.error('[LOGIN] Auto-confirm error:', confirmErr.message);
+        return res.status(401).json({ message: 'Login failed. Please contact admin.' });
+      }
+    }
+
+    // Legacy account — Supabase Auth user doesn't exist yet
+    const passwordOk = !profile.password || profile.password === password;
     if (!passwordOk) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
@@ -114,11 +151,11 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/signup', async (req, res) => {
   const { email, password, fullName, studentId, user_type } = req.body;
 
-  // 1. Create Supabase Auth user with email_confirm: false (requires verification)
+  // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: false, // User must verify email
+    email_confirm: true,
   });
 
   if (authError) {
@@ -142,68 +179,13 @@ app.post('/api/signup', async (req, res) => {
   if (error) {
     // Rollback auth user if profile insert fails
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    // Give a friendly message for common constraint violations
-    if (error.code === '23505' || error.message.includes('profiles_student_id_key')) {
-      return res.status(400).json({ message: 'This CTU ID is already registered. Try logging in instead.' });
-    }
-    if (error.message.includes('profiles_email_key') || error.message.includes('email')) {
-      return res.status(400).json({ message: 'This email is already in use. Try logging in instead.' });
-    }
     return res.status(400).json({ message: error.message });
   }
 
-  // 3. Generate email verification link
-  const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'signup',
-    email: email,
-    options: { redirectTo: `${siteUrl}/portal` },
-  });
+  // Sign them in to get a session token
+  const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (linkError) {
-    console.error('[SIGNUP] Link generation error:', linkError.message);
-  }
-
-  // 4. Send verification email via Gmail SMTP (if configured)
-  if (linkData?.properties?.action_link && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-
-    try {
-      await transporter.sendMail({
-        from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-        to: email,
-        subject: 'Verify your NEXO Connect account',
-        html: `
-          <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
-            <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
-            <p>Welcome, <strong>${fullName}</strong>!</p>
-            <p>Click the link below to verify your email and activate your account:</p>
-            <a href="${linkData.properties.action_link}"
-               style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
-              VERIFY EMAIL
-            </a>
-            <p style="color:#666;font-size:12px;">This link expires in 24 hours. After verification, your account will be reviewed by an admin.</p>
-          </div>
-        `,
-      });
-      console.log('[SIGNUP] Verification email sent to', email);
-    } catch (emailErr) {
-      console.error('[SIGNUP] Email send error:', emailErr.message);
-    }
-  }
-
-  res.status(200).json({ 
-    message: 'Account created! Check your email to verify your account.', 
-    user: data, 
-    session: null 
-  });
+  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
 });
 
 // ── SESSION VERIFY (frontend calls this to validate stored session) ────────────
@@ -229,44 +211,6 @@ app.get('/api/students', async (req, res) => {
     .from('profiles').select('*').order('created_at', { ascending: false });
   if (error) return res.status(400).json(error);
   res.json(data);
-});
-
-// ── DELETE USER (admin only) ──────────────────────────────────────────────────
-app.delete('/api/delete-user/:id', async (req, res) => {
-  // Verify the requester is an admin
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'Unauthorized.' });
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ message: 'Invalid session.' });
-
-  const { data: adminProfile } = await supabaseAdmin
-    .from('profiles').select('user_type').eq('id', user.id).single();
-  if (!adminProfile || adminProfile.user_type !== 'Admin') {
-    return res.status(403).json({ message: 'Admin access required.' });
-  }
-
-  const targetId = req.params.id;
-  if (!targetId) return res.status(400).json({ message: 'User ID required.' });
-
-  // Delete profile first (cascades related data via FK)
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles').delete().eq('id', targetId);
-  if (profileError) {
-    console.error('[DELETE USER] Profile delete error:', profileError.message);
-    return res.status(500).json({ message: 'Failed to delete profile.', detail: profileError.message });
-  }
-
-  // Delete from Supabase Auth
-  const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(targetId);
-  if (authDeleteError) {
-    console.error('[DELETE USER] Auth delete error:', authDeleteError.message);
-    // Profile already deleted — still return success but warn
-    return res.status(207).json({ message: 'Profile deleted but auth user removal failed.', detail: authDeleteError.message });
-  }
-
-  console.log('[DELETE USER] Deleted user', targetId);
-  res.json({ message: 'User deleted successfully.' });
 });
 
 // ── DELETE COMMUNITY ─────────────────────────────────────────────────────────
@@ -375,42 +319,6 @@ app.post('/api/upload-cover', async (req, res) => {
   res.json({ url: cover });
 });
 
-// ── UPLOAD ID PHOTO (for verification) ───────────────────────────────────────
-app.post('/api/upload-id-photo', async (req, res) => {
-  let resolvedUserId = null;
-
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) resolvedUserId = user.id;
-  }
-  if (!resolvedUserId) {
-    const legacyUserId = req.headers['x-user-id'];
-    if (legacyUserId) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles').select('id').eq('id', legacyUserId).single();
-      if (profile) resolvedUserId = profile.id;
-    }
-  }
-  if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
-
-  const { photo } = req.body;
-  if (!photo) return res.status(400).json({ message: 'No photo provided.' });
-
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ id_photo_url: photo })
-    .eq('id', resolvedUserId);
-
-  if (error) {
-    console.error('[UPLOAD ID PHOTO] DB error:', error.message);
-    return res.status(500).json({ message: 'Failed to save ID photo.' });
-  }
-
-  console.log('[UPLOAD ID PHOTO] Saved for user', resolvedUserId);
-  res.json({ message: 'ID photo uploaded successfully.' });
-});
-
 // ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
 app.post('/api/upload-avatar', async (req, res) => {
   let resolvedUserId = null;
@@ -453,64 +361,6 @@ app.post('/api/upload-avatar', async (req, res) => {
   res.json({ url: avatar });
 });
 
-// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
-app.post('/api/forgot-password', async (req, res) => {
-  const { studentId } = req.body;
-  if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
-
-  const { data: profile, error } = await supabaseAdmin
-    .from('profiles').select('email').eq('student_id', studentId).single();
-
-  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
-
-  const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'recovery',
-    email: profile.email,
-    options: { redirectTo: `${siteUrl}/reset-password` },
-  });
-
-  if (linkError) {
-    console.error('[FORGOT PASSWORD] Link error:', linkError.message);
-    return res.status(400).json({ message: linkError.message });
-  }
-
-  const nodemailer = require('nodemailer');
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
-
-  try {
-    await transporter.sendMail({
-      from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-      to: profile.email,
-      subject: 'Reset your NEXO Connect password',
-      html: `
-        <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
-          <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
-          <p>You requested a password reset. Click the link below to set a new password:</p>
-          <a href="${linkData.properties.action_link}"
-             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
-            RESET PASSWORD
-          </a>
-          <p style="color:#666;font-size:12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
-        </div>
-      `,
-    });
-    console.log('[FORGOT PASSWORD] Reset email sent to', profile.email);
-  } catch (emailErr) {
-    console.error('[FORGOT PASSWORD] Email send error:', emailErr.message);
-    return res.status(400).json({ message: 'Failed to send reset email.' });
-  }
-
-  res.status(200).json({ message: 'Password reset email sent.' });
-});
-
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
   const { error } = await supabaseAdmin
@@ -519,13 +369,33 @@ app.post('/api/verify-student/:id', async (req, res) => {
   res.json({ message: 'Student verified!' });
 });
 
-// ── ADMIN: FORCE VERIFY EMAIL ─────────────────────────────────────────────────
-app.post('/api/force-verify-email/:id', async (req, res) => {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(req.params.id, {
-    email_confirm: true,
-  });
+// ── ADMIN: DELETE USER ────────────────────────────────────────────────────────
+app.delete('/api/delete-user', async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ message: 'User ID required.' });
+
+  // Verify requester is admin
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) {
+      const { data: profile } = await supabaseAdmin.from('profiles').select('user_type').eq('id', user.id).single();
+      if (profile?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
+    }
+  }
+
+  try {
+    // Delete from Supabase Auth first
+    await supabaseAdmin.auth.admin.deleteUser(id);
+  } catch (e) {
+    console.warn('[DELETE USER] Auth delete failed (may not exist):', e.message);
+  }
+
+  // Delete profile (cascades to memberships, notifications, etc.)
+  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', id);
   if (error) return res.status(400).json({ message: error.message });
-  res.json({ message: 'Email confirmed.' });
+
+  res.json({ message: 'User deleted successfully.' });
 });
 
 app.listen(port, '0.0.0.0', () => {

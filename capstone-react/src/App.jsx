@@ -1,10 +1,17 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
+import Landing from './components/Landing';
+import LandingPage from './components/LandingPage';
 import Onboarding from './components/Onboarding';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/AdminDashboard';
 import ResetPassword from './components/ResetPassword';
+
+function LandingWrapper() {
+  const navigate = useNavigate();
+  return <Landing onEnter={(mode) => navigate('/auth?mode=' + mode)} />;
+}
 
 function ProtectedRoute({ children, allowedType }) {
   const [status, setStatus] = useState('checking');
@@ -65,14 +72,15 @@ function ProtectedRoute({ children, allowedType }) {
     );
   }
 
-  if (status === 'fail') return <Navigate to="/" replace />;
+  if (status === 'fail') return <Navigate to="/auth" replace />;
   return children;
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Auth />} />
+      <Route path="/" element={<LandingWrapper />} />
+      <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={
         <ProtectedRoute>
           <Onboarding />
