@@ -642,7 +642,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Registered</th><th>Actions</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
                     <tr key={s.id}>
@@ -655,13 +655,26 @@ export default function AdminDashboard() {
                             <img
                               src={s.id_photo_url}
                               alt="School ID"
-                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(0,240,255,0.3)', cursor: 'pointer' }}
+                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: `1px solid ${s.id_verified ? 'rgba(62,207,142,0.4)' : 'rgba(247,169,79,0.4)'}`, cursor: 'pointer' }}
                             />
                           </a>
                         ) : (
                           <span style={{ fontSize: 11, color: 'var(--red)' }}>
                             <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
                             No photo
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {!s.id_photo_url ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                        ) : s.id_verified ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-circle-check"></i> Passed
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--orange)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-triangle-exclamation"></i> Manual
                           </span>
                         )}
                       </td>
