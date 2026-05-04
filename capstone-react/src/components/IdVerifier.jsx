@@ -120,8 +120,8 @@ function CropTool({ imageSrc, onCrop, onSkip }) {
     const scaleX = img.naturalWidth / canvas.width;
     const scaleY = img.naturalHeight / canvas.height;
     const cropCanvas = document.createElement('canvas');
-    // Upscale crop 3x for better OCR
-    const scale = 3;
+    // Upscale crop 2x — enough for Google Vision, keeps file size small
+    const scale = 2;
     cropCanvas.width = Math.round(rect.w * scaleX * scale);
     cropCanvas.height = Math.round(rect.h * scaleY * scale);
     const ctx = cropCanvas.getContext('2d');
@@ -285,11 +285,28 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Convert file to base64 for server
+      // Resize image to max 800px before sending — keeps it fast for Google Vision
       const base64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.readAsDataURL(imageFile);
+        const img = new Image();
+        const url = URL.createObjectURL(imageFile);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const MAX = 800;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => {
+          // fallback: read as-is
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(imageFile);
+        };
+        img.src = url;
       });
 
       setProgress(30);
@@ -364,8 +381,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
         const makeVariant = (transformFn) => {
           const c = document.createElement('canvas');
-          c.width = img.width * 4;
-          c.height = img.height * 4;
+          c.width = img.width * 2;
+          c.height = img.height * 2;
           const ctx = c.getContext('2d');
           ctx.drawImage(img, 0, 0, c.width, c.height);
           const id = ctx.getImageData(0, 0, c.width, c.height);
