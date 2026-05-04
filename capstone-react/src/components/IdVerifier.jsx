@@ -285,35 +285,41 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Run multiple preprocessing variants and pick the best match
+      // Prepare just 2 variants: inverted (for white-on-dark) + plain grayscale
       const variants = await prepareVariants(imageFile);
-      let bestMatch = { found: false };
-      let bestText = '';
 
+      let variantIndex = 0;
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
-          if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
+          if (m.status === 'recognizing text') {
+            // Show combined progress: variant 1 = 0-50%, variant 2 = 50-100%
+            setProgress(Math.round(variantIndex * 50 + m.progress * 50));
+          }
         },
       });
 
+      // Use PSM 7 (single text line) — best for a cropped number row
+      await worker.setParameters({
+        tessedit_pageseg_mode: '7',
+        tessedit_char_whitelist: '0123456789',
+      });
+
+      let bestMatch = { found: false };
+      let bestText = '';
+
       for (const variant of variants) {
-        // Try PSM 7 (single line) and PSM 13 (raw line)
-        for (const psm of ['7', '13', '6']) {
-          await worker.setParameters({
-            tessedit_pageseg_mode: psm,
-            tessedit_char_whitelist: '0123456789',
-          });
-          const { data: { text } } = await worker.recognize(variant);
-          console.log(`[OCR] PSM${psm} text:`, JSON.stringify(text.trim()));
-          const match = extractIdFromText(text, ctuId);
-          if (match.found) { bestMatch = match; bestText = text; break; }
-          if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) bestText = text;
+        const { data: { text } } = await worker.recognize(variant);
+        console.log('[OCR] text:', JSON.stringify(text.trim()));
+        const match = extractIdFromText(text, ctuId);
+        if (match.found) { bestMatch = match; break; }
+        if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) {
+          bestText = text;
         }
-        if (bestMatch.found) break;
+        variantIndex++;
       }
 
       await worker.terminate();
-      console.log('[OCR] Best text:', JSON.stringify(bestText));
+      console.log('[OCR] Best digits found:', bestText.replace(/\D/g,''));
       setResult(bestMatch);
       setStage('done');
     } catch (err) {
@@ -322,18 +328,16 @@ export default function IdVerifier({ ctuId, onVerified }) {
     }
   };
 
-  // Prepare multiple image variants for OCR
+  // Prepare 2 image variants: inverted + plain grayscale (4x upscale)
   async function prepareVariants(imageFile) {
     return new Promise((resolve) => {
       const img = new Image();
       const url = URL.createObjectURL(imageFile);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const variants = [];
 
-        const process = (filter) => {
+        const makeVariant = (transformFn) => {
           const c = document.createElement('canvas');
-          // Upscale 4x
           c.width = img.width * 4;
           c.height = img.height * 4;
           const ctx = c.getContext('2d');
@@ -341,31 +345,29 @@ export default function IdVerifier({ ctuId, onVerified }) {
           const id = ctx.getImageData(0, 0, c.width, c.height);
           const d = id.data;
           for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i+1], b = d[i+2];
-            const gray = Math.round(0.299*r + 0.587*g + 0.114*b);
-            let val = filter(gray);
+            const gray = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
+            const val = transformFn(gray);
             d[i] = d[i+1] = d[i+2] = val;
           }
           ctx.putImageData(id, 0, 0);
           return c.toDataURL('image/png');
         };
 
-        // Variant 1: plain grayscale
-        variants.push(process(g => g));
-        // Variant 2: inverted (for white-on-dark)
-        variants.push(process(g => 255 - g));
-        // Variant 3: high contrast threshold (binarize at 128)
-        variants.push(process(g => g > 128 ? 255 : 0));
-        // Variant 4: inverted binarize
-        variants.push(process(g => g > 128 ? 0 : 255));
-        // Variant 5: adaptive-like — boost midtones
-        variants.push(process(g => {
-          const c = 1.5;
-          const f = (259*(c*255+255))/(255*(259-c*255));
-          return Math.min(255, Math.max(0, Math.round(f*(g-128)+128)));
-        }));
+        // Check average brightness to decide which variant to try first
+        const tempC = document.createElement('canvas');
+        tempC.width = img.width; tempC.height = img.height;
+        const tempCtx = tempC.getContext('2d');
+        tempCtx.drawImage(img, 0, 0);
+        const sample = tempCtx.getImageData(0, 0, img.width, img.height).data;
+        let total = 0;
+        for (let i = 0; i < sample.length; i += 4) total += (sample[i] + sample[i+1] + sample[i+2]) / 3;
+        const avg = total / (sample.length / 4);
 
-        resolve(variants);
+        const plain    = makeVariant(g => g);
+        const inverted = makeVariant(g => 255 - g);
+
+        // If dark background (white text), try inverted first
+        resolve(avg < 128 ? [inverted, plain] : [plain, inverted]);
       };
       img.onerror = () => resolve([imageFile]);
       img.src = url;
