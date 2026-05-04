@@ -225,7 +225,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
             </span>
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} ï¿½ {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
@@ -241,7 +241,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
             </button>
           </div>
         )}
-        {/* Report button "” always visible to non-owners */}
+        {/* Report button "ï¿½ always visible to non-owners */}
         {onReport && user?.user_type !== 'Admin' && a.author_id !== user?.id && (
           <button className="chat-action-btn" onClick={() => onReport({ type: 'announcement', id: a.id, preview: `${a.title}: ${a.content}`, reportedUserId: a.author_id })}
             title="Report this post"
@@ -289,13 +289,13 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% ï¿½ {votes}</span>}
                 </div>
               </button>
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` · You voted "${myVote}"` : ' · Click to vote'}
+            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` ï¿½ You voted "${myVote}"` : ' ï¿½ Click to vote'}
           </div>
         </div>
       )}
@@ -510,7 +510,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {/* Inline action bar "” appears below bubble on hover */}
+        {/* Inline action bar "ï¿½ appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
             {/* Emoji reaction button */}
@@ -709,8 +709,8 @@ function rankColor(level) {
 function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const name = m.profiles?.full_name || '"”';
-  const initials = name !== '"”'
+  const name = m.profiles?.full_name || '"ï¿½';
+  const initials = name !== '"ï¿½'
     ? name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
@@ -1014,7 +1014,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                     : '?'}
                 </span>
               </div>
-              <div className="members-banner-name">{leader?.full_name || '"”'}</div>
+              <div className="members-banner-name">{leader?.full_name || '"ï¿½'}</div>
               <div className="members-banner-handle">
                 <span style={{ color: 'var(--cyber-yellow)', fontSize: 11, border: '1px solid var(--cyber-yellow)', padding: '2px 10px', borderRadius: 20 }}>
                   Leader / Founder
@@ -1080,8 +1080,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 <tbody>
                   {requests.map(r => (
                     <tr key={r.id}>
-                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '"”'}</td>
-                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '"”'}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '"ï¿½'}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '"ï¿½'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="member-action-btn promote" onClick={() => approveRequest(r.id)}><i className="fa-solid fa-check"></i> Approve</button>
@@ -1289,7 +1289,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
 
       const { url } = await res.json();
-      // Saved to DB "” update localStorage with the persisted value
+      // Saved to DB "ï¿½ update localStorage with the persisted value
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
     } catch (err) {
@@ -1423,7 +1423,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             </div>
             {idUploaded && (
               <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
-                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted — awaiting admin review
+                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted ï¿½ awaiting admin review
               </div>
             )}
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
@@ -1465,7 +1465,7 @@ function AuditionDetailModal({ data, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{ maxWidth: 500, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "” {c.name}</h3>
+        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "ï¿½ {c.name}</h3>
 
         {/* Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: `${statusColor}10`, border: `1px solid ${statusColor}40`, borderRadius: 8 }}>
@@ -1482,7 +1482,7 @@ function AuditionDetailModal({ data, onClose }) {
         {r.status === 'phase2' && r.phase2_details && (
           <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: 'var(--cyber-yellow)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
-              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "” LIVE SCREENING
+              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "ï¿½ LIVE SCREENING
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{r.phase2_details}</p>
           </div>
@@ -1516,7 +1516,7 @@ function AuditionDetailModal({ data, onClose }) {
                   : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)' }}>
-                  {r.answers?.[q.id] || '"”'}
+                  {r.answers?.[q.id] || '"ï¿½'}
                 </div>
               )}
             </div>
@@ -1530,7 +1530,7 @@ function AuditionDetailModal({ data, onClose }) {
 }
 
 async function autoFlagContent({ reporterId, reportedUserId, contentType, contentId, contentPreview }) {
-  // Create the report only "” admin reviews and decides on formal warnings
+  // Create the report only "ï¿½ admin reviews and decides on formal warnings
   await supabase.from('reports').insert([{
     reporter_id: reporterId,
     reported_user_id: reportedUserId,
@@ -1540,7 +1540,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
     reason: 'Auto-detected: inappropriate language',
     status: 'pending',
   }]);
-  // Send a mild alert to the user (no point deduction "” admin decides that)
+  // Send a mild alert to the user (no point deduction "ï¿½ admin decides that)
   if (reportedUserId) {
     await supabase.from('notifications').insert([{
       user_id: reportedUserId,
@@ -1894,7 +1894,7 @@ export default function UserPortal() {
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
     } else if (commId) {
-      // No channel selected "” load all messages for this community
+      // No channel selected "ï¿½ load all messages for this community
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
         .is('channel_id', null)
@@ -1924,7 +1924,7 @@ export default function UserPortal() {
     setCircleChatMessages(data || []);
   }, []);
 
-  // Initial load + realtime subscription "” re-runs when channel/community changes
+  // Initial load + realtime subscription "ï¿½ re-runs when channel/community changes
   useEffect(() => {
     loadMessages(activeCommId, activeChannelId);
 
@@ -1983,7 +1983,7 @@ export default function UserPortal() {
     setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
-  // Avatar is persisted in localStorage "” no DB sync needed on mount
+  // Avatar is persisted in localStorage "ï¿½ no DB sync needed on mount
 
   // Realtime home feed (campus-wide announcements)
   useEffect(() => {
@@ -2043,7 +2043,7 @@ export default function UserPortal() {
     return () => supabase.removeChannel(sub);
   }, [activeCommId]);
 
-  // Circle chat "” load and realtime
+  // Circle chat "ï¿½ load and realtime
   useEffect(() => {
     if (!activeCommId || activeCommId === 'global' || section !== 'circle-chat') return;
     loadCircleChatMessages(activeCommId);
@@ -2110,7 +2110,7 @@ export default function UserPortal() {
 
   const sendPost = async () => {
     if (!msgInput.trim()) return;
-    // Block bad words "” don't send, show error
+    // Block bad words "ï¿½ don't send, show error
     if (containsBadWord(msgInput)) {
       setSendError('âš ï¸ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
@@ -2183,7 +2183,7 @@ export default function UserPortal() {
       await loadCommunities();
       setActiveCommId('global'); setSection('home');
     } catch (err) {
-      showToast('Network error "” could not delete circle.');
+      showToast('Network error "ï¿½ could not delete circle.');
     }
   };
 
@@ -2260,7 +2260,7 @@ export default function UserPortal() {
 
       {/* TOP NAV */}
       <nav className="top-nav-bar">
-        {/* LEFT "” hamburger (mobile) + date & time */}
+        {/* LEFT "ï¿½ hamburger (mobile) + date & time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(o => !o)}>
             <i className="fa-solid fa-bars"></i>
@@ -2275,7 +2275,7 @@ export default function UserPortal() {
         </div>
         </div>
 
-        {/* CENTER "” search */}
+        {/* CENTER "ï¿½ search */}
         <div className="nav-search-wrap">
           <i className="fa-solid fa-magnifying-glass nav-search-icon"></i>
           <input
@@ -2321,7 +2321,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT "” notifications + user hud */}
+        {/* RIGHT "ï¿½ notifications + user hud */}
         <div className="user-hud">
           {/* Theme Picker Button */}
           <button
@@ -2396,7 +2396,7 @@ export default function UserPortal() {
       </nav>
 
       <div className="main">
-        {/* CIRCLE DOCK "” only joined circles */}
+        {/* CIRCLE DOCK "ï¿½ only joined circles */}
         <div className="circle-dock">
           <div className="dock-branding">
             <img src="/logoo.png" className="brand-logo-small" alt="NEXO" />
@@ -2420,7 +2420,7 @@ export default function UserPortal() {
           <div className="sidebar-backdrop show" onClick={() => setMobileSidebarOpen(false)} />
         )}
 
-        {/* SIDEBAR "” context aware */}
+        {/* SIDEBAR "ï¿½ context aware */}
         <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
           {activeCommId === 'global' ? (
             /* â”€â”€ GLOBAL / HOME sidebar â”€â”€ */
@@ -2435,7 +2435,7 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); setMobileSidebarOpen(false); }}>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); loadMessages('global', null); setMobileSidebarOpen(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
                 </div>
@@ -2481,7 +2481,7 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
-                {/* Announcements "” always first, powered by announcements table */}
+                {/* Announcements "ï¿½ always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
                   onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
@@ -2518,7 +2518,7 @@ export default function UserPortal() {
                   </div>
                 ))}
 
-                {/* Add channel "” leaders/co-leaders only */}
+                {/* Add channel "ï¿½ leaders/co-leaders only */}
                 {canModerate && (
                   showAddChannel ? (
                     <div style={{ padding: '6px 10px', display: 'flex', gap: 6 }}>
@@ -2612,7 +2612,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* Welcome + stats "” kept from before */}
+              {/* Welcome + stats "ï¿½ kept from before */}
               <div className="welcome-grid">
                 <div className="post" style={{ borderLeft: '4px solid var(--cyber-yellow)' }}>
                   <h2 style={{ fontSize: 18, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
@@ -2639,7 +2639,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* â”€â”€ POST COMPOSER "” verified users only â”€â”€ */}
+              {/* â”€â”€ POST COMPOSER "ï¿½ verified users only â”€â”€ */}
               {user?.is_verified && (
                 <div className="home-post-composer">
                   <div className="home-composer-header">
@@ -2716,7 +2716,7 @@ export default function UserPortal() {
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously "” click to use your name' : 'Post anonymously'}>
+                        title={newPost.anonymous ? 'Posting anonymously "ï¿½ click to use your name' : 'Post anonymously'}>
                         <i className="fa-solid fa-user-secret"></i>
                         <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
                       </button>
@@ -2873,7 +2873,7 @@ export default function UserPortal() {
             </div>
           )}
 
-          {/* â”€â”€ GLOBAL FEED "” campus-wide chat â”€â”€ */}
+          {/* â”€â”€ GLOBAL FEED "ï¿½ campus-wide chat â”€â”€ */}
           {section === 'global' && (
             <>
               <div className="c-feed fade-in">
@@ -2882,7 +2882,7 @@ export default function UserPortal() {
                     <i className="fa-solid fa-network-wired" style={{ marginRight: 10 }}></i>GLOBAL FEED
                   </h2>
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                    Campus-wide chat "” open to all verified students and faculty.
+                    Campus-wide chat "ï¿½ open to all verified students and faculty.
                   </p>
                 </div>
 
@@ -2919,7 +2919,7 @@ export default function UserPortal() {
             </>
           )}
 
-          {/* â”€â”€ ACTIVITY HUB "” discover & join circles â”€â”€ */}
+          {/* â”€â”€ ACTIVITY HUB "ï¿½ discover & join circles â”€â”€ */}
           {section === 'activity' && (
             <div className="c-feed fade-in">
               <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
@@ -3038,7 +3038,7 @@ export default function UserPortal() {
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button "” top-right, only for creator */}
+                  {/* Cover photo edit button "ï¿½ top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -3150,7 +3150,7 @@ export default function UserPortal() {
                 ) : showCircleAnnouncements ? (
                   /* â”€â”€ CIRCLE ANNOUNCEMENTS VIEW â”€â”€ */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer "” all members can post */}
+                    {/* Post composer "ï¿½ all members can post */}
                     {isMember(activeCommId) && user?.is_verified && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
