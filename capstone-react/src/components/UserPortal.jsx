@@ -1104,6 +1104,16 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 }
 
 // â”€â”€ PROFILE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const INTEREST_LABELS = {
+  art: '🎨 Art', coding: '💻 Coding', design: '🎨 Design', gaming: '🎮 Gaming',
+  music: '🎵 Music', sports: '⚽ Sports', research: '🔬 Research',
+  photography: '📷 Photography', writing: '✍ Writing', travel: '✈ Travel',
+  debate: '🎤 Debate', language: '🌐 Language Learning', anime: '🎌 Anime',
+  bxgl: '🏳️‍🌈 Watching BL/GL',
+};
+const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
+const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
+
 function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
