@@ -28,6 +28,10 @@ export default async function handler(req, res) {
   const { error: oppError } = await supabaseAdmin.from('opportunities').delete().eq('community_id', id);
   if (oppError) console.error('[DELETE COMMUNITY] opportunities error:', JSON.stringify(oppError));
 
+  // Delete memberships (FK constraint not cascading in live DB)
+  const { error: memError } = await supabaseAdmin.from('memberships').delete().eq('community_id', id);
+  if (memError) console.error('[DELETE COMMUNITY] memberships error:', JSON.stringify(memError));
+
   // Delete the community (all other related tables cascade)
   const { error: deleteError } = await supabaseAdmin
     .from('communities').delete().eq('id', id);
