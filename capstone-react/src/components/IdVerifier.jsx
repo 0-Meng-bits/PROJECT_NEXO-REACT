@@ -1,232 +1,27 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 
 function extractIdFromText(text, typedId) {
-  const ocrDigits = text.replace(/\D/g, '');
-  const typedDigits = typedId.replace(/\D/g, '');
-  if (typedDigits.length < 4) return { found: false };
-
-  // Exact match
-  if (ocrDigits.includes(typedDigits)) return { found: true };
-
-  // Fuzzy: allow up to 2 digit differences (OCR commonly misreads 8↔3, 6↔0, 1↔7)
-  for (let i = 0; i <= ocrDigits.length - typedDigits.length; i++) {
-    const chunk = ocrDigits.substring(i, i + typedDigits.length);
-    let diff = 0;
-    for (let j = 0; j < typedDigits.length; j++) {
-      if (chunk[j] !== typedDigits[j]) diff++;
-    }
-    if (diff <= 2) return { found: true };
-  }
-
-  // Partial match: if at least 5 of 7 digits match in sequence
-  const minMatch = Math.max(4, typedDigits.length - 2);
-  for (let len = typedDigits.length - 1; len >= minMatch; len--) {
-    for (let start = 0; start <= typedDigits.length - len; start++) {
-      const sub = typedDigits.substring(start, start + len);
-      if (ocrDigits.includes(sub)) return { found: true };
-    }
-  }
-
+  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
+  const typedNorm = typedId.replace(/\s+/g, '').toUpperCase();
+  const ocrClean = normalized.replace(/\s/g, '');
+  if (ocrClean.includes(typedNorm)) return { found: true };
+  const typedStripped = typedNorm.replace(/[-\s]/g, '');
+  const ocrStripped = ocrClean.replace(/[-\s]/g, '');
+  if (ocrStripped.includes(typedStripped) && typedStripped.length >= 4) return { found: true };
   return { found: false };
 }
 
-// ── CROP TOOL ────────────────────────────────────────────────────────────────
-function CropTool({ imageSrc, onCrop, onSkip }) {
-  const canvasRef = useRef(null);
-  const imgRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
-  const [start, setStart] = useState(null);
-  const [rect, setRect] = useState(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
-
-  // Draw image + selection rect on canvas
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const img = imgRef.current;
-    if (!canvas || !img || !imgLoaded) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    if (rect) {
-      // Dim outside selection
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(0, 0, canvas.width, rect.y);
-      ctx.fillRect(0, rect.y + rect.h, canvas.width, canvas.height - rect.y - rect.h);
-      ctx.fillRect(0, rect.y, rect.x, rect.h);
-      ctx.fillRect(rect.x + rect.w, rect.y, canvas.width - rect.x - rect.w, rect.h);
-      // Selection border
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 3]);
-      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-      ctx.setLineDash([]);
-      // Corner handles
-      const hs = 8;
-      ctx.fillStyle = '#00f0ff';
-      [[rect.x, rect.y], [rect.x + rect.w, rect.y],
-       [rect.x, rect.y + rect.h], [rect.x + rect.w, rect.y + rect.h]].forEach(([cx, cy]) => {
-        ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
-      });
-    }
-  }, [rect, imgLoaded]);
-
-  useEffect(() => { draw(); }, [draw]);
-
-  const getPos = (e) => {
-    const canvas = canvasRef.current;
-    const bounds = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / bounds.width;
-    const scaleY = canvas.height / bounds.height;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: (clientX - bounds.left) * scaleX,
-      y: (clientY - bounds.top) * scaleY,
-    };
-  };
-
-  const onMouseDown = (e) => {
-    e.preventDefault();
-    const pos = getPos(e);
-    setDragging(true);
-    setStart(pos);
-    setRect(null);
-  };
-
-  const onMouseMove = (e) => {
-    if (!dragging || !start) return;
-    e.preventDefault();
-    const pos = getPos(e);
-    setRect({
-      x: Math.min(start.x, pos.x),
-      y: Math.min(start.y, pos.y),
-      w: Math.abs(pos.x - start.x),
-      h: Math.abs(pos.y - start.y),
-    });
-  };
-
-  const onMouseUp = (e) => {
-    e.preventDefault();
-    setDragging(false);
-  };
-
-  const handleCrop = () => {
-    if (!rect || rect.w < 20 || rect.h < 10) return;
-    const canvas = canvasRef.current;
-    const img = imgRef.current;
-    // Scale rect back to original image dimensions
-    const scaleX = img.naturalWidth / canvas.width;
-    const scaleY = img.naturalHeight / canvas.height;
-    const cropCanvas = document.createElement('canvas');
-    // Upscale crop 3x for better OCR
-    const scale = 3;
-    cropCanvas.width = Math.round(rect.w * scaleX * scale);
-    cropCanvas.height = Math.round(rect.h * scaleY * scale);
-    const ctx = cropCanvas.getContext('2d');
-
-    // Draw only the cropped region
-    ctx.drawImage(img,
-      rect.x * scaleX, rect.y * scaleY, rect.w * scaleX, rect.h * scaleY,
-      0, 0, cropCanvas.width, cropCanvas.height
-    );
-
-    // Smart preprocessing: grayscale → detect dark bg → invert if needed
-    const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
-    const data = imageData.data;
-
-    // Step 1: convert to grayscale
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = Math.round(0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]);
-      data[i] = data[i+1] = data[i+2] = gray;
-    }
-
-    // Step 2: check average brightness
-    let total = 0;
-    for (let i = 0; i < data.length; i += 4) total += data[i];
-    const avg = total / (data.length / 4);
-
-    // Step 3: if dark background (white text), invert so Tesseract sees dark text on white
-    if (avg < 128) {
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = data[i+1] = data[i+2] = 255 - data[i];
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    cropCanvas.toBlob((blob) => {
-      const croppedFile = new File([blob], 'id-crop.png', { type: 'image/png' });
-      const croppedUrl = URL.createObjectURL(blob);
-      onCrop(croppedFile, croppedUrl);
-    }, 'image/png');
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <p style={{ fontSize: 12, color: 'var(--cyber-cyan)', textAlign: 'center', fontWeight: 700 }}>
-        <i className="fa-solid fa-crop-simple" style={{ marginRight: 6 }} />
-        Drag to select the area containing your ID number
-      </p>
-      <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: -6 }}>
-        Select only the row with your 7-digit ID number for best accuracy
-      </p>
-      <div style={{ position: 'relative', cursor: 'crosshair', borderRadius: 8, overflow: 'hidden', border: '2px solid rgba(0,240,255,0.3)' }}>
-        <img
-          ref={imgRef}
-          src={imageSrc}
-          alt="ID"
-          style={{ display: 'none' }}
-          onLoad={() => {
-            const img = imgRef.current;
-            const canvas = canvasRef.current;
-            if (!canvas || !img) return;
-            // Fit to max 480px wide
-            const maxW = 480;
-            const ratio = img.naturalHeight / img.naturalWidth;
-            canvas.width = Math.min(img.naturalWidth, maxW);
-            canvas.height = canvas.width * ratio;
-            setImgLoaded(true);
-          }}
-        />
-        <canvas
-          ref={canvasRef}
-          style={{ display: 'block', width: '100%', touchAction: 'none' }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onTouchStart={onMouseDown}
-          onTouchMove={onMouseMove}
-          onTouchEnd={onMouseUp}
-        />
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="cyber-btn secondary" onClick={onSkip} type="button" style={{ flex: 1 }}>
-          <i className="fa-solid fa-forward" style={{ marginRight: 6 }} />Skip Crop
-        </button>
-        <button className="cyber-btn" onClick={handleCrop} type="button" style={{ flex: 1 }}
-          disabled={!rect || rect.w < 20}>
-          <i className="fa-solid fa-magnifying-glass" style={{ marginRight: 6 }} />Scan Selection
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function IdVerifier({ ctuId, onVerified }) {
-  // stages: idle | camera | crop | scanning | done | error
-  const [stage, setStage] = useState('idle');
+  const [stage, setStage] = useState('idle'); // idle | camera | scanning | done | error
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState(null);       // shown during scan/result
-  const [originalPreview, setOriginalPreview] = useState(null); // full ID image for re-crop
+  const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const fileRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const capturedFileRef = useRef(null);   // full original file
-  const cropFileRef = useRef(null);       // cropped region file
+  const capturedFileRef = useRef(null);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -263,21 +58,9 @@ export default function IdVerifier({ ctuId, onVerified }) {
       if (!blob) { setCameraError('Capture failed. Try uploading a photo instead.'); setStage('idle'); return; }
       const file = new File([blob], 'id-capture.jpg', { type: 'image/jpeg' });
       capturedFileRef.current = file;
-      const url = URL.createObjectURL(blob);
-      setPreview(url);
-      setOriginalPreview(url);
-      setStage('crop');
+      setPreview(URL.createObjectURL(blob));
+      runOCR(file);
     }, 'image/jpeg', 0.95);
-  };
-
-  const handleFile = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    capturedFileRef.current = file;
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    setOriginalPreview(url);
-    setStage('crop');
   };
 
   const runOCR = async (imageFile) => {
@@ -285,42 +68,14 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Prepare just 2 variants: inverted (for white-on-dark) + plain grayscale
-      const variants = await prepareVariants(imageFile);
-
-      let variantIndex = 0;
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
-          if (m.status === 'recognizing text') {
-            // Show combined progress: variant 1 = 0-50%, variant 2 = 50-100%
-            setProgress(Math.round(variantIndex * 50 + m.progress * 50));
-          }
+          if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
         },
       });
-
-      // Use PSM 7 (single text line) — best for a cropped number row
-      await worker.setParameters({
-        tessedit_pageseg_mode: '7',
-        tessedit_char_whitelist: '0123456789',
-      });
-
-      let bestMatch = { found: false };
-      let bestText = '';
-
-      for (const variant of variants) {
-        const { data: { text } } = await worker.recognize(variant);
-        console.log('[OCR] text:', JSON.stringify(text.trim()));
-        const match = extractIdFromText(text, ctuId);
-        if (match.found) { bestMatch = match; break; }
-        if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) {
-          bestText = text;
-        }
-        variantIndex++;
-      }
-
+      const { data: { text } } = await worker.recognize(imageFile);
       await worker.terminate();
-      console.log('[OCR] Best digits found:', bestText.replace(/\D/g,''));
-      setResult(bestMatch);
+      setResult(extractIdFromText(text, ctuId));
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);
@@ -328,65 +83,15 @@ export default function IdVerifier({ ctuId, onVerified }) {
     }
   };
 
-  // Prepare 2 image variants: inverted + plain grayscale (4x upscale)
-  async function prepareVariants(imageFile) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(imageFile);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-
-        const makeVariant = (transformFn) => {
-          const c = document.createElement('canvas');
-          c.width = img.width * 4;
-          c.height = img.height * 4;
-          const ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0, c.width, c.height);
-          const id = ctx.getImageData(0, 0, c.width, c.height);
-          const d = id.data;
-          for (let i = 0; i < d.length; i += 4) {
-            const gray = Math.round(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
-            const val = transformFn(gray);
-            d[i] = d[i+1] = d[i+2] = val;
-          }
-          ctx.putImageData(id, 0, 0);
-          return c.toDataURL('image/png');
-        };
-
-        // Check average brightness to decide which variant to try first
-        const tempC = document.createElement('canvas');
-        tempC.width = img.width; tempC.height = img.height;
-        const tempCtx = tempC.getContext('2d');
-        tempCtx.drawImage(img, 0, 0);
-        const sample = tempCtx.getImageData(0, 0, img.width, img.height).data;
-        let total = 0;
-        for (let i = 0; i < sample.length; i += 4) total += (sample[i] + sample[i+1] + sample[i+2]) / 3;
-        const avg = total / (sample.length / 4);
-
-        const plain    = makeVariant(g => g);
-        const inverted = makeVariant(g => 255 - g);
-
-        // If dark background (white text), try inverted first
-        resolve(avg < 128 ? [inverted, plain] : [plain, inverted]);
-      };
-      img.onerror = () => resolve([imageFile]);
-      img.src = url;
-    });
-  }
-
-  const handleCropDone = (croppedFile, croppedUrl) => {
-    cropFileRef.current = croppedFile;
-    setPreview(croppedUrl); // show the cropped image during scanning
-    runOCR(croppedFile);
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    capturedFileRef.current = file;
+    setPreview(URL.createObjectURL(file));
+    runOCR(file);
   };
 
-  const handleSkipCrop = () => {
-    // Scan the full image without cropping
-    cropFileRef.current = capturedFileRef.current;
-    runOCR(capturedFileRef.current);
-  };
-
-  const handleContinue = () => {
+  const handleContinue = async () => {
     onVerified(result?.found || false, capturedFileRef.current || null);
   };
 
@@ -398,7 +103,6 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setCameraError(null);
     capturedFileRef.current = null;
-    cropFileRef.current = null;
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -411,7 +115,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
         <div>
           <div className="id-verifier-title">School ID Verification</div>
           <div className="id-verifier-sub">
-            Upload your CTU school ID — you'll crop the ID number area for accurate scanning
+            Upload a photo of your CTU school ID so the admin can verify you're a real student
           </div>
         </div>
       </div>
@@ -421,11 +125,11 @@ export default function IdVerifier({ ctuId, onVerified }) {
         <div className="id-upload-area">
           <i className="fa-solid fa-id-card" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 10 }} />
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-            Upload a clear photo of your CTU school ID
+            Make sure your <strong style={{ color: 'white' }}>CTU ID number</strong> is clearly visible
           </p>
           <p style={{ fontSize: 11, color: 'var(--cyber-yellow)', marginBottom: 16, textAlign: 'center' }}>
             <i className="fa-solid fa-circle-info" style={{ marginRight: 5 }} />
-            You'll be able to crop the ID number area before scanning
+            Required — admin needs this to confirm your identity
           </p>
           {cameraError && (
             <p style={{ fontSize: 11, color: 'var(--red)', marginBottom: 12, textAlign: 'center' }}>
@@ -457,7 +161,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
         </div>
       )}
 
-      {/* ── CAMERA ── */}
+      {/* ── CAMERA (desktop) ── */}
       {stage === 'camera' && (
         <div className="id-camera-wrap">
           <div className="id-camera-frame">
@@ -477,91 +181,71 @@ export default function IdVerifier({ ctuId, onVerified }) {
         </div>
       )}
 
-      {/* ── CROP ── */}
-      {stage === 'crop' && originalPreview && (
-        <CropTool
-          imageSrc={originalPreview}
-          onCrop={handleCropDone}
-          onSkip={handleSkipCrop}
-        />
-      )}
-
-      {/* ── SCANNING ── */}
-      {stage === 'scanning' && (
+      {/* ── SCANNING / DONE / ERROR ── */}
+      {(stage === 'scanning' || stage === 'done' || stage === 'error') && (
         <div className="id-scan-area">
           {preview && (
             <div className="id-preview-wrap">
               <img src={preview} alt="ID preview" className="id-preview-img" />
-              <div className="id-scan-line" />
+              {stage === 'scanning' && <div className="id-scan-line" />}
             </div>
           )}
-          <div className="id-progress-wrap">
-            <div className="id-progress-bar">
-              <div className="id-progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="id-progress-label">
-              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />
-              Scanning ID number... {progress}%
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* ── DONE ── */}
-      {stage === 'done' && result && (
-        <div className="id-scan-area">
-          {preview && (
-            <div className="id-preview-wrap">
-              <img src={preview} alt="ID preview" className="id-preview-img" />
+          {stage === 'scanning' && (
+            <div className="id-progress-wrap">
+              <div className="id-progress-bar">
+                <div className="id-progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+              <p className="id-progress-label">
+                <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />
+                Reading ID... {progress}%
+              </p>
             </div>
           )}
-          <div className={`id-result ${result.found ? 'success' : 'fail'}`}>
-            {result.found ? (
-              <>
-                <i className="fa-solid fa-circle-check" style={{ fontSize: 24, marginBottom: 8 }} />
-                <div className="id-result-title">ID Number Detected!</div>
-                <div className="id-result-sub">
-                  ID <strong>{ctuId}</strong> was found in your photo.
-                  Your ID will be sent to the admin for final approval.
-                </div>
-              </>
-            ) : (
-              <>
-                <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 24, marginBottom: 8 }} />
-                <div className="id-result-title">Could Not Read ID Number</div>
-                <div className="id-result-sub">
-                  The scanner couldn't detect <strong>{ctuId}</strong>. Try cropping more precisely
-                  around just the ID number row, or retake with better lighting.
-                </div>
-              </>
-            )}
-            <div style={{ display: 'flex', gap: 8, marginTop: 14, width: '100%' }}>
-              <button className="cyber-btn secondary" onClick={() => { setPreview(originalPreview); setStage('crop'); }} type="button" style={{ flex: 1 }}>
-                <i className="fa-solid fa-crop-simple" style={{ marginRight: 6 }} />Re-crop
-              </button>
-              <button className="cyber-btn secondary" onClick={reset} type="button" style={{ flex: 1 }}>
-                <i className="fa-solid fa-rotate-left" style={{ marginRight: 6 }} />Retake
-              </button>
-              {result.found && (
-                <button className="cyber-btn" onClick={handleContinue} type="button" style={{ flex: 1 }}>
+
+          {stage === 'done' && result && (
+            <div className={`id-result ${result.found ? 'success' : 'fail'}`}>
+              {result.found ? (
+                <>
+                  <i className="fa-solid fa-circle-check" style={{ fontSize: 24, marginBottom: 8 }} />
+                  <div className="id-result-title">ID Match Found!</div>
+                  <div className="id-result-sub">
+                    CTU ID <strong>{ctuId}</strong> was detected in your photo.
+                    Your photo will be sent to the admin for final approval.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 24, marginBottom: 8 }} />
+                  <div className="id-result-title">Could Not Read ID</div>
+                  <div className="id-result-sub">
+                    The system couldn't detect <strong>{ctuId}</strong> in the photo.
+                    You can still continue — the admin will verify your ID manually from the photo.
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, width: '100%' }}>
+                <button className="cyber-btn secondary" onClick={reset} type="button" style={{ flex: 1 }}>
+                  <i className="fa-solid fa-rotate-left" style={{ marginRight: 6 }} />
+                  Retake
+                </button>
+                <button className="cyber-btn" onClick={handleContinue} type="button"
+                  style={{ flex: 1 }}>
                   <i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Submit
                 </button>
-              )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ── ERROR ── */}
-      {stage === 'error' && (
-        <div className="id-scan-area">
-          <div className="id-result fail">
-            <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 24, marginBottom: 8 }} />
-            <div className="id-result-title">Scan Failed</div>
-            <div className="id-result-sub">Could not process the image. Try a clearer photo.</div>
-            <button className="cyber-btn secondary" onClick={reset} type="button"
-              style={{ marginTop: 14, width: '100%' }}>Try Again</button>
-          </div>
+          {stage === 'error' && (
+            <div className="id-result fail">
+              <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 24, marginBottom: 8 }} />
+              <div className="id-result-title">Scan Failed</div>
+              <div className="id-result-sub">Could not read the image. Try a clearer photo.</div>
+              <button className="cyber-btn secondary" onClick={reset} type="button"
+                style={{ marginTop: 14, width: '100%' }}>Try Again</button>
+            </div>
+          )}
         </div>
       )}
     </div>

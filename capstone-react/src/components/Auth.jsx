@@ -194,7 +194,7 @@ export default function Auth() {
             <div className="input-group">
               <label>CTU_ID</label>
               <input name="ctuId" value={form.ctuId} onChange={update}
-                placeholder="e.g. 2400001" required disabled={loading} />
+                placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
             </div>
             <button type="submit" className="cyber-btn" disabled={loading} style={{ marginTop: 8 }}>
               {loading ? 'SENDING...' : 'SEND RESET LINK'}
@@ -257,7 +257,7 @@ export default function Auth() {
           <div className="input-group">
             <label>CTU_ID</label>
             <input name="ctuId" value={form.ctuId} onChange={update}
-              placeholder="e.g. 2400001" required disabled={loading} />
+              placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
           </div>
 
           {!isLogin && (
