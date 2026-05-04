@@ -5,16 +5,29 @@ function extractIdFromText(text, typedId) {
   const ocrDigits = text.replace(/\D/g, '');
   const typedDigits = typedId.replace(/\D/g, '');
   if (typedDigits.length < 4) return { found: false };
+
+  // Exact match
   if (ocrDigits.includes(typedDigits)) return { found: true };
-  // Fuzzy: allow 1 digit off
+
+  // Fuzzy: allow up to 2 digit differences (OCR commonly misreads 8↔3, 6↔0, 1↔7)
   for (let i = 0; i <= ocrDigits.length - typedDigits.length; i++) {
     const chunk = ocrDigits.substring(i, i + typedDigits.length);
     let diff = 0;
     for (let j = 0; j < typedDigits.length; j++) {
       if (chunk[j] !== typedDigits[j]) diff++;
     }
-    if (diff <= 1) return { found: true };
+    if (diff <= 2) return { found: true };
   }
+
+  // Partial match: if at least 5 of 7 digits match in sequence
+  const minMatch = Math.max(4, typedDigits.length - 2);
+  for (let len = typedDigits.length - 1; len >= minMatch; len--) {
+    for (let start = 0; start <= typedDigits.length - len; start++) {
+      const sub = typedDigits.substring(start, start + len);
+      if (ocrDigits.includes(sub)) return { found: true };
+    }
+  }
+
   return { found: false };
 }
 
@@ -109,27 +122,43 @@ function CropTool({ imageSrc, onCrop, onSkip }) {
     const cropCanvas = document.createElement('canvas');
     // Upscale crop 3x for better OCR
     const scale = 3;
-    cropCanvas.width = rect.w * scaleX * scale;
-    cropCanvas.height = rect.h * scaleY * scale;
+    cropCanvas.width = Math.round(rect.w * scaleX * scale);
+    cropCanvas.height = Math.round(rect.h * scaleY * scale);
     const ctx = cropCanvas.getContext('2d');
-    // Grayscale + contrast on the cropped region
+
+    // Draw only the cropped region
     ctx.drawImage(img,
       rect.x * scaleX, rect.y * scaleY, rect.w * scaleX, rect.h * scaleY,
       0, 0, cropCanvas.width, cropCanvas.height
     );
-    // Enhance contrast
+
+    // Smart preprocessing: grayscale → detect dark bg → invert if needed
     const imageData = ctx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
     const data = imageData.data;
+
+    // Step 1: convert to grayscale
     for (let i = 0; i < data.length; i += 4) {
-      const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-      const contrast = 2.2;
-      const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-      const adjusted = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
-      data[i] = data[i+1] = data[i+2] = adjusted;
+      const gray = Math.round(0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]);
+      data[i] = data[i+1] = data[i+2] = gray;
     }
+
+    // Step 2: check average brightness
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) total += data[i];
+    const avg = total / (data.length / 4);
+
+    // Step 3: if dark background (white text), invert so Tesseract sees dark text on white
+    if (avg < 128) {
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = data[i+1] = data[i+2] = 255 - data[i];
+      }
+    }
+
     ctx.putImageData(imageData, 0, 0);
     cropCanvas.toBlob((blob) => {
-      onCrop(new File([blob], 'id-crop.png', { type: 'image/png' }));
+      const croppedFile = new File([blob], 'id-crop.png', { type: 'image/png' });
+      const croppedUrl = URL.createObjectURL(blob);
+      onCrop(croppedFile, croppedUrl);
     }, 'image/png');
   };
 
@@ -189,7 +218,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
   // stages: idle | camera | crop | scanning | done | error
   const [stage, setStage] = useState('idle');
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null);       // shown during scan/result
+  const [originalPreview, setOriginalPreview] = useState(null); // full ID image for re-crop
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const fileRef = useRef(null);
@@ -235,6 +265,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
       capturedFileRef.current = file;
       const url = URL.createObjectURL(blob);
       setPreview(url);
+      setOriginalPreview(url);
       setStage('crop');
     }, 'image/jpeg', 0.95);
   };
@@ -245,6 +276,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
     capturedFileRef.current = file;
     const url = URL.createObjectURL(file);
     setPreview(url);
+    setOriginalPreview(url);
     setStage('crop');
   };
 
@@ -253,21 +285,36 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
+      // Run multiple preprocessing variants and pick the best match
+      const variants = await prepareVariants(imageFile);
+      let bestMatch = { found: false };
+      let bestText = '';
+
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
         },
       });
-      // PSM 7 = single text line — best for a cropped ID number row
-      await worker.setParameters({
-        tessedit_pageseg_mode: '7',
-        tessedit_char_whitelist: '0123456789',
-      });
-      const { data: { text } } = await worker.recognize(imageFile);
+
+      for (const variant of variants) {
+        // Try PSM 7 (single line) and PSM 13 (raw line)
+        for (const psm of ['7', '13', '6']) {
+          await worker.setParameters({
+            tessedit_pageseg_mode: psm,
+            tessedit_char_whitelist: '0123456789',
+          });
+          const { data: { text } } = await worker.recognize(variant);
+          console.log(`[OCR] PSM${psm} text:`, JSON.stringify(text.trim()));
+          const match = extractIdFromText(text, ctuId);
+          if (match.found) { bestMatch = match; bestText = text; break; }
+          if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) bestText = text;
+        }
+        if (bestMatch.found) break;
+      }
+
       await worker.terminate();
-      console.log('[OCR] Raw text:', JSON.stringify(text));
-      const match = extractIdFromText(text, ctuId);
-      setResult(match);
+      console.log('[OCR] Best text:', JSON.stringify(bestText));
+      setResult(bestMatch);
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);
@@ -275,8 +322,59 @@ export default function IdVerifier({ ctuId, onVerified }) {
     }
   };
 
-  const handleCropDone = (croppedFile) => {
+  // Prepare multiple image variants for OCR
+  async function prepareVariants(imageFile) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(imageFile);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const variants = [];
+
+        const process = (filter) => {
+          const c = document.createElement('canvas');
+          // Upscale 4x
+          c.width = img.width * 4;
+          c.height = img.height * 4;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          const id = ctx.getImageData(0, 0, c.width, c.height);
+          const d = id.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i+1], b = d[i+2];
+            const gray = Math.round(0.299*r + 0.587*g + 0.114*b);
+            let val = filter(gray);
+            d[i] = d[i+1] = d[i+2] = val;
+          }
+          ctx.putImageData(id, 0, 0);
+          return c.toDataURL('image/png');
+        };
+
+        // Variant 1: plain grayscale
+        variants.push(process(g => g));
+        // Variant 2: inverted (for white-on-dark)
+        variants.push(process(g => 255 - g));
+        // Variant 3: high contrast threshold (binarize at 128)
+        variants.push(process(g => g > 128 ? 255 : 0));
+        // Variant 4: inverted binarize
+        variants.push(process(g => g > 128 ? 0 : 255));
+        // Variant 5: adaptive-like — boost midtones
+        variants.push(process(g => {
+          const c = 1.5;
+          const f = (259*(c*255+255))/(255*(259-c*255));
+          return Math.min(255, Math.max(0, Math.round(f*(g-128)+128)));
+        }));
+
+        resolve(variants);
+      };
+      img.onerror = () => resolve([imageFile]);
+      img.src = url;
+    });
+  }
+
+  const handleCropDone = (croppedFile, croppedUrl) => {
     cropFileRef.current = croppedFile;
+    setPreview(croppedUrl); // show the cropped image during scanning
     runOCR(croppedFile);
   };
 
@@ -378,9 +476,9 @@ export default function IdVerifier({ ctuId, onVerified }) {
       )}
 
       {/* ── CROP ── */}
-      {stage === 'crop' && preview && (
+      {stage === 'crop' && originalPreview && (
         <CropTool
-          imageSrc={preview}
+          imageSrc={originalPreview}
           onCrop={handleCropDone}
           onSkip={handleSkipCrop}
         />
@@ -436,7 +534,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
               </>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 14, width: '100%' }}>
-              <button className="cyber-btn secondary" onClick={() => setStage('crop')} type="button" style={{ flex: 1 }}>
+              <button className="cyber-btn secondary" onClick={() => { setPreview(originalPreview); setStage('crop'); }} type="button" style={{ flex: 1 }}>
                 <i className="fa-solid fa-crop-simple" style={{ marginRight: 6 }} />Re-crop
               </button>
               <button className="cyber-btn secondary" onClick={reset} type="button" style={{ flex: 1 }}>
