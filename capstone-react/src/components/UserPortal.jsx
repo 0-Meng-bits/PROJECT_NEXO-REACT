@@ -1041,17 +1041,34 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
   const saveProfile = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests })
-      .eq('id', user.id);
-    setSaving(false);
-    if (!error) {
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const updated = { ...stored, ...editForm };
-      localStorage.setItem('currentUser', JSON.stringify(updated));
-      onProfileUpdate?.(updated);
-      setEditing(false);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+        },
+        body: JSON.stringify({
+          course: editForm.course,
+          year_level: editForm.year_level,
+          interests: editForm.interests,
+        }),
+      });
+      if (res.ok) {
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const updated = { ...stored, ...editForm };
+        localStorage.setItem('currentUser', JSON.stringify(updated));
+        onProfileUpdate?.(updated);
+        setEditing(false);
+      } else {
+        console.error('[saveProfile] failed:', await res.text());
+      }
+    } catch (err) {
+      console.error('[saveProfile] error:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
