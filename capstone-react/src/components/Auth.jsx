@@ -3,56 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Landing from './Landing';
 import IdVerifier from './IdVerifier';
 
-function getPasswordStrength(password) {
-  if (!password) return null;
-  let score = 0;
-  const checks = {
-    length:    password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number:    /[0-9]/.test(password),
-    special:   /[^A-Za-z0-9]/.test(password),
-  };
-  score = Object.values(checks).filter(Boolean).length;
-  if (score <= 2) return { label: 'WEAK',   color: '#f75f5f', width: '25%',  checks };
-  if (score === 3) return { label: 'FAIR',   color: '#f7a94f', width: '50%',  checks };
-  if (score === 4) return { label: 'GOOD',   color: '#fcee0a', width: '75%',  checks };
-  return              { label: 'STRONG', color: '#3ecf8e', width: '100%', checks };
-}
-
-function PasswordStrength({ password }) {
-  const strength = getPasswordStrength(password);
-  if (!strength) return null;
-  return (
-    <div style={{ marginTop: 8 }}>
-      {/* Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: strength.width, background: strength.color, borderRadius: 4, transition: 'width 0.3s, background 0.3s' }} />
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 800, color: strength.color, fontFamily: 'monospace', letterSpacing: 1, minWidth: 48 }}>
-          {strength.label}
-        </span>
-      </div>
-      {/* Checklist */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px' }}>
-        {[
-          { key: 'length',    label: '8+ characters' },
-          { key: 'uppercase', label: 'Uppercase letter' },
-          { key: 'lowercase', label: 'Lowercase letter' },
-          { key: 'number',    label: 'Number' },
-          { key: 'special',   label: 'Special character' },
-        ].map(({ key, label }) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: strength.checks[key] ? '#3ecf8e' : 'rgba(255,255,255,0.3)' }}>
-            <i className={`fa-solid ${strength.checks[key] ? 'fa-circle-check' : 'fa-circle'}`} style={{ fontSize: 9 }} />
-            {label}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function Auth() {
   const [mode, setMode] = useState('splash'); // 'splash' | 'login' | 'signup'
   const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
@@ -68,9 +18,8 @@ export default function Auth() {
   // Called when signup form is submitted — go to ID verify step first
   const handleSignupFormSubmit = (e) => {
     e.preventDefault();
-    const strength = getPasswordStrength(form.password);
-    if (!strength || strength.label === 'WEAK') {
-      alert('SYSTEM_ALERT: Password is too weak. Use at least 8 characters with uppercase, lowercase, and a number.');
+    if (form.password.length < 6) {
+      alert('SYSTEM_ALERT: Password must be at least 6 characters.');
       return;
     }
     setSignupStep('id-verify');
@@ -196,7 +145,8 @@ export default function Auth() {
   if (mode === 'email-sent') {
     return (
       <div className="auth-page">
-        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+        <div className="auth-card-glow" style={{ width: '420px' }}>
+          <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
           <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>CHECK YOUR EMAIL</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
@@ -206,6 +156,7 @@ export default function Auth() {
           <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
             BACK TO LOGIN
           </button>
+          </div>
         </div>
       </div>
     );
@@ -215,7 +166,8 @@ export default function Auth() {
   if (mode === 'reset-sent') {
     return (
       <div className="auth-page">
-        <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+        <div className="auth-card-glow" style={{ width: '420px' }}>
+          <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔑</div>
           <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 12 }}>CHECK YOUR EMAIL</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
@@ -224,6 +176,7 @@ export default function Auth() {
           <button className="cyber-btn" onClick={() => setMode('login')} style={{ width: '100%' }}>
             BACK TO LOGIN
           </button>
+          </div>
         </div>
       </div>
     );
@@ -233,7 +186,8 @@ export default function Auth() {
   if (mode === 'forgot') {
     return (
       <div className="auth-page">
-        <div className="auth-card fade-in">
+        <div className="auth-card-glow" style={{ width: '420px' }}>
+          <div className="auth-card fade-in">
           <div className="auth-header">
             <button className="auth-back-btn" onClick={() => setMode('login')} type="button">
               <i className="fa-solid fa-arrow-left" /> Back
@@ -251,6 +205,7 @@ export default function Auth() {
               {loading ? 'SENDING...' : 'SEND RESET LINK'}
             </button>
           </form>
+          </div>
         </div>
       </div>
     );
@@ -265,7 +220,8 @@ export default function Auth() {
   if (mode === 'signup' && signupStep === 'id-verify') {
     return (
       <div className="auth-page">
-        <div className="auth-card fade-in" style={{ maxWidth: 460 }}>
+        <div className="auth-card-glow" style={{ width: '480px' }}>
+          <div className="auth-card fade-in">
           <button className="auth-back-btn" onClick={() => setSignupStep('form')} type="button">
             <i className="fa-solid fa-arrow-left" /> Back
           </button>
@@ -283,6 +239,7 @@ export default function Auth() {
               onVerified={(verified, photoFile) => doSignup(verified, photoFile)}
             />
           )}
+          </div>
         </div>
       </div>
     );
@@ -293,7 +250,8 @@ export default function Auth() {
   // ── LOGIN / SIGNUP FORM ──
   return (
     <div className="auth-page">
-      <div className="auth-card fade-in">
+      <div className="auth-card-glow" style={{ width: isLogin ? '420px' : '600px' }}>
+        <div className="auth-card fade-in">
         <div className="auth-header">
           <button className="auth-back-btn" onClick={() => setMode('splash')} type="button">
             <i className="fa-solid fa-arrow-left" /> Back
@@ -305,64 +263,102 @@ export default function Auth() {
         </div>
 
         <form onSubmit={isLogin ? handleLogin : handleSignupFormSubmit}>
-          <div className="input-group">
-            <label>CTU_ID</label>
-            <input name="ctuId" value={form.ctuId} onChange={update}
-              placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
-          </div>
-
-          {!isLogin && (
+          {isLogin ? (
+            /* ── LOGIN — single column ── */
             <>
               <div className="input-group">
-                <label>FULL_NAME</label>
-                <input name="fullName" value={form.fullName} onChange={update}
-                  placeholder="Juan Dela Cruz" required disabled={loading} />
+                <label>CTU_ID</label>
+                <input name="ctuId" value={form.ctuId} onChange={update}
+                  placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
               </div>
               <div className="input-group">
-                <label>EMAIL (for password recovery)</label>
-                <input name="email" type="email" value={form.email} onChange={update}
-                  placeholder="your.real@email.com" required disabled={loading}
-                  pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
-                  title="Please enter a valid email address (e.g. name@gmail.com)" />
-              </div>
-              <div className="input-group">
-                <label>USER_TYPE</label>
-                <select name="userType" value={form.userType} onChange={update} disabled={loading}>
-                  <option value="Student">STUDENT</option>
-                  <option value="Faculty">FACULTY</option>
-                </select>
+                <label>PASSWORD</label>
+                <input name="password" type="password" value={form.password} onChange={update}
+                  placeholder="••••••••" required disabled={loading} minLength={6} />
               </div>
             </>
-          )}
-
-          <div className="input-group">
-            <label>PASSWORD</label>
-            <input name="password" type="password" value={form.password} onChange={update}
-              placeholder="••••••••" required disabled={loading} minLength={6} />
-            {!isLogin && <PasswordStrength password={form.password} />}
-          </div>
-
-          {!isLogin && (
-            <div className="id-verify-notice">
-              <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
-              You will verify your ID in the next step
+          ) : (
+            /* ── SIGNUP — two columns ── */
+            <div className="signup-two-col">
+              {/* LEFT */}
+              <div className="signup-col">
+                <div className="input-group">
+                  <label>CTU_ID</label>
+                  <input name="ctuId" value={form.ctuId} onChange={update}
+                    placeholder="e.g. 2024-CTU-DB-001" required disabled={loading} />
+                </div>
+                <div className="input-group">
+                  <label>FULL_NAME</label>
+                  <input name="fullName" value={form.fullName} onChange={update}
+                    placeholder="Juan Dela Cruz" required disabled={loading} />
+                </div>
+                <div className="input-group">
+                  <label>EMAIL (for password recovery)</label>
+                  <input name="email" type="email" value={form.email} onChange={update}
+                    placeholder="your.real@email.com" required disabled={loading}
+                    pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
+                    title="Please enter a valid email address" />
+                </div>
+              </div>
+              {/* RIGHT */}
+              <div className="signup-col">
+                <div className="input-group">
+                  <label>USER_TYPE</label>
+                  <select name="userType" value={form.userType} onChange={update} disabled={loading}>
+                    <option value="Student">STUDENT</option>
+                    <option value="Faculty">FACULTY</option>
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label>PASSWORD</label>
+                  <input name="password" type="password" value={form.password} onChange={update}
+                    placeholder="••••••••" required disabled={loading} minLength={6} />
+                </div>
+                <div className="id-verify-notice">
+                  <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
+                  You will verify your ID in the next step
+                </div>
+              </div>
             </div>
           )}
 
-          <button type="submit" className="cyber-btn" disabled={loading}>
+          <button
+            type="submit"
+            className="cyber-btn ripple-btn"
+            disabled={loading}
+            onClick={(e) => {
+              const btn = e.currentTarget;
+              const circle = document.createElement('span');
+              const diameter = Math.max(btn.clientWidth, btn.clientHeight);
+              const radius = diameter / 2;
+              const rect = btn.getBoundingClientRect();
+              circle.style.width = circle.style.height = `${diameter}px`;
+              circle.style.left = `${e.clientX - rect.left - radius}px`;
+              circle.style.top = `${e.clientY - rect.top - radius}px`;
+              circle.classList.add('ripple');
+              btn.querySelector('.ripple')?.remove();
+              btn.appendChild(circle);
+            }}
+          >
             {loading ? 'PROCESSING...' : isLogin ? 'LOGIN' : 'CREATE ACCOUNT'}
           </button>
         </form>
 
-        <div className="auth-footer">
-          {isLogin
-            ? <>
-                <p>New student? <a href="#" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); }}>Create an Account</a></p>
-                <p><a href="#" onClick={(e) => { e.preventDefault(); setMode('forgot'); }}>Forgot password?</a></p>
-              </>
-            : <p>Already registered? <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>Login here</a></p>
-          }
-        </div>
+        {isLogin ? (
+          <div className="auth-bottom-row">
+            <a href="#" className="auth-bottom-link" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); }}>
+               Create an account
+            </a>
+            <a href="#" className="auth-bottom-link" onClick={(e) => { e.preventDefault(); setMode('forgot'); }}>
+              Forgot password?
+            </a>
+          </div>
+        ) : (
+          <div className="auth-footer" style={{ textAlign: 'center' }}>
+            <p>Already registered? <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>Login here</a></p>
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );
