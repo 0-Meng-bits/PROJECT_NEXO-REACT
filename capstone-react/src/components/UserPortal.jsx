@@ -132,7 +132,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
     const { data, error } = await supabase.from('post_comments').insert([{
       announcement_id: a.id,
       author_id: user.id,
-      author_name: user.full_name,
+      author_name: user.full_name || user.student_id || 'User',
       author_type: user.user_type,
       content: commentInput.trim(),
     }]).select().single();
@@ -175,7 +175,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
     const { data, error } = await supabase.from('post_comments').insert([{
       announcement_id: a.id,
       author_id: user.id,
-      author_name: user.full_name,
+      author_name: user.full_name || user.student_id || 'User',
       author_type: user.user_type,
       content,
     }]).select().single();
