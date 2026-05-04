@@ -1110,6 +1110,60 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
   const fileInputRef = useRef(null);
+  const idPhotoRef = useRef(null);
+  const [saving, setSaving] = useState(false);
+  const [idUploading, setIdUploading] = useState(false);
+  const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
+  const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const load = async () => {
+      const { data, error } = await supabase.from('profiles')
+        .select('course, year_level, interests, avatar_url, id_photo_url')
+        .eq('id', user.id).single();
+      if (!error && data) {
+        setProfile({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
+        setEditForm({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
+        if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
+        if (data.id_photo_url) setIdUploaded(true);
+      }
+    };
+    load();
+  }, [user?.id]);
+
+  const saveProfile = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/update-profile?userId=${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests }),
+      });
+      if (res.ok) {
+        setProfile({ ...editForm });
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...editForm }));
+        setEditing(false);
+      }
+    } catch (err) { console.error(err); }
+    finally { setSaving(false); }
+  };
+
+  const handleIdPhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIdUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(file); });
+      const { error } = await supabase.from('profiles').update({ id_photo_url: dataUrl }).eq('id', user.id);
+      if (!error) { setIdUploaded(true); }
+    } catch (err) { console.error(err); }
+    finally { setIdUploading(false); }
+  };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
@@ -1237,8 +1291,90 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         <div className="stats-card" style={{ textAlign: 'left', marginBottom: 20 }}>
           <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
           <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.length}</span></div>
+          {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
+          {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
         </div>
+
+        {!editing && profile.interests?.length > 0 && (
+          <div style={{ textAlign: 'left', marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {profile.interests.map(id => (
+                <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                  {INTEREST_LABELS[id] || id}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {editing && (
+          <div style={{ textAlign: 'left', marginBottom: 16 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 6 }}>COURSE</label>
+              <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, color: 'white', padding: '8px 10px', fontSize: 13 }}>
+                <option value="">Select course</option>
+                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 6 }}>YEAR LEVEL</label>
+              <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, color: 'white', padding: '8px 10px', fontSize: 13 }}>
+                <option value="">Select year</option>
+                {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 8 }}>INTERESTS</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {INTEREST_BUBBLES.map(({ id, label }) => (
+                  <span key={id} onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                      background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
+                      color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!user.is_verified && (
+          <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+              <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
+            </div>
+            {idUploaded && (
+              <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
+                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted — awaiting admin review
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+              {idUploaded ? 'Want to send a clearer photo? Upload a new one below.' : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
+            </p>
+            <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()} disabled={idUploading}
+              style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
+              {idUploading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
+                : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>}
+            </button>
+            <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!editing
+            ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ width: '100%' }}><i className="fa-solid fa-pen" style={{ marginRight: 6 }} />EDIT PROFILE</button>
+            : <div style={{ display: 'flex', gap: 8 }}>
+                <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ flex: 1 }}>CANCEL</button>
+                <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ flex: 1 }}>
+                  {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />SAVING...</> : 'SAVE'}
+                </button>
+              </div>
+          }
           <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
           <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
         </div>
