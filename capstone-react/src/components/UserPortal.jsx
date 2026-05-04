@@ -423,10 +423,40 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
 }
 
 // â”€â”€ MESSAGE ITEM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
+  const [reactions, setReactions] = useState({});
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('message_reactions')
+        .select('reaction, student_id').eq('message_id', m.id);
+      if (data) {
+        const grouped = {};
+        data.forEach(r => {
+          if (!grouped[r.reaction]) grouped[r.reaction] = [];
+          grouped[r.reaction].push(r.student_id);
+        });
+        setReactions(grouped);
+      }
+    };
+    load();
+  }, [m.id]);
+
+  const toggleReaction = async (type) => {
+    const mine = reactions[type]?.includes(currentStudentId);
+    if (mine) {
+      await supabase.from('message_reactions')
+        .delete().eq('message_id', m.id).eq('student_id', currentStudentId).eq('reaction', type);
+      setReactions(prev => ({ ...prev, [type]: (prev[type] || []).filter(s => s !== currentStudentId) }));
+    } else {
+      await supabase.from('message_reactions')
+        .insert([{ message_id: m.id, student_id: currentStudentId, reaction: type }]);
+      setReactions(prev => ({ ...prev, [type]: [...(prev[type] || []), currentStudentId] }));
+    }
+  };
 
   const handleEdit = async () => {
     if (!editVal.trim() || editVal === m.content) { setEditing(false); return; }
@@ -480,6 +510,13 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         {/* Inline action bar "” appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
+            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
+              <button key={type} className="chat-action-btn" onClick={() => toggleReaction(type)}
+                title={type}
+                style={{ color: reactions[type]?.includes(currentStudentId) ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 14 }}>
+                {emoji}
+              </button>
+            ))}
             {isOwnerMsg && (
               <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
                 <i className="fa-solid fa-pen"></i>
@@ -503,6 +540,19 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 style={{ color: 'var(--text-muted)' }}>
                 <i className="fa-solid fa-flag"></i>
               </button>
+            )}
+          </div>
+        )}
+
+        {Object.entries(reactions).some(([, users]) => users.length > 0) && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
+            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) =>
+              reactions[type]?.length > 0 ? (
+                <button key={type} onClick={() => toggleReaction(type)}
+                  style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
+                  {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
+                </button>
+              ) : null
             )}
           </div>
         )}
@@ -2819,6 +2869,7 @@ export default function UserPortal() {
                       onDelete={deleteMessage}
                       onEdit={editMessage}
                       onReport={(data) => setShowReport(data)}
+                      currentStudentId={user?.student_id}
                     />
                   );
                 })}
@@ -3180,6 +3231,7 @@ export default function UserPortal() {
                         onDelete={deleteMessage}
                         onEdit={editMessage}
                         onReport={(data) => setShowReport(data)}
+                        currentStudentId={user?.student_id}
                       />
                     );
                   })
@@ -3239,6 +3291,7 @@ export default function UserPortal() {
                           await supabase.from('messages').update({ content, edited: true }).eq('id', id);
                           setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
                         }}
+                        currentStudentId={user?.student_id}
                       />
                     );
                   })
