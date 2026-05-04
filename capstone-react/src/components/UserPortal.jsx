@@ -133,9 +133,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
       announcement_id: a.id,
       author_id: user.id,
       author_name: user.full_name || user.student_id || 'User',
-      author_type: user.user_type,
+      author_type: user.user_type || 'Student',
       content: commentInput.trim(),
-    }]).select().single();
+    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at').single();
     setPostingComment(false);
     if (!error && data) {
       setComments(prev => [...prev, data]);
@@ -176,9 +176,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
       announcement_id: a.id,
       author_id: user.id,
       author_name: user.full_name || user.student_id || 'User',
-      author_type: user.user_type,
+      author_type: user.user_type || 'Student',
       content,
-    }]).select().single();
+    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at').single();
     if (!error && data) {
       setComments(prev => [...prev, data]);
       setCommentCount(prev => prev + 1);
