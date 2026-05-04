@@ -1,4 +1,4 @@
-﻿﻿import { useState, useEffect, useCallback, useRef } from 'react';
+?import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
@@ -59,7 +59,7 @@ function Toast({ message }) {
   return <div className={`toast ${message ? 'show' : ''}`}>{message?.toUpperCase()}</div>;
 }
 
-// â”€â”€ BAD WORDS AUTO-DETECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── BAD WORDS AUTO-DETECTION ─────────────────────────────────────────────────
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol', 'tangina', 'pakyu', 'yawa', 'buang'];
 
 function containsBadWord(text) {
@@ -68,7 +68,7 @@ function containsBadWord(text) {
   return BAD_WORDS.some(w => lower.includes(w));
 }
 
-// â”€â”€ POST TYPE CONFIG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── POST TYPE CONFIG ──────────────────────────────────────────────────────────
 const POST_TYPE = {
   announcement: { label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
   event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
@@ -225,7 +225,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
             </span>
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} � {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
@@ -241,7 +241,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
             </button>
           </div>
         )}
-        {/* Report button "” always visible to non-owners */}
+        {/* Report button "� always visible to non-owners */}
         {onReport && user?.user_type !== 'Admin' && a.author_id !== user?.id && (
           <button className="chat-action-btn" onClick={() => onReport({ type: 'announcement', id: a.id, preview: `${a.title}: ${a.content}`, reportedUserId: a.author_id })}
             title="Report this post"
@@ -264,7 +264,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
       <h3 className="announcement-title">{a.title}</h3>
       {a.content && <p className="announcement-body">{a.content}</p>}
 
-      {/* â”€â”€ AUDITION APPLY BUTTON â”€â”€ */}
+      {/* ── AUDITION APPLY BUTTON ── */}
       {isAuditionPost && onApply && (
         <div style={{ marginTop: 14 }}>
           <button onClick={() => onApply(a)}
@@ -276,7 +276,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
         </div>
       )}
 
-      {/* â”€â”€ POLL OPTIONS â”€â”€ */}
+      {/* ── POLL OPTIONS ── */}
       {isPoll && pollOptions.length > 0 && (
         <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pollOptions.map((opt, i) => {
@@ -289,18 +289,18 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% � {votes}</span>}
                 </div>
               </button>
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` · You voted "${myVote}"` : ' · Click to vote'}
+            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` � You voted "${myVote}"` : ' � Click to vote'}
           </div>
         </div>
       )}
 
-      {/* â”€â”€ COMMENT SECTION â”€â”€ */}
+      {/* ── COMMENT SECTION ── */}
       <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
         {/* Toggle comments button */}
         <button onClick={toggleComments}
@@ -422,7 +422,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
   );
 }
 
-// â”€â”€ MESSAGE ITEM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
 function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
@@ -510,7 +510,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {/* Inline action bar "” appears below bubble on hover */}
+        {/* Inline action bar "� appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
             {/* Emoji reaction button */}
@@ -520,7 +520,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               </button>
               {showEmojiPicker && (
                 <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
+                  {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
@@ -560,7 +560,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) =>
+            {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <button key={type} onClick={() => toggleReaction(type)}
                   style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
@@ -616,7 +616,7 @@ const CATEGORY_ICONS = {
   ],
 };
 
-// â”€â”€ CREATE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CREATE MODAL ──────────────────────────────────────────────────────────────
 function CreateModal({ onClose, onCreated, userId }) {
   const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap' });
   const [loading, setLoading] = useState(false);
@@ -705,12 +705,12 @@ function rankColor(level) {
   return 'var(--text-muted)';
 }
 
-// â”€â”€ MEMBER CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MEMBER CARD ───────────────────────────────────────────────────────────────
 function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const name = m.profiles?.full_name || '"”';
-  const initials = name !== '"”'
+  const name = m.profiles?.full_name || '"�';
+  const initials = name !== '"�'
     ? name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
@@ -769,7 +769,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
   );
 }
 
-// â”€â”€ MANAGE GROUP MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MANAGE GROUP MODAL ────────────────────────────────────────────────────────
 function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic' });
   const [members, setMembers] = useState([]);
@@ -1014,7 +1014,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                     : '?'}
                 </span>
               </div>
-              <div className="members-banner-name">{leader?.full_name || '"”'}</div>
+              <div className="members-banner-name">{leader?.full_name || '"�'}</div>
               <div className="members-banner-handle">
                 <span style={{ color: 'var(--cyber-yellow)', fontSize: 11, border: '1px solid var(--cyber-yellow)', padding: '2px 10px', borderRadius: 20 }}>
                   Leader / Founder
@@ -1080,8 +1080,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 <tbody>
                   {requests.map(r => (
                     <tr key={r.id}>
-                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '"”'}</td>
-                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '"”'}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '"�'}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '"�'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="member-action-btn promote" onClick={() => approveRequest(r.id)}><i className="fa-solid fa-check"></i> Approve</button>
@@ -1169,13 +1169,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   );
 }
 
-// â”€â”€ PROFILE MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── PROFILE MODAL ─────────────────────────────────────────────────────────────
 const INTEREST_LABELS = {
-  art: '🎨 Art', coding: '💻 Coding', design: '🎨 Design', gaming: '🎮 Gaming',
-  music: '🎵 Music', sports: '⚽ Sports', research: '🔬 Research',
-  photography: '📷 Photography', writing: '✍ Writing', travel: '✈ Travel',
-  debate: '🎤 Debate', language: '🌐 Language Learning', anime: '🎌 Anime',
-  bxgl: '🏳️‍🌈 Watching BL/GL',
+  art: '?? Art', coding: '?? Coding', design: '?? Design', gaming: '?? Gaming',
+  music: '?? Music', sports: '? Sports', research: '?? Research',
+  photography: '?? Photography', writing: '? Writing', travel: '? Travel',
+  debate: '?? Debate', language: '?? Language Learning', anime: '?? Anime',
+  bxgl: '?????? Watching BL/GL',
 };
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
 const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
@@ -1247,7 +1247,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     setUploading(true);
 
     try {
-      // Resize + compress to â‰¤200px JPEG before uploading
+      // Resize + compress to ≤200px JPEG before uploading
       const compressed = await new Promise((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
@@ -1289,7 +1289,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
 
       const { url } = await res.json();
-      // Saved to DB "” update localStorage with the persisted value
+      // Saved to DB "� update localStorage with the persisted value
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
     } catch (err) {
@@ -1354,7 +1354,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
         {user.is_verified ? (
           <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
-            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user.user_type || 'Student'} âœ“
+            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user.user_type || 'Student'} ✓
           </div>
         ) : (
           <div className="verified-badge" style={{ margin: '0 auto 20px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
@@ -1423,7 +1423,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             </div>
             {idUploaded && (
               <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
-                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted — awaiting admin review
+                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted � awaiting admin review
               </div>
             )}
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
@@ -1456,7 +1456,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   );
 }
 
-// â”€â”€ AUDITION DETAIL MODAL (applicant view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AUDITION DETAIL MODAL (applicant view) ───────────────────────────────────
 function AuditionDetailModal({ data, onClose }) {
   const { response: r, community: c, questions } = data;
   const statusColor = auditionStatusColor(r.status, r.phase2_result);
@@ -1465,7 +1465,7 @@ function AuditionDetailModal({ data, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{ maxWidth: 500, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "” {c.name}</h3>
+        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "� {c.name}</h3>
 
         {/* Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: `${statusColor}10`, border: `1px solid ${statusColor}40`, borderRadius: 8 }}>
@@ -1482,7 +1482,7 @@ function AuditionDetailModal({ data, onClose }) {
         {r.status === 'phase2' && r.phase2_details && (
           <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: 'var(--cyber-yellow)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
-              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "” LIVE SCREENING
+              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "� LIVE SCREENING
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{r.phase2_details}</p>
           </div>
@@ -1516,7 +1516,7 @@ function AuditionDetailModal({ data, onClose }) {
                   : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)' }}>
-                  {r.answers?.[q.id] || '"”'}
+                  {r.answers?.[q.id] || '"�'}
                 </div>
               )}
             </div>
@@ -1530,7 +1530,7 @@ function AuditionDetailModal({ data, onClose }) {
 }
 
 async function autoFlagContent({ reporterId, reportedUserId, contentType, contentId, contentPreview }) {
-  // Create the report only "” admin reviews and decides on formal warnings
+  // Create the report only "� admin reviews and decides on formal warnings
   await supabase.from('reports').insert([{
     reporter_id: reporterId,
     reported_user_id: reportedUserId,
@@ -1540,7 +1540,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
     reason: 'Auto-detected: inappropriate language',
     status: 'pending',
   }]);
-  // Send a mild alert to the user (no point deduction "” admin decides that)
+  // Send a mild alert to the user (no point deduction "� admin decides that)
   if (reportedUserId) {
     await supabase.from('notifications').insert([{
       user_id: reportedUserId,
@@ -1550,7 +1550,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
   }
 }
 
-// â”€â”€ REPORT MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── REPORT MODAL ─────────────────────────────────────────────────────────────
 function ReportModal({ data, user, onClose }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1629,7 +1629,7 @@ function ReportModal({ data, user, onClose }) {
   );
 }
 
-// â”€â”€ MAIN PORTAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function UserPortal() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('currentUser'));
@@ -1638,7 +1638,7 @@ export default function UserPortal() {
   const [activeCommId, setActiveCommId] = useState('global');
   const [section, setSection] = useState('home');
   const [messages, setMessages] = useState([]);
-  const avatarCache = useRef({}); // student_id -> avatar_url
+  const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
   const [msgInput, setMsgInput] = useState('');
   const [circleChatMessages, setCircleChatMessages] = useState([]);
   const [circleChatInput, setCircleChatInput] = useState('');
@@ -1894,7 +1894,7 @@ export default function UserPortal() {
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
     } else if (commId) {
-      // No channel selected "” load all messages for this community
+      // No channel selected "� load all messages for this community
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
         .is('channel_id', null)
@@ -1905,11 +1905,15 @@ export default function UserPortal() {
     }
   }, []);
   const fetchAvatarsForMessages = useCallback(async (msgs) => {
-      const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id && !avatarCache.current[id]))];
-      if (uncached.length === 0) return;
-      const { data } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', uncached);
-      (data || []).forEach(p => { avatarCache.current[p.student_id] = p.avatar_url || ''; });
-    }, []);
+    const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id))];
+    if (uncached.length === 0) return;
+    const { data } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', uncached);
+    if (data) {
+      const map = {};
+      data.forEach(p => { map[p.student_id] = p.avatar_url || null; });
+      setAvatarCache(prev => ({ ...prev, ...map }));
+    }
+  }, []);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
@@ -1920,7 +1924,7 @@ export default function UserPortal() {
     setCircleChatMessages(data || []);
   }, []);
 
-  // Initial load + realtime subscription "” re-runs when channel/community changes
+  // Initial load + realtime subscription "� re-runs when channel/community changes
   useEffect(() => {
     loadMessages(activeCommId, activeChannelId);
 
@@ -1979,7 +1983,7 @@ export default function UserPortal() {
     setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
-  // Avatar is persisted in localStorage "” no DB sync needed on mount
+  // Avatar is persisted in localStorage "� no DB sync needed on mount
 
   // Realtime home feed (campus-wide announcements)
   useEffect(() => {
@@ -2039,7 +2043,7 @@ export default function UserPortal() {
     return () => supabase.removeChannel(sub);
   }, [activeCommId]);
 
-  // Circle chat "” load and realtime
+  // Circle chat "� load and realtime
   useEffect(() => {
     if (!activeCommId || activeCommId === 'global' || section !== 'circle-chat') return;
     loadCircleChatMessages(activeCommId);
@@ -2106,9 +2110,9 @@ export default function UserPortal() {
 
   const sendPost = async () => {
     if (!msgInput.trim()) return;
-    // Block bad words "” don't send, show error
+    // Block bad words "� don't send, show error
     if (containsBadWord(msgInput)) {
-      setSendError('âš ï¸ Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       // Still auto-flag for admin awareness
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: msgInput });
@@ -2135,7 +2139,7 @@ export default function UserPortal() {
   const sendCircleChatPost = async () => {
     if (!circleChatInput.trim()) return;
     if (containsBadWord(circleChatInput)) {
-      setSendError('âš ï¸ Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: circleChatInput });
       return;
@@ -2179,7 +2183,7 @@ export default function UserPortal() {
       await loadCommunities();
       setActiveCommId('global'); setSection('home');
     } catch (err) {
-      showToast('Network error "” could not delete circle.');
+      showToast('Network error "� could not delete circle.');
     }
   };
 
@@ -2256,7 +2260,7 @@ export default function UserPortal() {
 
       {/* TOP NAV */}
       <nav className="top-nav-bar">
-        {/* LEFT "” hamburger (mobile) + date & time */}
+        {/* LEFT "� hamburger (mobile) + date & time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(o => !o)}>
             <i className="fa-solid fa-bars"></i>
@@ -2271,7 +2275,7 @@ export default function UserPortal() {
         </div>
         </div>
 
-        {/* CENTER "” search */}
+        {/* CENTER "� search */}
         <div className="nav-search-wrap">
           <i className="fa-solid fa-magnifying-glass nav-search-icon"></i>
           <input
@@ -2317,7 +2321,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT "” notifications + user hud */}
+        {/* RIGHT "� notifications + user hud */}
         <div className="user-hud">
           {/* Theme Picker Button */}
           <button
@@ -2392,7 +2396,7 @@ export default function UserPortal() {
       </nav>
 
       <div className="main">
-        {/* CIRCLE DOCK "” only joined circles */}
+        {/* CIRCLE DOCK "� only joined circles */}
         <div className="circle-dock">
           <div className="dock-branding">
             <img src="/logoo.png" className="brand-logo-small" alt="NEXO" />
@@ -2416,10 +2420,10 @@ export default function UserPortal() {
           <div className="sidebar-backdrop show" onClick={() => setMobileSidebarOpen(false)} />
         )}
 
-        {/* SIDEBAR "” context aware */}
+        {/* SIDEBAR "� context aware */}
         <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
           {activeCommId === 'global' ? (
-            /* â”€â”€ GLOBAL / HOME sidebar â”€â”€ */
+            /* ── GLOBAL / HOME sidebar ── */
             <>
               <div className="sidebar-brand-area">
                 <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
@@ -2460,7 +2464,7 @@ export default function UserPortal() {
               </div>
             </>
           ) : (
-            /* â”€â”€ CIRCLE sidebar â”€â”€ */
+            /* ── CIRCLE sidebar ── */
             <>
               <div className="sidebar-brand-area" style={{ paddingBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2477,7 +2481,7 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
-                {/* Announcements "” always first, powered by announcements table */}
+                {/* Announcements "� always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
                   onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
@@ -2514,7 +2518,7 @@ export default function UserPortal() {
                   </div>
                 ))}
 
-                {/* Add channel "” leaders/co-leaders only */}
+                {/* Add channel "� leaders/co-leaders only */}
                 {canModerate && (
                   showAddChannel ? (
                     <div style={{ padding: '6px 10px', display: 'flex', gap: 6 }}>
@@ -2591,7 +2595,7 @@ export default function UserPortal() {
         {/* CONTENT */}
         <div className="content">
 
-          {/* â”€â”€ HOME â”€â”€ */}
+          {/* ── HOME ── */}
           {section === 'home' && (
             <div className="c-feed fade-in">
 
@@ -2608,7 +2612,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* Welcome + stats "” kept from before */}
+              {/* Welcome + stats "� kept from before */}
               <div className="welcome-grid">
                 <div className="post" style={{ borderLeft: '4px solid var(--cyber-yellow)' }}>
                   <h2 style={{ fontSize: 18, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
@@ -2616,7 +2620,7 @@ export default function UserPortal() {
                   </h2>
                   {user?.is_verified ? (
                     <div className="verified-badge">
-                      <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user?.user_type || 'Student'} âœ“
+                      <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user?.user_type || 'Student'} ✓
                     </div>
                   ) : (
                     <div className="verified-badge" style={{ borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
@@ -2635,7 +2639,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* â”€â”€ POST COMPOSER "” verified users only â”€â”€ */}
+              {/* ── POST COMPOSER "� verified users only ── */}
               {user?.is_verified && (
                 <div className="home-post-composer">
                   <div className="home-composer-header">
@@ -2712,7 +2716,7 @@ export default function UserPortal() {
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously "” click to use your name' : 'Post anonymously'}>
+                        title={newPost.anonymous ? 'Posting anonymously "� click to use your name' : 'Post anonymously'}>
                         <i className="fa-solid fa-user-secret"></i>
                         <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
                       </button>
@@ -2729,7 +2733,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* â”€â”€ CAMPUS FEED â”€â”€ */}
+              {/* ── CAMPUS FEED ── */}
               <div className="home-section-header" style={{ marginTop: 4 }}>
                 <span><i className="fa-solid fa-bullhorn" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>Campus Feed</span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
@@ -2869,7 +2873,7 @@ export default function UserPortal() {
             </div>
           )}
 
-          {/* â”€â”€ GLOBAL FEED "” campus-wide chat â”€â”€ */}
+          {/* ── GLOBAL FEED "� campus-wide chat ── */}
           {section === 'global' && (
             <>
               <div className="c-feed fade-in">
@@ -2878,7 +2882,7 @@ export default function UserPortal() {
                     <i className="fa-solid fa-network-wired" style={{ marginRight: 10 }}></i>GLOBAL FEED
                   </h2>
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                    Campus-wide chat "” open to all verified students and faculty.
+                    Campus-wide chat "� open to all verified students and faculty.
                   </p>
                 </div>
 
@@ -2893,7 +2897,7 @@ export default function UserPortal() {
                       onEdit={editMessage}
                       onReport={(data) => setShowReport(data)}
                       currentStudentId={user?.student_id}
-                      avatarUrl={avatarCache.current[m.student_id] || null}
+                      avatarUrl={avatarCache[m.student_id] || null}
                     />
                   );
                 })}
@@ -2915,7 +2919,7 @@ export default function UserPortal() {
             </>
           )}
 
-          {/* â”€â”€ ACTIVITY HUB "” discover & join circles â”€â”€ */}
+          {/* ── ACTIVITY HUB "� discover & join circles ── */}
           {section === 'activity' && (
             <div className="c-feed fade-in">
               <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
@@ -3024,17 +3028,17 @@ export default function UserPortal() {
             </div>
           )}
 
-          {/* â”€â”€ MY CIRCLES / CIRCLE FEED â”€â”€ */}
+          {/* ── MY CIRCLES / CIRCLE FEED ── */}
           {section === 'circles' && (
             <>
               <div className="c-feed fade-in">
-                {/* â”€â”€ CIRCLE COVER BANNER â”€â”€ */}
+                {/* ── CIRCLE COVER BANNER ── */}
                 <div className="circle-cover-banner" style={{
                   background: activeComm.cover_url
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button "” top-right, only for creator */}
+                  {/* Cover photo edit button "� top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -3144,9 +3148,9 @@ export default function UserPortal() {
                     )}
                   </div>
                 ) : showCircleAnnouncements ? (
-                  /* â”€â”€ CIRCLE ANNOUNCEMENTS VIEW â”€â”€ */
+                  /* ── CIRCLE ANNOUNCEMENTS VIEW ── */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer "” all members can post */}
+                    {/* Post composer "� all members can post */}
                     {isMember(activeCommId) && user?.is_verified && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
@@ -3256,7 +3260,7 @@ export default function UserPortal() {
                         onEdit={editMessage}
                         onReport={(data) => setShowReport(data)}
                         currentStudentId={user?.student_id}
-                        avatarUrl={avatarCache.current[m.student_id] || null}
+                        avatarUrl={avatarCache[m.student_id] || null}
                       />
                     );
                   })
@@ -3278,7 +3282,7 @@ export default function UserPortal() {
             </>
           )}
 
-          {/* â”€â”€ CIRCLE CHAT â”€â”€ */}
+          {/* ── CIRCLE CHAT ── */}
           {section === 'circle-chat' && activeCommId !== 'global' && (
             <>
               <div className="c-feed fade-in">
@@ -3317,7 +3321,7 @@ export default function UserPortal() {
                           setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
                         }}
                         currentStudentId={user?.student_id}
-                        avatarUrl={avatarCache.current[m.student_id] || null}
+                        avatarUrl={avatarCache[m.student_id] || null}
                       />
                     );
                   })
@@ -3380,6 +3384,7 @@ export default function UserPortal() {
     </div>
   );
 }
+
 
 
 
