@@ -287,10 +287,8 @@ export default function AdminDashboard() {
   // ── Delete verified user ─────────────────────────────────────────────────
   const deleteUser = async (id, name) => {
     if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/delete-user?id=${id}`, {
+    const res = await fetch(`/api/delete-user?id=${id}&adminId=${admin?.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
       showToast(`${name} deleted.`);
