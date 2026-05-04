@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
@@ -423,7 +423,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
 }
 
 // â”€â”€ MESSAGE ITEM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -472,7 +472,9 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
       {!isOwnerMsg && (
-        <div className="chat-avatar" style={{ background: tagColor }}>{initials}</div>
+        <div className="chat-avatar" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
+          {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+        </div>
       )}
 
       <div className="chat-body"
@@ -578,7 +580,9 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
       </div>
 
       {isOwnerMsg && (
-        <div className="chat-avatar own" style={{ background: tagColor }}>{initials}</div>
+        <div className="chat-avatar own" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
+          {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+        </div>
       )}
     </div>
   );
@@ -1634,6 +1638,7 @@ export default function UserPortal() {
   const [activeCommId, setActiveCommId] = useState('global');
   const [section, setSection] = useState('home');
   const [messages, setMessages] = useState([]);
+  const avatarCache = useRef({}); // student_id -> avatar_url
   const [msgInput, setMsgInput] = useState('');
   const [circleChatMessages, setCircleChatMessages] = useState([]);
   const [circleChatInput, setCircleChatInput] = useState('');
@@ -1899,6 +1904,12 @@ export default function UserPortal() {
       setMessages([]);
     }
   }, []);
+  const fetchAvatarsForMessages = useCallback(async (msgs) => {
+      const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id && !avatarCache.current[id]))];
+      if (uncached.length === 0) return;
+      const { data } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', uncached);
+      (data || []).forEach(p => { avatarCache.current[p.student_id] = p.avatar_url || ''; });
+    }, []);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
@@ -2882,6 +2893,7 @@ export default function UserPortal() {
                       onEdit={editMessage}
                       onReport={(data) => setShowReport(data)}
                       currentStudentId={user?.student_id}
+                      avatarUrl={avatarCache.current[m.student_id] || null}
                     />
                   );
                 })}
@@ -3244,6 +3256,7 @@ export default function UserPortal() {
                         onEdit={editMessage}
                         onReport={(data) => setShowReport(data)}
                         currentStudentId={user?.student_id}
+                        avatarUrl={avatarCache.current[m.student_id] || null}
                       />
                     );
                   })
@@ -3304,6 +3317,7 @@ export default function UserPortal() {
                           setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
                         }}
                         currentStudentId={user?.student_id}
+                        avatarUrl={avatarCache.current[m.student_id] || null}
                       />
                     );
                   })
