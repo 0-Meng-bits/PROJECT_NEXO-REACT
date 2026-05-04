@@ -2,13 +2,26 @@ import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 
 function extractIdFromText(text, typedId) {
-  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
-  const typedNorm = typedId.replace(/\s+/g, '').toUpperCase();
-  const ocrClean = normalized.replace(/\s/g, '');
-  if (ocrClean.includes(typedNorm)) return { found: true };
-  const typedStripped = typedNorm.replace(/[-\s]/g, '');
-  const ocrStripped = ocrClean.replace(/[-\s]/g, '');
-  if (ocrStripped.includes(typedStripped) && typedStripped.length >= 4) return { found: true };
+  // Remove all non-digit characters from both OCR text and typed ID
+  const ocrDigits = text.replace(/\D/g, '');
+  const typedDigits = typedId.replace(/\D/g, '');
+
+  if (typedDigits.length < 4) return { found: false };
+
+  // Check if the typed ID digits appear anywhere in the OCR output
+  if (ocrDigits.includes(typedDigits)) return { found: true };
+
+  // Fuzzy: allow 1 digit difference for OCR misread (e.g. 0 vs O, 1 vs I)
+  // Check all substrings of same length
+  for (let i = 0; i <= ocrDigits.length - typedDigits.length; i++) {
+    const chunk = ocrDigits.substring(i, i + typedDigits.length);
+    let diff = 0;
+    for (let j = 0; j < typedDigits.length; j++) {
+      if (chunk[j] !== typedDigits[j]) diff++;
+    }
+    if (diff <= 1) return { found: true };
+  }
+
   return { found: false };
 }
 
@@ -68,13 +81,62 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
+      // Preprocess image: boost contrast, convert to grayscale, upscale
+      const preprocessed = await new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(imageFile);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          // Upscale to at least 1600px wide for better OCR accuracy
+          const scale = Math.max(1, 1600 / img.width);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+
+          // Draw original
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Apply grayscale + contrast boost via pixel manipulation
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const data = imageData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            // Grayscale
+            const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            // Contrast stretch: push toward black or white
+            const contrast = 1.8;
+            const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+            const adjusted = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
+            data[i] = data[i+1] = data[i+2] = adjusted;
+          }
+          ctx.putImageData(imageData, 0, 0);
+
+          canvas.toBlob((blob) => resolve(blob), 'image/png');
+        };
+        img.onerror = () => resolve(imageFile); // fallback to original
+        img.src = url;
+      });
+
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
         },
       });
-      const { data: { text } } = await worker.recognize(imageFile);
+
+      // Configure Tesseract for ID card reading:
+      // PSM 6 = assume a single uniform block of text
+      // Whitelist alphanumeric + dash + space for CTU ID format
+      await worker.setParameters({
+        tessedit_pageseg_mode: '6',
+        tessedit_char_whitelist: '0123456789 ',
+      });
+
+      const { data: { text } } = await worker.recognize(preprocessed);
       await worker.terminate();
+
+      console.log('[OCR] Raw text:', text);
       setResult(extractIdFromText(text, ctuId));
       setStage('done');
     } catch (err) {
