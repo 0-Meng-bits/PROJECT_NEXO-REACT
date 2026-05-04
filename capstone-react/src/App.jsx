@@ -37,12 +37,12 @@ function ProtectedRoute({ children, allowedType }) {
         return res.json();
       })
       .then(data => {
-        // Preserve locally-stored avatar if the DB doesn't have one yet
-        // (user may have uploaded a base64 avatar that hasn't synced to storage)
+        // Only preserve locally-stored avatar if it belongs to the same account
         const existing = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const isSameUser = existing.student_id === data.user.student_id;
         const merged = {
           ...data.user,
-          avatar_url: data.user.avatar_url || existing.avatar_url || null,
+          avatar_url: data.user.avatar_url || (isSameUser ? existing.avatar_url : null) || null,
         };
         localStorage.setItem('currentUser', JSON.stringify(merged));
         if (allowedType && data.user.user_type !== allowedType) {

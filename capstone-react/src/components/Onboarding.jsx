@@ -116,16 +116,48 @@ export default function Onboarding() {
 
     let avatarUrl = null;
 
-    // Upload avatar if provided
+    // Upload avatar via server (same path as profile pic change — uses service role)
     if (avatarFile) {
-      const ext = avatarFile.name.split('.').pop();
-      const path = `avatars/${user.id}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, avatarFile, { upsert: true });
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-        avatarUrl = urlData.publicUrl;
+      try {
+        // Compress to ≤200px before uploading
+        const compressed = await new Promise((resolve, reject) => {
+          const img = new Image();
+          const objUrl = URL.createObjectURL(avatarFile);
+          img.onload = () => {
+            URL.revokeObjectURL(objUrl);
+            const MAX = 200;
+            const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          };
+          img.onerror = reject;
+          img.src = objUrl;
+        });
+
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch('/api/upload-avatar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
+          },
+          body: JSON.stringify({ avatar: compressed }),
+        });
+
+        if (res.ok) {
+          const { url } = await res.json();
+          avatarUrl = url;
+        } else {
+          // Fallback: save base64 locally so it shows in the session
+          avatarUrl = compressed;
+        }
+      } catch (err) {
+        console.error('Avatar upload error during onboarding:', err);
       }
     }
 
@@ -146,7 +178,16 @@ export default function Onboarding() {
       .single();
 
     if (updatedProfile) {
-      localStorage.setItem('currentUser', JSON.stringify(updatedProfile));
+      // Merge avatar_url in case it was saved separately via /api/upload-avatar
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      localStorage.setItem('currentUser', JSON.stringify({
+        ...updatedProfile,
+        avatar_url: updatedProfile.avatar_url || avatarUrl || stored.avatar_url || null,
+      }));
+    } else if (avatarUrl) {
+      // Profile update failed but we still have the avatar — save it locally
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: avatarUrl }));
     }
 
     setSaving(false);
