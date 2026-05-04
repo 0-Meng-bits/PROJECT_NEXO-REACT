@@ -203,7 +203,8 @@ export default function Onboarding() {
       <div className="onboarding-orb orb-1" />
       <div className="onboarding-orb orb-2" />
 
-      <div className="onboarding-card">
+      <div className="auth-card-glow" style={{ width: '520px', maxWidth: '95vw' }}>
+        <div className="onboarding-card">
         {/* Progress bar */}
         <div className="onboarding-progress">
           {[1, 2, 3].map(s => (
@@ -352,6 +353,7 @@ export default function Onboarding() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

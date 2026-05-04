@@ -220,7 +220,8 @@ export default function Auth() {
   if (mode === 'signup' && signupStep === 'id-verify') {
     return (
       <div className="auth-page">
-        <div className="auth-card fade-in" style={{ maxWidth: 460 }}>
+        <div className="auth-card-glow" style={{ width: '480px' }}>
+          <div className="auth-card fade-in">
           <button className="auth-back-btn" onClick={() => setSignupStep('form')} type="button">
             <i className="fa-solid fa-arrow-left" /> Back
           </button>
@@ -238,6 +239,7 @@ export default function Auth() {
               onVerified={(verified, photoFile) => doSignup(verified, photoFile)}
             />
           )}
+          </div>
         </div>
       </div>
     );
