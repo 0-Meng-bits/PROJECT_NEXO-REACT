@@ -3,17 +3,11 @@ import { supabaseAdmin } from './_supabase.js';
 export default async function handler(req, res) {
   if (req.method !== 'DELETE') return res.status(405).end();
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'Unauthorized.' });
-
-  // Use admin client to verify the token reliably
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ message: 'Invalid session.' });
-
-  const { id } = req.query;
+  const { id, userId } = req.query;
   if (!id) return res.status(400).json({ message: 'Community ID required.' });
+  if (!userId) return res.status(400).json({ message: 'User ID required.' });
 
-  // Fetch the community to check ownership (column is creator_id)
+  // Fetch the community to check ownership
   const { data: community, error: fetchError } = await supabaseAdmin
     .from('communities').select('id, creator_id').eq('id', id).single();
 
@@ -21,10 +15,10 @@ export default async function handler(req, res) {
 
   // Allow if requester is the creator or an admin
   const { data: profile } = await supabaseAdmin
-    .from('profiles').select('user_type').eq('id', user.id).single();
+    .from('profiles').select('user_type').eq('id', userId).single();
 
   const isAdmin = profile?.user_type === 'Admin';
-  const isCreator = community.creator_id === user.id;
+  const isCreator = community.creator_id === userId;
 
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ message: 'Only the circle creator or an admin can delete this circle.' });
