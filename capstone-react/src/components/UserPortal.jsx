@@ -892,15 +892,39 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
   const fileInputRef = useRef(null);
   const idPhotoRef = useRef(null);
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
-  const [editForm, setEditForm] = useState({
+  // Fresh profile data fetched from DB on open
+  const [profile, setProfile] = useState({
     course: user.course || '',
     year_level: user.year_level || '',
     interests: user.interests || [],
   });
+
+  // Fetch latest profile data from DB when modal opens
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('profiles')
+      .select('course, year_level, interests, avatar_url, id_photo_url')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProfile({
+            course: data.course || '',
+            year_level: data.year_level || '',
+            interests: data.interests || [],
+          });
+          if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
+          if (data.id_photo_url) setIdUploaded(true);
+          // Update localStorage with fresh data
+          const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...data }));
+        }
+      });
+  }, [user.id]);
 
   const handleIdPhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -1100,110 +1124,62 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           </div>
         )}
 
-        {!editing ? (
-          <>
-            {/* View mode */}
-            <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
-              <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
-              <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
-              {user.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{user.course}</span></div>}
-              {user.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{user.year_level}</span></div>}
-            </div>
-            {user.interests?.length > 0 && (
-              <div style={{ textAlign: 'left', marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {user.interests.map(id => (
-                    <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
-                      {INTEREST_LABELS[id] || id}
-                    </span>
-                  ))}
-                </div>
+        {/* View mode — always shown, no edit mode */}
+        <>
+          <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
+            <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
+            <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
+            {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
+            {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
+          </div>
+          {profile.interests?.length > 0 && (
+            <div style={{ textAlign: 'left', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {profile.interests.map(id => (
+                  <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                    {INTEREST_LABELS[id] || id}
+                  </span>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* ID upload for unverified users */}
-            {!user.is_verified && (
-              <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
-                <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
-                  <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
-                </div>
-                {idUploaded ? (
-                  <div style={{ fontSize: 12, color: 'var(--green)' }}>
-                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
-                    ID photo submitted — awaiting admin review
-                  </div>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                      Upload a clear photo of your CTU school ID so the admin can verify your account.
-                    </p>
-                    <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
-                      disabled={idUploading}
-                      style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
-                      {idUploading
-                        ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
-                        : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />UPLOAD SCHOOL ID</>
-                      }
-                    </button>
-                    <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
-                  </>
-                )}
+          {/* ID upload for unverified users */}
+          {!user.is_verified && (
+            <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+                <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
               </div>
-            )}
+              {idUploaded ? (
+                <div style={{ fontSize: 12, color: 'var(--green)' }}>
+                  <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
+                  ID photo submitted — awaiting admin review
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                    Upload a clear photo of your CTU school ID so the admin can verify your account.
+                  </p>
+                  <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
+                    disabled={idUploading}
+                    style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
+                    {idUploading
+                      ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
+                      : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />UPLOAD SCHOOL ID</>
+                    }
+                  </button>
+                  <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
+                </>
+              )}
+            </div>
+          )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button className="cyber-btn secondary" onClick={() => setEditing(true)} style={{ width: '100%' }}>
-                <i className="fa-solid fa-pen" style={{ marginRight: 6 }} />EDIT PROFILE
-              </button>
-              <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Edit mode */}
-            <div style={{ textAlign: 'left' }}>
-              <div className="input-group">
-                <label>COURSE / PROGRAM</label>
-                <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}>
-                  <option value="">Select course...</option>
-                  {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="input-group">
-                <label>YEAR LEVEL</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {YEAR_LEVELS.map(y => (
-                    <button key={y} type="button"
-                      onClick={() => setEditForm(f => ({ ...f, year_level: y }))}
-                      style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${editForm.year_level === y ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.15)'}`, background: editForm.year_level === y ? 'rgba(0,240,255,0.12)' : 'transparent', color: editForm.year_level === y ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
-                      {y}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="input-group">
-                <label>INTERESTS</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 160, overflowY: 'auto' }}>
-                  {INTEREST_BUBBLES.map(b => (
-                    <button key={b.id} type="button"
-                      onClick={() => toggleInterest(b.id)}
-                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, border: `1px solid ${editForm.interests.includes(b.id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.15)'}`, background: editForm.interests.includes(b.id) ? 'rgba(0,240,255,0.12)' : 'transparent', color: editForm.interests.includes(b.id) ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer' }}>
-                      {b.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ flex: 1 }}>
-                {saving ? 'SAVING...' : <><i className="fa-solid fa-floppy-disk" style={{ marginRight: 6 }} />SAVE</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ flex: 1 }}>CANCEL</button>
-            </div>
-          </>
-        )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
+            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+          </div>
+        </>
       </div>
     </div>
   );
