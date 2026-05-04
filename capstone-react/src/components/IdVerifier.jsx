@@ -2,32 +2,14 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { createWorker } from 'tesseract.js';
 
 function extractIdFromText(text, typedId) {
+  const ocrDigits = text.replace(/\D/g, '');
   const typedDigits = typedId.replace(/\D/g, '');
   if (typedDigits.length < 4) return { found: false };
 
-  // Extract ALL digit sequences from OCR text
-  const allDigitSequences = text.match(/\d+/g) || [];
-  const ocrDigits = text.replace(/\D/g, '');
-
-  console.log('[MATCH] Typed:', typedDigits, '| OCR sequences:', allDigitSequences, '| All digits:', ocrDigits);
-
-  // 1. Exact match anywhere in full digit string
+  // Exact match
   if (ocrDigits.includes(typedDigits)) return { found: true };
 
-  // 2. Check each individual digit sequence from OCR
-  for (const seq of allDigitSequences) {
-    if (seq.includes(typedDigits) || typedDigits.includes(seq)) return { found: true };
-    // Fuzzy: allow up to 2 digit differences
-    if (seq.length === typedDigits.length) {
-      let diff = 0;
-      for (let j = 0; j < typedDigits.length; j++) {
-        if (seq[j] !== typedDigits[j]) diff++;
-      }
-      if (diff <= 2) return { found: true };
-    }
-  }
-
-  // 3. Sliding window fuzzy match on full digit string
+  // Fuzzy: allow up to 2 digit differences (OCR commonly misreads 8↔3, 6↔0, 1↔7)
   for (let i = 0; i <= ocrDigits.length - typedDigits.length; i++) {
     const chunk = ocrDigits.substring(i, i + typedDigits.length);
     let diff = 0;
@@ -37,9 +19,9 @@ function extractIdFromText(text, typedId) {
     if (diff <= 2) return { found: true };
   }
 
-  // 4. Partial: at least 5 consecutive digits match
-  const minMatch = Math.max(5, typedDigits.length - 2);
-  for (let len = typedDigits.length; len >= minMatch; len--) {
+  // Partial match: if at least 5 of 7 digits match in sequence
+  const minMatch = Math.max(4, typedDigits.length - 2);
+  for (let len = typedDigits.length - 1; len >= minMatch; len--) {
     for (let start = 0; start <= typedDigits.length - len; start++) {
       const sub = typedDigits.substring(start, start + len);
       if (ocrDigits.includes(sub)) return { found: true };
@@ -138,8 +120,8 @@ function CropTool({ imageSrc, onCrop, onSkip }) {
     const scaleX = img.naturalWidth / canvas.width;
     const scaleY = img.naturalHeight / canvas.height;
     const cropCanvas = document.createElement('canvas');
-    // Upscale crop 2x — enough for Google Vision, keeps file size small
-    const scale = 2;
+    // Upscale crop 3x for better OCR
+    const scale = 3;
     cropCanvas.width = Math.round(rect.w * scaleX * scale);
     cropCanvas.height = Math.round(rect.h * scaleY * scale);
     const ctx = cropCanvas.getContext('2d');
@@ -236,9 +218,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
   // stages: idle | camera | crop | scanning | done | error
   const [stage, setStage] = useState('idle');
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState(null);       // full original ID (shown in result)
+  const [preview, setPreview] = useState(null);       // shown during scan/result
   const [originalPreview, setOriginalPreview] = useState(null); // full ID image for re-crop
-  const [cropPreview, setCropPreview] = useState(null); // cropped region (shown during scan)
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const fileRef = useRef(null);
@@ -304,85 +285,42 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Resize image to max 800px before sending — keeps it fast for Google Vision
-      const base64 = await new Promise((resolve) => {
-        const img = new Image();
-        const url = URL.createObjectURL(imageFile);
-        img.onload = () => {
-          URL.revokeObjectURL(url);
-          const MAX = 800;
-          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => {
-          // fallback: read as-is
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target.result);
-          reader.readAsDataURL(imageFile);
-        };
-        img.src = url;
+      // Prepare just 2 variants: inverted (for white-on-dark) + plain grayscale
+      const variants = await prepareVariants(imageFile);
+
+      let variantIndex = 0;
+      const worker = await createWorker('eng', 1, {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            // Show combined progress: variant 1 = 0-50%, variant 2 = 50-100%
+            setProgress(Math.round(variantIndex * 50 + m.progress * 50));
+          }
+        },
       });
 
-      setProgress(30);
+      // Use PSM 7 (single text line) — best for a cropped number row
+      await worker.setParameters({
+        tessedit_pageseg_mode: '7',
+        tessedit_char_whitelist: '0123456789',
+      });
 
-      // Try Google Vision via server first
-      let text = '';
-      let usedGoogleVision = false;
-      try {
-        const token = localStorage.getItem('accessToken');
-        const serverRes = await fetch('/api/scan-id', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ image: base64 }),
-        });
-        const data = await serverRes.json();
-        if (serverRes.ok && data.text) {
-          text = data.text;
-          usedGoogleVision = true;
-          setProgress(90);
-          console.log('[OCR] Google Vision text:', JSON.stringify(text));
-        } else if (data.fallback) {
-          console.log('[OCR] Google Vision not configured, using Tesseract fallback');
+      let bestMatch = { found: false };
+      let bestText = '';
+
+      for (const variant of variants) {
+        const { data: { text } } = await worker.recognize(variant);
+        console.log('[OCR] text:', JSON.stringify(text.trim()));
+        const match = extractIdFromText(text, ctuId);
+        if (match.found) { bestMatch = match; break; }
+        if (text.replace(/\D/g,'').length > bestText.replace(/\D/g,'').length) {
+          bestText = text;
         }
-      } catch (fetchErr) {
-        console.log('[OCR] Server unreachable, using Tesseract fallback');
+        variantIndex++;
       }
 
-      // Tesseract fallback if Google Vision unavailable
-      if (!usedGoogleVision) {
-        const variants = await prepareVariants(imageFile);
-        let variantIndex = 0;
-        const worker = await createWorker('eng', 1, {
-          logger: (m) => {
-            if (m.status === 'recognizing text') {
-              setProgress(Math.round(variantIndex * 50 + m.progress * 50));
-            }
-          },
-        });
-        await worker.setParameters({
-          tessedit_pageseg_mode: '7',
-          tessedit_char_whitelist: '0123456789',
-        });
-        for (const variant of variants) {
-          const { data: { text: t } } = await worker.recognize(variant);
-          if ((t || '').replace(/\D/g,'').length > text.replace(/\D/g,'').length) text = t || '';
-          variantIndex++;
-        }
-        await worker.terminate();
-      }
-
-      setProgress(100);
-      console.log('[OCR] Final text:', JSON.stringify(text));
-      const match = extractIdFromText(text, ctuId);
-      setResult(match);
+      await worker.terminate();
+      console.log('[OCR] Best digits found:', bestText.replace(/\D/g,''));
+      setResult(bestMatch);
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);
@@ -400,8 +338,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
         const makeVariant = (transformFn) => {
           const c = document.createElement('canvas');
-          c.width = img.width * 2;
-          c.height = img.height * 2;
+          c.width = img.width * 4;
+          c.height = img.height * 4;
           const ctx = c.getContext('2d');
           ctx.drawImage(img, 0, 0, c.width, c.height);
           const id = ctx.getImageData(0, 0, c.width, c.height);
@@ -438,7 +376,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
   const handleCropDone = (croppedFile, croppedUrl) => {
     cropFileRef.current = croppedFile;
-    setCropPreview(croppedUrl); // show cropped image during scanning
+    setPreview(croppedUrl); // show the cropped image during scanning
     runOCR(croppedFile);
   };
 
@@ -456,8 +394,6 @@ export default function IdVerifier({ ctuId, onVerified }) {
     stopCamera();
     setStage('idle');
     setPreview(null);
-    setOriginalPreview(null);
-    setCropPreview(null);
     setResult(null);
     setProgress(0);
     setCameraError(null);
@@ -553,10 +489,9 @@ export default function IdVerifier({ ctuId, onVerified }) {
       {/* ── SCANNING ── */}
       {stage === 'scanning' && (
         <div className="id-scan-area">
-          {/* Show the cropped region during scanning */}
-          {(cropPreview || preview) && (
+          {preview && (
             <div className="id-preview-wrap">
-              <img src={cropPreview || preview} alt="ID crop" className="id-preview-img" />
+              <img src={preview} alt="ID preview" className="id-preview-img" />
               <div className="id-scan-line" />
             </div>
           )}

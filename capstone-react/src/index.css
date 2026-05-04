@@ -225,7 +225,7 @@ body {
   border-radius: 12px;
   padding: 40px;
   width: 100%;
-  max-width: 520px;
+  max-width: 400px;
   box-sizing: border-box;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
   text-align: center;
@@ -3551,14 +3551,13 @@ body {
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(0,240,255,0.2);
+  max-height: 200px;
 }
 .id-preview-img {
   width: 100%;
-  height: auto;
-  max-height: 420px;
-  object-fit: contain;
+  height: 200px;
+  object-fit: cover;
   display: block;
-  background: #111;
 }
 .id-scan-line {
   position: absolute;
