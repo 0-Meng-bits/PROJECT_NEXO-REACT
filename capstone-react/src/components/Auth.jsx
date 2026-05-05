@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Splash from './Splash';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const initialMode = params.get('mode') || 'splash';
+  const initialMode = params.get('mode') || 'login';
 
   const [mode, setMode] = useState(initialMode);
   const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
@@ -269,11 +268,6 @@ export default function Auth() {
     );
   }
 
-  // ── SPLASH ──
-  if (mode === 'splash') {
-    return <Splash onEnter={(m) => { setMode(m); setSignupStep('form'); }} />;
-  }
-
   // ── ID VERIFY STEP ──
   if (mode === 'signup' && signupStep === 'id-verify') {
     return (
@@ -311,7 +305,7 @@ export default function Auth() {
       <div className="auth-card-glow" style={{ width: isLogin ? '420px' : '600px' }}>
         <div className="auth-card fade-in">
         <div className="auth-header">
-          <button className="auth-back-btn" onClick={() => setMode('splash')} type="button">
+          <button className="auth-back-btn" onClick={() => navigate('/')} type="button">
             <i className="fa-solid fa-arrow-left" /> Back
           </button>
           <h1 className="logo-text">NEXO<span>CONNECT</span></h1>

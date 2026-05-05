@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Auth from './components/Auth';
 import Landing from './components/Landing';
-import LandingPage from './components/LandingPage';
 import Onboarding from './components/Onboarding';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/AdminDashboard';
