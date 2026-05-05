@@ -147,8 +147,13 @@ export default function AdminDashboard() {
 
   const loadCampusEvents = async () => {
     setEventsLoading(true);
-    const { data } = await supabase.from('campus_events').select('*').order('start_date', { ascending: true });
-    setCampusEvents(data || []);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/admin-data', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) { const d = await res.json(); setCampusEvents(d.campusEvents || []); }
+    } catch { setCampusEvents([]); }
     setEventsLoading(false);
   };
 
@@ -222,6 +227,7 @@ export default function AdminDashboard() {
       setReports(adminData.reports || []);
       setAllMessages(adminData.allMessages || []);
       setAllCircleAnnouncements(adminData.circleAnnouncements || []);
+      setCampusEvents(adminData.campusEvents || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
