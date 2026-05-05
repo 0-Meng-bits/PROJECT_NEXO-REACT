@@ -13,6 +13,7 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 -- Allow public read access to avatars
-CREATE POLICY IF NOT EXISTS "Public avatar read access"
+DROP POLICY IF EXISTS "Public avatar read access" ON storage.objects;
+CREATE POLICY "Public avatar read access"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'avatars');
