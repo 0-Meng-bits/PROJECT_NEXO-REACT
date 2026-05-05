@@ -208,26 +208,20 @@ export default function AdminDashboard() {
     const token = localStorage.getItem('accessToken');
     const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const [studRes, commRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes] = await Promise.all([
-        fetch('/api/students', { headers: authHeaders }),
+      const [commRes, adminRes] = await Promise.all([
         fetch('/api/communities', { headers: authHeaders }),
-        supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-        supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
-        supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
-        supabase.from('memberships').select('community_id, status, created_at'),
-        supabase.from('reports').select('*, reporter:reporter_id(full_name, student_id), reported:reported_user_id(full_name, student_id)').order('created_at', { ascending: false }),
-        supabase.from('messages').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
-        supabase.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
+        fetch('/api/admin-data', { headers: authHeaders }),
       ]);
-      setStudents(await studRes.json());
+      const adminData = adminRes.ok ? await adminRes.json() : {};
       setCommunities(commRes.ok ? await commRes.json() : []);
-      setAnnouncements(annRes.data || []);
-      setAuditions(audRes.data || []);
-      setGlobalMessages(msgRes.data || []);
-      setMemberships(membRes.data || []);
-      setReports(repRes.data || []);
-      setAllMessages(allMsgRes.data || []);
-      setAllCircleAnnouncements(circAnnRes.data || []);
+      setStudents(adminData.students || []);
+      setAnnouncements(adminData.announcements || []);
+      setAuditions(adminData.auditions || []);
+      setGlobalMessages(adminData.messages || []);
+      setMemberships(adminData.memberships || []);
+      setReports(adminData.reports || []);
+      setAllMessages(adminData.allMessages || []);
+      setAllCircleAnnouncements(adminData.circleAnnouncements || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
