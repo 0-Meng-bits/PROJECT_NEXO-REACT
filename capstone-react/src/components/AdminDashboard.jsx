@@ -205,10 +205,12 @@ export default function AdminDashboard() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const token = localStorage.getItem('accessToken');
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     try {
       const [studRes, commRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes] = await Promise.all([
-        fetch('/api/students'),
-        supabase.from('communities').select('*, profiles(full_name)').order('created_at', { ascending: false }),
+        fetch('/api/students', { headers: authHeaders }),
+        fetch('/api/communities', { headers: authHeaders }),
         supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
         supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
         supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
@@ -218,7 +220,7 @@ export default function AdminDashboard() {
         supabase.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       ]);
       setStudents(await studRes.json());
-      setCommunities(commRes.data || []);
+      setCommunities(commRes.ok ? await commRes.json() : []);
       setAnnouncements(annRes.data || []);
       setAuditions(audRes.data || []);
       setGlobalMessages(msgRes.data || []);

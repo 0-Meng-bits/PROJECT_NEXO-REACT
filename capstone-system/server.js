@@ -124,19 +124,8 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    // Legacy account — Supabase Auth user doesn't exist yet
-    const passwordOk = !profile.password || profile.password === password;
-    if (!passwordOk) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
-    }
-
-    return res.json({
-      message: isPending ? 'Pending approval' : 'Authentication successful',
-      user: profile,
-      session: null,
-      pending: isPending,
-      legacy: true,
-    });
+    // All users are on Supabase Auth — wrong password means invalid credentials
+    return res.status(401).json({ message: 'Invalid credentials.' });
   }
 
   res.json({
@@ -217,7 +206,7 @@ app.get('/api/students', async (req, res) => {
 app.get('/api/communities', async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('communities')
-    .select('*')
+    .select('*, profiles(full_name)')
     .order('created_at', { ascending: false });
   if (error) return res.status(400).json({ message: error.message });
   res.json(data);
