@@ -126,8 +126,12 @@ export default function Auth() {
         };
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         localStorage.setItem('currentUser', JSON.stringify(mergedUser));
-        if (data.session) localStorage.setItem('accessToken', data.session.access_token);
+        if (data.session) {
+          localStorage.setItem('accessToken', data.session.access_token);
+          localStorage.setItem('refreshToken', data.session.refresh_token);
+        }
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {
           setPendingRoute(data.user.user_type === 'Admin' ? '/admin' : '/portal');
@@ -491,6 +495,7 @@ export default function Auth() {
                 setShowTermsModal(false);
                 localStorage.removeItem('currentUser');
                 localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
                 setMode('login');
               }}>
                 <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
