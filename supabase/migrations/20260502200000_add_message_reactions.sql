@@ -13,5 +13,7 @@ CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON message_reactions(message
 
 -- Allow anyone to read reactions
 ALTER TABLE message_reactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Anyone can read reactions" ON message_reactions FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Users can manage own reactions" ON message_reactions FOR ALL USING (true);
+DROP POLICY IF EXISTS "Anyone can read reactions" ON message_reactions;
+CREATE POLICY "Anyone can read reactions" ON message_reactions FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can manage own reactions" ON message_reactions;
+CREATE POLICY "Users can manage own reactions" ON message_reactions FOR ALL USING (true);

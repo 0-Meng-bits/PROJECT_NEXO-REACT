@@ -449,13 +449,24 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const toggleReaction = async (type) => {
     const mine = reactions[type]?.includes(currentStudentId);
     if (mine) {
+      // Remove the reaction if clicking the same emoji
       await supabase.from('message_reactions')
-        .delete().eq('message_id', m.id).eq('student_id', currentStudentId).eq('reaction', type);
+        .delete().eq('message_id', m.id).eq('student_id', currentStudentId);
       setReactions(prev => ({ ...prev, [type]: (prev[type] || []).filter(s => s !== currentStudentId) }));
     } else {
+      // Delete any existing reaction first, then add the new one
+      await supabase.from('message_reactions')
+        .delete().eq('message_id', m.id).eq('student_id', currentStudentId);
       await supabase.from('message_reactions')
         .insert([{ message_id: m.id, student_id: currentStudentId, reaction: type }]);
-      setReactions(prev => ({ ...prev, [type]: [...(prev[type] || []), currentStudentId] }));
+      
+      // Update state: remove user from all reactions, then add to the new one
+      const updated = {};
+      Object.keys(reactions).forEach(key => {
+        updated[key] = (reactions[key] || []).filter(s => s !== currentStudentId);
+      });
+      updated[type] = [...(updated[type] || []), currentStudentId];
+      setReactions(updated);
     }
   };
 
@@ -520,7 +531,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               </button>
               {showEmojiPicker && (
                 <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) => (
+                  {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
@@ -560,7 +571,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-            {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) =>
+            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <button key={type} onClick={() => toggleReaction(type)}
                   style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
