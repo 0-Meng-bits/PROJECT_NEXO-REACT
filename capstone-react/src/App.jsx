@@ -59,6 +59,7 @@ function ProtectedRoute({ children, allowedType }) {
       .catch(() => {
         localStorage.removeItem('currentUser');
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         setStatus('fail');
       });
   }, [allowedType]);

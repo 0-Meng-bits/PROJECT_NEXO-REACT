@@ -213,6 +213,48 @@ app.get('/api/students', async (req, res) => {
   res.json(data);
 });
 
+// ── GET ALL COMMUNITIES ───────────────────────────────────────────────────────
+app.get('/api/communities', async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from('communities')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+
+// ── CREATE COMMUNITY ─────────────────────────────────────────────────────────
+app.post('/api/create-community', async (req, res) => {
+  let resolvedUserId = null;
+
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (!error && user) resolvedUserId = user.id;
+  }
+  if (!resolvedUserId) {
+    const legacyUserId = req.headers['x-user-id'];
+    if (legacyUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles').select('id').eq('id', legacyUserId).single();
+      if (profile) resolvedUserId = profile.id;
+    }
+  }
+  if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
+
+  const { name, description, category, icon } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: 'Circle name is required.' });
+
+  const { data, error } = await supabaseAdmin
+    .from('communities')
+    .insert([{ name: name.trim(), description: description?.trim() || '', category, icon, creator_id: resolvedUserId, is_official: false }])
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ community: data });
+});
+
 // ── DELETE COMMUNITY ─────────────────────────────────────────────────────────
 app.delete('/api/delete-community', async (req, res) => {
   const { id, userId } = req.query;

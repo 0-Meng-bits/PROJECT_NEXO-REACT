@@ -541,7 +541,7 @@ export default function AdminDashboard() {
         <div style={{ marginTop: 'auto' }}>
           <div className="adm-sidebar-label">ACCOUNT</div>
           <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--text-muted)' }}>{admin?.full_name}</div>
-          <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); navigate('/'); }}>
+          <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/'); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
           </div>

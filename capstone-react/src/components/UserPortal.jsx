@@ -641,14 +641,25 @@ function CreateModal({ onClose, onCreated, userId }) {
   const submit = async () => {
     if (!form.name.trim()) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('communities')
-      .insert([{ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon, creator_id: userId, is_official: false }])
-      .select();
+    const token = localStorage.getItem('accessToken');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    else if (userId) headers['x-user-id'] = userId;
+
+    try {
+      const res = await fetch('/api/create-community', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.message || 'Failed to create circle.'); setLoading(false); return; }
+      onCreated(data.community);
+      onClose();
+    } catch {
+      alert('Network error — could not create circle.');
+    }
     setLoading(false);
-    if (error) { alert('Failed to create circle.'); return; }
-    onCreated(data[0]);
-    onClose();
   };
 
   const icons = CATEGORY_ICONS[form.category] || [];
@@ -1707,8 +1718,16 @@ export default function UserPortal() {
   }, []);
 
   const loadCommunities = useCallback(async () => {
-    const { data } = await supabase.from('communities').select('*');
-    setCommunities([GLOBAL_COMM, ...(data || [])]);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/communities', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setCommunities([GLOBAL_COMM, ...(Array.isArray(data) ? data : [])]);
+    } catch {
+      setCommunities([GLOBAL_COMM]);
+    }
   }, []);
 
   const loadChannels = useCallback(async (commId) => {
@@ -2080,6 +2099,7 @@ export default function UserPortal() {
     if (confirm('TERMINATE_SESSION?')) {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       navigate('/auth');
     }
   };
