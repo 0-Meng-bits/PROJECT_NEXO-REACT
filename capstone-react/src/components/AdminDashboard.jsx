@@ -160,28 +160,43 @@ export default function AdminDashboard() {
   const submitEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.start_date) return;
     setPostingEvent(true);
-    const { error } = await supabase.from('campus_events').insert([{
-      title: newEvent.title.trim(),
-      description: newEvent.description.trim(),
-      category: newEvent.category,
-      start_date: newEvent.start_date,
-      end_date: newEvent.end_date || newEvent.start_date,
-      created_by: admin?.id,
-    }]);
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch('/api/admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          action: 'add_event',
+          title: newEvent.title.trim(),
+          description: newEvent.description.trim(),
+          category: newEvent.category,
+          start_date: newEvent.start_date,
+          end_date: newEvent.end_date || newEvent.start_date,
+          created_by: admin?.id,
+        }),
+      });
+      if (res.ok) {
+        setNewEvent({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+        setShowEventForm(false);
+        loadCampusEvents();
+        showToast('Event added.');
+      } else showToast('Failed to add event.');
+    } catch { showToast('Network error.'); }
     setPostingEvent(false);
-    if (!error) {
-      setNewEvent({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
-      setShowEventForm(false);
-      loadCampusEvents();
-      showToast('Event added.');
-    }
   };
 
   const deleteEvent = async (id) => {
     if (!confirm('Delete this event?')) return;
-    await supabase.from('campus_events').delete().eq('id', id);
-    loadCampusEvents();
-    showToast('Event deleted.');
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch('/api/admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'delete_event', id }),
+      });
+      if (res.ok) { loadCampusEvents(); showToast('Event deleted.'); }
+      else showToast('Failed to delete event.');
+    } catch { showToast('Network error.'); }
   };
 
   const submitAdminPost = async () => {

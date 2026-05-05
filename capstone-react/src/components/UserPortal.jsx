@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
@@ -7,7 +7,7 @@ import { loadTheme } from '../lib/theme';
 
 function getCategoryIcon(category) {
   const map = {
-    academic: 'fa-solid fa-graduation-cap',
+    academic: 'fa-solid fa-graduatiâ†on-cap',
     project:  'fa-solid fa-flask',
     hobby:    'fa-solid fa-gamepad',
     social:   'fa-solid fa-user-group',

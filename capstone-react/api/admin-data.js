@@ -1,6 +1,26 @@
 import { supabaseAdmin } from './_supabase.js';
 
 export default async function handler(req, res) {
+  // POST — write actions (add/delete events)
+  if (req.method === 'POST') {
+    const { action, id, ...payload } = req.body;
+    try {
+      if (action === 'add_event') {
+        const { data, error } = await supabaseAdmin.from('campus_events').insert([payload]).select().single();
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ event: data });
+      }
+      if (action === 'delete_event') {
+        const { error } = await supabaseAdmin.from('campus_events').delete().eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
+      return res.status(400).json({ message: 'Unknown action.' });
+    } catch (err) {
+      return res.status(500).json({ message: err.message });
+    }
+  }
+
   if (req.method !== 'GET') return res.status(405).end();
 
   try {
