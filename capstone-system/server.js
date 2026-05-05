@@ -224,7 +224,7 @@ app.get('/api/communities', async (req, res) => {
 });
 
 // ── CREATE COMMUNITY ─────────────────────────────────────────────────────────
-app.post('/api/create-community', async (req, res) => {
+app.post('/api/communities', async (req, res) => {
   let resolvedUserId = null;
 
   const token = req.headers.authorization?.replace('Bearer ', '');

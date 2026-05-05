@@ -647,7 +647,7 @@ function CreateModal({ onClose, onCreated, userId }) {
     else if (userId) headers['x-user-id'] = userId;
 
     try {
-      const res = await fetch('/api/create-community', {
+      const res = await fetch('/api/communities', {
         method: 'POST',
         headers,
         body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon }),
