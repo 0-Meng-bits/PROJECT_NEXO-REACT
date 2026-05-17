@@ -31,6 +31,32 @@ export function AuditionFormBuilder({ comm, onToggle }) {
 
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
+  // ── Audition is ONLY available for Hobby circles ──────────────────────────
+  if (comm.category !== 'hobby') {
+    return (
+      <div style={{
+        padding: '20px 16px',
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 10,
+        textAlign: 'center',
+      }}>
+        <i className="fa-solid fa-lock" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }} />
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'white', marginBottom: 6 }}>
+          Auditions are for Hobby Circles only
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          The audition system is designed to assess the skills and capacity of applicants
+          for hobby-based communities (e.g. music, dance, art, gaming).
+          This circle is classified as <strong style={{ color: 'var(--cyber-cyan)' }}>{comm.category}</strong> and does not support auditions.
+        </p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          To enable auditions, change this circle's category to <strong>Hobby</strong> in Settings.
+        </p>
+      </div>
+    );
+  }
+
   const toggleAudition = async () => {
     const next = !enabled;
     const { error } = await supabase.from('communities')
@@ -81,7 +107,7 @@ export function AuditionFormBuilder({ comm, onToggle }) {
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>Audition Mode</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-            Require applicants to fill a form before joining this circle
+            Require applicants to demonstrate their skills before joining this hobby circle
           </div>
         </div>
         <button

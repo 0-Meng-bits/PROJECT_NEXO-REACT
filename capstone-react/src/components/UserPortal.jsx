@@ -646,6 +646,9 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           {viewerIsOwner && (
             <button className={`manage-tab ${tab === 'audition' ? 'active' : ''}`} onClick={() => setTab('audition')}>
               <i className="fa-solid fa-microphone"></i> Audition
+              {comm.category !== 'hobby' && (
+                <i className="fa-solid fa-lock" style={{ marginLeft: 5, fontSize: 9, opacity: 0.5 }} />
+              )}
             </button>
           )}
         </div>
@@ -813,70 +816,236 @@ const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th', 'Graduate'];
 function ViewProfileModal({ studentId, onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sharedCircles, setSharedCircles] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+
+  // Load the viewed user's saved theme from their profile_theme key
+  const [viewedTheme, setViewedTheme] = useState({
+    cover: 'gradient-blue', accent: 'cyan', cardStyle: 'glass', bg: 'dark'
+  });
+
+  const ACCENT_MAP = {
+    cyan: '#8DD8E9', purple: '#a855f7', green: '#3ecf8e',
+    yellow: '#fcee0a', orange: '#f7a94f', rose: '#f75f8f',
+  };
+  const COVER_MAP = {
+    'gradient-blue':   'linear-gradient(135deg, #001D39 0%, #0A4174 50%, #4E8EA2 100%)',
+    'gradient-purple': 'linear-gradient(135deg, #1a0533 0%, #4a1a7a 50%, #8b5cf6 100%)',
+    'gradient-green':  'linear-gradient(135deg, #0a1f0a 0%, #1a4a1a 50%, #3ecf8e 100%)',
+    'gradient-sunset': 'linear-gradient(135deg, #1a0a00 0%, #7a2a00 50%, #f7a94f 100%)',
+    'gradient-rose':   'linear-gradient(135deg, #1a0010 0%, #6a0030 50%, #f75f8f 100%)',
+    'gradient-dark':   'linear-gradient(135deg, #050505 0%, #111 50%, #222 100%)',
+  };
+  const BG_MAP = {
+    dark: 'rgba(0,18,40,0.97)', darker: '#000', navy: 'rgba(0,29,57,0.97)',
+    'deep-purple': 'rgba(20,5,40,0.97)', forest: 'rgba(5,20,10,0.97)', charcoal: 'rgba(18,18,22,0.97)',
+  };
+
+  const accent = ACCENT_MAP[viewedTheme.accent] || '#8DD8E9';
+  const cover  = COVER_MAP[viewedTheme.cover]  || COVER_MAP['gradient-blue'];
+  const bg     = BG_MAP[viewedTheme.bg]        || BG_MAP['dark'];
 
   useEffect(() => {
-    const fetch_ = async () => {
+    const load = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('full_name, student_id, user_type, is_verified, avatar_url, course, year_level, interests')
+        .select('id, full_name, student_id, user_type, is_verified, avatar_url, course, year_level, interests')
         .eq('student_id', studentId)
         .single();
       setProfile(data);
       setLoading(false);
+
+      if (data?.id) {
+        // Load their saved theme
+        const themeKey = `profile_theme_${data.id}`;
+        try {
+          const t = JSON.parse(localStorage.getItem(themeKey) || '{}');
+          if (t.cover || t.accent) setViewedTheme(prev => ({ ...prev, ...t }));
+        } catch {}
+
+        // Load shared circles
+        const { data: myMemb } = await supabase.from('memberships')
+          .select('community_id').eq('user_id', currentUser.id).eq('status', 'active');
+        const { data: theirMemb } = await supabase.from('memberships')
+          .select('community_id, communities(name, icon, category)').eq('user_id', data.id).eq('status', 'active');
+        const myIds = new Set((myMemb || []).map(m => m.community_id));
+        setSharedCircles((theirMemb || []).filter(m => myIds.has(m.community_id)));
+
+        // Load profile comments (stored as announcements with a special type)
+        const { data: cmts } = await supabase.from('announcements')
+          .select('*')
+          .eq('community_id', null)
+          .eq('post_type', 'profile_comment')
+          .eq('author_type', data.id) // reuse author_type to store target user id
+          .order('created_at', { ascending: false })
+          .limit(10);
+        setComments(cmts || []);
+      }
     };
-    fetch_();
+    load();
   }, [studentId]);
 
+  const postComment = async () => {
+    if (!newComment.trim()) return;
+    setPostingComment(true);
+    const { data, error } = await supabase.from('announcements').insert([{
+      author_id: currentUser.id,
+      author_name: currentUser.full_name,
+      author_type: profile.id, // target user id stored here
+      title: 'Profile Comment',
+      content: newComment.trim(),
+      post_type: 'profile_comment',
+      community_id: null,
+    }]).select().single();
+    setPostingComment(false);
+    if (!error && data) {
+      setComments(prev => [data, ...prev]);
+      setNewComment('');
+    }
+  };
+
   const initials = profile?.full_name
-    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : '??';
+    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: 360 }}>
+      <div className="vp-profile" onClick={e => e.stopPropagation()}
+        style={{ '--vp-accent': accent, background: bg,
+          border: viewedTheme.cardStyle === 'neon' ? `2px solid ${accent}` : undefined,
+          boxShadow: viewedTheme.cardStyle === 'neon' ? `0 0 40px ${accent}33, 0 32px 80px rgba(0,0,0,0.8)` : undefined,
+        }}>
+
         {loading ? (
-          <div style={{ padding: 40, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 12, display: 'block' }} />
-            LOADING...
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 28, marginBottom: 12, display: 'block', color: accent }} />
+            Loading profile...
           </div>
         ) : !profile ? (
-          <p style={{ color: 'var(--text-muted)', padding: 32 }}>Profile not found.</p>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Profile not found.</div>
         ) : (
           <>
-            {/* Avatar */}
-            <div style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid var(--cyber-cyan)', margin: '0 auto 14px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 'bold', color: 'var(--cyber-cyan)', background: 'rgba(0,240,255,0.05)' }}>
-              {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : initials}
+            {/* COVER */}
+            <div className="vp-cover" style={{ background: cover }}>
+              <button className="fs-close" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
             </div>
-            <h2 style={{ fontSize: 17, marginBottom: 6 }}>{profile.full_name?.toUpperCase()}</h2>
-            {profile.is_verified ? (
-              <div className="verified-badge" style={{ margin: '0 auto 16px' }}>
-                <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }} /> Verified {profile.user_type} ✓
-              </div>
-            ) : (
-              <div className="verified-badge" style={{ margin: '0 auto 16px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
-                <i className="fa-solid fa-clock" style={{ marginRight: 6 }} /> Pending Verification
-              </div>
-            )}
-            <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
-              <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{profile.student_id}</span></div>
-              {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
-              {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
-            </div>
-            {profile.interests?.length > 0 && (
-              <div style={{ textAlign: 'left', marginBottom: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {profile.interests.map(id => (
-                    <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
-                      {INTEREST_LABELS[id] || id}
-                    </span>
-                  ))}
+
+            {/* THREE-COLUMN LAYOUT */}
+            <div className="vp-layout">
+
+              {/* LEFT — photo + quick info */}
+              <div className="vp-left">
+                <div className="vp-avatar-wrap">
+                  <div className="vp-avatar" style={{ borderColor: accent, boxShadow: `0 0 20px ${accent}44` }}>
+                    {profile.avatar_url
+                      ? <img src={profile.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      : <span style={{ fontSize: 40, fontWeight: 800, color: accent }}>{initials}</span>}
+                  </div>
+                </div>
+
+                <h2 className="vp-name">{profile.full_name}</h2>
+                {profile.is_verified
+                  ? <div className="vp-badge" style={{ color: accent, borderColor: accent + '55', background: accent + '11' }}>
+                      <i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {profile.user_type}
+                    </div>
+                  : <div className="vp-badge" style={{ color: 'var(--orange)', borderColor: 'rgba(247,169,79,0.4)', background: 'rgba(247,169,79,0.08)' }}>
+                      <i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending
+                    </div>}
+
+                <div className="vp-info-box">
+                  <div className="vp-info-row"><span>ID</span><span style={{ color: accent, fontFamily: 'monospace' }}>{profile.student_id}</span></div>
+                  {profile.course && <div className="vp-info-row"><span>Course</span><span>{profile.course}</span></div>}
+                  {profile.year_level && <div className="vp-info-row"><span>Year</span><span>{profile.year_level}</span></div>}
                 </div>
               </div>
-            )}
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+
+              {/* MIDDLE — about + interests */}
+              <div className="vp-middle">
+                <div className="vp-section">
+                  <div className="vp-section-title" style={{ borderBottomColor: accent + '44' }}>
+                    <i className="fa-solid fa-user" style={{ color: accent, marginRight: 8 }} />About
+                  </div>
+                  <div className="vp-about-grid">
+                    <div className="vp-about-item"><span className="vp-about-label">Student ID</span><span className="vp-about-val" style={{ color: accent, fontFamily: 'monospace' }}>{profile.student_id}</span></div>
+                    <div className="vp-about-item"><span className="vp-about-label">User Type</span><span className="vp-about-val">{profile.user_type}</span></div>
+                    {profile.course && <div className="vp-about-item"><span className="vp-about-label">Course</span><span className="vp-about-val">{profile.course}</span></div>}
+                    {profile.year_level && <div className="vp-about-item"><span className="vp-about-label">Year Level</span><span className="vp-about-val">{profile.year_level}</span></div>}
+                    <div className="vp-about-item"><span className="vp-about-label">Status</span><span className="vp-about-val" style={{ color: profile.is_verified ? accent : 'var(--orange)' }}>{profile.is_verified ? '✓ Verified' : '⏳ Pending'}</span></div>
+                  </div>
+                </div>
+
+                {profile.interests?.length > 0 && (
+                  <div className="vp-section">
+                    <div className="vp-section-title" style={{ borderBottomColor: accent + '44' }}>
+                      <i className="fa-solid fa-heart" style={{ color: accent, marginRight: 8 }} />Interests
+                    </div>
+                    <div className="vp-tags">
+                      {profile.interests.map(id => (
+                        <span key={id} className="vp-tag" style={{ borderColor: accent + '55', color: accent, background: accent + '11' }}>
+                          {INTEREST_LABELS[id] || id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comments */}
+                <div className="vp-section">
+                  <div className="vp-section-title" style={{ borderBottomColor: accent + '44' }}>
+                    <i className="fa-solid fa-comment" style={{ color: accent, marginRight: 8 }} />Comments
+                  </div>
+                  {currentUser.id && currentUser.id !== profile.id && (
+                    <div className="vp-comment-composer">
+                      <input className="vp-comment-input" placeholder={`Leave a comment for ${profile.full_name}...`}
+                        value={newComment} onChange={e => setNewComment(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && postComment()} />
+                      <button className="vp-comment-btn" style={{ background: accent, color: '#000' }}
+                        onClick={postComment} disabled={postingComment || !newComment.trim()}>
+                        {postingComment ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-paper-plane" />}
+                      </button>
+                    </div>
+                  )}
+                  {comments.length === 0
+                    ? <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '12px 0' }}>No comments yet. Be the first!</p>
+                    : comments.map(c => (
+                      <div key={c.id} className="vp-comment">
+                        <div className="vp-comment-avatar" style={{ background: accent + '22', color: accent }}>
+                          {(c.author_name || 'A')[0].toUpperCase()}
+                        </div>
+                        <div className="vp-comment-body">
+                          <div className="vp-comment-name">{c.author_name}</div>
+                          <div className="vp-comment-text">{c.content}</div>
+                          <div className="vp-comment-time">{new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* RIGHT — shared circles */}
+              <div className="vp-right">
+                <div className="vp-section">
+                  <div className="vp-section-title" style={{ borderBottomColor: accent + '44' }}>
+                    <i className="fa-solid fa-network-wired" style={{ color: accent, marginRight: 8 }} />Circles
+                  </div>
+                  {sharedCircles.length === 0
+                    ? <p style={{ fontSize: 11, color: 'var(--text-muted)', padding: '8px 0' }}>No shared circles.</p>
+                    : sharedCircles.map(m => (
+                      <div key={m.community_id} className="vp-circle-row">
+                        <div className="vp-circle-icon" style={{ background: accent + '18', color: accent }}>
+                          <i className={m.communities?.icon || 'fa-solid fa-network-wired'} />
+                        </div>
+                        <div>
+                          <div className="vp-circle-name">{m.communities?.name}</div>
+                          <div className="vp-circle-cat">{m.communities?.category}</div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -895,6 +1064,63 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [saving, setSaving] = useState(false);
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
+  const [editTab, setEditTab] = useState('info'); // 'info' | 'design'
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ course: '', year_level: '', interests: [] });
+
+  // Profile theme — stored in localStorage per user
+  const THEME_KEY = `profile_theme_${user.id}`;
+  const savedTheme = (() => { try { return JSON.parse(localStorage.getItem(THEME_KEY) || '{}'); } catch { return {}; } })();
+  const [profileTheme, setProfileTheme] = useState({
+    cover: savedTheme.cover || 'gradient-blue',
+    accent: savedTheme.accent || 'cyan',
+    cardStyle: savedTheme.cardStyle || 'glass',
+    bg: savedTheme.bg || 'dark',
+  });
+
+  const COVER_OPTIONS = [
+    { id: 'gradient-blue',   label: 'Ocean',    style: 'linear-gradient(135deg, #001D39 0%, #0A4174 50%, #4E8EA2 100%)' },
+    { id: 'gradient-purple', label: 'Nebula',   style: 'linear-gradient(135deg, #1a0533 0%, #4a1a7a 50%, #8b5cf6 100%)' },
+    { id: 'gradient-green',  label: 'Forest',   style: 'linear-gradient(135deg, #0a1f0a 0%, #1a4a1a 50%, #3ecf8e 100%)' },
+    { id: 'gradient-sunset', label: 'Sunset',   style: 'linear-gradient(135deg, #1a0a00 0%, #7a2a00 50%, #f7a94f 100%)' },
+    { id: 'gradient-rose',   label: 'Rose',     style: 'linear-gradient(135deg, #1a0010 0%, #6a0030 50%, #f75f8f 100%)' },
+    { id: 'gradient-dark',   label: 'Midnight', style: 'linear-gradient(135deg, #050505 0%, #111 50%, #222 100%)' },
+  ];
+
+  const ACCENT_OPTIONS = [
+    { id: 'cyan',   label: 'Cyan',   color: '#8DD8E9' },
+    { id: 'purple', label: 'Purple', color: '#a855f7' },
+    { id: 'green',  label: 'Green',  color: '#3ecf8e' },
+    { id: 'yellow', label: 'Gold',   color: '#fcee0a' },
+    { id: 'orange', label: 'Orange', color: '#f7a94f' },
+    { id: 'rose',   label: 'Rose',   color: '#f75f8f' },
+  ];
+
+  const CARD_STYLES = [
+    { id: 'glass',  label: 'Glass',  desc: 'Frosted glass effect' },
+    { id: 'solid',  label: 'Solid',  desc: 'Clean solid background' },
+    { id: 'neon',   label: 'Neon',   desc: 'Glowing neon border' },
+  ];
+
+  const BG_OPTIONS = [
+    { id: 'dark',        label: 'Dark',      style: 'rgba(0,18,40,0.95)' },
+    { id: 'darker',      label: 'Midnight',  style: '#000' },
+    { id: 'navy',        label: 'Navy',      style: 'rgba(0,29,57,0.97)' },
+    { id: 'deep-purple', label: 'Violet',    style: 'rgba(20,5,40,0.97)' },
+    { id: 'forest',      label: 'Forest',    style: 'rgba(5,20,10,0.97)' },
+    { id: 'charcoal',    label: 'Charcoal',  style: 'rgba(18,18,22,0.97)' },
+  ];
+
+  const bgStyle = BG_OPTIONS.find(b => b.id === profileTheme.bg)?.style || BG_OPTIONS[0].style;
+
+  const accentColor = ACCENT_OPTIONS.find(a => a.id === profileTheme.accent)?.color || '#8DD8E9';
+  const coverStyle  = COVER_OPTIONS.find(c => c.id === profileTheme.cover)?.style || COVER_OPTIONS[0].style;
+
+  const saveTheme = (newTheme) => {
+    setProfileTheme(newTheme);
+    localStorage.setItem(THEME_KEY, JSON.stringify(newTheme));
+  };
+
   // Fresh profile data fetched from DB on open
   const [profile, setProfile] = useState({
     course: user.course || '',
@@ -1138,162 +1364,296 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     }
   };
 
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: 380, maxHeight: '90vh', overflowY: 'auto' }}>
-        {/* Avatar */}
-        <div style={{ position: 'relative', width: 90, height: 90, margin: '0 auto 15px' }}>
-          <div style={{ width: 90, height: 90, border: '2px solid var(--cyber-cyan)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'var(--cyber-cyan)', overflow: 'hidden', background: 'rgba(0,240,255,0.05)' }}>
-            {avatarUrl
-              ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : initials}
-          </div>
-          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change profile picture"
-            style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', background: 'var(--cyber-cyan)', color: '#000', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-            {uploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-camera" />}
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+      <div className="fs-profile" onClick={e => e.stopPropagation()}
+        style={{
+          '--fs-accent': accentColor,
+          border: profileTheme.cardStyle === 'neon' ? `2px solid ${accentColor}` : undefined,
+          boxShadow: profileTheme.cardStyle === 'neon' ? `0 0 40px ${accentColor}33` : undefined,
+          background: bgStyle,
+        }}>
+
+        {/* -- COVER BANNER -- */}
+        <div className="fs-cover" style={{ background: coverStyle }}>
+          <button className="fs-close" onClick={onClose}><i className="fa-solid fa-xmark" /></button>
         </div>
 
-        <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
-        {user.is_verified ? (
-          <div className="verified-badge" style={{ margin: '0 auto 16px' }}>
-            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }} /> Verified {user.user_type || 'Student'} ✓
-          </div>
-        ) : (
-          <div className="verified-badge" style={{ margin: '0 auto 16px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
-            <i className="fa-solid fa-clock" style={{ marginRight: 6 }} /> Pending Verification
-          </div>
-        )}
+        {/* -- TWO COLUMN LAYOUT -- */}
+        <div className="fs-layout">
 
-        {/* View mode — always shown, no edit mode */}
-        <>
-          <div className="stats-card" style={{ textAlign: 'left', marginBottom: 16 }}>
-            <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
-            <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.filter(c => c.id !== 'global').length}</span></div>
-            {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
-            {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
-          </div>
-          {profile.interests?.length > 0 && (
-            <div style={{ textAlign: 'left', marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {profile.interests.map(id => (
-                  <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
-                    {INTEREST_LABELS[id] || id}
-                  </span>
-                ))}
+          {/* LEFT SIDEBAR */}
+          <div className="fs-sidebar">
+            {/* Avatar */}
+            <div className="fs-avatar-wrap">
+              <div className="fs-avatar" style={{ borderColor: accentColor, boxShadow: `0 0 20px ${accentColor}44` }}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  : <span style={{ fontSize: 36, fontWeight: 800, color: accentColor }}>{initials}</span>}
               </div>
+              <button className="fs-avatar-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                style={{ background: accentColor, color: '#000' }}>
+                {uploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-camera" />}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
             </div>
-          )}
 
-          {/* ID upload for unverified users */}
-          {!user.is_verified && (
-            <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
-                <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
-              </div>
-              {idUploaded && (
-                <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
-                  <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
-                  ID photo submitted — awaiting admin review
+            {/* Name + badge */}
+            <h2 className="fs-name">{user.full_name}</h2>
+            {user.is_verified
+              ? <div className="fs-verified" style={{ color: accentColor, borderColor: accentColor + '55', background: accentColor + '11' }}>
+                  <i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type}
                 </div>
-              )}
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                {idUploaded
-                  ? 'Want to send a clearer photo? Upload a new one below.'
-                  : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
-              </p>
-              <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()}
-                disabled={idUploading}
-                style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
-                {idUploading
-                  ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
-                  : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>
-                }
-              </button>
-              <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
-            </div>
-          )}
+              : <div className="fs-pending"><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending</div>}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
-
-            {/* ── Account management ── */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textAlign: 'center', textTransform: 'uppercase' }}>Account Management</p>
-
-              {/* Deactivate */}
-              <button
-                style={{
-                  width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(247,169,79,0.4)',
-                  background: 'rgba(247,169,79,0.06)', color: '#f7a94f', fontFamily: 'inherit',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                }}
-                onClick={async () => {
-                  if (!confirm('Deactivate your account? You can reactivate by contacting an admin.')) return;
-                  const token = localStorage.getItem('accessToken');
-                  const res = await fetch('/api/deactivate-account', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({ userId: user.id }),
-                  });
-                  if (res.ok) {
-                    alert('Your account has been deactivated. You will now be logged out.');
-                    onLogout();
-                  } else {
-                    const d = await res.json().catch(() => ({}));
-                    alert('Failed to deactivate: ' + (d.message || 'Unknown error'));
-                  }
-                }}>
-                <i className="fa-solid fa-user-slash" style={{ marginRight: 6 }}></i>
-                Deactivate Account
-              </button>
-
-              {/* Delete */}
-              <button
-                style={{
-                  width: '100%', padding: '10px', borderRadius: 8, border: '1px solid rgba(247,95,95,0.4)',
-                  background: 'rgba(247,95,95,0.06)', color: 'var(--red)', fontFamily: 'inherit',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                }}
-                onClick={async () => {
-                  if (!confirm('⚠️ Permanently delete your account? This cannot be undone. All your data will be removed.')) return;
-                  if (!confirm('Are you absolutely sure? Type OK to confirm.')) return;
-                  const token = localStorage.getItem('accessToken');
-                  const res = await fetch('/api/delete-account', {
-                    method: 'DELETE',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({ userId: user.id }),
-                  });
-                  if (res.ok) {
-                    alert('Your account has been permanently deleted.');
-                    localStorage.removeItem('currentUser');
-                    localStorage.removeItem('accessToken');
-                    window.location.href = '/';
-                  } else {
-                    const d = await res.json().catch(() => ({}));
-                    alert('Failed to delete: ' + (d.message || 'Unknown error'));
-                  }
-                }}>
-                <i className="fa-solid fa-trash-can" style={{ marginRight: 6 }}></i>
-                Delete Account Permanently
-              </button>
+            {/* Quick info box */}
+            <div className="fs-info-box">
+              <div className="fs-info-row"><span>ID</span><span style={{ fontFamily: 'monospace', color: accentColor }}>{user.student_id}</span></div>
+              {profile.course && <div className="fs-info-row"><span>Course</span><span>{profile.course}</span></div>}
+              {profile.year_level && <div className="fs-info-row"><span>Year</span><span>{profile.year_level}</span></div>}
+              <div className="fs-info-row"><span>Circles</span><span style={{ color: accentColor }}>{communities.filter(c => c.id !== 'global').length}</span></div>
             </div>
 
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+            {/* Edit / Save buttons */}
+            {!editing
+              ? <button className="fs-edit-btn" style={{ borderColor: accentColor, color: accentColor }}
+                  onClick={() => { setEditing(true); setEditTab('info'); setEditForm({ course: profile.course, year_level: profile.year_level, interests: profile.interests }); }}>
+                  <i className="fa-solid fa-pen" style={{ marginRight: 6 }} />Customize Profile
+                </button>
+              : <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                  {editTab === 'info' && (
+                    <button className="fs-save-btn" style={{ background: accentColor, color: '#000', flex: 1 }} onClick={saveProfile} disabled={saving}>
+                      {saving ? <i className="fa-solid fa-spinner fa-spin" /> : 'Save'}
+                    </button>
+                  )}
+                  <button className="fs-cancel-btn" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancel</button>
+                </div>}
+
+            {/* Sign out */}
+            <button className="fs-logout-btn" onClick={onLogout}>
+              <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />Sign Out
+            </button>
           </div>
-        </>
+
+          {/* RIGHT CONTENT */}
+          <div className="fs-content">
+
+            {/* Edit mode */}
+            {editing && (
+              <div className="fs-edit-panel">
+                {/* Tabs */}
+                <div className="fs-edit-tabs">
+                  <button className={`fs-edit-tab ${editTab === 'info' ? 'active' : ''}`}
+                    style={editTab === 'info' ? { color: accentColor, borderBottomColor: accentColor } : {}}
+                    onClick={() => setEditTab('info')}>
+                    <i className="fa-solid fa-user" style={{ marginRight: 6 }} />Profile Info
+                  </button>
+                  <button className={`fs-edit-tab ${editTab === 'design' ? 'active' : ''}`}
+                    style={editTab === 'design' ? { color: accentColor, borderBottomColor: accentColor } : {}}
+                    onClick={() => setEditTab('design')}>
+                    <i className="fa-solid fa-palette" style={{ marginRight: 6 }} />Design
+                  </button>
+                </div>
+
+                {/* Info tab */}
+                {editTab === 'info' && (
+                  <div className="fs-form">
+                    <div className="fs-field"><label>Course</label><input value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))} placeholder="e.g. BSIT" /></div>
+                    <div className="fs-field">
+                      <label>Year Level</label>
+                      <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}>
+                        <option value="">Select year</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                      </select>
+                    </div>
+                    <div className="fs-field">
+                      <label>Interests</label>
+                      <div className="fs-interests-grid">
+                        {Object.entries(INTEREST_LABELS).map(([id, label]) => (
+                          <button key={id} type="button"
+                            className={`fs-interest-chip ${editForm.interests.includes(id) ? 'active' : ''}`}
+                            style={editForm.interests.includes(id) ? { borderColor: accentColor, color: accentColor, background: accentColor + '18' } : {}}
+                            onClick={() => toggleInterest(id)}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Design tab */}
+                {editTab === 'design' && (
+                  <div className="fs-form">
+                    <div className="fs-field">
+                      <label>Cover Style</label>
+                      <div className="fs-cover-grid">
+                        {COVER_OPTIONS.map(opt => (
+                          <button key={opt.id} type="button"
+                            className={`fs-cover-swatch ${profileTheme.cover === opt.id ? 'active' : ''}`}
+                            style={{ background: opt.style, outline: profileTheme.cover === opt.id ? `2px solid ${accentColor}` : 'none' }}
+                            onClick={() => saveTheme({ ...profileTheme, cover: opt.id })}>
+                            <span>{opt.label}</span>
+                            {profileTheme.cover === opt.id && <i className="fa-solid fa-check" style={{ position: 'absolute', top: 4, right: 4, fontSize: 9, color: 'white' }} />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="fs-field">
+                      <label>Accent Color</label>
+                      <div className="fs-accent-row">
+                        {ACCENT_OPTIONS.map(opt => (
+                          <button key={opt.id} type="button"
+                            className={`fs-accent-dot ${profileTheme.accent === opt.id ? 'active' : ''}`}
+                            style={{ background: opt.color, outline: profileTheme.accent === opt.id ? `3px solid ${opt.color}` : 'none', outlineOffset: 2 }}
+                            title={opt.label}
+                            onClick={() => saveTheme({ ...profileTheme, accent: opt.id })} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="fs-field">
+                      <label>Card Style</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {CARD_STYLES.map(opt => (
+                          <button key={opt.id} type="button"
+                            className={`fs-card-btn ${profileTheme.cardStyle === opt.id ? 'active' : ''}`}
+                            style={profileTheme.cardStyle === opt.id ? { borderColor: accentColor, color: accentColor, background: accentColor + '18' } : {}}
+                            onClick={() => saveTheme({ ...profileTheme, cardStyle: opt.id })}>
+                            <div style={{ fontWeight: 700 }}>{opt.label}</div>
+                            <div style={{ fontSize: 10, opacity: 0.7 }}>{opt.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Background color */}
+                    <div className="fs-field">
+                      <label>Background Color</label>
+                      <div className="fs-bg-grid">
+                        {BG_OPTIONS.map(opt => (
+                          <button key={opt.id} type="button"
+                            className={`fs-bg-swatch ${profileTheme.bg === opt.id ? 'active' : ''}`}
+                            style={{
+                              background: opt.style,
+                              outline: profileTheme.bg === opt.id ? `2px solid ${accentColor}` : 'none',
+                              outlineOffset: 2,
+                            }}
+                            onClick={() => saveTheme({ ...profileTheme, bg: opt.id })}>
+                            <span className="fs-bg-label">{opt.label}</span>
+                            {profileTheme.bg === opt.id && <i className="fa-solid fa-check" style={{ position: 'absolute', top: 4, right: 4, fontSize: 9, color: 'white' }} />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* About section */}
+            {!editing && (
+              <>
+                <div className="fs-section">
+                  <div className="fs-section-header" style={{ borderBottomColor: accentColor + '44' }}>
+                    <i className="fa-solid fa-user" style={{ color: accentColor, marginRight: 8 }} />About Me
+                  </div>
+                  <div className="fs-about-grid">
+                    <div className="fs-about-item"><span className="fs-about-label">Student ID</span><span className="fs-about-val" style={{ fontFamily: 'monospace', color: accentColor }}>{user.student_id}</span></div>
+                    <div className="fs-about-item"><span className="fs-about-label">User Type</span><span className="fs-about-val">{user.user_type}</span></div>
+                    {profile.course && <div className="fs-about-item"><span className="fs-about-label">Course</span><span className="fs-about-val">{profile.course}</span></div>}
+                    {profile.year_level && <div className="fs-about-item"><span className="fs-about-label">Year Level</span><span className="fs-about-val">{profile.year_level}</span></div>}
+                    <div className="fs-about-item"><span className="fs-about-label">Status</span>
+                      <span className="fs-about-val" style={{ color: user.is_verified ? accentColor : 'var(--orange)' }}>
+                        {user.is_verified ? '? Verified' : '? Pending'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interests */}
+                {profile.interests?.length > 0 && (
+                  <div className="fs-section">
+                    <div className="fs-section-header" style={{ borderBottomColor: accentColor + '44' }}>
+                      <i className="fa-solid fa-heart" style={{ color: accentColor, marginRight: 8 }} />Interests
+                    </div>
+                    <div className="fs-tags">
+                      {profile.interests.map(id => (
+                        <span key={id} className="fs-tag" style={{ borderColor: accentColor + '55', color: accentColor, background: accentColor + '11' }}>
+                          {INTEREST_LABELS[id] || id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* My Circles */}
+                {communities.filter(c => c.id !== 'global').length > 0 && (
+                  <div className="fs-section">
+                    <div className="fs-section-header" style={{ borderBottomColor: accentColor + '44' }}>
+                      <i className="fa-solid fa-network-wired" style={{ color: accentColor, marginRight: 8 }} />My Circles
+                    </div>
+                    <div className="fs-circles-list">
+                      {communities.filter(c => c.id !== 'global').slice(0, 6).map(c => (
+                        <div key={c.id} className="fs-circle-chip">
+                          <i className={c.icon || 'fa-solid fa-network-wired'} style={{ color: accentColor, marginRight: 6, fontSize: 11 }} />
+                          {c.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ID verification */}
+            {!user.is_verified && !editing && (
+              <div className="fs-section">
+                <div className="fs-section-header" style={{ borderBottomColor: 'rgba(247,169,79,0.4)', color: 'var(--orange)' }}>
+                  <i className="fa-solid fa-id-card" style={{ marginRight: 8 }} />School ID Verification
+                </div>
+                {idUploaded && <p style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 5 }} />ID submitted � awaiting admin review</p>}
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                  {idUploaded ? 'Want to send a clearer photo? Upload a new one.' : 'Upload your CTU school ID so the admin can verify your account.'}
+                </p>
+                <button className="fs-id-btn" onClick={() => idPhotoRef.current?.click()} disabled={idUploading}>
+                  {idUploading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />Uploading...</> : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'Re-upload ID' : 'Upload School ID'}</>}
+                </button>
+                <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
+              </div>
+            )}
+
+            {/* Danger zone */}
+            {!editing && (
+              <div className="fs-danger">
+                <p className="fs-danger-label">Account</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="fs-deactivate" onClick={async () => {
+                    if (!confirm('Deactivate your account?')) return;
+                    const token = localStorage.getItem('accessToken');
+                    const res = await fetch('/api/deactivate-account', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ userId: user.id }) });
+                    if (res.ok) { alert('Account deactivated.'); onLogout(); }
+                    else { const d = await res.json().catch(() => ({})); alert('Failed: ' + (d.message || 'Unknown error')); }
+                  }}><i className="fa-solid fa-user-slash" style={{ marginRight: 5 }} />Deactivate</button>
+                  <button className="fs-delete" onClick={async () => {
+                    if (!confirm('Permanently delete your account? This cannot be undone.')) return;
+                    if (!confirm('Are you absolutely sure?')) return;
+                    const token = localStorage.getItem('accessToken');
+                    const res = await fetch('/api/delete-account', { method: 'DELETE', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ userId: user.id }) });
+                    if (res.ok) { alert('Account deleted.'); localStorage.clear(); window.location.href = '/'; }
+                    else { const d = await res.json().catch(() => ({})); alert('Failed: ' + (d.message || 'Unknown error')); }
+                  }}><i className="fa-solid fa-trash-can" style={{ marginRight: 5 }} />Delete</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
 
 // ── AUDITION DETAIL MODAL (applicant view) ───────────────────────────────────
 function AuditionDetailModal({ data, onClose }) {
@@ -3097,7 +3457,7 @@ export default function UserPortal() {
                               <i className="fa-solid fa-eye" style={{ marginLeft: 6, fontSize: 9 }}></i>
                             </span>
                           ) : (
-                            c.audition_enabled ? (
+                            c.audition_enabled && c.category === 'hobby' ? (
                               <button className="group-action-btn manage" onClick={() => setShowAuditionForm(c)}>
                                 <i className="fa-solid fa-microphone"></i> APPLY
                               </button>
@@ -3235,7 +3595,7 @@ export default function UserPortal() {
                         <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Join request pending approval...
                       </span>
                     ) : (
-                      activeComm.audition_enabled ? (
+                      activeComm.audition_enabled && activeComm.category === 'hobby' ? (
                         <button className="group-action-btn manage" onClick={() => setShowAuditionForm(activeComm)}>
                           <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
                         </button>
