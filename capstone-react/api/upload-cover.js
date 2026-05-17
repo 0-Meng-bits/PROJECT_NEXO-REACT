@@ -3,20 +3,17 @@ import { supabase, supabaseAdmin } from './_supabase.js';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  let resolvedUserId = null;
+  let resolvedUserId = req.query.userId || null;
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) resolvedUserId = user.id;
+  if (!resolvedUserId) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (!authError && user) resolvedUserId = user.id;
+    }
   }
   if (!resolvedUserId) {
-    const legacyUserId = req.headers['x-user-id'];
-    if (legacyUserId) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles').select('id').eq('id', legacyUserId).single();
-      if (profile) resolvedUserId = profile.id;
-    }
+    resolvedUserId = req.headers['x-user-id'] || null;
   }
   if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
 

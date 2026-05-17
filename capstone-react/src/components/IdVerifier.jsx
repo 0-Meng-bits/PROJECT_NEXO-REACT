@@ -1,78 +1,118 @@
 import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 
+// Common OCR misreads for digits
+const OCR_DIGIT_VARIANTS = {
+  '0': ['0', 'O', 'o', 'Q', 'D'],
+  '1': ['1', 'l', 'I', 'i', '|', '!'],
+  '2': ['2', 'Z', 'z'],
+  '3': ['3', 'B'],
+  '4': ['4', 'A'],
+  '5': ['5', 'S', 's'],
+  '6': ['6', 'b', 'G'],
+  '7': ['7', 'T'],
+  '8': ['8', 'B'],
+  '9': ['9', 'g', 'q'],
+};
+
+// Build all fuzzy variants of the ID number to match against OCR output
+function buildIdVariants(id) {
+  const digits = id.replace(/[-\s]/g, '').toUpperCase().split('');
+  // Generate combinations of common misreads
+  const variants = new Set();
+  variants.add(digits.join(''));
+
+  // Replace each digit with its OCR variants one at a time
+  digits.forEach((ch, i) => {
+    const alts = OCR_DIGIT_VARIANTS[ch] || [ch];
+    alts.forEach(alt => {
+      const variant = [...digits];
+      variant[i] = alt;
+      variants.add(variant.join(''));
+    });
+  });
+
+  // Also add version with spaces stripped and common separators removed
+  variants.add(id.replace(/[\s\-\.]/g, '').toUpperCase());
+  return [...variants];
+}
+
 function extractIdFromText(text, typedId) {
-  // Noise filter — if OCR text is too short, it's a blank/dark image
-  if (text.trim().length < 8) return { found: false };
+  // Normalize OCR text — remove all whitespace and punctuation for comparison
+  const ocrRaw = text.toUpperCase();
+  const ocrStripped = ocrRaw.replace(/[\s\-\.]/g, '');
 
-  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
-  const typedNorm = typedId.replace(/\s+/g, '').toUpperCase();
-  const ocrClean = normalized.replace(/\s/g, '');
+  const idClean = typedId.replace(/[\s\-\.]/g, '').toUpperCase();
 
-  // Direct match
-  if (ocrClean.includes(typedNorm)) return { found: true };
+  // 1. Direct match
+  if (ocrStripped.includes(idClean)) return { found: true };
 
-  const typedStripped = typedNorm.replace(/[-\s]/g, '');
-  const ocrStripped = ocrClean.replace(/[-\s]/g, '');
+  // 2. Match with spaces allowed between digits (OCR sometimes inserts spaces)
+  const spacedPattern = idClean.split('').join('[\\s\\-\\.]*');
+  if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true };
 
-  // Direct stripped match
-  if (ocrStripped.includes(typedStripped) && typedStripped.length >= 5) return { found: true };
-
-  // OCR confusion: B↔8, O↔0, I↔1, S↔5, Z↔2, 6↔8
-  const normalize = (s) => s
-    .replace(/B/g, '8').replace(/O/g, '0').replace(/I/g, '1')
-    .replace(/S/g, '5').replace(/Z/g, '2').replace(/G/g, '6')
-    .replace(/6/g, '8') // 6 and 8 look similar in OCR
-    .replace(/\s/g, '');
-
-  const typedNormalized = normalize(typedStripped);
-  const ocrNormalized = normalize(ocrStripped);
-  if (ocrNormalized.includes(typedNormalized) && typedNormalized.length >= 5) return { found: true };
-
-  // Also try matching with 8→6 substitution (in case typed is 8 but OCR reads 6)
-  const typedWith6 = typedStripped.replace(/8/g, '6');
-  if (ocrStripped.includes(typedWith6) && typedWith6.length >= 5) return { found: true };
-
-  // Try last 6 digits match (OCR sometimes misses first digit)
-  if (typedStripped.length >= 6) {
-    const last6 = typedStripped.slice(-6);
-    const last6with6 = last6.replace(/8/g, '6');
-    if (ocrStripped.includes(last6) || ocrStripped.includes(last6with6) || ocrNormalized.includes(normalize(last6))) return { found: true };
+  // 3. Fuzzy match — try all OCR misread variants
+  const variants = buildIdVariants(typedId);
+  for (const variant of variants) {
+    if (ocrStripped.includes(variant)) return { found: true };
+    // Also try spaced version of each variant
+    const spacedVar = variant.split('').join('[\\s\\-\\.]*');
+    if (new RegExp(spacedVar).test(ocrRaw)) return { found: true };
   }
 
-  // Try first 5 digits match (OCR sometimes misses last digits)
-  if (typedStripped.length >= 5) {
-    const first5 = typedStripped.slice(0, 5);
-    const first5with6 = first5.replace(/8/g, '6');
-    const first5norm = normalize(first5);
-    if (ocrStripped.includes(first5) || ocrStripped.includes(first5with6) || ocrNormalized.includes(first5norm)) return { found: true };
-  }
-
-  // Try any 4 consecutive digits match as last resort
-  if (typedStripped.length >= 4) {
-    for (let i = 0; i <= typedStripped.length - 4; i++) {
-      const chunk = typedStripped.slice(i, i + 4);
-      const chunkWith6 = chunk.replace(/8/g, '6');
-      const chunkNorm = normalize(chunk);
-      if (ocrStripped.includes(chunk) || ocrStripped.includes(chunkWith6) || ocrNormalized.includes(chunkNorm)) return { found: true };
-    }
-  }
-
-  // Try sliding window — check if any 5-digit substring of the ID appears in OCR
-  if (typedStripped.length >= 5) {
-    for (let i = 0; i <= typedStripped.length - 5; i++) {
-      const chunk = typedStripped.slice(i, i + 5);
-      const chunkWith6 = chunk.replace(/8/g, '6');
-      const chunkWith8 = chunk.replace(/6/g, '8');
-      if (ocrStripped.includes(chunk) || ocrStripped.includes(chunkWith6) || ocrStripped.includes(chunkWith8) || ocrNormalized.includes(normalize(chunk))) {
-        return { found: true };
-      }
+  // 4. Partial match — if at least 5 consecutive digits match (handles partial OCR reads)
+  if (idClean.length >= 5) {
+    for (let i = 0; i <= idClean.length - 5; i++) {
+      const chunk = idClean.slice(i, i + 5);
+      if (ocrStripped.includes(chunk)) return { found: true };
     }
   }
 
   return { found: false };
 }
 
+// Preprocess image on canvas to improve OCR accuracy:
+// - Upscale, increase contrast, convert to grayscale
+async function preprocessImage(imageFile) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(imageFile);
+    img.onload = () => {
+      const scale = Math.max(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+
+      // Draw scaled image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Apply grayscale + contrast boost via pixel manipulation
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // Grayscale
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        // Contrast stretch: push darks darker, lights lighter
+        const contrast = 1.5;
+        const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+        const adjusted = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
+        data[i] = data[i + 1] = data[i + 2] = adjusted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        resolve(new File([blob], 'processed.png', { type: 'image/png' }));
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(imageFile); // fallback to original
+    };
+    img.src = url;
+  });
+}
 export default function IdVerifier({ ctuId, onVerified }) {
   const [stage, setStage] = useState('idle'); // idle | camera | scanning | done | error
   const [progress, setProgress] = useState(0);
@@ -129,44 +169,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Helper: apply contrast + grayscale to a canvas context
-      const applyContrast = (ctx, w, h) => {
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-          const factor = (259 * (1.5 * 255 + 255)) / (255 * (259 - 1.5 * 255));
-          const val = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
-          data[i] = data[i+1] = data[i+2] = val;
-        }
-        ctx.putImageData(imageData, 0, 0);
-      };
-
-      // Load image once
-      const img = await new Promise((resolve) => {
-        const i = new Image();
-        const url = URL.createObjectURL(imageFile);
-        i.onload = () => { URL.revokeObjectURL(url); resolve(i); };
-        i.src = url;
-      });
-
-      // PASS 1: Full image → check for CTU keywords
-      const fullCanvas = document.createElement('canvas');
-      fullCanvas.width = img.width; fullCanvas.height = img.height;
-      const fullCtx = fullCanvas.getContext('2d');
-      fullCtx.drawImage(img, 0, 0);
-      applyContrast(fullCtx, img.width, img.height);
-      const fullBlob = await new Promise(r => fullCanvas.toBlob(r, 'image/jpeg', 0.9));
-
-      // PASS 2: Cropped bottom 55% → check for ID number
-      const cropTop = Math.floor(img.height * 0.45);
-      const cropH = img.height - cropTop;
-      const cropCanvas = document.createElement('canvas');
-      cropCanvas.width = img.width; cropCanvas.height = cropH;
-      const cropCtx = cropCanvas.getContext('2d');
-      cropCtx.drawImage(img, 0, cropTop, img.width, cropH, 0, 0, img.width, cropH);
-      applyContrast(cropCtx, img.width, cropH);
-      const cropBlob = await new Promise(r => cropCanvas.toBlob(r, 'image/jpeg', 0.9));
+      // Preprocess image for better OCR accuracy
+      const processedFile = await preprocessImage(imageFile);
 
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
@@ -174,32 +178,17 @@ export default function IdVerifier({ ctuId, onVerified }) {
         },
       });
 
-      // Run full image OCR for CTU keywords
-      await worker.setParameters({ tessedit_pageseg_mode: '6' });
-      const { data: { text: fullText } } = await worker.recognize(fullBlob);
+      // Configure Tesseract for ID number detection
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
+        tessedit_pageseg_mode: '6', // Assume uniform block of text
+      });
 
-      // Run cropped OCR for ID number (multiple passes)
-      const cropResults = [];
-      for (const psm of ['6', '11', '3']) {
-        await worker.setParameters({
-          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-:',
-          tessedit_pageseg_mode: psm,
-        });
-        const { data: { text } } = await worker.recognize(cropBlob);
-        cropResults.push(text);
-      }
+      const { data: { text } } = await worker.recognize(processedFile);
       await worker.terminate();
 
-      // Check CTU keywords in full image
-      const fullUpper = fullText.toUpperCase().replace(/\s+/g, ' ');
-      const CTU_KEYWORDS = ['CEBU TECHNOLOGICAL', 'CTU', 'BSIT', 'BSCS', 'BSCE', 'BSED', 'BSBA', 'BSHM', 'BSMT', 'BSME', 'BSEE', 'BSIE'];
-      const isCTU = CTU_KEYWORDS.some(kw => fullUpper.includes(kw));
-
-      // Check ID number in cropped image
-      const combinedCrop = cropResults.join(' ');
-      const idMatch = extractIdFromText(combinedCrop, ctuId);
-
-      setResult({ found: idMatch.found, isCTU });
+      console.log('[OCR] Raw text:', text); // helpful for debugging
+      setResult(extractIdFromText(text, ctuId));
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);

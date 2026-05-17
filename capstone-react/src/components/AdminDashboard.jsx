@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -11,9 +11,11 @@ const SECTIONS = [
   { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
+  { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-flag' },
+  { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
 ];
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function toDateInput(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -36,7 +38,7 @@ function countInRange(items, dateField, start, end) {
   }).length;
 }
 
-// Simple bar chart — no external lib needed
+// Simple bar chart â€” no external lib needed
 function MiniBarChart({ data, color }) {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
@@ -86,6 +88,15 @@ function StatCard({ label, value, color, icon }) {
   );
 }
 
+// Inappropriate words filter (basic list â€” expand as needed)
+const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol'];
+
+function containsBadWord(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return BAD_WORDS.some(w => lower.includes(w));
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const admin = JSON.parse(localStorage.getItem('currentUser'));
@@ -102,80 +113,90 @@ export default function AdminDashboard() {
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [circleMembers, setCircleMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-
-  // ── User detail modal ────────────────────────────────────────────────────
+  const [reports, setReports] = useState([]);
+  const [allMessages, setAllMessages] = useState([]);
+  const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // ── Circle messages ──────────────────────────────────────────────────────
-  const [circleMessages, setCircleMessages] = useState([]);
-  const [loadingCircleMsgs, setLoadingCircleMsgs] = useState(false);
-  const [circleMsgTab, setCircleMsgTab] = useState('members'); // 'members' | 'messages'
-
-  // ── Analytics state ──────────────────────────────────────────────────────
+  // â”€â”€ Analytics state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [preset, setPreset] = useState('week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]   = useState('');
   const [useCustom, setUseCustom]   = useState(false);
 
-  // ── Campus Feed post composer state ──────────────────────────────────────
+  // â”€â”€ Campus Feed post composer state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [newAdminPost, setNewAdminPost] = useState({ title: '', content: '', post_type: 'announcement' });
   const [postingAdminPost, setPostingAdminPost] = useState(false);
-
-  // ── Campus Events state ───────────────────────────────────────────────────
+  // -- Campus Events state
   const [campusEvents, setCampusEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventForm, setEventForm] = useState({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general', event_end_date: '' });
-  const [postingEvent, setPostingEvent] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+  const [postingEvent, setPostingEvent] = useState(false);
 
   const EVENT_CATS = [
-    { key: 'semester',   label: 'Semester',            color: '#facc15' },
-    { key: 'exam',       label: 'Exam Schedules',       color: '#f87171' },
-    { key: 'enrollment', label: 'Enrollment',           color: '#34d399' },
-    { key: 'holiday',    label: 'Holidays',             color: '#fb923c' },
-    { key: 'sports',     label: 'Sports / Intramural',  color: '#a78bfa' },
-    { key: 'cultural',   label: 'Cultural',             color: '#f472b6' },
-    { key: 'seminar',    label: 'Seminar',              color: '#22d3ee' },
-    { key: 'general',    label: 'General',              color: '#94a3b8' },
+    { key: 'semester',   label: 'Semester',           color: '#facc15' },
+    { key: 'exam',       label: 'Exam Schedules',      color: '#f87171' },
+    { key: 'enrollment', label: 'Enrollment',          color: '#34d399' },
+    { key: 'holiday',    label: 'Holidays',            color: '#fb923c' },
+    { key: 'sports',     label: 'Sports / Intramural', color: '#a78bfa' },
+    { key: 'cultural',   label: 'Cultural',            color: '#f472b6' },
+    { key: 'seminar',    label: 'Seminar',             color: '#22d3ee' },
+    { key: 'general',    label: 'General',             color: '#94a3b8' },
   ];
 
-  const fetchEvents = useCallback(async () => {
+  const loadCampusEvents = async () => {
     setEventsLoading(true);
-    const { data } = await supabase.from('campus_events').select('*').order('event_date', { ascending: true });
-    setCampusEvents(data || []);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/admin-data', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) { const d = await res.json(); setCampusEvents(d.campusEvents || []); }
+    } catch { setCampusEvents([]); }
     setEventsLoading(false);
-  }, []);
+  };
 
-  const postEvent = async () => {
-    if (!eventForm.title.trim() || !eventForm.event_date) return;
+  const submitEvent = async () => {
+    if (!newEvent.title.trim() || !newEvent.start_date) return;
     setPostingEvent(true);
-    const { error } = await supabase.from('campus_events').insert([{
-      title: eventForm.title.trim(),
-      description: eventForm.description.trim(),
-      event_date: eventForm.event_date,
-      event_end_date: eventForm.event_end_date || null,
-      event_time: eventForm.event_time || null,
-      location: eventForm.location.trim(),
-      category: eventForm.category,
-      poster_id: admin?.id,
-      poster_name: admin?.full_name || 'Admin',
-      poster_type: 'Admin',
-      is_official: true,
-    }]);
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch('/api/admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          action: 'add_event',
+          title: newEvent.title.trim(),
+          description: newEvent.description.trim(),
+          category: newEvent.category,
+          start_date: newEvent.start_date,
+          end_date: newEvent.end_date || newEvent.start_date,
+          created_by: admin?.id,
+        }),
+      });
+      if (res.ok) {
+        setNewEvent({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+        setShowEventForm(false);
+        loadCampusEvents();
+        showToast('Event added.');
+      } else showToast('Failed to add event.');
+    } catch { showToast('Network error.'); }
     setPostingEvent(false);
-    if (!error) {
-      setEventForm({ title: '', description: '', event_date: '', event_time: '', location: '', category: 'general', event_end_date: '' });
-      setShowEventForm(false);
-      showToast('Event posted.');
-      fetchEvents();
-    } else showToast('Failed to post event.');
   };
 
   const deleteEvent = async (id) => {
     if (!confirm('Delete this event?')) return;
-    await supabase.from('campus_events').delete().eq('id', id);
-    showToast('Event deleted.');
-    fetchEvents();
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch('/api/admin-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'delete_event', id }),
+      });
+      if (res.ok) { loadCampusEvents(); showToast('Event deleted.'); }
+      else showToast('Failed to delete event.');
+    } catch { showToast('Network error.'); }
   };
 
   const submitAdminPost = async () => {
@@ -204,38 +225,49 @@ export default function AdminDashboard() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const token = localStorage.getItem('accessToken');
+    const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const [studRes, commRes, annRes, audRes, msgRes, membRes] = await Promise.all([
-        fetch('/api/students'),
-        supabase.from('communities').select('*, profiles(full_name)').order('created_at', { ascending: false }),
-        supabase.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-        supabase.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
-        supabase.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
-        supabase.from('memberships').select('*'),
+      const [commRes, adminRes] = await Promise.all([
+        fetch('/api/communities', { headers: authHeaders }),
+        fetch('/api/admin-data', { headers: authHeaders }),
       ]);
-      setStudents(await studRes.json());
-      setCommunities(commRes.data || []);
-      setAnnouncements(annRes.data || []);
-      setAuditions(audRes.data || []);
-      setGlobalMessages(msgRes.data || []);
-      setMemberships(membRes.data || []);
+      const adminData = adminRes.ok ? await adminRes.json() : {};
+      setCommunities(commRes.ok ? await commRes.json() : []);
+      setStudents(adminData.students || []);
+      setAnnouncements(adminData.announcements || []);
+      setAuditions(adminData.auditions || []);
+      setGlobalMessages(adminData.messages || []);
+      setMemberships(adminData.memberships || []);
+      setReports(adminData.reports || []);
+      setAllMessages(adminData.allMessages || []);
+      setAllCircleAnnouncements(adminData.circleAnnouncements || []);
+      setCampusEvents(adminData.campusEvents || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { if (section === 'events') fetchEvents(); }, [section, fetchEvents]);
+  useEffect(() => { fetchData(); loadCampusEvents(); }, [fetchData]);
+
+  // Real-time: new reports appear instantly in admin panel
+  useEffect(() => {
+    const sub = supabase.channel('admin:reports')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reports' },
+        (payload) => {
+          setReports(prev => [payload.new, ...prev]);
+        }
+      ).subscribe();
+    return () => supabase.removeChannel(sub);
+  }, []);
 
   const viewCircleMembers = async (circle) => {
     setSelectedCircle(circle);
-    setCircleMsgTab('members');
     setLoadingMembers(true);
     const { data } = await supabase.from('memberships')
       .select('*, profiles(full_name, student_id)')
       .eq('community_id', circle.id);
     setCircleMembers(data || []);
     setLoadingMembers(false);
-    viewCircleMessages(circle);
   };
 
   const approveStudent = async (id, name) => {
@@ -284,51 +316,123 @@ export default function AdminDashboard() {
     if (!error) setGlobalMessages(prev => prev.filter(m => m.id !== id));
   };
 
-  // ── Delete verified user ─────────────────────────────────────────────────
-  const deleteUser = async (id, name) => {
-    if (!confirm(`Permanently delete "${name}"? This removes their profile and all data.`)) return;
-    const res = await fetch(`/api/delete-user?id=${id}&adminId=${admin?.id}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      showToast(`${name} deleted.`);
+  const issueWarning = async (userId, userName, reason) => {
+    // Get current trust points
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('warning_count, trust_points, is_banned')
+      .eq('id', userId).single();
+
+    if (profile?.is_banned) { showToast(`${userName} is already banned.`); return; }
+
+    const currentPoints = profile?.trust_points ?? 3;
+    const newPoints = Math.max(0, currentPoints - 1);
+    const newWarnings = (profile?.warning_count || 0) + 1;
+    const willSuspend = newPoints === 0;
+
+    // Insert warning record
+    await supabase.from('user_warnings').insert([{
+      user_id: userId, admin_id: admin?.id, type: 'warning', reason,
+    }]);
+
+    // Compute suspension end date (7 days from now)
+    const suspendedUntil = willSuspend
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
+    // Update profile
+    await supabase.from('profiles').update({
+      warning_count: newWarnings,
+      trust_points: willSuspend ? 1 : newPoints, // reset to 1 after suspension
+      ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
+    }).eq('id', userId);
+
+    // Send notification to user
+    const notifMsg = willSuspend
+      ? `ðŸš« Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+      : `âš ï¸ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
+
+    await supabase.from('notifications').insert([{
+      user_id: userId,
+      type: 'audition_update',
+      message: notifMsg,
+    }]);
+
+    showToast(willSuspend ? `${userName} suspended for 7 days.` : `Warning issued to ${userName}. ${newPoints} point(s) left.`);
+    fetchData();
+  };
+
+  const banUser = async (userId, userName) => {
+    if (!confirm(`Ban ${userName}? They will lose access to the platform.`)) return;
+    const reason = prompt('Reason for ban:');
+    if (!reason) return;
+    await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
+    await supabase.from('user_warnings').insert([{
+      user_id: userId, admin_id: admin?.id, type: 'ban', reason,
+    }]);
+    await supabase.from('notifications').insert([{
+      user_id: userId, type: 'audition_update',
+      message: `ðŸš« Your account has been banned: ${reason}`,
+    }]);
+    showToast(`${userName} has been banned.`);
+    fetchData();
+  };
+
+  const unbanUser = async (userId, userName) => {
+    if (!confirm(`Unban ${userName}?`)) return;
+    await supabase.from('profiles').update({ is_banned: false }).eq('id', userId);
+    showToast(`${userName} has been unbanned.`);
+    fetchData();
+  };
+
+  const deleteUser = async (userId, userName) => {
+    if (!confirm(`Permanently delete ${userName}? This cannot be undone.`)) return;
+    // Delete via server (needs service role)
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(`/api/delete-user?id=${userId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        showToast(`${userName} deleted.`);
+        setSelectedUser(null);
+        fetchData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        showToast(d.message || 'Failed to delete user.');
+      }
+    } catch {
+      // Fallback: just delete profile
+      await supabase.from('profiles').delete().eq('id', userId);
+      showToast(`${userName} deleted.`);
       setSelectedUser(null);
       fetchData();
-    } else {
-      const body = await res.json().catch(() => ({}));
-      showToast(body.message || 'Failed to delete user.');
     }
   };
 
-  // ── Force verify email (mark email_confirmed in auth) ────────────────────
-  const forceVerifyEmail = async (id, name) => {
-    if (!confirm(`Force-verify email for "${name}"?`)) return;
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(`/api/force-verify-email?id=${id}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) showToast(`Email verified for ${name}.`);
-    else showToast('Failed — check server logs.');
+  const forceVerifyEmail = async (userId, userName) => {
+    if (!confirm(`Force verify email for ${userName}?`)) return;
+    await supabase.from('profiles').update({ is_verified: true }).eq('id', userId);
+    showToast(`${userName} verified.`);
+    if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev, is_verified: true }));
+    fetchData();
   };
 
-  // ── Load circle messages ─────────────────────────────────────────────────
-  const viewCircleMessages = async (circle) => {
-    setLoadingCircleMsgs(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('community_id', circle.id)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    setCircleMessages(data || []);
-    setLoadingCircleMsgs(false);
+  const resolveReport = async (reportId, status, note) => {
+    await supabase.from('reports').update({
+      status, admin_note: note, reviewed_at: new Date().toISOString(), reviewed_by: admin?.id,
+    }).eq('id', reportId);
+    showToast('Report updated.');
+    fetchData();
   };
 
-  const deleteCircleMessage = async (id) => {
-    if (!confirm('Delete this message?')) return;
-    const { error } = await supabase.from('messages').delete().eq('id', id);
-    if (!error) setCircleMessages(prev => prev.filter(m => m.id !== id));
+  const deleteContent = async (type, id) => {
+    if (!confirm('Delete this content?')) return;
+    if (type === 'message') await supabase.from('messages').delete().eq('id', id);
+    if (type === 'announcement') await supabase.from('announcements').delete().eq('id', id);
+    showToast('Content deleted.');
+    fetchData();
   };
 
   const rankLabel = (level) => ['Member', 'Moderator', 'Co-Leader', 'Leader'][level ?? 0] || 'Member';
@@ -346,7 +450,7 @@ export default function AdminDashboard() {
     s.student_id?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Analytics computed values ─────────────────────────────────────────────
+  // â”€â”€ Analytics computed values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { start: rangeStart, end: rangeEnd } = useCustom && customStart && customEnd
     ? { start: new Date(customStart + 'T00:00:00'), end: new Date(customEnd + 'T23:59:59') }
     : getPresetRange(preset);
@@ -358,7 +462,7 @@ export default function AdminDashboard() {
   const newAuditions  = countInRange(auditions,    'submitted_at', rangeStart, rangeEnd);
   const newPosts      = countInRange(announcements,'created_at',   rangeStart, rangeEnd);
 
-  // Build bar chart data — split range into buckets
+  // Build bar chart data â€” split range into buckets
   function buildChartData(items, dateField) {
     const diffDays = Math.round((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
     const buckets = [];
@@ -407,7 +511,7 @@ export default function AdminDashboard() {
   const messageChartData = buildChartData(globalMessages,'created_at');
 
   const rangeLabel = useCustom && customStart && customEnd
-    ? `${customStart} → ${customEnd}`
+    ? `${customStart} â†’ ${customEnd}`
     : { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year' }[preset];
 
   const auditionStatusLabel = (status, phase2Result) => {
@@ -428,7 +532,7 @@ export default function AdminDashboard() {
         <div className="adm-brand">
           <img src="/logoo.png" alt="NEXO" style={{ width: 32, height: 32, borderRadius: 8, marginRight: 10, filter: 'drop-shadow(0 0 6px rgba(0,240,255,0.5))' }} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'white', letterSpacing: 2 }}>NEXO</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 2 }}>NEXO</div>
             <div style={{ fontSize: 9, color: 'var(--cyber-cyan)', letterSpacing: 2 }}>ADMIN PANEL</div>
           </div>
         </div>
@@ -445,13 +549,16 @@ export default function AdminDashboard() {
             {s.key === 'auditions' && auditions.filter(a => a.status === 'pending').length > 0 && (
               <span className="adm-badge">{auditions.filter(a => a.status === 'pending').length}</span>
             )}
+            {s.key === 'reports' && reports.filter(r => r.status === 'pending').length > 0 && (
+              <span className="adm-badge">{reports.filter(r => r.status === 'pending').length}</span>
+            )}
           </div>
         ))}
 
         <div style={{ marginTop: 'auto' }}>
           <div className="adm-sidebar-label">ACCOUNT</div>
           <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--text-muted)' }}>{admin?.full_name}</div>
-          <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); navigate('/'); }}>
+          <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/'); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
           </div>
@@ -463,9 +570,9 @@ export default function AdminDashboard() {
         <div className="adm-topbar">
           <div>
             <h1 className="adm-page-title">
-              {selectedCircle ? `${selectedCircle.name} — Members` : SECTIONS.find(s => s.key === section)?.label}
+              {selectedCircle ? `${selectedCircle.name} â€” Members` : SECTIONS.find(s => s.key === section)?.label}
             </h1>
-            <p className="adm-page-sub">NEXO Connect — Admin Control Panel</p>
+            <p className="adm-page-sub">NEXO Connect â€” Admin Control Panel</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {selectedCircle && (
@@ -487,7 +594,7 @@ export default function AdminDashboard() {
           <StatCard label="Circles"        value={communities.length} color="var(--cyber-yellow)" icon="fa-solid fa-network-wired" />
         </div>
 
-        {/* ── ANALYTICS ── */}
+        {/* â”€â”€ ANALYTICS â”€â”€ */}
         {section === 'analytics' && (
           <div>
             {/* Date range controls */}
@@ -512,7 +619,7 @@ export default function AdminDashboard() {
                   value={customStart}
                   max={customEnd || toDateInput(new Date())}
                   onChange={e => { setCustomStart(e.target.value); setUseCustom(true); }} />
-                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>→</span>
+                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>â†’</span>
                 <input type="date" className="analytics-date-input"
                   value={customEnd}
                   min={customStart}
@@ -610,7 +717,7 @@ export default function AdminDashboard() {
                           return (
                             <tr key={c.id}>
                               <td style={{ color: 'var(--text-muted)', fontWeight: 700 }}>#{i + 1}</td>
-                              <td style={{ color: 'white', fontWeight: 600 }}>{c.name}</td>
+                              <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{c.name}</td>
                               <td><span className="adm-tag">{c.category}</span></td>
                               <td>
                                 <span style={{ color: 'var(--green)', fontWeight: 700 }}>+{c.joinCount}</span>
@@ -627,7 +734,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── VERIFICATION QUEUE ── */}
+        {/* â”€â”€ VERIFICATION QUEUE â”€â”€ */}
         {section === 'verification' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -638,16 +745,16 @@ export default function AdminDashboard() {
             : pending.length === 0 ? (
               <div className="adm-empty">
                 <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: 'var(--green)', marginBottom: 12, display: 'block' }}></i>
-                All caught up — no pending verifications.
+                All caught up â€” no pending verifications.
               </div>
             ) : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Registered</th><th>Actions</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
                     <tr key={s.id}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
                       <td>
                         {s.id_photo_url ? (
@@ -655,13 +762,26 @@ export default function AdminDashboard() {
                             <img
                               src={s.id_photo_url}
                               alt="School ID"
-                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(0,240,255,0.3)', cursor: 'pointer' }}
+                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: `1px solid ${s.id_verified ? 'rgba(62,207,142,0.4)' : 'rgba(247,169,79,0.4)'}`, cursor: 'pointer' }}
                             />
                           </a>
                         ) : (
                           <span style={{ fontSize: 11, color: 'var(--red)' }}>
                             <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
                             No photo
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {!s.id_photo_url ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                        ) : s.id_verified ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-circle-check"></i> Passed
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--orange)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-triangle-exclamation"></i> Manual
                           </span>
                         )}
                       </td>
@@ -684,7 +804,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── ALL USERS ── */}
+        {/* â”€â”€ ALL USERS â”€â”€ */}
         {section === 'users' && !selectedUser && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -694,20 +814,34 @@ export default function AdminDashboard() {
             </div>
             {loading ? <div className="adm-empty">Loading...</div> : (
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filtered.map(s => (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(s)}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{s.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
-                      <td><span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span></td>
+                      <td>
+                        {s.is_banned
+                          ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
+                          : s.suspended_until && new Date(s.suspended_until) > new Date()
+                            ? <span className="adm-status" style={{ background: 'rgba(247,169,79,0.1)', color: 'var(--orange)', border: '1px solid var(--orange)' }}>SUSPENDED</span>
+                            : <span className={`adm-status ${s.is_verified ? 'verified' : 'pending'}`}>{s.is_verified ? 'Verified' : 'Pending'}</span>
+                        }
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 700, color: (s.trust_points ?? 3) <= 1 ? 'var(--red)' : (s.trust_points ?? 3) <= 2 ? 'var(--orange)' : 'var(--green)' }}>
+                          {s.trust_points ?? 3}/3
+                        </span>
+                      </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td onClick={e => e.stopPropagation()}>
-                        <button className="adm-btn reject" onClick={() => deleteUser(s.id, s.full_name)} title="Delete user">
-                          <i className="fa-solid fa-trash-can"></i>
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteUser(s.id, s.full_name)}>
+                            <i className="fa-solid fa-trash"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -716,56 +850,77 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
-
-        {/* ── USER DETAIL VIEW ── */}
         {section === 'users' && selectedUser && (
           <div>
-            <button className="adm-refresh-btn" style={{ marginBottom: 16 }} onClick={() => setSelectedUser(null)}>
+            <button className="adm-btn" style={{ marginBottom: 16 }} onClick={() => setSelectedUser(null)}>
               <i className="fa-solid fa-arrow-left"></i> Back to Users
             </button>
-            <div className="adm-card" style={{ marginBottom: 16 }}>
+            <div className="adm-card">
               <div className="adm-card-head">
                 <span>User Profile</span>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="adm-btn" style={{ color: 'var(--cyber-cyan)', borderColor: 'var(--cyber-cyan)' }}
-                    onClick={() => forceVerifyEmail(selectedUser.id, selectedUser.full_name)}
-                    title="Force-confirm their email in Supabase Auth">
-                    <i className="fa-solid fa-envelope-circle-check"></i> Force Verify Email
-                  </button>
+                  {!selectedUser.is_verified && (
+                    <button className="adm-btn approve" onClick={() => forceVerifyEmail(selectedUser.id, selectedUser.full_name)}>
+                      <i className="fa-solid fa-shield-check"></i> Force Verify Email
+                    </button>
+                  )}
                   <button className="adm-btn reject" onClick={() => deleteUser(selectedUser.id, selectedUser.full_name)}>
-                    <i className="fa-solid fa-trash-can"></i> Delete User
+                    <i className="fa-solid fa-trash"></i> Delete User
                   </button>
                 </div>
               </div>
-              <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                {/* Left — info */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+                {/* Left: user info */}
+                <div>
                   {[
-                    { label: 'Full Name',   value: selectedUser.full_name },
-                    { label: 'CTU ID',      value: selectedUser.student_id },
-                    { label: 'Email',       value: selectedUser.email },
-                    { label: 'User Type',   value: selectedUser.user_type },
-                    { label: 'Status',      value: selectedUser.is_verified ? '✅ Verified' : '⏳ Pending' },
-                    { label: 'ID Verified', value: selectedUser.id_verified ? '✅ Yes' : '❌ No' },
-                    { label: 'Joined',      value: new Date(selectedUser.created_at).toLocaleString() },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', minWidth: 100, paddingTop: 2 }}>{label}</span>
-                      <span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{value || '—'}</span>
+                    { label: 'FULL NAME',  value: selectedUser.full_name },
+                    { label: 'CTU ID',     value: selectedUser.student_id, mono: true },
+                    { label: 'EMAIL',      value: selectedUser.email },
+                    { label: 'USER TYPE',  value: selectedUser.user_type },
+                    { label: 'STATUS',     value: selectedUser.is_banned ? '🚫 Banned' : selectedUser.is_verified ? '✅ Verified' : '⏳ Pending' },
+                    { label: 'ID VERIFIED', value: selectedUser.id_photo_url ? '✅ Yes' : '❌ No' },
+                    { label: 'JOINED',     value: new Date(selectedUser.created_at).toLocaleString() },
+                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 3}/3` },
+                    { label: 'WARNINGS',   value: selectedUser.warning_count || 0 },
+                  ].map(({ label, value, mono }) => (
+                    <div key={label} style={{ display: 'flex', gap: 16, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ width: 120, fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>{label}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: mono ? 'monospace' : 'inherit' }}>{value}</div>
                     </div>
                   ))}
+                  <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {!selectedUser.is_banned && selectedUser.is_verified && (
+                      <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)' }}
+                        onClick={() => { const r = prompt('Warning reason:'); if (r) { issueWarning(selectedUser.id, selectedUser.full_name, r); setSelectedUser(prev => ({ ...prev, warning_count: (prev.warning_count || 0) + 1, trust_points: Math.max(0, (prev.trust_points ?? 3) - 1) })); } }}>
+                        <i className="fa-solid fa-triangle-exclamation"></i> Issue Warning
+                      </button>
+                    )}
+                    {selectedUser.is_banned
+                      ? <button className="adm-btn approve" onClick={() => { unbanUser(selectedUser.id, selectedUser.full_name); setSelectedUser(prev => ({ ...prev, is_banned: false })); }}>
+                          <i className="fa-solid fa-unlock"></i> Unban
+                        </button>
+                      : selectedUser.is_verified && (
+                        <button className="adm-btn reject" onClick={() => { banUser(selectedUser.id, selectedUser.full_name); setSelectedUser(prev => ({ ...prev, is_banned: true })); }}>
+                          <i className="fa-solid fa-ban"></i> Ban User
+                        </button>
+                      )
+                    }
+                  </div>
                 </div>
-                {/* Right — ID photo */}
+                {/* Right: ID photo */}
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>School ID Photo</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>SCHOOL ID PHOTO</div>
                   {selectedUser.id_photo_url ? (
                     <a href={selectedUser.id_photo_url} target="_blank" rel="noreferrer">
                       <img src={selectedUser.id_photo_url} alt="School ID"
-                        style={{ width: '100%', maxWidth: 320, borderRadius: 10, border: '1px solid rgba(0,240,255,0.3)', cursor: 'pointer' }} />
+                        style={{ width: '100%', maxWidth: 360, borderRadius: 10, border: '1px solid rgba(0,240,255,0.2)', cursor: 'zoom-in', objectFit: 'contain', background: '#000' }} />
                     </a>
                   ) : (
-                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                      <i className="fa-solid fa-image-slash" style={{ marginRight: 8 }} />No ID photo submitted
+                    <div style={{ width: '100%', maxWidth: 360, height: 200, borderRadius: 10, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <i className="fa-solid fa-id-card" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}></i>
+                        No ID photo uploaded
+                      </div>
                     </div>
                   )}
                 </div>
@@ -774,7 +929,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLES ── */}
+        {/* â”€â”€ CIRCLES â”€â”€ */}
         {section === 'communities' && !selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -789,7 +944,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {communities.map(c => (
                     <tr key={c.id}>
-                      <td style={{ color: 'white', fontWeight: 600, cursor: 'pointer' }}
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
                         onClick={() => viewCircleMembers(c)}>
                         {c.name}
                         <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
@@ -801,7 +956,7 @@ export default function AdminDashboard() {
                           {c.audition_enabled ? 'On' : 'Off'}
                         </span>
                       </td>
-                      <td style={{ color: 'var(--text-muted)' }}>{c.profiles?.full_name || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{c.profiles?.full_name || 'â€”'}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -821,176 +976,34 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLE MEMBERS DETAIL ── */}
+        {/* â”€â”€ CIRCLE MEMBERS DETAIL â”€â”€ */}
         {section === 'communities' && selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>{selectedCircle.name}</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className={`adm-btn ${circleMsgTab === 'members' ? 'approve' : ''}`} onClick={() => setCircleMsgTab('members')}>
-                  <i className="fa-solid fa-users"></i> Members ({circleMembers.length})
-                </button>
-                <button className={`adm-btn ${circleMsgTab === 'messages' ? 'approve' : ''}`} onClick={() => setCircleMsgTab('messages')}>
-                  <i className="fa-solid fa-message"></i> Messages ({circleMessages.length})
-                </button>
-              </div>
+              <span>Members of {selectedCircle.name}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{circleMembers.length} members</span>
             </div>
-
-            {circleMsgTab === 'members' && (
-              loadingMembers ? <div className="adm-empty">Loading...</div>
-              : circleMembers.length === 0 ? <div className="adm-empty">No members yet.</div>
-              : (
-                <table className="adm-table">
-                  <thead><tr><th>Full Name</th><th>Student ID</th><th>Rank</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {circleMembers.map(m => (
-                      <tr key={m.id}>
-                        <td style={{ color: 'white', fontWeight: 600 }}>{m.profiles?.full_name || '—'}</td>
-                        <td><span className="adm-mono">{m.profiles?.student_id || '—'}</span></td>
-                        <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
-                        <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            )}
-
-            {circleMsgTab === 'messages' && (
-              loadingCircleMsgs ? <div className="adm-empty">Loading...</div>
-              : circleMessages.length === 0 ? <div className="adm-empty">No messages in this circle yet.</div>
-              : (
-                <table className="adm-table">
-                  <thead><tr><th>Author</th><th>Message</th><th>Sent</th><th>Actions</th></tr></thead>
-                  <tbody>
-                    {circleMessages.map(m => (
-                      <tr key={m.id}>
-                        <td style={{ color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
-                        <td style={{ color: 'var(--text-muted)', maxWidth: 300 }}>{m.content}</td>
-                        <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(m.created_at).toLocaleString()}</td>
-                        <td>
-                          <button className="adm-btn reject" onClick={() => deleteCircleMessage(m.id)}>
-                            <i className="fa-solid fa-trash-can"></i>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
+            {loadingMembers ? <div className="adm-empty">Loading...</div>
+            : circleMembers.length === 0 ? <div className="adm-empty">No members yet.</div>
+            : (
+              <table className="adm-table">
+                <thead><tr><th>Full Name</th><th>Student ID</th><th>Rank</th><th>Status</th></tr></thead>
+                <tbody>
+                  {circleMembers.map(m => (
+                    <tr key={m.id}>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{m.profiles?.full_name || 'â€”'}</td>
+                      <td><span className="adm-mono">{m.profiles?.student_id || 'â€”'}</span></td>
+                      <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
+                      <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}
 
-        {/* ── CAMPUS EVENTS ── */}
-        {section === 'events' && (
-          <div>
-            {/* Post form */}
-            <div className="adm-card" style={{ marginBottom: 16 }}>
-              <div className="adm-card-head">
-                <span><i className="fa-solid fa-calendar-plus" style={{ marginRight: 8 }}></i>Campus Events</span>
-                <button className="adm-btn approve" onClick={() => setShowEventForm(o => !o)}>
-                  <i className={`fa-solid ${showEventForm ? 'fa-xmark' : 'fa-plus'}`}></i>
-                  {showEventForm ? 'Cancel' : 'New Event'}
-                </button>
-              </div>
-              {showEventForm && (
-                <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>TITLE *</div>
-                      <input className="adm-search" style={{ width: '100%' }} placeholder="Event title"
-                        value={eventForm.title} onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>CATEGORY</div>
-                      <select className="adm-search" style={{ width: '100%' }}
-                        value={eventForm.category} onChange={e => setEventForm(f => ({ ...f, category: e.target.value }))}>
-                        {EVENT_CATS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>START DATE *</div>
-                      <input type="date" className="adm-search" style={{ width: '100%' }}
-                        value={eventForm.event_date} onChange={e => setEventForm(f => ({ ...f, event_date: e.target.value }))} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>END DATE</div>
-                      <input type="date" className="adm-search" style={{ width: '100%' }}
-                        value={eventForm.event_end_date} onChange={e => setEventForm(f => ({ ...f, event_end_date: e.target.value }))} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>TIME</div>
-                      <input type="time" className="adm-search" style={{ width: '100%' }}
-                        value={eventForm.event_time} onChange={e => setEventForm(f => ({ ...f, event_time: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>LOCATION</div>
-                    <input className="adm-search" style={{ width: '100%' }} placeholder="e.g. AVR, Gymnasium, Online"
-                      value={eventForm.location} onChange={e => setEventForm(f => ({ ...f, location: e.target.value }))} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 5 }}>DESCRIPTION</div>
-                    <textarea style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'white', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 70 }}
-                      placeholder="Details about the event..."
-                      value={eventForm.description} onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))} />
-                  </div>
-                  <button className="adm-btn approve" style={{ alignSelf: 'flex-start' }}
-                    disabled={postingEvent || !eventForm.title.trim() || !eventForm.event_date}
-                    onClick={postEvent}>
-                    {postingEvent ? <><i className="fa-solid fa-spinner fa-spin"></i> Posting...</> : <><i className="fa-solid fa-paper-plane"></i> Post Event</>}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Events list */}
-            <div className="adm-card">
-              <div className="adm-card-head">
-                <span>All Campus Events</span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{campusEvents.length} custom events</span>
-              </div>
-              {eventsLoading ? <div className="adm-empty">Loading...</div>
-              : campusEvents.length === 0 ? (
-                <div className="adm-empty">
-                  <i className="fa-solid fa-calendar-xmark" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 12, display: 'block' }}></i>
-                  No custom events yet. The hardcoded CTU calendar is shown to users by default.
-                </div>
-              ) : (
-                <table className="adm-table">
-                  <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Location</th><th>Posted By</th><th>Actions</th></tr></thead>
-                  <tbody>
-                    {campusEvents.map(e => {
-                      const cat = EVENT_CATS.find(c => c.key === e.category) || { label: e.category, color: '#94a3b8' };
-                      return (
-                        <tr key={e.id}>
-                          <td style={{ color: 'white', fontWeight: 600 }}>{e.title}</td>
-                          <td><span style={{ fontSize: 11, color: cat.color, border: `1px solid ${cat.color}`, padding: '2px 8px', borderRadius: 10 }}>{cat.label}</span></td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                            {new Date(e.event_date).toLocaleDateString()}
-                            {e.event_end_date && e.event_end_date !== e.event_date && ` → ${new Date(e.event_end_date).toLocaleDateString()}`}
-                          </td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.location || '—'}</td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{e.poster_name || '—'}</td>
-                          <td>
-                            <button className="adm-btn reject" onClick={() => deleteEvent(e.id)}>
-                              <i className="fa-solid fa-trash-can"></i>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── GLOBAL FEED MESSAGES ── */}
+        {/* â”€â”€ GLOBAL FEED MESSAGES â”€â”€ */}
         {section === 'globalfeed' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1000,12 +1013,13 @@ export default function AdminDashboard() {
             {loading ? <div className="adm-empty">Loading...</div>
             : globalMessages.length === 0 ? <div className="adm-empty">No messages yet.</div>
             : (
+              <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
               <table className="adm-table">
                 <thead><tr><th>Author</th><th>Message</th><th>Sent</th><th>Actions</th></tr></thead>
                 <tbody>
                   {globalMessages.map(m => (
                     <tr key={m.id}>
-                      <td style={{ color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{m.full_name}</td>
                       <td style={{ color: 'var(--text-muted)', maxWidth: 300 }}>{m.content}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{new Date(m.created_at).toLocaleString()}</td>
                       <td>
@@ -1017,11 +1031,12 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}
 
-        {/* ── CAMPUS FEED POSTS ── */}
+        {/* â”€â”€ CAMPUS FEED POSTS â”€â”€ */}
         {section === 'announcements' && (
           <div>
             {/* Admin post composer */}
@@ -1037,7 +1052,7 @@ export default function AdminDashboard() {
                   onChange={e => setNewAdminPost(p => ({ ...p, title: e.target.value }))}
                 />
                 <textarea
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'white', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 80 }}
+                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 80 }}
                   placeholder="Write your announcement, event, or shoutout..."
                   value={newAdminPost.content}
                   onChange={e => setNewAdminPost(p => ({ ...p, content: e.target.value }))}
@@ -1149,7 +1164,7 @@ export default function AdminDashboard() {
                                 {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                               </span>
                             </div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: 'white', marginBottom: 6 }}>{a.title}</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', marginBottom: 6 }}>{a.title}</div>
                             <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>{a.content}</p>
                           </div>
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -1171,7 +1186,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── AUDITION APPLICATIONS ── */}
+        {/* â”€â”€ AUDITION APPLICATIONS â”€â”€ */}
         {section === 'auditions' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1186,9 +1201,9 @@ export default function AdminDashboard() {
                 <tbody>
                   {auditions.map(a => (
                     <tr key={a.id}>
-                      <td style={{ color: 'white', fontWeight: 600 }}>{a.profiles?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{a.profiles?.student_id || '—'}</span></td>
-                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '—'}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.profiles?.full_name || 'â€”'}</td>
+                      <td><span className="adm-mono">{a.profiles?.student_id || 'â€”'}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || 'â€”'}</td>
                       <td>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
@@ -1207,9 +1222,335 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        
+        {/* -- CAMPUS EVENTS -- */}
+        {section === 'events' && (
+          <div>
+            <div className="adm-card" style={{ marginBottom: 16 }}>
+              <div className="adm-card-head">
+                <span><i className="fa-solid fa-calendar-plus" style={{ marginRight: 8 }}></i>Campus Events</span>
+                <button className="adm-btn approve" onClick={() => setShowEventForm(o => !o)}>
+                  <i className={`fa-solid ${showEventForm ? 'fa-xmark' : 'fa-plus'}`}></i>
+                  {showEventForm ? ' Cancel' : ' Add Event'}
+                </button>
+              </div>
+              {showEventForm && (
+                <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input className="adm-search" style={{ width: '100%' }} placeholder="Event title"
+                    value={newEvent.title} onChange={e => setNewEvent(p => ({ ...p, title: e.target.value }))} />
+                  <textarea style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', height: 60, resize: 'none' }}
+                    placeholder="Description (optional)"
+                    value={newEvent.description} onChange={e => setNewEvent(p => ({ ...p, description: e.target.value }))} />
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <select className="adm-search" style={{ flex: 1 }} value={newEvent.category}
+                      onChange={e => setNewEvent(p => ({ ...p, category: e.target.value }))}>
+                      {EVENT_CATS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
+                      value={newEvent.start_date} onChange={e => setNewEvent(p => ({ ...p, start_date: e.target.value }))} />
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
+                      value={newEvent.end_date} onChange={e => setNewEvent(p => ({ ...p, end_date: e.target.value }))} />
+                  </div>
+                  <button className="adm-btn approve" onClick={submitEvent} disabled={postingEvent || !newEvent.title.trim() || !newEvent.start_date}>
+                    <i className="fa-solid fa-calendar-plus"></i> {postingEvent ? 'Adding...' : 'Add Event'}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <span>All Campus Events</span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{campusEvents.length} events</span>
+              </div>
+              {eventsLoading ? <div className="adm-empty">Loading...</div>
+              : campusEvents.length === 0 ? <div className="adm-empty">No events yet. Add one above.</div>
+              : (
+                <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
+                <table className="adm-table">
+                  <thead><tr><th>TITLE</th><th>CATEGORY</th><th>START</th><th>END</th><th>ACTION</th></tr></thead>
+                  <tbody>
+                    {campusEvents.map(ev => {
+                      const cat = EVENT_CATS.find(c => c.key === ev.category) || EVENT_CATS[EVENT_CATS.length - 1];
+                      return (
+                        <tr key={ev.id}>
+                          <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{ev.title}</td>
+                          <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: cat.color, border: `1px solid ${cat.color}`, background: `${cat.color}15` }}>{cat.label}</span></td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(ev.start_date).toLocaleDateString()}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.end_date ? new Date(ev.end_date).toLocaleDateString() : '-'}</td>
+                          <td><button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteEvent(ev.id)}><i className="fa-solid fa-trash"></i></button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+{/* â”€â”€ REPORTS â”€â”€ */}
+        {section === 'reports' && (
+          <div className="adm-card">
+            <div className="adm-card-head">
+              <span>User Reports</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {reports.filter(r => r.status === 'pending').length} pending
+              </span>
+            </div>
+            {loading ? <div className="adm-empty">Loading...</div>
+            : reports.length === 0 ? (
+              <div className="adm-empty">No reports yet.</div>
+            ) : (
+              <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
+              <table className="adm-table">
+                <thead>
+                  <tr><th>REPORTED BY</th><th>REPORTED USER</th><th>TYPE</th><th>REASON</th><th>CONTENT</th><th>STATUS</th><th>ACTIONS</th></tr>
+                </thead>
+                <tbody>
+                  {reports.map(r => (
+                    <tr key={r.id}>
+                      <td style={{ fontSize: 11 }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || 'â€”'}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || 'â€”'}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
+                      </td>
+                      <td><span className="adm-tag">{r.content_type}</span></td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 160 }}>{r.reason}</td>
+                      <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 180 }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.content_preview || 'â€”'}
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                          color: r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : 'var(--text-muted)',
+                          border: `1px solid ${r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : '#333'}` }}>
+                          {r.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        {r.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {r.reported_user_id && (
+                              <>
+                                <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
+                                  onClick={() => {
+                                    const reason = prompt('Warning reason:');
+                                    if (reason) issueWarning(r.reported_user_id, r.reported?.full_name, reason);
+                                    resolveReport(r.id, 'reviewed', 'Warning issued');
+                                  }}>
+                                  <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                                </button>
+                                <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                  onClick={() => {
+                                    banUser(r.reported_user_id, r.reported?.full_name);
+                                    resolveReport(r.id, 'reviewed', 'User banned');
+                                  }}>
+                                  <i className="fa-solid fa-ban"></i> Ban
+                                </button>
+                              </>
+                            )}
+                            {r.content_id && (
+                              <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                onClick={() => {
+                                  deleteContent(r.content_type, r.content_id);
+                                  resolveReport(r.id, 'reviewed', 'Content deleted');
+                                }}>
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            )}
+                            <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }}
+                              onClick={() => resolveReport(r.id, 'dismissed', 'Dismissed by admin')}>
+                              Dismiss
+                            </button>
+                          </div>
+                        )}
+                        {r.status !== 'pending' && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || 'â€”'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            )}
+          </div>
+        )}
+        {/* â”€â”€ CONTENT MONITOR â”€â”€ */}
+        {section === 'moderation' && (() => {
+          const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
+          const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
+          const flaggedGlobal = globalMessages.filter(m => containsBadWord(m.content));
+          const allFlagged = [
+            ...flaggedMessages.map(m => ({ ...m, _type: 'circle_message', _circle: m.communities?.name })),
+            ...flaggedAnnouncements.map(a => ({ ...a, _type: 'announcement', _circle: a.communities?.name })),
+            ...flaggedGlobal.map(m => ({ ...m, _type: 'global_message', _circle: 'Global Feed' })),
+          ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Warning stats */}
+              <div className="adm-stats-row">
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(247,169,79,0.15)', color: 'var(--orange)' }}>
+                    <i className="fa-solid fa-triangle-exclamation"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--orange)' }}>{allFlagged.length}</div>
+                    <div className="adm-stat-lbl">Flagged Content</div>
+                  </div>
+                </div>
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(247,95,95,0.15)', color: 'var(--red)' }}>
+                    <i className="fa-solid fa-ban"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--red)' }}>
+                      {students.filter(s => s.is_banned).length}
+                    </div>
+                    <div className="adm-stat-lbl">Banned Users</div>
+                  </div>
+                </div>
+                <div className="adm-stat-card">
+                  <div className="adm-stat-icon" style={{ background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)' }}>
+                    <i className="fa-solid fa-flag"></i>
+                  </div>
+                  <div>
+                    <div className="adm-stat-val" style={{ color: 'var(--cyber-yellow)' }}>
+                      {reports.filter(r => r.status === 'pending').length}
+                    </div>
+                    <div className="adm-stat-lbl">Pending Reports</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flagged content */}
+              <div className="adm-card">
+                <div className="adm-card-head">
+                  <span><i className="fa-solid fa-robot" style={{ marginRight: 8, color: 'var(--orange)' }}></i>Auto-Detected Inappropriate Content</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{allFlagged.length} flagged</span>
+                </div>
+                {allFlagged.length === 0 ? (
+                  <div className="adm-empty">
+                    <i className="fa-solid fa-shield-halved" style={{ fontSize: 28, color: 'var(--green)', marginBottom: 10, display: 'block' }}></i>
+                    No inappropriate content detected.
+                  </div>
+                ) : (
+                  <table className="adm-table">
+                    <thead><tr><th>TYPE</th><th>CIRCLE</th><th>CONTENT</th><th>AUTHOR</th><th>DATE</th><th>ACTION</th></tr></thead>
+                    <tbody>
+                      {allFlagged.map((item, i) => {
+                        const content = item.content || item.title || '';
+                        const highlighted = content.replace(
+                          new RegExp(BAD_WORDS.join('|'), 'gi'),
+                          match => `[${match}]`
+                        );
+                        return (
+                          <tr key={i}>
+                            <td><span className="adm-tag" style={{ color: 'var(--orange)', borderColor: 'var(--orange)' }}>
+                              {item._type === 'global_message' ? 'Global' : item._type === 'announcement' ? 'Post' : 'Message'}
+                            </span></td>
+                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || 'â€”'}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-primary)', maxWidth: 280 }}>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {highlighted}
+                              </div>
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {item.full_name || item.author_name || 'â€”'}
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </td>
+                            <td>
+                              <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                onClick={() => deleteContent(
+                                  item._type === 'announcement' ? 'announcement' : 'message',
+                                  item.id
+                                )}>
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* User warnings history */}
+              <div className="adm-card">
+                <div className="adm-card-head">
+                  <span>Users with Warnings / Bans</span>
+                </div>
+                {(() => {
+                  const warnedUsers = students.filter(s => s.warning_count > 0 || s.is_banned);
+                  return warnedUsers.length === 0 ? (
+                    <div className="adm-empty">No warnings or bans issued yet.</div>
+                  ) : (
+                    <table className="adm-table">
+                      <thead><tr><th>CTU ID</th><th>NAME</th><th>WARNINGS</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                      <tbody>
+                        {warnedUsers.map(s => (
+                          <tr key={s.id}>
+                            <td><span className="adm-mono">{s.student_id}</span></td>
+                            <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
+                            <td>
+                              <span style={{ color: s.warning_count >= 3 ? 'var(--red)' : 'var(--orange)', fontWeight: 700 }}>
+                                {s.warning_count || 0} warning{s.warning_count !== 1 ? 's' : ''}
+                              </span>
+                            </td>
+                            <td>
+                              {s.is_banned
+                                ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
+                                : <span className="adm-status verified">ACTIVE</span>
+                              }
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {!s.is_banned && (
+                                  <>
+                                    <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
+                                      onClick={() => { const r = prompt('Warning reason:'); if (r) issueWarning(s.id, s.full_name, r); }}>
+                                      <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                                    </button>
+                                    <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                      onClick={() => banUser(s.id, s.full_name)}>
+                                      <i className="fa-solid fa-ban"></i> Ban
+                                    </button>
+                                  </>
+                                )}
+                                {s.is_banned && (
+                                  <button className="adm-btn approve" style={{ fontSize: 10 }}
+                                    onClick={() => unbanUser(s.id, s.full_name)}>
+                                    <i className="fa-solid fa-unlock"></i> Unban
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
   );
 }
+
+
+
+

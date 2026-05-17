@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS campus_events (
 CREATE INDEX IF NOT EXISTS idx_events_date ON campus_events(event_date);
 
 ALTER TABLE campus_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Anyone can read events" ON campus_events FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Verified users can post events" ON campus_events FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "Poster can delete own events" ON campus_events FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Anyone can read events" ON campus_events;
+CREATE POLICY "Anyone can read events" ON campus_events FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Verified users can post events" ON campus_events;
+CREATE POLICY "Verified users can post events" ON campus_events FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Poster can delete own events" ON campus_events;
+CREATE POLICY "Poster can delete own events" ON campus_events FOR DELETE USING (true);

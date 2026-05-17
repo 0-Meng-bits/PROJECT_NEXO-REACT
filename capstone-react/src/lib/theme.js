@@ -36,6 +36,30 @@ export const THEMES = [
     description: 'Warm retro palette with earthy tones',
     preview: ['#F5EFE0', '#B5706A', '#C4963A', '#4A7A8A'],
   },
+  {
+    id: 'rose-gold',
+    name: 'Rose Gold',
+    description: 'Elegant pink and gold tones',
+    preview: ['#1a0a0f', '#f43f5e', '#fbbf24'],
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    description: 'Deep sea blues and teals',
+    preview: ['#020c1b', '#06b6d4', '#0ea5e9'],
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    description: 'Warm orange and red gradients',
+    preview: ['#1a0a00', '#f97316', '#ef4444'],
+  },
+  {
+    id: 'monochrome',
+    name: 'Monochrome',
+    description: 'Clean black and white',
+    preview: ['#111111', '#ffffff', '#888888'],
+  },
 ];
 
 export function applyTheme(themeId) {

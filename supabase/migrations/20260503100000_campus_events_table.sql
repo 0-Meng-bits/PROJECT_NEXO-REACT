@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS campus_events (
 
 CREATE INDEX IF NOT EXISTS idx_campus_events_date ON campus_events(event_date);
 ALTER TABLE campus_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Anyone can read events" ON campus_events FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Admin and faculty can manage events" ON campus_events FOR ALL USING (true);
+DROP POLICY IF EXISTS "Anyone can read events" ON campus_events;
+CREATE POLICY "Anyone can read events" ON campus_events FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin and faculty can manage events" ON campus_events;
+CREATE POLICY "Admin and faculty can manage events" ON campus_events FOR ALL USING (true);
 
 -- ── PRE-SEED: CTU AY 2025-2026 ACADEMIC CALENDAR ─────────────────────────────
 
