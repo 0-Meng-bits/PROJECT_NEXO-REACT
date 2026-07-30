@@ -1,37 +1,29 @@
-import { supabase, supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  let resolvedUserId = req.query.userId || null;
+  const communityId = req.body.communityId || req.query.communityId;
+  if (!communityId) return res.status(400).json({ message: 'Missing communityId.' });
 
-  if (!resolvedUserId) {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (token) {
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-      if (!authError && user) resolvedUserId = user.id;
-    }
-  }
-  if (!resolvedUserId) {
-    resolvedUserId = req.headers['x-user-id'] || null;
-  }
-  if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
+  // Build the update object
+  const updates = {};
+  if (req.body.cover !== undefined)       updates.cover_url   = req.body.cover;
+  if (req.body.cover_url !== undefined)   updates.cover_url   = req.body.cover_url;
+  if (req.body.logo_url !== undefined)    updates.logo_url    = req.body.logo_url;
+  if (req.body.name !== undefined)        updates.name        = req.body.name;
+  if (req.body.description !== undefined) updates.description = req.body.description;
+  if (req.body.category !== undefined)    updates.category    = req.body.category;
 
-  const { cover, communityId } = req.body;
-  if (!cover || !communityId) return res.status(400).json({ message: 'Missing cover or communityId.' });
+  if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'Nothing to update.' });
 
-  // Confirm requester is the creator
-  const { data: comm, error: commErr } = await supabaseAdmin
-    .from('communities').select('creator_id').eq('id', communityId).single();
-  if (commErr || !comm) return res.status(404).json({ message: 'Circle not found.' });
-  if (comm.creator_id !== resolvedUserId) {
-    return res.status(403).json({ message: 'Only the circle creator can change the cover photo.' });
+  const { error } = await supabaseAdmin
+    .from('communities').update(updates).eq('id', communityId);
+
+  if (error) {
+    console.error('[upload-cover] DB error:', error);
+    return res.status(500).json({ message: 'Failed to save: ' + error.message });
   }
 
-  const { error: updateError } = await supabaseAdmin
-    .from('communities').update({ cover_url: cover }).eq('id', communityId);
-
-  if (updateError) return res.status(500).json({ message: 'Failed to save cover photo.' });
-
-  res.json({ url: cover });
+  res.json({ ok: true });
 }

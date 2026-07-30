@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 const SECTIONS = [
+  { key: 'circle_requests', label: 'Circle Requests',       icon: 'fa-solid fa-circle-nodes' },
   { key: 'analytics',     label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
   { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
   { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
@@ -117,6 +118,7 @@ export default function AdminDashboard() {
   const [allMessages, setAllMessages] = useState([]);
   const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [circleRequests, setCircleRequests] = useState([]);
 
   // â”€â”€ Analytics state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [preset, setPreset] = useState('week');
@@ -247,7 +249,41 @@ export default function AdminDashboard() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchData(); loadCampusEvents(); }, [fetchData]);
+  const fetchCircleRequests = useCallback(async () => {
+    try {
+      const res = await fetch('/api/circle-requests');
+      const data = await res.json();
+      setCircleRequests(Array.isArray(data) ? data : []);
+    } catch { setCircleRequests([]); }
+  }, []);
+
+  const approveCircleRequest = async (req) => {
+    try {
+      const res = await fetch('/api/circle-requests/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: req.id, adminId: admin?.id }),
+      });
+      if (!res.ok) { const d = await res.json(); showToast(d.message || 'Failed to approve.'); return; }
+    } catch { showToast('Network error.'); return; }
+    showToast(`Circle "${req.name}" approved.`);
+    fetchCircleRequests();
+    fetchData();
+  };
+
+  const rejectCircleRequest = async (req, note) => {
+    try {
+      await fetch('/api/circle-requests/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: req.id, adminId: admin?.id, note }),
+      });
+    } catch { showToast('Network error.'); return; }
+    showToast('Circle request rejected.');
+    fetchCircleRequests();
+  };
+
+  useEffect(() => { fetchData(); loadCampusEvents(); fetchCircleRequests(); }, [fetchData, fetchCircleRequests]);
 
   // Real-time: new reports appear instantly in admin panel
   useEffect(() => {
@@ -543,6 +579,9 @@ export default function AdminDashboard() {
             onClick={() => { setSection(s.key); setSelectedCircle(null); }}>
             <i className={s.icon}></i>
             <span>{s.label}</span>
+            {s.key === 'circle_requests' && circleRequests.filter(r => r.status === 'pending').length > 0 && (
+              <span className="adm-badge">{circleRequests.filter(r => r.status === 'pending').length}</span>
+            )}
             {s.key === 'verification' && pending.length > 0 && (
               <span className="adm-badge">{pending.length}</span>
             )}
@@ -595,13 +634,72 @@ export default function AdminDashboard() {
         </div>
 
         {/* â”€â”€ ANALYTICS â”€â”€ */}
+        {/* Circle Requests */}
+        {section === 'circle_requests' && (
+          <div>
+            <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+              {circleRequests.filter(r => r.status === 'pending').length} pending · {circleRequests.length} total
+            </div>
+            {circleRequests.length === 0 ? (
+              <div className="adm-empty">No circle requests yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {circleRequests.map(req => (
+                  <div key={req.id} className="adm-card" style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                      <i className={req.icon}></i>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{req.name}</span>
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, border: '1px solid', ...(
+                          req.status === 'pending'  ? { color: 'var(--cyber-yellow)', borderColor: 'rgba(252,238,10,0.3)',  background: 'rgba(252,238,10,0.08)' } :
+                          req.status === 'approved' ? { color: 'var(--green)',        borderColor: 'rgba(62,207,142,0.3)', background: 'rgba(62,207,142,0.08)' } :
+                                                      { color: 'var(--red)',          borderColor: 'rgba(247,95,95,0.3)',  background: 'rgba(247,95,95,0.08)' }
+                        )}}>
+                          {req.status.toUpperCase()}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{req.category}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0' }}>{req.description || 'No description'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        By <strong style={{ color: 'var(--text-primary)' }}>{req.profiles?.full_name || 'Unknown'}</strong>
+                        {req.profiles?.student_id && ` (${req.profiles.student_id})`}
+                        {' \u00b7 '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                      {req.status === 'rejected' && req.admin_note && (
+                        <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Reason: {req.admin_note}</div>
+                      )}
+                    </div>
+                    {req.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => approveCircleRequest(req)}
+                          style={{ background: 'rgba(62,207,142,0.1)', color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                          <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>Approve
+                        </button>
+                        <button onClick={() => {
+                          const note = prompt('Reason for rejecting (optional):');
+                          if (note !== null) rejectCircleRequest(req, note);
+                        }}
+                          style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid rgba(247,95,95,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                          <i className="fa-solid fa-xmark" style={{ marginRight: 4 }}></i>Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {section === 'analytics' && (
           <div>
             {/* Date range controls */}
             <div className="analytics-controls">
               <div className="analytics-presets">
                 {[
-                  { key: 'today', label: 'Today' },
+                  { key: 'today', label: 'Today' }, 
                   { key: 'week',  label: 'This Week' },
                   { key: 'month', label: 'This Month' },
                   { key: 'year',  label: 'This Year' },
@@ -1550,7 +1648,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-
-

@@ -1817,6 +1817,7 @@ body {
   flex-direction: column;
   padding: 24px 16px;
   flex-shrink: 0;
+  overflow-y: auto;
   -webkit-backdrop-filter: blur(15px);
   backdrop-filter: blur(15px);
 }
@@ -1933,6 +1934,25 @@ body {
   border: 1px solid rgba(0,240,255,0.08);
   border-radius: 12px;
   overflow: hidden;
+}
+
+/* Tables inside cards scroll horizontally on small screens */
+.adm-table-wrap {
+  overflow-x: auto;
+  border-radius: 0 0 12px 12px;
+}
+
+/* All tables inside adm-card are horizontally scrollable */
+.adm-card table,
+.adm-card .adm-table {
+  min-width: 600px;
+}
+
+.adm-card > table,
+.adm-card > .adm-table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
 }
 
 .adm-card-head {
@@ -3817,6 +3837,11 @@ body {
   background: rgba(247,95,95,0.08);
   border: 1px solid rgba(247,95,95,0.3);
   color: var(--red);
+}
+.id-result.unclear {
+  background: rgba(255,190,0,0.08);
+  border: 1px solid rgba(255,190,0,0.3);
+  color: var(--cyber-yellow, #ffc107);
 }
 .id-result-title {
   font-size: 15px;

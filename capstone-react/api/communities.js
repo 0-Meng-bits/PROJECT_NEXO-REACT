@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.json(data);
   }
 
-  // POST — create a community
+  // POST — submit a circle creation request (requires admin approval)
   if (req.method === 'POST') {
     let resolvedUserId = null;
 
@@ -34,13 +34,13 @@ export default async function handler(req, res) {
     if (!name?.trim()) return res.status(400).json({ message: 'Circle name is required.' });
 
     const { data, error } = await supabaseAdmin
-      .from('communities')
-      .insert([{ name: name.trim(), description: description?.trim() || '', category, icon, creator_id: resolvedUserId, is_official: false }])
+      .from('circle_requests')
+      .insert([{ name: name.trim(), description: description?.trim() || '', category, icon, creator_id: resolvedUserId, status: 'pending' }])
       .select()
       .single();
 
     if (error) return res.status(400).json({ message: error.message });
-    return res.json({ community: data });
+    return res.json({ request: data, pending: true });
   }
 
   res.status(405).end();

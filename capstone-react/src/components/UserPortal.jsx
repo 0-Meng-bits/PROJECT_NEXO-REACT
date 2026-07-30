@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
@@ -77,7 +77,7 @@ const POST_TYPE = {
   poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
 };
 
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
@@ -207,8 +207,16 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
         </div>
       )}
       <div className="announcement-header">
-        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`}>
-          {isAnon ? <i className="fa-solid fa-user-secret"></i> : avatarChar}
+        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`} style={{ overflow: 'hidden', padding: 0 }}>
+          {isAnon
+            ? <i className="fa-solid fa-user-secret"></i>
+            : (() => {
+                const url = avatarCache?.[a.author_student_id] || avatarCache?.[String(a.author_student_id)];
+                return url
+                  ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  : avatarChar;
+              })()
+          }
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -422,8 +430,30 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport 
   );
 }
 
+// ── CHAT TIME SEPARATOR ───────────────────────────────────────────────────────
+function ChatTimeSeparator({ date }) {
+  const now = new Date();
+  const d = new Date(date);
+  const diffDays = Math.floor((now - d) / 86400000);
+  let label;
+  if (diffDays === 0) {
+    label = 'Today ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffDays === 1) {
+    label = 'Yesterday ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffDays < 7) {
+    label = d.toLocaleDateString([], { weekday: 'long' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
+    label = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: diffDays > 365 ? 'numeric' : undefined });
+  }
+  return (
+    <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
+      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: 1 }}>{label}</span>
+    </div>
+  );
+}
+
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -483,7 +513,8 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
       {!isOwnerMsg && (
-        <div className="chat-avatar" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
+        <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+          style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
           {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
         </div>
       )}
@@ -494,7 +525,12 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
       >
         {!isOwnerMsg && (
           <div className="chat-meta">
-            <span className="chat-name">{m.full_name}</span>
+            <span className="chat-name" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+              style={{ cursor: onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
+              onMouseEnter={e => { if (onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
+              onMouseLeave={e => { e.target.style.color = ''; }}>
+              {m.full_name}
+            </span>
             {m.role && <span className="chat-role">{m.role}</span>}
             <span className="chat-time">{time}</span>
           </div>
@@ -653,11 +689,12 @@ function CreateModal({ onClose, onCreated, userId }) {
         body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon }),
       });
       const data = await res.json();
-      if (!res.ok) { alert(data.message || 'Failed to create circle.'); setLoading(false); return; }
-      onCreated(data.community);
+      if (!res.ok) { alert(data.message || 'Failed to submit request.'); setLoading(false); return; }
+      // Request submitted for approval
+      alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
       onClose();
     } catch {
-      alert('Network error — could not create circle.');
+      alert('Network error — could not submit request.');
     }
     setLoading(false);
   };
@@ -707,7 +744,7 @@ function CreateModal({ onClose, onCreated, userId }) {
         </div>
         <div className="modal-actions">
           <button className="cyber-btn" onClick={submit} disabled={loading} style={{ flex: 1 }}>
-            {loading ? 'CREATING...' : 'CREATE CIRCLE'}
+            {loading ? 'SUBMITTING...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />SUBMIT FOR APPROVAL</>}
           </button>
           <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
         </div>
@@ -801,9 +838,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState(viewerIsOwner ? 'settings' : 'members');
   const [inviteSearch, setInviteSearch] = useState('');
-  const [inviteResult, setInviteResult] = useState(null); // { id, full_name, student_id }
+  const [inviteResult, setInviteResult] = useState(null);
   const [inviteSearching, setInviteSearching] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(comm.logo_url || null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoMode, setLogoMode] = useState(comm.logo_url ? 'photo' : 'icon'); // 'icon' | 'photo'
+  const logoInputRef = useRef(null);
 
   const fetchMembers = useCallback(async () => {
     setLoadingMembers(true);
@@ -831,13 +872,63 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
   const saveSettings = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
-    const { error } = await supabase.from('communities')
-      .update({ name: form.name.trim(), description: form.description.trim(), category: form.category })
-      .eq('id', comm.id);
+    const updates = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      category: form.category,
+      logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
+    };
+    // Use service-role API to bypass RLS
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`/api/upload-cover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ ...updates, communityId: comm.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('Failed to save: ' + (err.message || res.status));
+        setSaving(false);
+        return;
+      }
+      onSaved({ ...comm, ...updates });
+      onClose();
+    } catch (err) {
+      alert('Failed to save: ' + err.message);
+    }
     setSaving(false);
-    if (error) { alert('Failed to save.'); return; }
-    onSaved({ ...comm, ...form });
-    onClose();
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const SIZE = 200;
+          const canvas = document.createElement('canvas');
+          canvas.width = SIZE; canvas.height = SIZE;
+          const ctx = canvas.getContext('2d');
+          const scale = Math.max(SIZE / img.width, SIZE / img.height);
+          const sw = img.width * scale, sh = img.height * scale;
+          ctx.drawImage(img, (SIZE - sw) / 2, (SIZE - sh) / 2, sw, sh);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+      setLogoUrl(compressed);
+      setLogoMode('photo');
+    } catch (err) { console.error(err); }
+    finally { setLogoUploading(false); }
   };
 
   const approveRequest = async (memberId) => {
@@ -999,6 +1090,43 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 
         {tab === 'settings' && (
           <div className="manage-tab-content">
+            {/* CIRCLE LOGO */}
+            <div className="input-group">
+              <label>CIRCLE LOGO</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <button type="button" onClick={() => setLogoMode('icon')}
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'icon' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'icon' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
+                  <i className="fa-solid fa-icons" style={{ marginRight: 6 }} />ICON
+                </button>
+                <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
+                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 6 }} />}PHOTO
+                </button>
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+              </div>
+              {/* Preview */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: 8, border: '1px solid #222' }}>
+                <div style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {logoMode === 'photo' && logoUrl
+                    ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{form.name || comm.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {logoMode === 'photo' && logoUrl ? 'Custom photo set' : 'Using category icon'}
+                  </div>
+                </div>
+                {logoMode === 'photo' && logoUrl && (
+                  <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
+                    title="Remove photo">
+                    <i className="fa-solid fa-xmark" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="input-group">
               <label>CIRCLE NAME</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
@@ -1193,21 +1321,22 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 
 // ── PROFILE MODAL ─────────────────────────────────────────────────────────────
 const INTEREST_LABELS = {
-  art: '?? Art', coding: '?? Coding', design: '?? Design', gaming: '?? Gaming',
-  music: '?? Music', sports: '? Sports', research: '?? Research',
-  photography: '?? Photography', writing: '? Writing', travel: '? Travel',
-  debate: '?? Debate', language: '?? Language Learning', anime: '?? Anime',
-  bxgl: '?????? Watching BL/GL',
+  art: 'Art', coding: 'Coding', design: 'Design', gaming: 'Gaming',
+  music: 'Music', sports: 'Sports', research: 'Research',
+  photography: 'Photography', writing: 'Writing', travel: 'Travel',
+  debate: 'Debate', language: 'Language Learning', anime: 'Anime',
+  bxgl: 'Watching BL/GL',
 };
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
 const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
 
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
   const fileInputRef = useRef(null);
+  const coverInputRef = useRef(null);
   const idPhotoRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [idUploading, setIdUploading] = useState(false);
@@ -1215,17 +1344,20 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
   const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
+  const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
+  const [coverUploading, setCoverUploading] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
     const load = async () => {
       const { data, error } = await supabase.from('profiles')
-        .select('course, year_level, interests, avatar_url, id_photo_url')
+        .select('course, year_level, interests, avatar_url, id_photo_url, cover_url')
         .eq('id', user.id).single();
       if (!error && data) {
         setProfile({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
         setEditForm({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
         if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
+        if (data.cover_url) setCoverUrl(data.cover_url);
         if (data.id_photo_url) setIdUploaded(true);
       }
     };
@@ -1256,20 +1388,48 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     setIdUploading(true);
     try {
       const reader = new FileReader();
-      const dataUrl = await new Promise(r => { reader.onload = e => r(e.target.result); reader.readAsDataURL(file); });
+      const dataUrl = await new Promise(r => { reader.onload = ev => r(ev.target.result); reader.readAsDataURL(file); });
       const { error } = await supabase.from('profiles').update({ id_photo_url: dataUrl }).eq('id', user.id);
-      if (!error) { setIdUploaded(true); }
+      if (!error) setIdUploaded(true);
     } catch (err) { console.error(err); }
     finally { setIdUploading(false); }
+  };
+
+  const handleCoverChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setCoverUploading(true);
+    try {
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const W = 900, H = 300;
+          const canvas = document.createElement('canvas');
+          canvas.width = W; canvas.height = H;
+          const ctx = canvas.getContext('2d');
+          const scale = Math.max(W / img.width, H / img.height);
+          const sw = img.width * scale, sh = img.height * scale;
+          ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+      setCoverUrl(compressed);
+      await supabase.from('profiles').update({ cover_url: compressed }).eq('id', user.id);
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      localStorage.setItem('currentUser', JSON.stringify({ ...stored, cover_url: compressed }));
+    } catch (err) { console.error(err); }
+    finally { setCoverUploading(false); }
   };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-
     try {
-      // Resize + compress to ≤200px JPEG before uploading
       const compressed = await new Promise((resolve, reject) => {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
@@ -1277,208 +1437,245 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           URL.revokeObjectURL(objectUrl);
           const MAX = 200;
           const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
+          canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.82));
         };
         img.onerror = reject;
         img.src = objectUrl;
       });
-
-      // Show preview immediately
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
-
       const res = await fetch(`/api/upload-avatar?userId=${user.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatar: compressed }),
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('Avatar upload failed:', err);
-        // Save to localStorage as fallback so it survives the session
-        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (res.ok) {
+        const { url } = await res.json();
+        localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
+      } else {
         localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: compressed }));
-        return;
       }
-
-      const { url } = await res.json();
-      // Saved to DB "� update localStorage with the persisted value
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
-    } catch (err) {
-      console.error('Avatar upload error:', err);
-      // Save locally as last resort
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: stored.avatar_url || null }));
-    } finally {
-      setUploading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setUploading(false); }
   };
+
+  const coverGradients = [
+    'linear-gradient(135deg,#0d3b6e 0%,#00f0ff 100%)',
+    'linear-gradient(135deg,#1a003a 0%,#c084fc 100%)',
+    'linear-gradient(135deg,#003a1a 0%,#3ecf8e 100%)',
+    'linear-gradient(135deg,#3a1a00 0%,#f97316 100%)',
+    'linear-gradient(135deg,#1a0a0f 0%,#f43f5e 100%)',
+  ];
+  const gradIdx = (user.student_id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % coverGradients.length;
+  const coverBg = coverUrl ? `url(${coverUrl}) center/cover no-repeat` : coverGradients[gradIdx];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
-        {/* Avatar with edit button */}
-        <div style={{ position: 'relative', width: 90, height: 90, margin: '0 auto 15px' }}>
-          <div style={{
-            width: 90, height: 90,
-            border: '2px solid var(--cyber-cyan)',
-            borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32, fontWeight: 'bold',
-            color: 'var(--cyber-cyan)',
-            overflow: 'hidden',
-            background: 'rgba(0,240,255,0.05)',
-          }}>
-            {avatarUrl
-              ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : initials
-            }
-          </div>
-          {/* Camera edit button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            title="Change profile picture"
-            style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'var(--cyber-cyan)', color: '#000',
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            {uploading
-              ? <i className="fa-solid fa-spinner fa-spin" />
-              : <i className="fa-solid fa-camera" />
-            }
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleAvatarChange}
-          />
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--card-bg)',
+        border: '1px solid rgba(0,240,255,0.15)',
+        borderRadius: 16, width: '100%', maxWidth: 680,
+        maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,240,255,0.2) transparent',
+      }}>
+
+        {/* COVER */}
+        <div style={{ position: 'relative', height: 180, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
+          {!readOnly && (
+            <>
+              <button onClick={() => coverInputRef.current?.click()} disabled={coverUploading} title="Change cover"
+                style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(6px)' }}>
+                {coverUploading ? <><i className="fa-solid fa-spinner fa-spin" /> UPLOADING</> : <><i className="fa-solid fa-image" /> COVER</>}
+              </button>
+              <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCoverChange} />
+            </>
+          )}
         </div>
 
-        <h2 style={{ fontSize: 18, marginBottom: 8 }}>{user.full_name?.toUpperCase()}</h2>
-        {user.is_verified ? (
-          <div className="verified-badge" style={{ margin: '0 auto 20px' }}>
-            <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user.user_type || 'Student'} ✓
+        {/* AVATAR + NAME ROW */}
+        <div style={{ position: 'relative', padding: '0 28px', marginTop: -52 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div style={{ width: 96, height: 96, border: '4px solid var(--card-bg)', borderRadius: '50%', background: 'rgba(0,240,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 800, color: 'var(--cyber-cyan)', boxShadow: '0 0 20px rgba(0,240,255,0.25)' }}>
+                {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+              </div>
+              {!readOnly && (
+                <>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change photo"
+                    style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: '50%', background: 'var(--cyber-cyan)', color: '#000', border: '2px solid var(--card-bg)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {uploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-camera" />}
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+                </>
+              )}
+            </div>
+
+            <div style={{ paddingBottom: 8, flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 1, lineHeight: 1.2, textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
+                {user.full_name?.toUpperCase()}
+              </div>
+              <div style={{ marginTop: 6 }}>
+                {user.is_verified
+                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'} ✓</span>
+                  : <span className="verified-badge" style={{ fontSize: 11, borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending Verification</span>
+                }
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0 }}>
+              {!readOnly && (!editing
+                ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '7px 14px' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
+                : <>
+                    <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ fontSize: 11, padding: '7px 14px' }}>CANCEL</button>
+                    <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ fontSize: 11, padding: '7px 14px' }}>
+                      {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />SAVING</> : 'SAVE'}
+                    </button>
+                  </>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="verified-badge" style={{ margin: '0 auto 20px', borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
-            <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i> Pending Verification
-          </div>
-        )}
-        <div className="stats-card" style={{ textAlign: 'left', marginBottom: 20 }}>
-          <div className="stat-line"><span>STUDENT ID</span><span className="stat-val" style={{ color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</span></div>
-          <div className="stat-line"><span>ACTIVE CIRCLES</span><span className="stat-val">{communities.length}</span></div>
-          {profile.course && <div className="stat-line"><span>COURSE</span><span className="stat-val">{profile.course}</span></div>}
-          {profile.year_level && <div className="stat-line"><span>YEAR</span><span className="stat-val">{profile.year_level}</span></div>}
         </div>
 
-        {!editing && profile.interests?.length > 0 && (
-          <div style={{ textAlign: 'left', marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 8, fontWeight: 700 }}>INTERESTS</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {profile.interests.map(id => (
-                <span key={id} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
-                  {INTEREST_LABELS[id] || id}
-                </span>
+        {/* BODY */}
+        <div style={{ padding: '20px 28px 28px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20 }}>
+
+          {/* LEFT */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { label: 'STUDENT ID', value: user.student_id, mono: true, accent: 'var(--cyber-yellow)' },
+                { label: 'CIRCLES', value: communities.length, accent: 'var(--cyber-cyan)' },
+                profile.course && { label: 'COURSE', value: profile.course },
+                profile.year_level && { label: 'YEAR', value: profile.year_level },
+              ].filter(Boolean).map((item, i) => (
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,240,255,0.1)', borderRadius: 10, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: item.accent || 'var(--cyber-cyan)', fontFamily: item.mono ? 'monospace' : 'inherit' }}>{item.value}</div>
+                </div>
               ))}
             </div>
-          </div>
-        )}
 
-        {editing && (
-          <div style={{ textAlign: 'left', marginBottom: 16 }}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 6 }}>COURSE</label>
-              <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, color: 'white', padding: '8px 10px', fontSize: 13 }}>
-                <option value="">Select course</option>
-                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 6 }}>YEAR LEVEL</label>
-              <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, color: 'white', padding: '8px 10px', fontSize: 13 }}>
-                <option value="">Select year</option>
-                {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 8 }}>INTERESTS</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {INTEREST_BUBBLES.map(({ id, label }) => (
-                  <span key={id} onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                      background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
-                      border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                      color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!user.is_verified && (
-          <div style={{ textAlign: 'left', marginBottom: 16, padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
-              <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
-            </div>
-            {idUploaded && (
-              <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 10 }}>
-                <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID photo submitted � awaiting admin review
+            {!editing && profile.interests?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                  {profile.interests.map(id => (
+                    <span key={id} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                      {INTEREST_LABELS[id] || id}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-              {idUploaded ? 'Want to send a clearer photo? Upload a new one below.' : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
-            </p>
-            <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()} disabled={idUploading}
-              style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)' }}>
-              {idUploading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</>
-                : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>}
-            </button>
-            <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
-          </div>
-        )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {!editing
-            ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ width: '100%' }}><i className="fa-solid fa-pen" style={{ marginRight: 6 }} />EDIT PROFILE</button>
-            : <div style={{ display: 'flex', gap: 8 }}>
-                <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ flex: 1 }}>CANCEL</button>
-                <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ flex: 1 }}>
-                  {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />SAVING...</> : 'SAVE'}
-                </button>
+            {!readOnly && editing && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>EDIT PROFILE</div>
+                <div>
+                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>COURSE</label>
+                  <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}>
+                    <option value="">Select course</option>
+                    {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>YEAR LEVEL</label>
+                  <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}>
+                    <option value="">Select year</option>
+                    {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 8 }}>INTERESTS</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {INTEREST_BUBBLES.map(({ id, label }) => (
+                      <span key={id}
+                        onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
+                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                          background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
+                          color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-          }
-          <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%' }}>TERMINATE SESSION</button>
-          <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>CLOSE</button>
+            )}
+
+            {!readOnly && !user.is_verified && (
+              <div style={{ padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
+                <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+                  <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
+                </div>
+                {idUploaded && (
+                  <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted — awaiting admin review
+                  </div>
+                )}
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                  {idUploaded ? 'Want to send a clearer photo? Upload a new one below.' : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
+                </p>
+                <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()} disabled={idUploading}
+                  style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)', fontSize: 11 }}>
+                  {idUploading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</> : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>}
+                </button>
+                <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(252,238,10,0.15)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--cyber-yellow)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>STATS</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--cyber-cyan)', lineHeight: 1 }}>{communities.length}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginTop: 4 }}>CIRCLES JOINED</div>
+            </div>
+
+            {communities.length > 0 && (
+              <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(0,240,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {communities.slice(0, 6).map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--cyber-cyan)', overflow: 'hidden' }}>
+                        {c.logo_url
+                          ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                          : <i className={c.faIcon || c.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 12 }} />
+                        }
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                    </div>
+                  ))}
+                  {communities.length > 6 && <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 4 }}>+{communities.length - 6} more</div>}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+              {!readOnly && (
+                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11 }}>
+                  <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
+                </button>
+              )}
+              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11 }}>CLOSE</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── AUDITION DETAIL MODAL (applicant view) ───────────────────────────────────
 function AuditionDetailModal({ data, onClose }) {
   const { response: r, community: c, questions } = data;
   const statusColor = auditionStatusColor(r.status, r.phase2_result);
@@ -1694,6 +1891,26 @@ export default function UserPortal() {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
   const [showReport, setShowReport] = useState(null); // { type, id, preview, reportedUserId }
+  const [viewingProfile, setViewingProfile] = useState(null); // fetched profile object for viewing
+
+  const viewUserProfile = useCallback(async (studentId) => {
+    if (!studentId) return;
+    const { data, error } = await supabase.from('profiles')
+      .select('id, full_name, student_id, user_type, is_verified, course, year_level, interests, avatar_url, cover_url')
+      .eq('student_id', String(studentId)).single();
+    if (!error && data) {
+      // fetch their active circle memberships
+      const { data: memberships } = await supabase
+        .from('memberships')
+        .select('community_id, communities(id, name, icon, faIcon, cover_url)')
+        .eq('user_id', data.id)
+        .eq('status', 'active');
+      const circles = (memberships || []).map(m => m.communities).filter(Boolean);
+      setViewingProfile({ ...data, _circles: circles });
+    } else {
+      console.error('viewUserProfile error:', error, 'studentId:', studentId);
+    }
+  }, []);
   const [sendError, setSendError] = useState(''); // inline error for bad word block
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -1762,6 +1979,15 @@ export default function UserPortal() {
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false });
     setAnnouncements(data || []);
+    const authorIds = [...new Set((data || []).map(a => a.author_student_id).filter(Boolean))];
+    if (authorIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', authorIds);
+      if (profiles) {
+        const map = {};
+        profiles.forEach(p => { map[p.student_id] = p.avatar_url || null; });
+        setAvatarCache(prev => ({ ...prev, ...map }));
+      }
+    }
   }, []);
 
   const loadCircleAnnouncements = useCallback(async (commId) => {
@@ -1787,6 +2013,7 @@ export default function UserPortal() {
     const pollOptions = type === 'poll' ? newPost.pollOptions.filter(o => o.trim()) : null;
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
+      author_student_id: user.student_id,
       author_name: newPost.anonymous ? 'Anonymous' : user.full_name,
       author_type: newPost.anonymous ? 'Anonymous' : user.user_type,
       title: newPost.title.trim(),
@@ -1826,6 +2053,7 @@ export default function UserPortal() {
       ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
+      author_student_id: user.student_id,
       author_name: user.full_name,
       author_type: user.user_type,
       title: newCirclePost.title.trim(),
@@ -1912,24 +2140,6 @@ export default function UserPortal() {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
   };
 
-  const loadMessages = useCallback(async (commId, channelId) => {
-    if (commId === 'global') {
-      const { data } = await supabase.from('messages').select('*')
-        .is('community_id', null).order('created_at', { ascending: true });
-      setMessages(data || []);
-    } else if (channelId) {
-      const { data } = await supabase.from('messages').select('*')
-        .eq('channel_id', channelId).order('created_at', { ascending: true });
-      setMessages(data || []);
-    } else if (commId) {
-      const { data } = await supabase.from('messages').select('*')
-        .eq('community_id', commId)
-        .order('created_at', { ascending: true });
-      setMessages(data || []);
-    } else {
-      setMessages([]);
-    }
-  }, []);
   const fetchAvatarsForMessages = useCallback(async (msgs) => {
     const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id))];
     if (uncached.length === 0) return;
@@ -1941,6 +2151,28 @@ export default function UserPortal() {
     }
   }, []);
 
+  const loadMessages = useCallback(async (commId, channelId) => {
+    if (commId === 'global') {
+      const { data } = await supabase.from('messages').select('*')
+        .is('community_id', null).order('created_at', { ascending: true });
+      setMessages(data || []);
+      fetchAvatarsForMessages(data || []);
+    } else if (channelId) {
+      const { data } = await supabase.from('messages').select('*')
+        .eq('channel_id', channelId).order('created_at', { ascending: true });
+      setMessages(data || []);
+      fetchAvatarsForMessages(data || []);
+    } else if (commId) {
+      const { data } = await supabase.from('messages').select('*')
+        .eq('community_id', commId)
+        .order('created_at', { ascending: true });
+      setMessages(data || []);
+      fetchAvatarsForMessages(data || []);
+    } else {
+      setMessages([]);
+    }
+  }, [fetchAvatarsForMessages]);
+
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
     const { data } = await supabase.from('messages').select('*')
@@ -1948,7 +2180,8 @@ export default function UserPortal() {
       .is('channel_id', null)
       .order('created_at', { ascending: true });
     setCircleChatMessages(data || []);
-  }, []);
+    fetchAvatarsForMessages(data || []);
+  }, [fetchAvatarsForMessages]);
 
   // Initial load + realtime subscription — re-runs when channel/community changes
   useEffect(() => {
@@ -1972,6 +2205,7 @@ export default function UserPortal() {
           if (isGlobal || isChannel || isCommunityNoChannel) {
             setMessages(prev => {
               if (prev.find(m => m.id === msg.id)) return prev;
+              fetchAvatarsForMessages([msg]);
               return [...prev, msg];
             });
           }
@@ -2070,6 +2304,7 @@ export default function UserPortal() {
           if (!msg.channel_id) {
             setCircleChatMessages(prev => {
               if (prev.find(m => m.id === msg.id)) return prev;
+              fetchAvatarsForMessages([msg]);
               return [...prev, msg];
             });
           }
@@ -2424,7 +2659,12 @@ export default function UserPortal() {
                 setActiveChannelId(null);
                 setSection(c.id === 'global' ? 'home' : 'circles');
               }}>
-              <i className={c.id === 'global' ? 'fa-solid fa-earth-asia' : (c.icon || (c.icon || getCategoryIcon(c.category)))}></i>
+              {c.id === 'global'
+                ? <i className="fa-solid fa-earth-asia"></i>
+                : c.logo_url
+                  ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
+                  : <i className={c.icon || getCategoryIcon(c.category)}></i>
+              }
             </div>
           ))}
           {user?.is_verified && (
@@ -2804,6 +3044,7 @@ export default function UserPortal() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {filtered.map(a => (
                       <AnnouncementCard key={a.id} a={a} user={user}
+                        avatarCache={avatarCache}
                         onPin={togglePin}
                         onDelete={deleteAnnouncement}
                         onVote={handleVote}
@@ -2907,19 +3148,25 @@ export default function UserPortal() {
                   </p>
                 </div>
 
-                {messages.map(m => {
+                {messages.map((m, idx) => {
                   const isOwnerMsg = m.student_id === user?.student_id;
+                  const prev = messages[idx - 1];
+                  const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                   return (
-                    <MessageItem key={m.id} m={m}
-                      tagColor="var(--cyber-cyan)"
-                      isOwnerMsg={isOwnerMsg}
-                      canDelete={isOwnerMsg || user?.user_type === 'Admin'}
-                      onDelete={deleteMessage}
-                      onEdit={editMessage}
-                      onReport={(data) => setShowReport(data)}
-                      currentStudentId={user?.student_id}
-                      avatarUrl={avatarCache[m.student_id] || null}
-                    />
+                    <React.Fragment key={m.id}>
+                      {showSep && <ChatTimeSeparator date={m.created_at} />}
+                      <MessageItem m={m}
+                        tagColor="var(--cyber-cyan)"
+                        isOwnerMsg={isOwnerMsg}
+                        canDelete={isOwnerMsg || user?.user_type === 'Admin'}
+                        onDelete={deleteMessage}
+                        onEdit={editMessage}
+                        onReport={(data) => setShowReport(data)}
+                        currentStudentId={user?.student_id}
+                        avatarUrl={avatarCache[m.student_id] || null}
+                        onViewProfile={viewUserProfile}
+                      />
+                    </React.Fragment>
                   );
                 })}
                 <div ref={feedBottomRef} />
@@ -3118,7 +3365,10 @@ export default function UserPortal() {
                   )}
                   <div className="circle-cover-overlay">
                     <div className="circle-cover-icon">
-                      <i className={activeComm.icon || getCategoryIcon(activeComm.category)}></i>
+                      {activeComm.logo_url
+                        ? <img src={activeComm.logo_url} alt={activeComm.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        : <i className={activeComm.icon || getCategoryIcon(activeComm.category)}></i>
+                      }
                     </div>
                     <div>
                       <h2 className="circle-cover-title">
@@ -3258,6 +3508,7 @@ export default function UserPortal() {
                     ) : (
                       circleAnnouncements.map(a => (
                         <AnnouncementCard key={a.id} a={a} user={user}
+                          avatarCache={avatarCache}
                           onPin={togglePin}
                           onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
                           onVote={handleCircleVote}
@@ -3267,22 +3518,27 @@ export default function UserPortal() {
                     )}
                   </div>
                 ) : (
-                  messages.map(m => {
+                  messages.map((m, idx) => {
                     const isOwnerMsg = m.student_id === user?.student_id;
                     const canDelete = isOwnerMsg || canModerate;
+                    const prev = messages[idx - 1];
+                    const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     return (
-                      <MessageItem
-                        key={m.id}
-                        m={m}
-                        tagColor={tagColor}
-                        isOwnerMsg={isOwnerMsg}
-                        canDelete={canDelete}
-                        onDelete={deleteMessage}
-                        onEdit={editMessage}
-                        onReport={(data) => setShowReport(data)}
-                        currentStudentId={user?.student_id}
-                        avatarUrl={avatarCache[m.student_id] || null}
-                      />
+                      <React.Fragment key={m.id}>
+                        {showSep && <ChatTimeSeparator date={m.created_at} />}
+                        <MessageItem
+                          m={m}
+                          tagColor={tagColor}
+                          isOwnerMsg={isOwnerMsg}
+                          canDelete={canDelete}
+                          onDelete={deleteMessage}
+                          onEdit={editMessage}
+                          onReport={(data) => setShowReport(data)}
+                          currentStudentId={user?.student_id}
+                          avatarUrl={avatarCache[m.student_id] || null}
+                          onViewProfile={viewUserProfile}
+                        />
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -3322,28 +3578,33 @@ export default function UserPortal() {
                     <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
                   </div>
                 ) : (
-                  circleChatMessages.map(m => {
+                  circleChatMessages.map((m, idx) => {
                     const isOwnerMsg = m.student_id === user?.student_id;
                     const canDelete = isOwnerMsg || canModerate;
+                    const prev = circleChatMessages[idx - 1];
+                    const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     return (
-                      <MessageItem
-                        key={m.id}
-                        m={m}
-                        tagColor={tagColor}
-                        isOwnerMsg={isOwnerMsg}
-                        canDelete={canDelete}
-                        onDelete={async (id) => {
-                          if (!confirm('Delete this message?')) return;
-                          await supabase.from('messages').delete().eq('id', id);
-                          setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
-                        }}
-                        onEdit={async (id, content) => {
-                          await supabase.from('messages').update({ content, edited: true }).eq('id', id);
-                          setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
-                        }}
-                        currentStudentId={user?.student_id}
-                        avatarUrl={avatarCache[m.student_id] || null}
-                      />
+                      <React.Fragment key={m.id}>
+                        {showSep && <ChatTimeSeparator date={m.created_at} />}
+                        <MessageItem
+                          m={m}
+                          tagColor={tagColor}
+                          isOwnerMsg={isOwnerMsg}
+                          canDelete={canDelete}
+                          onDelete={async (id) => {
+                            if (!confirm('Delete this message?')) return;
+                            await supabase.from('messages').delete().eq('id', id);
+                            setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
+                          }}
+                          onEdit={async (id, content) => {
+                            await supabase.from('messages').update({ content, edited: true }).eq('id', id);
+                            setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
+                          }}
+                          currentStudentId={user?.student_id}
+                          avatarUrl={avatarCache[m.student_id] || null}
+                          onViewProfile={viewUserProfile}
+                        />
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -3376,6 +3637,17 @@ export default function UserPortal() {
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
       {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {viewingProfile && (
+        <ProfileModal
+          user={viewingProfile}
+          communities={viewingProfile._circles || []}
+          onClose={() => setViewingProfile(null)}
+          onLogout={() => {}}
+          onAvatarUpdate={() => {}}
+          currentAvatarUrl={viewingProfile.avatar_url}
+          readOnly
+        />
+      )}
       {showAuditionForm && (
         <AuditionApplicationForm
           comm={showAuditionForm.comm}
@@ -3405,9 +3677,3 @@ export default function UserPortal() {
     </div>
   );
 }
-
-
-
-
-
-

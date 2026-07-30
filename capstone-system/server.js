@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const port = 3000;
@@ -260,6 +261,86 @@ app.post('/api/admin-data', async (req, res) => {
   }
 });
 
+// ── CIRCLE REQUESTS (admin) ───────────────────────────────────────────────────
+app.get('/api/circle-requests', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('circle_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[CIRCLE-REQUESTS GET]', error.message);
+      return res.status(500).json({ message: error.message });
+    }
+    // Enrich with creator profile info
+    const creatorIds = [...new Set((data || []).map(r => r.creator_id).filter(Boolean))];
+    let profileMap = {};
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from('profiles').select('id, full_name, student_id').in('id', creatorIds);
+      (profiles || []).forEach(p => { profileMap[p.id] = p; });
+    }
+    const enriched = (data || []).map(r => ({ ...r, profiles: profileMap[r.creator_id] || null }));
+    res.json(enriched);
+  } catch (err) {
+    console.error('[CIRCLE-REQUESTS GET] Unexpected:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/circle-requests/approve', async (req, res) => {
+  const { requestId, adminId } = req.body;
+  if (!requestId) return res.status(400).json({ message: 'Missing requestId.' });
+
+  // Fetch the request
+  const { data: cr, error: crErr } = await supabaseAdmin
+    .from('circle_requests').select('*').eq('id', requestId).single();
+  if (crErr || !cr) return res.status(404).json({ message: 'Request not found.' });
+
+  // Create the actual community
+  const { data: comm, error: commErr } = await supabaseAdmin
+    .from('communities')
+    .insert([{ name: cr.name, description: cr.description, category: cr.category, icon: cr.icon, creator_id: cr.creator_id, is_official: false }])
+    .select().single();
+  if (commErr) return res.status(500).json({ message: commErr.message });
+
+  // Auto-add creator as active member (leader)
+  await supabaseAdmin.from('memberships').insert([{ community_id: comm.id, user_id: cr.creator_id, rank_level: 3, status: 'active' }]);
+
+  // Mark approved
+  await supabaseAdmin.from('circle_requests').update({
+    status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: adminId || null,
+  }).eq('id', requestId);
+
+  // Notify creator
+  await supabaseAdmin.from('notifications').insert([{
+    user_id: cr.creator_id, type: 'join_approved',
+    message: `Your circle "${cr.name}" has been approved! You can now find it in your circles.`,
+    link_comm_id: comm.id,
+  }]);
+
+  res.json({ ok: true, community: comm });
+});
+
+app.post('/api/circle-requests/reject', async (req, res) => {
+  const { requestId, adminId, note } = req.body;
+  if (!requestId) return res.status(400).json({ message: 'Missing requestId.' });
+
+  const { data: cr } = await supabaseAdmin.from('circle_requests').select('*').eq('id', requestId).single();
+  if (!cr) return res.status(404).json({ message: 'Request not found.' });
+
+  await supabaseAdmin.from('circle_requests').update({
+    status: 'rejected', admin_note: note || '', reviewed_at: new Date().toISOString(), reviewed_by: adminId || null,
+  }).eq('id', requestId);
+
+  await supabaseAdmin.from('notifications').insert([{
+    user_id: cr.creator_id, type: 'join_denied',
+    message: `Your circle request "${cr.name}" was not approved.${note ? ` Reason: ${note}` : ''}`,
+  }]);
+
+  res.json({ ok: true });
+});
+
 // ── CREATE COMMUNITY ─────────────────────────────────────────────────────────
 app.post('/api/communities', async (req, res) => {
   let resolvedUserId = null;
@@ -282,14 +363,19 @@ app.post('/api/communities', async (req, res) => {
   const { name, description, category, icon } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: 'Circle name is required.' });
 
+  // Submit to circle_requests for admin approval instead of creating directly
   const { data, error } = await supabaseAdmin
-    .from('communities')
-    .insert([{ name: name.trim(), description: description?.trim() || '', category, icon, creator_id: resolvedUserId, is_official: false }])
+    .from('circle_requests')
+    .insert([{ name: name.trim(), description: description?.trim() || '', category, icon, creator_id: resolvedUserId, status: 'pending' }])
     .select()
     .single();
 
-  if (error) return res.status(400).json({ message: error.message });
-  res.json({ community: data });
+  if (error) {
+    console.error('[CIRCLE REQUEST] Insert error:', error.message, '| userId:', resolvedUserId);
+    return res.status(400).json({ message: error.message });
+  }
+  console.log('[CIRCLE REQUEST] Submitted:', data.id, name.trim(), 'by', resolvedUserId);
+  res.json({ request: data, pending: true });
 });
 
 // ── DELETE COMMUNITY ─────────────────────────────────────────────────────────
@@ -327,6 +413,12 @@ app.delete('/api/delete-community', async (req, res) => {
     return res.status(403).json({ message: 'Only the circle creator can delete it.' });
   }
 
+  // Delete related data first to avoid FK constraint violations
+  await supabaseAdmin.from('memberships').delete().eq('community_id', id);
+  await supabaseAdmin.from('messages').delete().eq('community_id', id);
+  await supabaseAdmin.from('announcements').delete().eq('community_id', id);
+  await supabaseAdmin.from('channels').delete().eq('community_id', id);
+
   const { error: deleteError } = await supabaseAdmin
     .from('communities').delete().eq('id', id);
 
@@ -337,65 +429,30 @@ app.delete('/api/delete-community', async (req, res) => {
 
 // ── UPLOAD CIRCLE COVER PHOTO ────────────────────────────────────────────────
 app.post('/api/upload-cover', async (req, res) => {
-  let resolvedUserId = null;
+  const communityId = req.body.communityId || req.query.communityId;
+  if (!communityId) return res.status(400).json({ message: 'Missing communityId.' });
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) resolvedUserId = user.id;
-  }
-  if (!resolvedUserId) {
-    const legacyUserId = req.headers['x-user-id'];
-    if (legacyUserId) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles').select('id').eq('id', legacyUserId).single();
-      if (profile) resolvedUserId = profile.id;
-    }
-  }
-  if (!resolvedUserId) {
-    console.error('[UPLOAD COVER] Could not resolve user identity');
-    return res.status(401).json({ message: 'Unable to verify identity.' });
-  }
+  // Build update — supports cover-only or full settings update
+  const updates = {};
+  if (req.body.cover !== undefined)       updates.cover_url   = req.body.cover;
+  if (req.body.cover_url !== undefined)   updates.cover_url   = req.body.cover_url;
+  if (req.body.logo_url !== undefined)    updates.logo_url    = req.body.logo_url;
+  if (req.body.name !== undefined)        updates.name        = req.body.name;
+  if (req.body.description !== undefined) updates.description = req.body.description;
+  if (req.body.category !== undefined)    updates.category    = req.body.category;
 
-  const { cover, communityId } = req.body;
-  if (!cover || !communityId) return res.status(400).json({ message: 'Missing cover or communityId.' });
-
-  // Ensure cover_url column exists (auto-migrate if needed)
-  try {
-    await supabaseAdmin.rpc('exec_sql', {
-      sql: 'ALTER TABLE communities ADD COLUMN IF NOT EXISTS cover_url TEXT;'
-    });
-  } catch (_) {
-    // rpc may not exist — try raw query via pg extension, ignore if fails
-  }
-
-  // Confirm requester is the creator
-  const { data: comm, error: commErr } = await supabaseAdmin
-    .from('communities').select('creator_id').eq('id', communityId).single();
-  if (commErr) {
-    console.error('[UPLOAD COVER] Could not fetch community:', commErr.message);
-    return res.status(500).json({ message: 'Could not verify community.' });
-  }
-  if (!comm || comm.creator_id !== resolvedUserId) {
-    return res.status(403).json({ message: 'Only the circle creator can change the cover photo.' });
-  }
+  if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'Nothing to update.' });
 
   const { error: updateError } = await supabaseAdmin
-    .from('communities')
-    .update({ cover_url: cover })
-    .eq('id', communityId);
+    .from('communities').update(updates).eq('id', communityId);
 
   if (updateError) {
     console.error('[UPLOAD COVER] DB update error:', updateError.message);
-    // If column doesn't exist, tell the client clearly
-    if (updateError.message.includes('cover_url') || updateError.message.includes('column')) {
-      return res.status(500).json({ message: 'cover_url column missing. Run migration first.', detail: updateError.message });
-    }
-    return res.status(500).json({ message: 'Failed to save cover photo.', detail: updateError.message });
+    return res.status(500).json({ message: 'Failed to save: ' + updateError.message });
   }
 
-  console.log('[UPLOAD COVER] Saved cover for community', communityId);
-  res.json({ url: cover });
+  console.log('[UPLOAD COVER] Saved for community', communityId, Object.keys(updates));
+  res.json({ ok: true });
 });
 
 // ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
@@ -475,6 +532,54 @@ app.delete('/api/delete-user', async (req, res) => {
   if (error) return res.status(400).json({ message: error.message });
 
   res.json({ message: 'User deleted successfully.' });
+});
+
+// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+app.post('/api/forgot-password', async (req, res) => {
+  const { studentId } = req.body;
+  if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
+
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles').select('email').eq('student_id', studentId).single();
+  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
+
+  const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'recovery',
+    email: profile.email,
+    options: { redirectTo: `${siteUrl}/reset-password` },
+  });
+  if (linkError) return res.status(400).json({ message: linkError.message });
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+  });
+
+  try {
+    await transporter.sendMail({
+      from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+      to: profile.email,
+      subject: 'Reset your NEXO Connect password',
+      html: `
+        <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+          <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+          <p>You requested a password reset. Click the link below:</p>
+          <a href="${linkData.properties.action_link}"
+             style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
+            RESET PASSWORD
+          </a>
+          <p style="color:#666;font-size:12px;">This link expires in 1 hour.</p>
+        </div>
+      `,
+    });
+  } catch (emailErr) {
+    console.error('[FORGOT PASSWORD] Email error:', emailErr.message);
+    return res.status(400).json({ message: 'Failed to send reset email.' });
+  }
+
+  res.json({ message: 'Password reset email sent.' });
 });
 
 app.listen(port, '0.0.0.0', () => {
