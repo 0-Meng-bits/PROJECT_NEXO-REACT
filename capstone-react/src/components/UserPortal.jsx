@@ -2037,10 +2037,10 @@ export default function UserPortal() {
   // Heartbeat: update last_seen every 30s
   useEffect(() => {
     if (!user?.id) return;
-    const ping = () => fetch('/api/heartbeat', {
+    const ping = () => fetch('/api/update-profile?userId=' + user.id, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id }),
+      body: JSON.stringify({ last_seen: new Date().toISOString() }),
     }).catch(() => {});
     ping();
     const t = setInterval(ping, 30000);
@@ -3972,4 +3972,3 @@ export default function UserPortal() {
     </div>
   );
 }
-  
