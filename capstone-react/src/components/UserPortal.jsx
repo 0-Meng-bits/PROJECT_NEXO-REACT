@@ -430,6 +430,70 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   );
 }
 
+// ── ONLINE USERS STACK ───────────────────────────────────────────────────────
+function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5 }) {
+  if (!onlineProfiles.length) return null;
+
+  // Sort: circle mates first, then others
+  const sorted = [...onlineProfiles].sort((a, b) => {
+    const aIsMate = circleMateIds.has(a.id);
+    const bIsMate = circleMateIds.has(b.id);
+    return bIsMate - aIsMate;
+  });
+
+  const shown = sorted.slice(0, maxShow);
+  const rest = onlineProfiles.length - shown.length;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {shown.map((p, i) => {
+          const url = avatarCache[p.student_id] || p.avatar_url;
+          const initials = (p.full_name || '?')[0].toUpperCase();
+          return (
+            <div key={p.id} title={p.full_name}
+              style={{
+                width: 26, height: 26, borderRadius: '50%',
+                border: '2px solid var(--card-bg)',
+                background: url ? 'transparent' : 'rgba(0,240,255,0.15)',
+                overflow: 'hidden',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: 'var(--cyber-cyan)',
+                marginLeft: i === 0 ? 0 : -8,
+                zIndex: maxShow - i,
+                position: 'relative',
+                flexShrink: 0,
+              }}>
+              {url
+                ? <img src={url} alt={p.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : initials
+              }
+            </div>
+          );
+        })}
+        {rest > 0 && (
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%',
+            border: '2px solid var(--card-bg)',
+            background: 'rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 9, fontWeight: 700, color: 'var(--text-muted)',
+            marginLeft: -8, position: 'relative', zIndex: 0, flexShrink: 0,
+          }}>
+            +{rest}
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#3ecf8e', flexShrink: 0 }} />
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+          {onlineProfiles.length} online
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── CHAT TIME SEPARATOR ───────────────────────────────────────────────────────
 function ChatTimeSeparator({ date }) {
   const now = new Date();
@@ -453,7 +517,7 @@ function ChatTimeSeparator({ date }) {
 }
 
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readCount, isLastOwn }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -513,9 +577,14 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   return (
     <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
       {!isOwnerMsg && (
-        <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
-          style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
-          {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+            style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
+            {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+          </div>
+          {online && (
+            <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
+          )}
         </div>
       )}
 
@@ -622,13 +691,26 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           <div className="chat-meta own">
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             <span className="chat-time">{time}</span>
+            {(isLastOwn || (isOwnerMsg && hovered)) && (
+              <span style={{ marginLeft: 3, color: readCount > 0 ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 10 }} title={readCount > 0 ? `Seen by ${readCount}` : 'Sent'}>
+                {readCount > 0
+                  ? <i className="fa-solid fa-check-double" />
+                  : <i className="fa-solid fa-check" />
+                }
+              </span>
+            )}
           </div>
         )}
       </div>
 
       {isOwnerMsg && (
-        <div className="chat-avatar own" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
-          {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div className="chat-avatar own" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
+            {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+          </div>
+          {online && (
+            <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
+          )}
         </div>
       )}
     </div>
@@ -1858,6 +1940,7 @@ export default function UserPortal() {
   const [section, setSection] = useState('home');
   const [messages, setMessages] = useState([]);
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
+  const [profileIdCache, setProfileIdCache] = useState({}); // student_id -> UUID
   const [msgInput, setMsgInput] = useState('');
   const [circleChatMessages, setCircleChatMessages] = useState([]);
   const [circleChatInput, setCircleChatInput] = useState('');
@@ -1865,6 +1948,8 @@ export default function UserPortal() {
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [circleChatMembers, setCircleChatMembers] = useState([]); // members for the panel
   const [showAuditionForm, setShowAuditionForm] = useState(null); // { comm, audition? }
   const [myAuditions, setMyAuditions] = useState([]);
   const [viewingAudition, setViewingAudition] = useState(null); // { response, community, questions }
@@ -1892,6 +1977,7 @@ export default function UserPortal() {
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
   const [showReport, setShowReport] = useState(null); // { type, id, preview, reportedUserId }
   const [viewingProfile, setViewingProfile] = useState(null); // fetched profile object for viewing
+  const [messageReads, setMessageReads] = useState({}); // message_id -> read count
 
   const viewUserProfile = useCallback(async (studentId) => {
     if (!studentId) return;
@@ -1902,7 +1988,7 @@ export default function UserPortal() {
       // fetch their active circle memberships
       const { data: memberships } = await supabase
         .from('memberships')
-        .select('community_id, communities(id, name, icon, faIcon, cover_url)')
+        .select('community_id, communities(id, name, icon, cover_url, logo_url, category)')
         .eq('user_id', data.id)
         .eq('status', 'active');
       const circles = (memberships || []).map(m => m.communities).filter(Boolean);
@@ -1911,11 +1997,92 @@ export default function UserPortal() {
       console.error('viewUserProfile error:', error, 'studentId:', studentId);
     }
   }, []);
+
+  // Fetch read counts for a batch of messages
+  const fetchReadCounts = useCallback(async (msgIds) => {
+    if (!msgIds?.length) return;
+    const { data } = await supabase.from('message_reads').select('message_id').in('message_id', msgIds);
+    if (data) {
+      const counts = {};
+      data.forEach(r => { counts[r.message_id] = (counts[r.message_id] || 0) + 1; });
+      setMessageReads(prev => ({ ...prev, ...counts }));
+    }
+  }, []);
+
+  // Mark visible messages as read
+  const markMessagesRead = useCallback(async (msgs) => {
+    if (!user?.id || !msgs?.length) return;
+    // Only attempt if user has a real Supabase auth session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const others = msgs.filter(m => m.student_id !== user.student_id);
+    if (!others.length) return;
+    const inserts = others.map(m => ({ message_id: m.id, reader_id: user.id }));
+    try {
+      await supabase.from('message_reads').upsert(inserts, { onConflict: 'message_id,reader_id', ignoreDuplicates: true });
+      const myMsgs = msgs.filter(m => m.student_id === user.student_id).map(m => m.id);
+      if (myMsgs.length) fetchReadCounts(myMsgs);
+    } catch (_) {}
+  }, [user?.id, user?.student_id, fetchReadCounts]);
+
   const [sendError, setSendError] = useState(''); // inline error for bad word block
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
   });
+
+  // ── ONLINE PRESENCE ──────────────────────────────────────────────────────────
+  const [onlineUsers, setOnlineUsers] = useState(new Set()); // set of profile UUIDs
+
+  // Heartbeat: update last_seen every 30s
+  useEffect(() => {
+    if (!user?.id) return;
+    const ping = () => fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id }),
+    }).catch(() => {});
+    ping();
+    const t = setInterval(ping, 30000);
+    return () => clearInterval(t);
+  }, [user?.id]);
+
+  // Poll online users every 30s (online = last_seen within 2 minutes)
+  const [onlineProfiles, setOnlineProfiles] = useState([]); // full profile objects of online users
+  const [circleMateIds, setCircleMateIds] = useState(new Set()); // UUIDs of users sharing a circle
+
+  useEffect(() => {
+    const fetchOnline = async () => {
+      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min window
+      const { data } = await supabase.from('profiles')
+        .select('id, full_name, student_id, avatar_url')
+        .gte('last_seen', since);
+      const profiles = (data || []);
+      setOnlineUsers(new Set(profiles.map(p => p.id)));
+      // Keep self in the list for display — just mark them differently if needed
+      setOnlineProfiles(profiles);
+    };
+    fetchOnline();
+    const t = setInterval(fetchOnline, 30000);
+    return () => clearInterval(t);
+  }, [user?.id]);
+
+  // Fetch circle mates (people in same circles as you)
+  useEffect(() => {
+    if (!user?.id || !myMemberships?.length) return;
+    const commIds = myMemberships.filter(m => m.status === 'active').map(m => m.community_id);
+    if (!commIds.length) return;
+    supabase.from('memberships')
+      .select('user_id')
+      .in('community_id', commIds)
+      .eq('status', 'active')
+      .neq('user_id', user.id)
+      .then(({ data }) => {
+        setCircleMateIds(new Set((data || []).map(m => m.user_id)));
+      });
+  }, [user?.id, myMemberships]);
+
+  const isOnline = useCallback((profileId) => onlineUsers.has(profileId), [onlineUsers]);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -2143,11 +2310,16 @@ export default function UserPortal() {
   const fetchAvatarsForMessages = useCallback(async (msgs) => {
     const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id))];
     if (uncached.length === 0) return;
-    const { data } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', uncached);
+    const { data } = await supabase.from('profiles').select('id, student_id, avatar_url').in('student_id', uncached);
     if (data) {
       const map = {};
-      data.forEach(p => { map[p.student_id] = p.avatar_url || null; });
+      const idMap = {};
+      data.forEach(p => {
+        map[p.student_id] = p.avatar_url || null;
+        idMap[p.student_id] = p.id; // student_id -> UUID for online check
+      });
       setAvatarCache(prev => ({ ...prev, ...map }));
+      setProfileIdCache(prev => ({ ...prev, ...idMap }));
     }
   }, []);
 
@@ -2163,8 +2335,10 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
     } else if (commId) {
+      // Only messages that belong to no specific channel (the default "general" flow)
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
+        .is('channel_id', null)
         .order('created_at', { ascending: true });
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
@@ -2181,7 +2355,10 @@ export default function UserPortal() {
       .order('created_at', { ascending: true });
     setCircleChatMessages(data || []);
     fetchAvatarsForMessages(data || []);
-  }, [fetchAvatarsForMessages]);
+    markMessagesRead(data || []);
+    const myMsgIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
+    if (myMsgIds.length) fetchReadCounts(myMsgIds);
+  }, [fetchAvatarsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
 
   // Initial load + realtime subscription — re-runs when channel/community changes
   useEffect(() => {
@@ -2200,8 +2377,8 @@ export default function UserPortal() {
         (payload) => {
           const msg = payload.new;
           const isGlobal = activeCommId === 'global' && !msg.community_id;
-          const isChannel = msg.channel_id === activeChannelId;
-          const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId;
+          const isChannel = msg.channel_id === activeChannelId && activeChannelId !== null;
+          const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId && !msg.channel_id;
           if (isGlobal || isChannel || isCommunityNoChannel) {
             setMessages(prev => {
               if (prev.find(m => m.id === msg.id)) return prev;
@@ -2228,6 +2405,15 @@ export default function UserPortal() {
   useEffect(() => {
     loadChannels(activeCommId);
     loadCircleAnnouncements(activeCommId);
+    // Load members for the panel whenever we switch circles
+    if (activeCommId && activeCommId !== 'global') {
+      supabase.from('memberships')
+        .select('rank_level, profiles(id, full_name, student_id, avatar_url)')
+        .eq('community_id', activeCommId).eq('status', 'active')
+        .then(({ data }) => {
+          setCircleChatMembers((data || []).map(m => ({ ...m.profiles, rank_level: m.rank_level })));
+        });
+    }
     setShowCircleAnnouncements(false);
     setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
@@ -2296,6 +2482,13 @@ export default function UserPortal() {
   useEffect(() => {
     if (!activeCommId || activeCommId === 'global' || section !== 'circle-chat') return;
     loadCircleChatMessages(activeCommId);
+    // Load members for the panel
+    supabase.from('memberships')
+      .select('rank_level, profiles(id, full_name, student_id, avatar_url)')
+      .eq('community_id', activeCommId).eq('status', 'active')
+      .then(({ data }) => {
+        setCircleChatMembers((data || []).map(m => ({ ...m.profiles, rank_level: m.rank_level })));
+      });
     const sub = supabase.channel('circle-chat:' + activeCommId)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `community_id=eq.${activeCommId}` },
@@ -2305,6 +2498,8 @@ export default function UserPortal() {
             setCircleChatMessages(prev => {
               if (prev.find(m => m.id === msg.id)) return prev;
               fetchAvatarsForMessages([msg]);
+              markMessagesRead([msg]);
+              if (msg.student_id === user?.student_id) fetchReadCounts([msg.id]);
               return [...prev, msg];
             });
           }
@@ -2488,10 +2683,19 @@ export default function UserPortal() {
   };
 
   const editMessage = async (msgId, newContent) => {
-    const { error } = await supabase.from('messages')
-      .update({ content: newContent, edited: true }).eq('id', msgId);
-    if (!error) setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: newContent, edited: true } : m));
-    else showToast('EDIT_FAILED');
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: msgId, content: newContent, studentId: user?.student_id }),
+      });
+      if (res.ok) {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: newContent, edited: true } : m));
+        setCircleChatMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: newContent, edited: true } : m));
+      } else {
+        showToast('Edit failed.');
+      }
+    } catch { showToast('Edit failed.'); }
   };
 
   // Joined circles for dock (only active memberships + owned)
@@ -2765,7 +2969,7 @@ export default function UserPortal() {
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
-                    onClick={() => { setActiveChannelId(prev => prev === ch.id ? null : ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
+                    onClick={() => { setActiveChannelId(ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
                   >
                     <i className="channel-hash">#</i>
                     <span className="node-name">{ch.name}</span>
@@ -3138,37 +3342,48 @@ export default function UserPortal() {
           {/* ── GLOBAL FEED "� campus-wide chat ── */}
           {section === 'global' && (
             <>
-              <div className="c-feed fade-in">
-                <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
-                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+              {/* Global feed header — stays visible, doesn't scroll */}
+              <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
                     <i className="fa-solid fa-network-wired" style={{ marginRight: 10 }}></i>GLOBAL FEED
                   </h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                    Campus-wide chat "� open to all verified students and faculty.
-                  </p>
+                  <OnlineStack onlineProfiles={onlineProfiles} circleMateIds={circleMateIds} avatarCache={avatarCache} />
                 </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
+                  Campus-wide chat — open to all verified students and faculty.
+                </p>
+              </div>
+              <div className="c-feed fade-in" style={{ margin: '0 20px 20px 0', borderRadius: '0 0 15px 15px', flex: 1 }}>
 
-                {messages.map((m, idx) => {
-                  const isOwnerMsg = m.student_id === user?.student_id;
-                  const prev = messages[idx - 1];
-                  const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
-                  return (
-                    <React.Fragment key={m.id}>
-                      {showSep && <ChatTimeSeparator date={m.created_at} />}
-                      <MessageItem m={m}
-                        tagColor="var(--cyber-cyan)"
-                        isOwnerMsg={isOwnerMsg}
-                        canDelete={isOwnerMsg || user?.user_type === 'Admin'}
-                        onDelete={deleteMessage}
-                        onEdit={editMessage}
-                        onReport={(data) => setShowReport(data)}
-                        currentStudentId={user?.student_id}
-                        avatarUrl={avatarCache[m.student_id] || null}
-                        onViewProfile={viewUserProfile}
-                      />
-                    </React.Fragment>
-                  );
-                })}
+                {(() => {
+                  const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                  return messages.map((m, idx) => {
+                    const isOwnerMsg = m.student_id === user?.student_id;
+                    const prev = messages[idx - 1];
+                    const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
+                    const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                    return (
+                      <React.Fragment key={m.id}>
+                        {showSep && <ChatTimeSeparator date={m.created_at} />}
+                        <MessageItem m={m}
+                          tagColor="var(--cyber-cyan)"
+                          isOwnerMsg={isOwnerMsg}
+                          canDelete={isOwnerMsg || user?.user_type === 'Admin'}
+                          onDelete={deleteMessage}
+                          onEdit={editMessage}
+                          onReport={(data) => setShowReport(data)}
+                          currentStudentId={user?.student_id}
+                          avatarUrl={avatarCache[m.student_id] || null}
+                          onViewProfile={viewUserProfile}
+                          online={isOnline(profileIdCache[m.student_id])}
+                          readCount={messageReads[m.id] || 0}
+                          isLastOwn={isLastOwn}
+                        />
+                      </React.Fragment>
+                    );
+                  });
+                })()}
                 <div ref={feedBottomRef} />
               </div>
 
@@ -3299,9 +3514,10 @@ export default function UserPortal() {
           {/* ── MY CIRCLES / CIRCLE FEED ── */}
           {section === 'circles' && (
             <>
-              <div className="c-feed fade-in">
-                {/* ── CIRCLE COVER BANNER ── */}
+              {/* Banner sits outside the scrollable feed — stays visible */}
+              <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', overflow: 'hidden', flexShrink: 0 }}>
                 <div className="circle-cover-banner" style={{
+                  borderRadius: 0,
                   background: activeComm.cover_url
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
@@ -3383,6 +3599,12 @@ export default function UserPortal() {
                         <div className="verified-badge" style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.3)' }}>
                           GROUP: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
                         </div>
+                        {(() => {
+                          const circleOnline = onlineProfiles.filter(p => circleMateIds.has(p.id) || p.id === user?.id);
+                          return circleOnline.length > 0
+                            ? <OnlineStack onlineProfiles={circleOnline} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={5} />
+                            : null;
+                        })()}
                       </div>
                       <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.5 }}>
                         {activeComm.description || 'No description provided.'}
@@ -3390,7 +3612,9 @@ export default function UserPortal() {
                     </div>
                   </div>
                 </div>
+              </div>{/* end banner wrapper */}
 
+              <div className="c-feed fade-in" style={{ margin: '0 20px 20px 0', borderRadius: '0 0 15px 15px', flex: 1 }}>
                 {/* Access gate for non-members */}
                 {!isMember(activeCommId) ? (
                   <div className="post" style={{ textAlign: 'center', padding: 40 }}>
@@ -3518,29 +3742,36 @@ export default function UserPortal() {
                     )}
                   </div>
                 ) : (
-                  messages.map((m, idx) => {
-                    const isOwnerMsg = m.student_id === user?.student_id;
-                    const canDelete = isOwnerMsg || canModerate;
-                    const prev = messages[idx - 1];
-                    const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
-                    return (
-                      <React.Fragment key={m.id}>
-                        {showSep && <ChatTimeSeparator date={m.created_at} />}
-                        <MessageItem
-                          m={m}
-                          tagColor={tagColor}
-                          isOwnerMsg={isOwnerMsg}
-                          canDelete={canDelete}
-                          onDelete={deleteMessage}
-                          onEdit={editMessage}
-                          onReport={(data) => setShowReport(data)}
-                          currentStudentId={user?.student_id}
-                          avatarUrl={avatarCache[m.student_id] || null}
-                          onViewProfile={viewUserProfile}
-                        />
-                      </React.Fragment>
-                    );
-                  })
+                  (() => {
+                    const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                    return messages.map((m, idx) => {
+                      const isOwnerMsg = m.student_id === user?.student_id;
+                      const canDelete = isOwnerMsg || canModerate;
+                      const prev = messages[idx - 1];
+                      const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
+                      const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      return (
+                        <React.Fragment key={m.id}>
+                          {showSep && <ChatTimeSeparator date={m.created_at} />}
+                          <MessageItem
+                            m={m}
+                            tagColor={tagColor}
+                            isOwnerMsg={isOwnerMsg}
+                            canDelete={canDelete}
+                            onDelete={deleteMessage}
+                            onEdit={editMessage}
+                            onReport={(data) => setShowReport(data)}
+                            currentStudentId={user?.student_id}
+                            avatarUrl={avatarCache[m.student_id] || null}
+                            onViewProfile={viewUserProfile}
+                            online={isOnline(profileIdCache[m.student_id])}
+                            readCount={messageReads[m.id] || 0}
+                            isLastOwn={isLastOwn}
+                          />
+                        </React.Fragment>
+                      );
+                    });
+                  })()
                 )}
                 <div ref={feedBottomRef} />
               </div>
@@ -3562,15 +3793,33 @@ export default function UserPortal() {
           {/* ── CIRCLE CHAT ── */}
           {section === 'circle-chat' && activeCommId !== 'global' && (
             <>
-              <div className="c-feed fade-in">
-                <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
-                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
+              {/* Circle chat header — fixed, doesn't scroll */}
+              <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
                     <i className="fa-solid fa-comments" style={{ marginRight: 10 }}></i>CIRCLE CHAT
                   </h2>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                    Private chat exclusive to members of {activeComm.name}.
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {(() => {
+                      const circleOnline = onlineProfiles.filter(p => circleMateIds.has(p.id) || p.id === user?.id);
+                      const toShow = circleOnline.length > 0 ? circleOnline : onlineProfiles.slice(0, 5);
+                      return toShow.length > 0 ? <OnlineStack onlineProfiles={toShow} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={6} /> : null;
+                    })()}
+                    <button onClick={() => setShowMembersPanel(p => !p)} title="Toggle members"
+                      style={{ background: showMembersPanel ? 'rgba(0,240,255,0.15)' : 'transparent', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 8, color: showMembersPanel ? 'var(--cyber-cyan)' : 'var(--text-muted)', padding: '5px 10px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="fa-solid fa-users" />
+                      <span>{circleChatMembers.length}</span>
+                    </button>
+                  </div>
                 </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
+                  Private chat exclusive to members of {activeComm.name}.
+                </p>
+              </div>
+
+              {/* Chat + optional members panel side by side */}
+              <div style={{ display: 'flex', flex: 1, margin: '0 20px 20px 0', overflow: 'hidden', gap: 0 }}>
+                <div className="c-feed fade-in" style={{ margin: 0, borderRadius: showMembersPanel ? '0 0 0 15px' : '0 0 15px 15px', flex: 1 }}>
 
                 {!isMember(activeCommId) ? (
                   <div className="post" style={{ textAlign: 'center', padding: 40 }}>
@@ -3578,35 +3827,42 @@ export default function UserPortal() {
                     <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
                   </div>
                 ) : (
-                  circleChatMessages.map((m, idx) => {
-                    const isOwnerMsg = m.student_id === user?.student_id;
-                    const canDelete = isOwnerMsg || canModerate;
-                    const prev = circleChatMessages[idx - 1];
-                    const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
-                    return (
-                      <React.Fragment key={m.id}>
-                        {showSep && <ChatTimeSeparator date={m.created_at} />}
-                        <MessageItem
-                          m={m}
-                          tagColor={tagColor}
-                          isOwnerMsg={isOwnerMsg}
-                          canDelete={canDelete}
-                          onDelete={async (id) => {
-                            if (!confirm('Delete this message?')) return;
-                            await supabase.from('messages').delete().eq('id', id);
-                            setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
-                          }}
-                          onEdit={async (id, content) => {
-                            await supabase.from('messages').update({ content, edited: true }).eq('id', id);
-                            setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
-                          }}
-                          currentStudentId={user?.student_id}
-                          avatarUrl={avatarCache[m.student_id] || null}
-                          onViewProfile={viewUserProfile}
-                        />
-                      </React.Fragment>
-                    );
-                  })
+                  (() => {
+                    const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                    return circleChatMessages.map((m, idx) => {
+                      const isOwnerMsg = m.student_id === user?.student_id;
+                      const canDelete = isOwnerMsg || canModerate;
+                      const prev = circleChatMessages[idx - 1];
+                      const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
+                      const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      return (
+                        <React.Fragment key={m.id}>
+                          {showSep && <ChatTimeSeparator date={m.created_at} />}
+                          <MessageItem
+                            m={m}
+                            tagColor={tagColor}
+                            isOwnerMsg={isOwnerMsg}
+                            canDelete={canDelete}
+                            onDelete={async (id) => {
+                              if (!confirm('Delete this message?')) return;
+                              await supabase.from('messages').delete().eq('id', id);
+                              setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
+                            }}
+                            onEdit={async (id, content) => {
+                              await supabase.from('messages').update({ content, edited: true }).eq('id', id);
+                              setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
+                            }}
+                            currentStudentId={user?.student_id}
+                            avatarUrl={avatarCache[m.student_id] || null}
+                            onViewProfile={viewUserProfile}
+                            online={isOnline(profileIdCache[m.student_id])}
+                            readCount={messageReads[m.id] || 0}
+                            isLastOwn={isLastOwn}
+                          />
+                        </React.Fragment>
+                      );
+                    });
+                  })()
                 )}
                 <div ref={feedBottomRef} />
               </div>
@@ -3621,6 +3877,45 @@ export default function UserPortal() {
                   </div>
                 </div>
               )}
+              {showMembersPanel && (
+                <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
+                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS — {circleChatMembers.length}</div>
+                  {[
+                    { label: 'ONLINE', filter: m => isOnline(m.id) },
+                    { label: 'OFFLINE', filter: m => !isOnline(m.id) },
+                  ].map(({ label, filter }) => {
+                    const group = circleChatMembers.filter(filter);
+                    if (!group.length) return null;
+                    return (
+                      <div key={label}>
+                        <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
+                          {label} — {group.length}
+                        </div>
+                        {group.map(m => {
+                          const url = avatarCache[m.student_id] || m.avatar_url;
+                          const initials = (m.full_name || '?')[0].toUpperCase();
+                          const rankLabels = ['', 'MOD', 'CO-LEAD', 'LEADER'];
+                          return (
+                            <div key={m.id} onClick={() => viewUserProfile(m.student_id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
+                              <div style={{ position: 'relative', flexShrink: 0 }}>
+                                <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
+                                  {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                                </div>
+                                {isOnline(m.id) && <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)' }} />}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.full_name}</div>
+                                {m.rank_level > 0 && <div style={{ fontSize: 9, color: 'var(--cyber-yellow)', letterSpacing: 1 }}>{rankLabels[m.rank_level] || ''}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              </div>{/* end chat+panel wrapper */}
             </>
           )}
         </div>
@@ -3677,3 +3972,4 @@ export default function UserPortal() {
     </div>
   );
 }
+  

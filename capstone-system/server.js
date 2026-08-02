@@ -455,6 +455,50 @@ app.post('/api/upload-cover', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── PRESENCE HEARTBEAT ────────────────────────────────────────────────────────
+app.post('/api/heartbeat', async (req, res) => {
+  const userId = req.body.userId || req.query.userId;
+  if (!userId) return res.status(400).json({ message: 'Missing userId.' });
+  const { error } = await supabaseAdmin.from('profiles')
+    .update({ last_seen: new Date().toISOString() }).eq('id', userId);
+  if (error) return res.status(500).json({ message: error.message });
+  res.json({ ok: true });
+});
+
+// ── UPDATE PROFILE (last_seen heartbeat + profile fields) ─────────────────────
+app.post('/api/update-profile', async (req, res) => {
+  const userId = req.query.userId || req.headers['x-user-id'];
+  if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
+  const allowed = ['course', 'year_level', 'interests', 'last_seen'];
+  const updates = {};
+  allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+  if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
+  const { error } = await supabaseAdmin.from('profiles').update(updates).eq('id', userId);
+  if (error) return res.status(500).json({ message: error.message });
+  res.json({ ok: true });
+});
+
+// ── EDIT MESSAGE ─────────────────────────────────────────────────────────────
+app.patch('/api/messages', async (req, res) => {
+  const { id, content, studentId } = req.body;
+  if (!id || !content?.trim() || !studentId) return res.status(400).json({ message: 'Missing fields.' });
+
+  try {
+    // Verify the message belongs to this student
+    const { data: msg, error: fetchErr } = await supabaseAdmin.from('messages').select('student_id').eq('id', id).single();
+    if (fetchErr) { console.error('[EDIT MSG] fetch error:', fetchErr.message); return res.status(500).json({ message: fetchErr.message }); }
+    if (!msg) return res.status(404).json({ message: 'Message not found.' });
+    if (String(msg.student_id) !== String(studentId)) return res.status(403).json({ message: 'Not your message.' });
+
+    const { error } = await supabaseAdmin.from('messages').update({ content: content.trim(), edited: true }).eq('id', id);
+    if (error) { console.error('[EDIT MSG] update error:', error.message); return res.status(500).json({ message: error.message }); }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[EDIT MSG] unexpected:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── UPLOAD AVATAR ─────────────────────────────────────────────────────────────
 app.post('/api/upload-avatar', async (req, res) => {
   let resolvedUserId = null;
