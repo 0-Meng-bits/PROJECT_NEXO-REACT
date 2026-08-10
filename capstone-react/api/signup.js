@@ -35,7 +35,18 @@ export default async function handler(req, res) {
     }
   }
 
-  // Insert profile linked to auth user
+  // Insert into new normalized tables + keep profiles in sync
+  try {
+    await supabaseAdmin.from('accounts').insert([{
+      id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type,
+    }]);
+    await supabaseAdmin.from('account_status').insert([{ id: authData.user.id, is_verified: false }]);
+    await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl }]);
+  } catch (e) {
+    console.warn('[SIGNUP] New table insert warning:', e.message);
+  }
+
+  // Insert profile linked to auth user (backwards compat)
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .insert([{

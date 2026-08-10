@@ -51,7 +51,7 @@ async function requireAuth(req, res, next) {
 async function requireAdmin(req, res, next) {
   await requireAuth(req, res, async () => {
     const { data } = await supabaseAdmin
-      .from('profiles').select('user_type').eq('id', req.authUser.id).single();
+      .from('accounts').select('user_type').eq('id', req.authUser.id).single();
     if (data?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
     next();
   });
@@ -61,16 +61,22 @@ async function requireAdmin(req, res, next) {
 app.post('/api/login', async (req, res) => {
   const { studentId, password } = req.body;
 
-  // 1. Find profile by student_id to get their email
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles').select('*').eq('student_id', studentId).single();
+  // 1. Find account by ctu_id + join status and details
+  const { data: account, error: accountError } = await supabaseAdmin
+    .from('accounts')
+    .select('*, account_status(*), account_details(*)')
+    .eq('ctu_id', studentId)
+    .single();
 
-  if (profileError || !profile) {
+  if (accountError || !account) {
     return res.status(401).json({ message: 'CTU_ID not found in the system.' });
   }
 
+  const status = account.account_status || {};
+  const details = account.account_details || {};
+
   // Check if permanently banned
-  if (profile.is_banned) {
+  if (status.is_banned) {
     return res.status(403).json({
       message: 'Your account has been permanently banned due to serious violations. Contact the administrator if you believe this is a mistake.',
       banned: true,
@@ -78,60 +84,67 @@ app.post('/api/login', async (req, res) => {
   }
 
   // Check if suspended
-  if (profile.suspended_until && new Date(profile.suspended_until) > new Date()) {
-    const until = new Date(profile.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  if (status.suspended_until && new Date(status.suspended_until) > new Date()) {
+    const until = new Date(status.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     return res.status(403).json({
       message: `Your account is suspended until ${until} due to community guideline violations.`,
       suspended: true,
-      suspended_until: profile.suspended_until,
+      suspended_until: status.suspended_until,
     });
   }
 
-  // 2. Check verification — but still allow login with limited access
-  const isPending = !profile.is_verified;
+  const isPending = !status.is_verified;
 
-  // 3. Sign in via Supabase Auth (issues real JWT)
+  // 2. Sign in via Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email: profile.email,
+    email: account.email,
     password,
   });
 
   if (authError) {
     console.error('[LOGIN] signInWithPassword error:', authError.message, authError.status);
 
-    // Auto-confirm email and retry — this is a school system, email confirmation
-    // is not required since admin verifies identity via ID photo instead
     if (authError.message?.includes('Email not confirmed')) {
       try {
-        await supabaseAdmin.auth.admin.updateUserById(profile.id, {
-          email_confirm: true,
-        });
-        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-          email: profile.email,
-          password,
-        });
-        if (retryError) {
-          return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-        return res.json({
-          message: isPending ? 'Pending approval' : 'Authentication successful',
-          user: profile,
-          session: retryData.session,
-          pending: isPending,
-        });
+        await supabaseAdmin.auth.admin.updateUserById(account.id, { email_confirm: true });
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email: account.email, password });
+        if (retryError) return res.status(401).json({ message: 'Invalid credentials.' });
+        // Build flat profile-compatible object
+        const user = { ...account, student_id: account.ctu_id, is_verified: status.is_verified, ...details };
+        return res.json({ message: isPending ? 'Pending approval' : 'Authentication successful', user, session: retryData.session, pending: isPending });
       } catch (confirmErr) {
-        console.error('[LOGIN] Auto-confirm error:', confirmErr.message);
         return res.status(401).json({ message: 'Login failed. Please contact admin.' });
       }
     }
 
-    // All users are on Supabase Auth — wrong password means invalid credentials
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
 
+  // Build flat profile-compatible response (same shape as before so frontend doesn't break)
+  const user = {
+    ...account,
+    student_id: account.ctu_id,       // alias for backwards compat
+    is_verified: status.is_verified,
+    is_banned: status.is_banned,
+    suspended_until: status.suspended_until,
+    warning_count: status.warning_count,
+    trust_points: status.trust_points,
+    course: details.course,
+    year_level: details.year_level,
+    interests: details.interests,
+    avatar_url: details.avatar_url,
+    cover_url: details.cover_url,
+    id_photo_url: details.id_photo_url,
+    last_seen: details.last_seen,
+    onboarding_complete: details.onboarding_complete,
+  };
+  // Remove nested objects from response
+  delete user.account_status;
+  delete user.account_details;
+
   res.json({
     message: isPending ? 'Pending approval' : 'Authentication successful',
-    user: profile,
+    user,
     session: authData.session,
     pending: isPending,
   });
@@ -143,64 +156,82 @@ app.post('/api/signup', async (req, res) => {
 
   // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+    email, password, email_confirm: true,
   });
 
   if (authError) {
-    console.error('[SIGNUP] createUser error:', authError.message, authError.status);
+    console.error('[SIGNUP] createUser error:', authError.message);
     return res.status(400).json({ message: authError.message });
   }
 
-  // 2. Insert profile linked to auth user
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .insert([{
-      id: authData.user.id,
-      student_id: studentId,
-      full_name: fullName,
-      email,
-      user_type,
-      is_verified: false,
-    }])
-    .select().single();
+  const userId = authData.user.id;
 
-  if (error) {
-    // Rollback auth user if profile insert fails
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    return res.status(400).json({ message: error.message });
+  try {
+    // 2a. Insert into accounts
+    await supabaseAdmin.from('accounts').insert([{
+      id: userId, ctu_id: studentId, full_name: fullName, email, user_type,
+    }]);
+
+    // 2b. Insert into account_status
+    await supabaseAdmin.from('account_status').insert([{ id: userId, is_verified: false }]);
+
+    // 2c. Insert into account_details
+    await supabaseAdmin.from('account_details').insert([{ id: userId }]);
+
+    // 2d. Keep profiles in sync for backwards compat during transition
+    await supabaseAdmin.from('profiles').insert([{
+      id: userId, student_id: studentId, full_name: fullName, email, user_type, is_verified: false,
+    }]);
+  } catch (err) {
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+    return res.status(400).json({ message: err.message });
   }
 
-  // Sign them in to get a session token
   const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
+  const user = { id: userId, student_id: studentId, full_name: fullName, email, user_type, is_verified: false };
 
-  res.status(200).json({ message: 'Awaiting approval', user: data, session: sessionData?.session || null });
+  res.status(200).json({ message: 'Awaiting approval', user, session: sessionData?.session || null });
 });
 
 // ── SESSION VERIFY (frontend calls this to validate stored session) ────────────
 app.get('/api/me', requireAuth, async (req, res) => {
-  const { data } = await supabaseAdmin
-    .from('profiles').select('*').eq('id', req.authUser.id).single();
-  if (!data) return res.status(404).json({ message: 'Profile not found.' });
-  res.json({ user: data });
+  const { data: account } = await supabaseAdmin
+    .from('accounts').select('*, account_status(*), account_details(*)')
+    .eq('id', req.authUser.id).single();
+  if (!account) return res.status(404).json({ message: 'Profile not found.' });
+  const status = account.account_status || {};
+  const details = account.account_details || {};
+  const user = { ...account, student_id: account.ctu_id, is_verified: status.is_verified, is_banned: status.is_banned, suspended_until: status.suspended_until, warning_count: status.warning_count, trust_points: status.trust_points, ...details };
+  delete user.account_status; delete user.account_details;
+  res.json({ user });
 });
 
 // ── ADMIN: GET ALL STUDENTS ───────────────────────────────────────────────────
 app.get('/api/students', async (req, res) => {
-  // Try token auth first, fall back to allowing if no token (legacy admin)
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (token) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return res.status(401).json({ message: 'Invalid session.' });
-    const { data: profile } = await supabaseAdmin.from('profiles').select('user_type').eq('id', user.id).single();
-    if (profile?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
+    const { data: acct } = await supabaseAdmin.from('accounts').select('user_type').eq('id', user.id).single();
+    if (acct?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
   }
-  // Legacy: no token but called from admin dashboard — allow
+  // Join accounts + account_status + account_details, return flat profile-compatible shape
   const { data, error } = await supabaseAdmin
-    .from('profiles').select('*').order('created_at', { ascending: false });
+    .from('accounts')
+    .select('*, account_status(*), account_details(*)')
+    .order('created_at', { ascending: false });
   if (error) return res.status(400).json(error);
-  res.json(data);
+  const flat = (data || []).map(a => ({
+    ...a,
+    student_id: a.ctu_id,
+    is_verified: a.account_status?.is_verified,
+    is_banned: a.account_status?.is_banned,
+    suspended_until: a.account_status?.suspended_until,
+    warning_count: a.account_status?.warning_count,
+    trust_points: a.account_status?.trust_points,
+    ...(a.account_details || {}),
+  }));
+  res.json(flat);
 });
 
 // ── GET ALL COMMUNITIES ───────────────────────────────────────────────────────
@@ -215,7 +246,7 @@ app.get('/api/communities', async (req, res) => {  const { data, error } = await
 // ── ADMIN: ALL DATA IN ONE SHOT ───────────────────────────────────────────────
 app.get('/api/admin-data', async (req, res) => {  try {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
       supabaseAdmin.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
@@ -277,8 +308,8 @@ app.get('/api/circle-requests', async (req, res) => {
     let profileMap = {};
     if (creatorIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
-        .from('profiles').select('id, full_name, student_id').in('id', creatorIds);
-      (profiles || []).forEach(p => { profileMap[p.id] = p; });
+        .from('accounts').select('id, full_name, ctu_id').in('id', creatorIds);
+      (profiles || []).forEach(p => { profileMap[p.id] = { ...p, student_id: p.ctu_id }; });
     }
     const enriched = (data || []).map(r => ({ ...r, profiles: profileMap[r.creator_id] || null }));
     res.json(enriched);
@@ -467,13 +498,20 @@ app.post('/api/heartbeat', async (req, res) => {
 
 // ── UPDATE PROFILE (last_seen heartbeat + profile fields) ─────────────────────
 app.post('/api/update-profile', async (req, res) => {
-  const userId = req.query.userId || req.headers['x-user-id'];
+  const userId = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
-  const allowed = ['course', 'year_level', 'interests', 'last_seen'];
-  const updates = {};
-  allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
-  if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
-  const { error } = await supabaseAdmin.from('profiles').update(updates).eq('id', userId);
+
+  const detailFields = ['course', 'year_level', 'interests', 'last_seen', 'cover_url', 'avatar_url'];
+  const detailUpdates = {};
+  detailFields.forEach(k => { if (req.body[k] !== undefined) detailUpdates[k] = req.body[k]; });
+
+  if (!Object.keys(detailUpdates).length) return res.status(400).json({ message: 'Nothing to update.' });
+
+  // Update new table
+  const { error } = await supabaseAdmin.from('account_details').update(detailUpdates).eq('id', userId);
+  // Keep profiles in sync
+  await supabaseAdmin.from('profiles').update(detailUpdates).eq('id', userId);
+
   if (error) return res.status(500).json({ message: error.message });
   res.json({ ok: true });
 });
@@ -529,9 +567,11 @@ app.post('/api/upload-avatar', async (req, res) => {
 
   // Save base64 directly to the avatar_url column — no storage bucket needed
   const { error: updateError } = await supabaseAdmin
-    .from('profiles')
+    .from('account_details')
     .update({ avatar_url: avatar })
     .eq('id', resolvedUserId);
+  // keep profiles in sync
+  await supabaseAdmin.from('profiles').update({ avatar_url: avatar }).eq('id', resolvedUserId);
 
   if (updateError) {
     console.error('[UPLOAD AVATAR] Profile update error:', updateError.message);
@@ -544,7 +584,9 @@ app.post('/api/upload-avatar', async (req, res) => {
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
   const { error } = await supabaseAdmin
-    .from('profiles').update({ is_verified: true }).eq('id', req.params.id);
+    .from('account_status').update({ is_verified: true }).eq('id', req.params.id);
+  // keep profiles in sync
+  await supabaseAdmin.from('profiles').update({ is_verified: true }).eq('id', req.params.id);
   if (error) return res.status(400).json(error);
   res.json({ message: 'Student verified!' });
 });
@@ -559,7 +601,7 @@ app.delete('/api/delete-user', async (req, res) => {
   if (token) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (!authError && user) {
-      const { data: profile } = await supabaseAdmin.from('profiles').select('user_type').eq('id', user.id).single();
+      const { data: profile } = await supabaseAdmin.from('accounts').select('user_type').eq('id', user.id).single();
       if (profile?.user_type !== 'Admin') return res.status(403).json({ message: 'Admin access required.' });
     }
   }
@@ -571,7 +613,9 @@ app.delete('/api/delete-user', async (req, res) => {
     console.warn('[DELETE USER] Auth delete failed (may not exist):', e.message);
   }
 
-  // Delete profile (cascades to memberships, notifications, etc.)
+  // Delete from new tables (cascade handles account_status and account_details)
+  await supabaseAdmin.from('accounts').delete().eq('id', id);
+  // Also delete from profiles for backwards compat
   const { error } = await supabaseAdmin.from('profiles').delete().eq('id', id);
   if (error) return res.status(400).json({ message: error.message });
 
@@ -584,7 +628,7 @@ app.post('/api/forgot-password', async (req, res) => {
   if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
 
   const { data: profile, error } = await supabaseAdmin
-    .from('profiles').select('email').eq('student_id', studentId).single();
+    .from('accounts').select('email').eq('ctu_id', studentId).single();
   if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
 
   const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
