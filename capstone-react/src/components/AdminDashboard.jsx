@@ -323,7 +323,9 @@ export default function AdminDashboard() {
 
   const rejectStudent = async (id, name) => {
     if (!confirm(`Reject and remove ${name}?`)) return;
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    // keep profiles in sync
+    await supabase.from('profiles').delete().eq('id', id);
     if (!error) { showToast('Student rejected and removed.'); fetchData(); }
     else showToast('Failed to reject.');
   };
@@ -355,7 +357,7 @@ export default function AdminDashboard() {
   const issueWarning = async (userId, userName, reason) => {
     // Get current trust points
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('account_status')
       .select('warning_count, trust_points, is_banned')
       .eq('id', userId).single();
 
@@ -376,10 +378,15 @@ export default function AdminDashboard() {
       ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
-    // Update profile
+    // Update account_status + keep profiles in sync
+    await supabase.from('account_status').update({
+      warning_count: newWarnings,
+      trust_points: willSuspend ? 1 : newPoints,
+      ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
+    }).eq('id', userId);
     await supabase.from('profiles').update({
       warning_count: newWarnings,
-      trust_points: willSuspend ? 1 : newPoints, // reset to 1 after suspension
+      trust_points: willSuspend ? 1 : newPoints,
       ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
     }).eq('id', userId);
 
@@ -402,6 +409,7 @@ export default function AdminDashboard() {
     if (!confirm(`Ban ${userName}? They will lose access to the platform.`)) return;
     const reason = prompt('Reason for ban:');
     if (!reason) return;
+    await supabase.from('account_status').update({ is_banned: true }).eq('id', userId);
     await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
     await supabase.from('user_warnings').insert([{
       user_id: userId, admin_id: admin?.id, type: 'ban', reason,
@@ -416,6 +424,7 @@ export default function AdminDashboard() {
 
   const unbanUser = async (userId, userName) => {
     if (!confirm(`Unban ${userName}?`)) return;
+    await supabase.from('account_status').update({ is_banned: false }).eq('id', userId);
     await supabase.from('profiles').update({ is_banned: false }).eq('id', userId);
     showToast(`${userName} has been unbanned.`);
     fetchData();
@@ -439,7 +448,8 @@ export default function AdminDashboard() {
         showToast(d.message || 'Failed to delete user.');
       }
     } catch {
-      // Fallback: just delete profile
+      // Fallback: delete from new tables + profiles
+      await supabase.from('accounts').delete().eq('id', userId);
       await supabase.from('profiles').delete().eq('id', userId);
       showToast(`${userName} deleted.`);
       setSelectedUser(null);
@@ -449,6 +459,7 @@ export default function AdminDashboard() {
 
   const forceVerifyEmail = async (userId, userName) => {
     if (!confirm(`Force verify email for ${userName}?`)) return;
+    await supabase.from('account_status').update({ is_verified: true }).eq('id', userId);
     await supabase.from('profiles').update({ is_verified: true }).eq('id', userId);
     showToast(`${userName} verified.`);
     if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev, is_verified: true }));

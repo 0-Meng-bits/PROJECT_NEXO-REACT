@@ -932,11 +932,11 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
     setLoadingMembers(true);
     // fetch leader profile
     const { data: leaderData } = await supabase
-      .from('profiles')
-      .select('full_name, student_id')
+      .from('accounts')
+      .select('full_name, ctu_id')
       .eq('id', comm.creator_id)
       .single();
-    if (leaderData) setLeader(leaderData);
+    if (leaderData) setLeader({ full_name: leaderData.full_name, student_id: leaderData.ctu_id });
 
     const { data } = await supabase
       .from('memberships')
@@ -1091,12 +1091,11 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
     if (!inviteSearch.trim()) return;
     setInviteSearching(true);
     setInviteResult(null);
-    const { data } = await supabase.from('profiles')
-      .select('id, full_name, student_id')
-      .ilike('student_id', `%${inviteSearch.trim()}%`)
-      .limit(1)
-      .single();
-    setInviteResult(data || null);
+    const { data } = await supabase.from('accounts')
+      .select('id, full_name, ctu_id')
+      .ilike('ctu_id', `%${inviteSearch.trim()}%`)
+      .limit(1).single();
+    setInviteResult(data ? { ...data, student_id: data.ctu_id } : null);
     setInviteSearching(false);
   };
 
@@ -1432,7 +1431,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   useEffect(() => {
     if (!user?.id) return;
     const load = async () => {
-      const { data, error } = await supabase.from('profiles')
+      const { data, error } = await supabase.from('account_details')
         .select('course, year_level, interests, avatar_url, id_photo_url, cover_url')
         .eq('id', user.id).single();
       if (!error && data) {
@@ -1471,7 +1470,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise(r => { reader.onload = ev => r(ev.target.result); reader.readAsDataURL(file); });
-      const { error } = await supabase.from('profiles').update({ id_photo_url: dataUrl }).eq('id', user.id);
+      const { error } = await supabase.from('account_details').update({ id_photo_url: dataUrl }).eq('id', user.id);
       if (!error) setIdUploaded(true);
     } catch (err) { console.error(err); }
     finally { setIdUploading(false); }
@@ -1500,7 +1499,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.src = objectUrl;
       });
       setCoverUrl(compressed);
-      await supabase.from('profiles').update({ cover_url: compressed }).eq('id', user.id);
+      await supabase.from('account_details').update({ cover_url: compressed }).eq('id', user.id);
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, cover_url: compressed }));
     } catch (err) { console.error(err); }
@@ -1981,10 +1980,18 @@ export default function UserPortal() {
 
   const viewUserProfile = useCallback(async (studentId) => {
     if (!studentId) return;
-    const { data, error } = await supabase.from('profiles')
-      .select('id, full_name, student_id, user_type, is_verified, course, year_level, interests, avatar_url, cover_url')
-      .eq('student_id', String(studentId)).single();
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(course, year_level, interests, avatar_url, cover_url)')
+      .eq('ctu_id', String(studentId)).single();
     if (!error && data) {
+      const flat = {
+        ...data,
+        student_id: data.ctu_id,
+        is_verified: data.account_status?.is_verified,
+        ...(data.account_details || {}),
+      };
+      delete flat.account_status; delete flat.account_details;
       // fetch their active circle memberships
       const { data: memberships } = await supabase
         .from('memberships')
@@ -1992,7 +1999,7 @@ export default function UserPortal() {
         .eq('user_id', data.id)
         .eq('status', 'active');
       const circles = (memberships || []).map(m => m.communities).filter(Boolean);
-      setViewingProfile({ ...data, _circles: circles });
+      setViewingProfile({ ...flat, _circles: circles });
     } else {
       console.error('viewUserProfile error:', error, 'studentId:', studentId);
     }
@@ -2054,10 +2061,12 @@ export default function UserPortal() {
   useEffect(() => {
     const fetchOnline = async () => {
       const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min window
-      const { data } = await supabase.from('profiles')
-        .select('id, full_name, student_id, avatar_url')
-        .gte('last_seen', since);
-      const profiles = (data || []);
+      const { data } = await supabase.from('accounts')
+        .select('id, full_name, ctu_id, account_details(avatar_url, last_seen)')
+        .gte('account_details.last_seen', since);
+      const profiles = (data || []).map(a => ({
+        ...a, student_id: a.ctu_id, avatar_url: a.account_details?.avatar_url,
+      }));
       setOnlineUsers(new Set(profiles.map(p => p.id)));
       // Keep self in the list for display — just mark them differently if needed
       setOnlineProfiles(profiles);
@@ -2148,10 +2157,10 @@ export default function UserPortal() {
     setAnnouncements(data || []);
     const authorIds = [...new Set((data || []).map(a => a.author_student_id).filter(Boolean))];
     if (authorIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('student_id, avatar_url').in('student_id', authorIds);
+      const { data: profiles } = await supabase.from('accounts').select('ctu_id, account_details(avatar_url)').in('ctu_id', authorIds);
       if (profiles) {
         const map = {};
-        profiles.forEach(p => { map[p.student_id] = p.avatar_url || null; });
+        profiles.forEach(p => { map[p.ctu_id] = p.account_details?.avatar_url || null; });
         setAvatarCache(prev => ({ ...prev, ...map }));
       }
     }
@@ -2310,13 +2319,13 @@ export default function UserPortal() {
   const fetchAvatarsForMessages = useCallback(async (msgs) => {
     const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id))];
     if (uncached.length === 0) return;
-    const { data } = await supabase.from('profiles').select('id, student_id, avatar_url').in('student_id', uncached);
+    const { data } = await supabase.from('accounts').select('id, ctu_id, account_details(avatar_url)').in('ctu_id', uncached);
     if (data) {
       const map = {};
       const idMap = {};
       data.forEach(p => {
-        map[p.student_id] = p.avatar_url || null;
-        idMap[p.student_id] = p.id; // student_id -> UUID for online check
+        map[p.ctu_id] = p.account_details?.avatar_url || null;
+        idMap[p.ctu_id] = p.id;
       });
       setAvatarCache(prev => ({ ...prev, ...map }));
       setProfileIdCache(prev => ({ ...prev, ...idMap }));
