@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
 
   const { error } = await supabaseAdmin
+    .from('account_details')
     .update(updates)
     .eq('id', userId);
 
