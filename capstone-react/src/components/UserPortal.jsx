@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { AuditionFormBuilder, AuditionReviewPanel, AuditionApplicationForm, auditionStatusLabel, auditionStatusColor } from './AuditionSystem';
+import { ApplicationFormBuilder, ApplicationReviewPanel, ApplicationApplicationForm, ApplicationStatusLabel, ApplicationStatusColor } from './ApplicationSystem';
 import ThemePicker from './ThemePicker';
 import { loadTheme } from '../lib/theme';
 
@@ -22,7 +22,7 @@ function notifIcon(type) {
     join_denied:      'fa-solid fa-circle-xmark',
     kicked:           'fa-solid fa-user-xmark',
     promoted:         'fa-solid fa-arrow-up',
-    audition_update:  'fa-solid fa-microphone',
+    application_update:  'fa-solid fa-microphone',
     new_announcement: 'fa-solid fa-bullhorn',
     invite_accepted:  'fa-solid fa-envelope-open-text',
   };
@@ -90,8 +90,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const totalVotes = Object.values(pollVotes).reduce((s, v) => s + (v?.length || 0), 0);
   const myVote = isPoll ? pollOptions.find(opt => (pollVotes[opt] || []).includes(user?.id)) : null;
 
-  // Detect audition announcements by title pattern
-  const isAuditionPost = a.title?.includes('Audition Open') || a.title?.includes('Internal Audition Open');
+  // Detect Application announcements by title pattern
+  const isApplicationPost = a.title?.includes('Application Open') || a.title?.includes('Internal Application Open');
 
   // Comment state
   const [showComments, setShowComments] = useState(false);
@@ -272,8 +272,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       <h3 className="announcement-title">{a.title}</h3>
       {a.content && <p className="announcement-body">{a.content}</p>}
 
-      {/* ── AUDITION APPLY BUTTON ── */}
-      {isAuditionPost && onApply && (
+      {/* ── Application APPLY BUTTON ── */}
+      {isApplicationPost && onApply && (
         <div style={{ marginTop: 14 }}>
           <button onClick={() => onApply(a)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(252,238,10,0.1)', border: '1px solid var(--cyber-yellow)', color: 'var(--cyber-yellow)', borderRadius: 8, padding: '9px 20px', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', transition: 'background 0.2s' }}
@@ -850,8 +850,8 @@ function rankColor(level) {
 function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
-  const name = m.profiles?.full_name || '"�';
-  const initials = name !== '"�'
+  const name = m.accounts?.full_name || '??';
+  const initials = name !== '??'
     ? name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
@@ -877,7 +877,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
             {rankLabel(m.rank_level)}
           </span>
           <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 8 }}>
-            {m.profiles?.student_id}
+            {m.accounts?.ctu_id}
           </span>
         </div>
       </div>
@@ -940,7 +940,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 
     const { data } = await supabase
       .from('memberships')
-      .select('*, profiles(full_name, student_id)')
+      .select('*, accounts!user_id(full_name, ctu_id)')
       .eq('community_id', comm.id);
     if (data) {
       setMembers(data.filter(m => m.status === 'active'));
@@ -1158,8 +1158,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
             </button>
           )}
           {viewerIsOwner && (
-            <button className={`manage-tab ${tab === 'audition' ? 'active' : ''}`} onClick={() => setTab('audition')}>
-              <i className="fa-solid fa-microphone"></i> Audition
+            <button className={`manage-tab ${tab === 'Application' ? 'active' : ''}`} onClick={() => setTab('Application')}>
+              <i className="fa-solid fa-microphone"></i> Application
             </button>
           )}
           {viewerIsOwner && (
@@ -1311,8 +1311,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 <tbody>
                   {requests.map(r => (
                     <tr key={r.id}>
-                      <td style={{ color: 'var(--text-primary)' }}>{r.profiles?.full_name || '"�'}</td>
-                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.profiles?.student_id || '"�'}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{r.accounts?.full_name || '??'}</td>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.accounts?.ctu_id || '??'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="member-action-btn promote" onClick={() => approveRequest(r.id)}><i className="fa-solid fa-check"></i> Approve</button>
@@ -1327,18 +1327,18 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           </div>
         )}
 
-        {tab === 'audition' && viewerIsOwner && (
+        {tab === 'Application' && viewerIsOwner && (
           <div className="manage-tab-content">
-            <AuditionFormBuilder
+            <ApplicationFormBuilder
               comm={comm}
-              onToggle={(enabled) => onSaved({ ...comm, audition_enabled: enabled })}
+              onToggle={(enabled) => onSaved({ ...comm, application_enabled: enabled })}
             />
-            {comm.audition_enabled && (
+            {comm.application_enabled && (
               <>
-                <div className="audition-section-label" style={{ marginTop: 24 }}>
+                <div className="Application-section-label" style={{ marginTop: 24 }}>
                   <span>Applications Received</span>
                 </div>
-                <AuditionReviewPanel comm={comm} />
+                <ApplicationReviewPanel comm={comm} />
               </>
             )}
           </div>
@@ -1351,7 +1351,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                 <i className="fa-solid fa-user-plus" style={{ marginRight: 8 }}></i>Personal Invite
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                Search for a CTU student by their Student ID and invite them directly into the circle, bypassing the audition process.
+                Search for a CTU student by their Student ID and invite them directly into the circle, bypassing the Application process.
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -1661,17 +1661,19 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>COURSE</label>
                   <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}>
-                    <option value="">Select course</option>
-                    {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}
+                    className="dark-select">
+                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select course</option>
+                    {COURSES.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>YEAR LEVEL</label>
                   <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}>
-                    <option value="">Select year</option>
-                    {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y}>{y}</option>)}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}
+                    className="dark-select">
+                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select year</option>
+                    {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y} style={{ background: '#1a1a2e', color: 'white' }}>{y}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1757,10 +1759,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   );
 }
 
-function AuditionDetailModal({ data, onClose }) {
+function ApplicationDetailModal({ data, onClose }) {
   const { response: r, community: c, questions } = data;
-  const statusColor = auditionStatusColor(r.status, r.phase2_result);
-  const statusLabel = auditionStatusLabel(r.status, r.phase2_result);
+  const statusColor = ApplicationStatusColor(r.status, r.phase2_result);
+  const statusLabel = ApplicationStatusLabel(r.status, r.phase2_result);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1844,7 +1846,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
   if (reportedUserId) {
     await supabase.from('notifications').insert([{
       user_id: reportedUserId,
-      type: 'audition_update',
+      type: 'application_update',
       message: 'Your message was flagged for inappropriate language and blocked. Please follow community guidelines.',
     }]);
   }
@@ -1949,9 +1951,9 @@ export default function UserPortal() {
   const [showManage, setShowManage] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [circleChatMembers, setCircleChatMembers] = useState([]); // members for the panel
-  const [showAuditionForm, setShowAuditionForm] = useState(null); // { comm, audition? }
-  const [myAuditions, setMyAuditions] = useState([]);
-  const [viewingAudition, setViewingAudition] = useState(null); // { response, community, questions }
+  const [showApplicationForm, setShowApplicationForm] = useState(null); // { comm, Application? }
+  const [myApplications, setMyApplications] = useState([]);
+  const [viewingApplication, setViewingApplication] = useState(null); // { response, community, questions }
   const [search, setSearch] = useState('');
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
@@ -2060,10 +2062,11 @@ export default function UserPortal() {
 
   useEffect(() => {
     const fetchOnline = async () => {
-      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 min window
+      const since = new Date(Date.now() - 2 * 60 * 1000).toISOString(); // 2 min window (truly online)
       const { data } = await supabase.from('accounts')
-        .select('id, full_name, ctu_id, account_details(avatar_url, last_seen)')
-        .gte('account_details.last_seen', since);
+        .select('id, full_name, ctu_id, account_details!inner(avatar_url, last_seen)')
+        .gte('account_details.last_seen', since)
+        .not('account_details.last_seen', 'is', null);
       const profiles = (data || []).map(a => ({
         ...a, student_id: a.ctu_id, avatar_url: a.account_details?.avatar_url,
       }));
@@ -2139,13 +2142,13 @@ export default function UserPortal() {
     setMyMemberships(data || []);
   }, [user?.id]);
 
-  const loadMyAuditions = useCallback(async () => {
+  const loadMyApplications = useCallback(async () => {
     if (!user?.id) return;
     const { data } = await supabase
-      .from('audition_responses')
+      .from('application_submissions')
       .select('community_id, status, phase2_result, id')
       .eq('applicant_id', user.id);
-    setMyAuditions(data || []);
+    setMyApplications(data || []);
   }, [user?.id]);
 
   const loadAnnouncements = useCallback(async () => {
@@ -2408,7 +2411,7 @@ export default function UserPortal() {
     return () => { supabase.removeChannel(subscription); };
   }, [activeCommId, activeChannelId]);
 
-  useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyAuditions(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyAuditions, loadAnnouncements, loadNotifications]);
+  useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
@@ -2417,10 +2420,15 @@ export default function UserPortal() {
     // Load members for the panel whenever we switch circles
     if (activeCommId && activeCommId !== 'global') {
       supabase.from('memberships')
-        .select('rank_level, profiles(id, full_name, student_id, avatar_url)')
+        .select('rank_level, user_id, accounts!user_id(id, full_name, ctu_id, account_details(avatar_url))')
         .eq('community_id', activeCommId).eq('status', 'active')
         .then(({ data }) => {
-          setCircleChatMembers((data || []).map(m => ({ ...m.profiles, rank_level: m.rank_level })));
+          setCircleChatMembers((data || []).map(m => ({ 
+            ...m.accounts, 
+            avatar_url: m.accounts?.account_details?.avatar_url,
+            rank_level: m.rank_level,
+            student_id: m.accounts?.ctu_id
+          })));
         });
     }
     setShowCircleAnnouncements(false);
@@ -2493,10 +2501,15 @@ export default function UserPortal() {
     loadCircleChatMessages(activeCommId);
     // Load members for the panel
     supabase.from('memberships')
-      .select('rank_level, profiles(id, full_name, student_id, avatar_url)')
+      .select('rank_level, user_id, accounts!user_id(id, full_name, ctu_id, account_details(avatar_url))')
       .eq('community_id', activeCommId).eq('status', 'active')
       .then(({ data }) => {
-        setCircleChatMembers((data || []).map(m => ({ ...m.profiles, rank_level: m.rank_level })));
+        setCircleChatMembers((data || []).map(m => ({ 
+          ...m.accounts, 
+          avatar_url: m.accounts?.account_details?.avatar_url,
+          rank_level: m.rank_level,
+          student_id: m.accounts?.ctu_id
+        })));
       });
     const sub = supabase.channel('circle-chat:' + activeCommId)
       .on('postgres_changes',
@@ -2553,7 +2566,7 @@ export default function UserPortal() {
     return m?.status === 'active';
   };
   const isPending = (commId) => getMembership(commId)?.status === 'pending';
-  const getMyAudition = (commId) => myAuditions.find(a => a.community_id === commId);
+  const getMyApplication = (commId) => myApplications.find(a => a.community_id === commId);
 
   const requestJoin = async (commId) => {
     const { error } = await supabase.from('memberships').insert([{
@@ -3268,8 +3281,8 @@ export default function UserPortal() {
                           const comm = commName
                             ? communities.find(c => c.name === commName)
                             : communities.find(c => ann.title?.includes(c.name));
-                          if (comm) setShowAuditionForm({ comm });
-                          else alert('Could not find the audition circle. Try visiting the circle directly.');
+                          if (comm) setShowApplicationForm({ comm });
+                          else alert('Could not find the Application circle. Try visiting the circle directly.');
                         }} />
                     ))}
                   </div>
@@ -3436,7 +3449,7 @@ export default function UserPortal() {
                       const owned = c.creator_id === user?.id;
                       const joined = isMember(c.id);
                       const pending = isPending(c.id);
-                      const myAudition = getMyAudition(c.id);
+                      const myApplication = getMyApplication(c.id);
                       return (
                         <div key={c.id} className="post" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
@@ -3445,7 +3458,7 @@ export default function UserPortal() {
                               <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
                             {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
-                            {c.audition_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Audition Required</span>}
+                            {c.application_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
                           </div>
                           <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.description || 'No description provided.'}</p>
                         </div>
@@ -3472,35 +3485,35 @@ export default function UserPortal() {
                             <span style={{ fontSize: 11, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '5px 12px', borderRadius: 20 }}>
                               <i className="fa-solid fa-clock" style={{ marginRight: 5 }}></i>PENDING
                             </span>
-                          ) : myAudition ? (
+                          ) : myApplication ? (
                             <span
                               style={{
                                 fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
-                                color: auditionStatusColor(myAudition.status, myAudition.phase2_result),
-                                border: `1px solid ${auditionStatusColor(myAudition.status, myAudition.phase2_result)}`,
+                                color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result),
+                                border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`,
                                 cursor: 'pointer',
                               }}
                               onClick={async () => {
                                 const [rRes, qRes] = await Promise.all([
-                                  supabase.from('audition_responses').select('*').eq('id', myAudition.id).single(),
-                                  supabase.from('audition_questions').select('*').eq('community_id', c.id).order('order_index'),
+                                  supabase.from('application_submissions').select('*').eq('id', myApplication.id).single(),
+                                  supabase.from('Application_questions').select('*').eq('community_id', c.id).order('order_index'),
                                 ]);
-                                setViewingAudition({ response: rRes.data, community: c, questions: qRes.data || [] });
+                                setViewingApplication({ response: rRes.data, community: c, questions: qRes.data || [] });
                               }}
                             >
                               <i className="fa-solid fa-microphone" style={{ marginRight: 5 }}></i>
-                              {auditionStatusLabel(myAudition.status, myAudition.phase2_result)}
+                              {ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}
                               <i className="fa-solid fa-eye" style={{ marginLeft: 6, fontSize: 9 }}></i>
                             </span>
                           ) : (
-                            c.audition_enabled ? (
-                              // Internal audition: outsiders can still REQUEST to join; audition is only for existing members
-                              c.internal_audition ? (
+                            c.application_enabled ? (
+                              // Internal Application: outsiders can still REQUEST to join; Application is only for existing members
+                              c.internal_Application ? (
                                 <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
                                   <i className="fa-solid fa-paper-plane"></i> REQUEST
                                 </button>
                               ) : (
-                                <button className="group-action-btn manage" onClick={() => setShowAuditionForm({ comm: c })}>
+                                <button className="group-action-btn manage" onClick={() => setShowApplicationForm({ comm: c })}>
                                   <i className="fa-solid fa-microphone"></i> APPLY
                                 </button>
                               )
@@ -3634,13 +3647,13 @@ export default function UserPortal() {
                         <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Join request pending approval...
                       </span>
                     ) : (
-                      activeComm.audition_enabled ? (
-                        activeComm.internal_audition ? (
+                      activeComm.application_enabled ? (
+                        activeComm.internal_Application ? (
                           <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
                             <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
                           </button>
                         ) : (
-                          <button className="group-action-btn manage" onClick={() => setShowAuditionForm({ comm: activeComm })}>
+                          <button className="group-action-btn manage" onClick={() => setShowApplicationForm({ comm: activeComm })}>
                             <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
                           </button>
                         )
@@ -3746,7 +3759,7 @@ export default function UserPortal() {
                           onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
                           onVote={handleCircleVote}
                           onReport={(data) => setShowReport(data)}
-                          onApply={() => setShowAuditionForm({ comm: activeComm })} />
+                          onApply={() => setShowApplicationForm({ comm: activeComm })} />
                       ))
                     )}
                   </div>
@@ -3952,17 +3965,17 @@ export default function UserPortal() {
           readOnly
         />
       )}
-      {showAuditionForm && (
-        <AuditionApplicationForm
-          comm={showAuditionForm.comm}
-          audition={showAuditionForm.audition || null}
+      {showApplicationForm && (
+        <ApplicationApplicationForm
+          comm={showApplicationForm.comm}
+          Application={showApplicationForm.Application || null}
           applicantId={user?.id}
-          onSubmitted={() => { setShowAuditionForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyAuditions(); }}
-          onCancel={() => setShowAuditionForm(null)}
+          onSubmitted={() => { setShowApplicationForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyApplications(); }}
+          onCancel={() => setShowApplicationForm(null)}
         />
       )}
-      {viewingAudition && (
-        <AuditionDetailModal data={viewingAudition} onClose={() => setViewingAudition(null)} />
+      {viewingApplication && (
+        <ApplicationDetailModal data={viewingApplication} onClose={() => setViewingApplication(null)} />
       )}
       <Toast message={toast} />
 
@@ -3981,3 +3994,4 @@ export default function UserPortal() {
     </div>
   );
 }
+

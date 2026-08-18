@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   // Allow if requester is the creator or an admin
   const { data: profile } = await supabaseAdmin
-    .from('profiles').select('user_type').eq('id', userId).single();
+    .from('accounts').select('user_type').eq('id', userId).single();
 
   const isAdmin = profile?.user_type === 'Admin';
   const isCreator = community.creator_id === userId;

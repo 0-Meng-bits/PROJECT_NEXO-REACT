@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabaseAdmin
       .from('communities')
-      .select('*, profiles(full_name)')
+      .select('*, accounts!creator_id(full_name)')
       .order('created_at', { ascending: false });
     if (error) return res.status(400).json({ message: error.message });
     return res.json(data);
@@ -24,7 +24,6 @@ export default async function handler(req, res) {
       const legacyUserId = req.headers['x-user-id'];
       if (legacyUserId) {
         const { data: profile } = await supabaseAdmin
-          .from('profiles').select('id').eq('id', legacyUserId).single();
         if (profile) resolvedUserId = profile.id;
       }
     }

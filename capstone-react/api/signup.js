@@ -35,7 +35,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Insert into new normalized tables + keep profiles in sync
   try {
     await supabaseAdmin.from('accounts').insert([{
       id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type,
@@ -48,7 +47,6 @@ export default async function handler(req, res) {
 
   // Insert profile linked to auth user (backwards compat)
   const { data, error } = await supabaseAdmin
-    .from('profiles')
     .insert([{
       id: authData.user.id,
       student_id: studentId,

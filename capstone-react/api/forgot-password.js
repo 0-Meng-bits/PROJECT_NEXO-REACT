@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   if (!studentId) return res.status(400).json({ message: 'CTU ID is required.' });
 
   const { data: profile, error } = await supabaseAdmin
-    .from('profiles').select('email').eq('student_id', studentId).single();
+    .from('accounts').select('email').eq('ctu_id', studentId).single();
 
   if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
 

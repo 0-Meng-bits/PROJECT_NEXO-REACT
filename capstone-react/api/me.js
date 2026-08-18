@@ -6,22 +6,25 @@ export default async function handler(req, res) {
   // Accept userId query param (token auth unreliable with new Supabase key format)
   const userId = req.query.userId;
   if (userId) {
-    const { data, error } = await supabaseAdmin
-      .from('profiles').select('*').eq('id', userId).single();
-    if (error || !data) return res.status(404).json({ message: 'Profile not found.' });
-    return res.json({ user: data });
+    const { data: account, error } = await supabaseAdmin
+      .from('accounts').select('*, account_status(*), account_details(*)').eq('id', userId).single();
+    if (error || !account) return res.status(404).json({ message: 'Profile not found.' });
+    const user = { ...account, student_id: account.ctu_id, is_verified: account.account_status?.is_verified, ...account.account_details };
+    delete user.account_status; delete user.account_details;
+    return res.json({ user });
   }
 
-  // Fallback: token-based auth
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ message: 'No token provided.' });
 
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ message: 'Invalid or expired session.' });
+  const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (authError || !authUser) return res.status(401).json({ message: 'Invalid or expired session.' });
 
-  const { data } = await supabaseAdmin
-    .from('profiles').select('*').eq('id', user.id).single();
+  const { data: account } = await supabaseAdmin
+    .from('accounts').select('*, account_status(*), account_details(*)').eq('id', authUser.id).single();
 
-  if (!data) return res.status(404).json({ message: 'Profile not found.' });
-  res.json({ user: data });
+  if (!account) return res.status(404).json({ message: 'Profile not found.' });
+  const user = { ...account, student_id: account.ctu_id, is_verified: account.account_status?.is_verified, ...account.account_details };
+  delete user.account_status; delete user.account_details;
+  res.json({ user });
 }

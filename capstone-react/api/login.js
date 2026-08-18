@@ -5,32 +5,35 @@ export default async function handler(req, res) {
 
   const { studentId, password } = req.body;
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles').select('*').eq('student_id', studentId).single();
+  const { data: account, error } = await supabaseAdmin
+    .from('accounts')
+    .select('*, account_status(*), account_details(*)')
+    .eq('ctu_id', studentId)
+    .single();
 
-  if (profileError || !profile) {
+  if (error || !account) {
     return res.status(401).json({ message: 'CTU_ID not found in the system.' });
   }
 
-  // Check ban
-  if (profile.is_banned) {
+  const status = account.account_status || {};
+  const details = account.account_details || {};
+
+  if (status.is_banned) {
     return res.status(403).json({ message: 'Your account has been banned.', banned: true });
   }
 
-  // Check suspension
-  if (profile.suspended_until && new Date(profile.suspended_until) > new Date()) {
+  if (status.suspended_until && new Date(status.suspended_until) > new Date()) {
     return res.status(403).json({
-      message: `Your account is suspended until ${new Date(profile.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
+      message: `Your account is suspended until ${new Date(status.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
       suspended: true,
-      suspended_until: profile.suspended_until,
+      suspended_until: status.suspended_until,
     });
   }
 
-  const isPending = !profile.is_verified;
+  const isPending = !status.is_verified;
 
-  // Try Supabase Auth first
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email: profile.email,
+    email: account.email,
     password,
   });
 
@@ -38,9 +41,22 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
 
+  const user = {
+    ...account,
+    student_id: account.ctu_id,
+    is_verified: status.is_verified,
+    is_banned: status.is_banned,
+    suspended_until: status.suspended_until,
+    warning_count: status.warning_count,
+    trust_points: status.trust_points,
+    ...details,
+  };
+  delete user.account_status;
+  delete user.account_details;
+
   res.json({
     message: isPending ? 'Pending approval' : 'Authentication successful',
-    user: profile,
+    user,
     session: authData.session,
     pending: isPending,
   });

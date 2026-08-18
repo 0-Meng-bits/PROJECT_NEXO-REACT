@@ -61,7 +61,7 @@ export default function Onboarding() {
     const fetchAura = async () => {
       // Count students with at least one matching interest (only works after migration)
       const { count } = await supabase
-        .from('profiles')
+        .from('account_details')
         .select('*', { count: 'exact', head: true })
         .overlaps('interests', selectedInterests)
         .neq('id', user.id || '');
@@ -161,31 +161,33 @@ export default function Onboarding() {
       }
     }
 
-    // Update profile
-    const updates = {
+    // Update account_details with onboarding data
+    const detailsUpdates = {
       course,
       year_level: yearLevel,
       interests: selectedInterests,
-      onboarding_complete: true,
       ...(avatarUrl && { avatar_url: avatarUrl }),
     };
+    await supabase.from('account_details').update(detailsUpdates).eq('id', user.id);
 
+    // Mark onboarding complete in account_status
+    await supabase.from('account_status').update({ onboarding_complete: true }).eq('id', user.id);
+
+    const profileUpdates = { ...detailsUpdates, onboarding_complete: true };
     const { data: updatedProfile } = await supabase
-      .from('profiles')
-      .update(updates)
+      .update(profileUpdates)
       .eq('id', user.id)
       .select()
       .single();
 
+    // Refresh localStorage with updated data
     if (updatedProfile) {
-      // Merge avatar_url in case it was saved separately via /api/upload-avatar
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({
         ...updatedProfile,
         avatar_url: updatedProfile.avatar_url || avatarUrl || stored.avatar_url || null,
       }));
     } else if (avatarUrl) {
-      // Profile update failed but we still have the avatar — save it locally
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: avatarUrl }));
     }

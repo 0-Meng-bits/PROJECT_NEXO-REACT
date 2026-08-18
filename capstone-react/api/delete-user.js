@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   // Verify requester is an admin
   const { data: adminProfile } = await supabaseAdmin
-    .from('profiles').select('user_type').eq('id', adminId).single();
+    .from('accounts').select('user_type').eq('id', adminId).single();
   if (!adminProfile || adminProfile.user_type !== 'Admin') {
     return res.status(403).json({ message: 'Admin access required.' });
   }
@@ -20,12 +20,10 @@ export default async function handler(req, res) {
   await supabaseAdmin.from('announcements').delete().eq('author_id', targetId);
   await supabaseAdmin.from('audition_responses').delete().eq('applicant_id', targetId);
   await supabaseAdmin.from('messages').delete().eq('student_id',
-    (await supabaseAdmin.from('profiles').select('student_id').eq('id', targetId).single()).data?.student_id
+    (await supabaseAdmin.from('accounts').select('ctu_id').eq('id', targetId).single()).data?.ctu_id
   );
 
-  // Delete profile
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles').delete().eq('id', targetId);
+  await supabaseAdmin.from('accounts').delete().eq('id', targetId);
   if (profileError) {
     console.error('[DELETE USER] Profile error:', profileError.message, profileError.details);
     return res.status(500).json({ message: profileError.message, detail: profileError.details, hint: profileError.hint });

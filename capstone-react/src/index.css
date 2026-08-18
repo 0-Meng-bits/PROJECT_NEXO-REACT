@@ -407,6 +407,13 @@ body {
 }
 .input-group select option { background: var(--bg-black); color: var(--text-primary); }
 
+/* Dark themed select dropdowns */
+.dark-select option {
+  background: #1a1a2e !important;
+  color: white !important;
+  padding: 8px;
+}
+
 .auth-footer { margin-top: 25px; font-size: 13px; color: #888; text-align: left; }
 .auth-footer a { color: var(--cyber-cyan); text-decoration: none; }
 .auth-footer a:hover { color: var(--cyber-yellow); }

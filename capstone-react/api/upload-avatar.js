@@ -51,9 +51,8 @@ export default async function handler(req, res) {
 
   if (uploadError) {
     console.error('Storage upload error:', uploadError.message);
-    // Fallback: save base64 directly to profiles table
+    await supabaseAdmin.from('account_details').update({ avatar_url: avatar }).eq('id', userId);
     const { error: dbError } = await supabaseAdmin
-      .from('profiles').update({ avatar_url: avatar }).eq('id', userId);
     if (dbError) return res.status(500).json({ message: 'Upload failed.', detail: uploadError.message });
     return res.status(200).json({ url: avatar });
   }
@@ -62,9 +61,8 @@ export default async function handler(req, res) {
   const { data: urlData } = supabaseAdmin.storage.from('avatars').getPublicUrl(path);
   publicUrl = urlData.publicUrl;
 
-  // Persist the URL in the profiles table
+  await supabaseAdmin.from('account_details').update({ avatar_url: publicUrl }).eq('id', userId);
   const { error: dbError } = await supabaseAdmin
-    .from('profiles')
     .update({ avatar_url: publicUrl })
     .eq('id', userId);
 

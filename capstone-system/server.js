@@ -178,10 +178,6 @@ app.post('/api/signup', async (req, res) => {
     // 2c. Insert into account_details
     await supabaseAdmin.from('account_details').insert([{ id: userId }]);
 
-    // 2d. Keep profiles in sync for backwards compat during transition
-    await supabaseAdmin.from('profiles').insert([{
-      id: userId, student_id: studentId, full_name: fullName, email, user_type, is_verified: false,
-    }]);
   } catch (err) {
     await supabaseAdmin.auth.admin.deleteUser(userId);
     return res.status(400).json({ message: err.message });
@@ -237,7 +233,7 @@ app.get('/api/students', async (req, res) => {
 // ── GET ALL COMMUNITIES ───────────────────────────────────────────────────────
 app.get('/api/communities', async (req, res) => {  const { data, error } = await supabaseAdmin
     .from('communities')
-    .select('*, profiles(full_name)')
+    .select('*, accounts!creator_id(full_name)')
     .order('created_at', { ascending: false });
   if (error) return res.status(400).json({ message: error.message });
   res.json(data);
@@ -248,10 +244,10 @@ app.get('/api/admin-data', async (req, res) => {  try {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-      supabaseAdmin.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
+      supabaseAdmin.from('application_submissions').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('memberships').select('community_id, status, created_at'),
-      supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, student_id), reported:reported_user_id(full_name, student_id)').order('created_at', { ascending: false }),
+      supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, ctu_id), reported:reported_user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('campus_events').select('*').order('start_date', { ascending: true }),
@@ -259,7 +255,7 @@ app.get('/api/admin-data', async (req, res) => {  try {
     res.json({
       students: studRes.data || [],
       announcements: annRes.data || [],
-      auditions: audRes.data || [],
+      applications: audRes.data || [],
       messages: msgRes.data || [],
       memberships: membRes.data || [],
       reports: repRes.data || [],
@@ -305,13 +301,13 @@ app.get('/api/circle-requests', async (req, res) => {
     }
     // Enrich with creator profile info
     const creatorIds = [...new Set((data || []).map(r => r.creator_id).filter(Boolean))];
-    let profileMap = {};
+    let accountsMap = {};
     if (creatorIds.length > 0) {
-      const { data: profiles } = await supabaseAdmin
+      const { data: accounts } = await supabaseAdmin
         .from('accounts').select('id, full_name, ctu_id').in('id', creatorIds);
-      (profiles || []).forEach(p => { profileMap[p.id] = { ...p, student_id: p.ctu_id }; });
+      (accounts || []).forEach(a => { accountsMap[a.id] = { ...a, student_id: a.ctu_id }; });
     }
-    const enriched = (data || []).map(r => ({ ...r, profiles: profileMap[r.creator_id] || null }));
+    const enriched = (data || []).map(r => ({ ...r, accounts: accountsMap[r.creator_id] || null }));
     res.json(enriched);
   } catch (err) {
     console.error('[CIRCLE-REQUESTS GET] Unexpected:', err.message);
@@ -385,7 +381,6 @@ app.post('/api/communities', async (req, res) => {
     const legacyUserId = req.headers['x-user-id'];
     if (legacyUserId) {
       const { data: profile } = await supabaseAdmin
-        .from('profiles').select('id').eq('id', legacyUserId).single();
       if (profile) resolvedUserId = profile.id;
     }
   }
@@ -426,7 +421,6 @@ app.delete('/api/delete-community', async (req, res) => {
   // Fallback for legacy accounts — verify the userId exists in profiles
   if (!resolvedUserId && userId) {
     const { data: profile } = await supabaseAdmin
-      .from('profiles').select('id').eq('id', userId).single();
     if (profile) resolvedUserId = profile.id;
   }
 
@@ -490,8 +484,10 @@ app.post('/api/upload-cover', async (req, res) => {
 app.post('/api/heartbeat', async (req, res) => {
   const userId = req.body.userId || req.query.userId;
   if (!userId) return res.status(400).json({ message: 'Missing userId.' });
-  const { error } = await supabaseAdmin.from('profiles')
+  
+  const { error } = await supabaseAdmin.from('account_details')
     .update({ last_seen: new Date().toISOString() }).eq('id', userId);
+  
   if (error) return res.status(500).json({ message: error.message });
   res.json({ ok: true });
 });
@@ -509,8 +505,6 @@ app.post('/api/update-profile', async (req, res) => {
 
   // Update new table
   const { error } = await supabaseAdmin.from('account_details').update(detailUpdates).eq('id', userId);
-  // Keep profiles in sync
-  await supabaseAdmin.from('profiles').update(detailUpdates).eq('id', userId);
 
   if (error) return res.status(500).json({ message: error.message });
   res.json({ ok: true });
@@ -553,7 +547,6 @@ app.post('/api/upload-avatar', async (req, res) => {
     const legacyUserId = req.headers['x-user-id'];
     if (legacyUserId) {
       const { data: profile } = await supabaseAdmin
-        .from('profiles').select('id').eq('id', legacyUserId).single();
       if (profile) resolvedUserId = profile.id;
     }
   }
@@ -566,12 +559,10 @@ app.post('/api/upload-avatar', async (req, res) => {
   if (!avatar) return res.status(400).json({ message: 'No avatar data provided.' });
 
   // Save base64 directly to the avatar_url column — no storage bucket needed
-  const { error: updateError } = await supabaseAdmin
+  const { error: updateError} = await supabaseAdmin
     .from('account_details')
     .update({ avatar_url: avatar })
     .eq('id', resolvedUserId);
-  // keep profiles in sync
-  await supabaseAdmin.from('profiles').update({ avatar_url: avatar }).eq('id', resolvedUserId);
 
   if (updateError) {
     console.error('[UPLOAD AVATAR] Profile update error:', updateError.message);
@@ -585,8 +576,6 @@ app.post('/api/upload-avatar', async (req, res) => {
 app.post('/api/verify-student/:id', async (req, res) => {
   const { error } = await supabaseAdmin
     .from('account_status').update({ is_verified: true }).eq('id', req.params.id);
-  // keep profiles in sync
-  await supabaseAdmin.from('profiles').update({ is_verified: true }).eq('id', req.params.id);
   if (error) return res.status(400).json(error);
   res.json({ message: 'Student verified!' });
 });
@@ -615,8 +604,6 @@ app.delete('/api/delete-user', async (req, res) => {
 
   // Delete from new tables (cascade handles account_status and account_details)
   await supabaseAdmin.from('accounts').delete().eq('id', id);
-  // Also delete from profiles for backwards compat
-  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', id);
   if (error) return res.status(400).json({ message: error.message });
 
   res.json({ message: 'User deleted successfully.' });

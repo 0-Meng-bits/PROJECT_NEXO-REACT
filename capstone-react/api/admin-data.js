@@ -25,9 +25,9 @@ export default async function handler(req, res) {
 
   try {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-      supabaseAdmin.from('audition_responses').select('*, profiles(full_name, student_id), communities(name)').order('submitted_at', { ascending: false }),
+      supabaseAdmin.from('audition_responses').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('memberships').select('community_id, status, created_at'),
       supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, student_id), reported:reported_user_id(full_name, student_id)').order('created_at', { ascending: false }),

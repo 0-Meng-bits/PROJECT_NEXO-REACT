@@ -58,16 +58,20 @@ export default function Landing({ onEnter }) {
 
   useEffect(() => {
     const fetchPulse = async () => {
+      // Count verified students from account_status
       const { count: total } = await supabase
-        .from('profiles')
+        .from('account_status')
         .select('*', { count: 'exact', head: true })
         .eq('is_verified', true);
+      
+      // Count new signups today from accounts
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const { count: todayCount } = await supabase
-        .from('profiles')
+        .from('accounts')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', today.toISOString());
+      
       setPulse({ online: total || 0, connections: todayCount || 0 });
     };
     fetchPulse();
