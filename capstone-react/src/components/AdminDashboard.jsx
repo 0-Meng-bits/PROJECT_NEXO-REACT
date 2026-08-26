@@ -300,9 +300,10 @@ export default function AdminDashboard() {
   const viewCircleMembers = async (circle) => {
     setSelectedCircle(circle);
     setLoadingMembers(true);
-    const { data } = await supabase.from('memberships')
-      .select('*, accounts!user_id(full_name, ctu_id)')
+    const { data, error } = await supabase.from('memberships')
+      .select('*, accounts:user_id(full_name, ctu_id)')
       .eq('community_id', circle.id);
+    if (error) console.error('Error loading members:', error);
     setCircleMembers(data || []);
     setLoadingMembers(false);
   };

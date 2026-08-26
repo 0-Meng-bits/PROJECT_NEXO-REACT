@@ -973,10 +973,22 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       .single();
     if (leaderData) setLeader({ full_name: leaderData.full_name, student_id: leaderData.ctu_id, avatar_url: leaderData.avatar_url });
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('memberships')
-      .select('*, accounts!user_id(full_name, ctu_id, avatar_url)')
+      .select(`
+        *,
+        accounts:user_id (
+          full_name,
+          ctu_id,
+          avatar_url
+        )
+      `)
       .eq('community_id', comm.id);
+    
+    if (error) {
+      console.error('Error fetching members:', error);
+    }
+    
     if (data) {
       setMembers(data.filter(m => m.status === 'active'));
       setRequests(data.filter(m => m.status === 'pending'));
@@ -2784,9 +2796,10 @@ export default function UserPortal() {
     // Load members for the panel whenever we switch circles
     if (activeCommId && activeCommId !== 'global') {
       supabase.from('memberships')
-        .select('rank_level, user_id, accounts!user_id(id, full_name, ctu_id, account_details(avatar_url))')
+        .select('rank_level, user_id, accounts:user_id(id, full_name, ctu_id, account_details(avatar_url))')
         .eq('community_id', activeCommId).eq('status', 'active')
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) console.error('Error loading circle members:', error);
           setCircleChatMembers((data || []).map(m => ({ 
             ...m.accounts, 
             avatar_url: m.accounts?.account_details?.avatar_url,
@@ -2865,9 +2878,10 @@ export default function UserPortal() {
     loadCircleChatMessages(activeCommId);
     // Load members for the panel
     supabase.from('memberships')
-      .select('rank_level, user_id, accounts!user_id(id, full_name, ctu_id, account_details(avatar_url))')
+      .select('rank_level, user_id, accounts:user_id(id, full_name, ctu_id, account_details(avatar_url))')
       .eq('community_id', activeCommId).eq('status', 'active')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('Error loading circle members:', error);
         setCircleChatMembers((data || []).map(m => ({ 
           ...m.accounts, 
           avatar_url: m.accounts?.account_details?.avatar_url,

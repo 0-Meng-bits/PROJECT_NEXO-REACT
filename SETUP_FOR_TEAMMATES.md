@@ -15,7 +15,7 @@ Your teammate has updated the database schema. Follow these steps to sync your l
 1. **Pull the latest code from GitHub:**
    ```bash
    git pull origin main
-   ```
+   ```````
 
 2. **Go to your Supabase Project:**
    - Log in to [supabase.com](https://supabase.com)
