@@ -270,3 +270,119 @@ SELECT
 FROM accounts
 WHERE id NOT IN (SELECT user_id FROM point_transactions)
 ON CONFLICT DO NOTHING;
+
+-- ══════════════════════════════════════════════════════════════════════
+-- AUTO-SUSPENSION SYSTEM
+-- ══════════════════════════════════════════════════════════════════════
+
+-- Function to check and apply auto-suspension based on trust points
+CREATE OR REPLACE FUNCTION check_auto_suspension(target_user_id uuid)
+RETURNS void AS $
+DECLARE
+  current_points decimal(4,1);
+BEGIN
+  -- Get current trust points
+  current_points := get_user_trust_points(target_user_id);
+  
+  -- Points 0: Permanent ban
+  IF current_points <= 0 THEN
+    UPDATE account_status
+    SET 
+      is_banned = true,
+      suspended_until = NULL -- NULL means permanent
+    WHERE id = target_user_id AND NOT is_banned;
+    
+    -- Notify user
+    INSERT INTO notifications (user_id, type, message)
+    VALUES (
+      target_user_id,
+      'join_denied',
+      '⛔ Your account has been permanently banned due to trust points reaching 0. Contact support for review.'
+    );
+    RETURN;
+  END IF;
+  
+  -- Points 1-3: 7-day suspension
+  IF current_points >= 1 AND current_points <= 3 THEN
+    UPDATE account_status
+    SET 
+      is_banned = false,
+      suspended_until = NOW() + INTERVAL '7 days'
+    WHERE id = target_user_id 
+      AND (suspended_until IS NULL OR suspended_until < NOW() + INTERVAL '7 days');
+    
+    -- Notify user if newly suspended
+    INSERT INTO notifications (user_id, type, message)
+    SELECT 
+      target_user_id,
+      'application_update',
+      '⚠️ Your account has been suspended for 7 days due to low trust points (1-3). Points will auto-recover daily.'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM account_status 
+      WHERE id = target_user_id 
+        AND suspended_until > NOW()
+    );
+    RETURN;
+  END IF;
+  
+  -- Points 4-6: Restricted (can't create communities)
+  IF current_points >= 4 AND current_points <= 6 THEN
+    -- Clear any existing suspension
+    UPDATE account_status
+    SET 
+      is_banned = false,
+      suspended_until = NULL
+    WHERE id = target_user_id 
+      AND (is_banned = true OR suspended_until IS NOT NULL);
+    
+    -- Notify user about restrictions
+    INSERT INTO notifications (user_id, type, message)
+    VALUES (
+      target_user_id,
+      'application_update',
+      '⚠️ Your account is restricted (4-6 trust points). You cannot create new circles until you reach 7+ points.'
+    )
+    ON CONFLICT DO NOTHING;
+    RETURN;
+  END IF;
+  
+  -- Points 7+: Good standing (clear all restrictions)
+  IF current_points >= 7 THEN
+    UPDATE account_status
+    SET 
+      is_banned = false,
+      suspended_until = NULL
+    WHERE id = target_user_id 
+      AND (is_banned = true OR suspended_until IS NOT NULL);
+  END IF;
+END;
+$ LANGUAGE plpgsql;
+
+-- Trigger to auto-check suspension after point transactions
+CREATE OR REPLACE FUNCTION trigger_check_suspension()
+RETURNS TRIGGER AS $
+BEGIN
+  PERFORM check_auto_suspension(NEW.user_id);
+  RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS auto_suspension_trigger ON point_transactions;
+CREATE TRIGGER auto_suspension_trigger
+  AFTER INSERT ON point_transactions
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_check_suspension();
+
+-- Function to sync trust_points column in account_status (for queries)
+CREATE OR REPLACE FUNCTION sync_trust_points()
+RETURNS void AS $
+BEGIN
+  UPDATE account_status
+  SET trust_points = (
+    SELECT get_user_trust_points(account_status.id)
+  );
+END;
+$ LANGUAGE plpgsql;
+
+-- Run initial sync
+SELECT sync_trust_points();
