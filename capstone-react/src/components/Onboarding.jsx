@@ -139,14 +139,14 @@ export default function Onboarding() {
         });
 
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('/api/upload-avatar', {
+        const res = await fetch('/api/upload', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(!token && user?.id ? { 'x-user-id': user.id } : {}),
           },
-          body: JSON.stringify({ avatar: compressed }),
+          body: JSON.stringify({ action: 'upload-avatar', userId: user?.id, avatar: compressed }),
         });
 
         if (res.ok) {

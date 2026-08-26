@@ -427,9 +427,13 @@ export default function AdminDashboard() {
     // Delete via server (needs service role)
     const token = localStorage.getItem('accessToken');
     try {
-      const res = await fetch(`/api/delete-user?id=${userId}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const res = await fetch(`/api/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action: 'delete-user', id: userId }),
       });
       if (res.ok) {
         showToast(`${userName} deleted.`);

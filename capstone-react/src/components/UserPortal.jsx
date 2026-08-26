@@ -1047,13 +1047,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // Use service-role API to bypass RLS
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`/api/upload-cover`, {
+      const res = await fetch(`/api/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ...updates, communityId: comm.id }),
+        body: JSON.stringify({ action: 'upload-cover', ...updates, communityId: comm.id }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1684,9 +1684,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       });
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
-      const res = await fetch(`/api/upload-avatar?userId=${user.id}`, {
+      const res = await fetch(`/api/upload`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar: compressed }),
+        body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: compressed }),
       });
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (res.ok) {
@@ -2126,13 +2126,14 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/give-appreciation', {
+      const res = await fetch('/api/moderation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          action: 'give-appreciation',
           giverId: currentUser.id,
           receiverId: targetUser.id,
           amount: amount,
@@ -2279,13 +2280,14 @@ function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/flag-user', {
+      const res = await fetch('/api/moderation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          action: 'flag-user',
           flaggerId: currentUser.id,
           flaggedUserId: targetUser.id,
           communityId: communityId,
@@ -2612,13 +2614,14 @@ function AppealModal({ warning, onClose, userId }) {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/appeal-warning', {
+      const res = await fetch('/api/moderation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          action: 'appeal-warning',
           warningId: warning.id,
           userId: userId,
           appealReason: reason.trim(),
@@ -3460,12 +3463,14 @@ export default function UserPortal() {
   const deleteCircle = async (id) => {
     if (!confirm('Delete this circle? This cannot be undone.')) return;
     const token = localStorage.getItem('accessToken');
-    const params = new URLSearchParams({ id });
-    if (user?.id) params.set('userId', user.id);
     try {
-      const res = await fetch(`/api/delete-community?${params}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const res = await fetch(`/api/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action: 'delete-community', id: id }),
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.message || 'Failed to delete circle.'); return; }
@@ -3473,7 +3478,7 @@ export default function UserPortal() {
       await loadCommunities();
       setActiveCommId('global'); setSection('home');
     } catch (err) {
-      showToast('Network error "� could not delete circle.');
+      showToast('Network error — could not delete circle.');
     }
   };
 
@@ -4414,10 +4419,10 @@ export default function UserPortal() {
                           // Save via server (uses service role key, bypasses RLS)
                           let saved = false;
                           try {
-                            const serverRes = await fetch(`/api/upload-cover?userId=${user.id}`, {
+                            const serverRes = await fetch(`/api/upload`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ cover: compressed, communityId: activeComm.id }),
+                              body: JSON.stringify({ action: 'upload-cover', logo_url: compressed, communityId: activeComm.id }),
                             });
                             if (serverRes.ok) {
                               saved = true;
