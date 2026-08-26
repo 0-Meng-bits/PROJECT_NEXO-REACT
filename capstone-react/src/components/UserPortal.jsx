@@ -892,7 +892,10 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
   useEffect(() => {
     if (!m.user_id) return;
     supabase.rpc('get_user_trust_points', { target_user_id: m.user_id })
-      .then(({ data }) => setTrustPoints(data || 10));
+      .then(({ data, error }) => {
+        console.log('Trust points for user:', m.user_id, 'Result:', data, 'Error:', error);
+        setTrustPoints(data || 10);
+      });
   }, [m.user_id]);
 
   const ranks = [
@@ -1521,7 +1524,8 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
-      const { data } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
+      const { data, error } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
+      console.log('Profile trust points for user:', userId, 'Result:', data, 'Error:', error);
       setTrustPoints(data || 10);
       setLoading(false);
     };
