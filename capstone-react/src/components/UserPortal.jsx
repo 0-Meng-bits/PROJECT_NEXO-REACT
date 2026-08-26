@@ -1005,10 +1005,14 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // fetch leader profile with avatar
     const { data: leaderData } = await supabase
       .from('accounts')
-      .select('full_name, ctu_id, avatar_url')
+      .select('full_name, ctu_id, account_details(avatar_url)')
       .eq('id', comm.creator_id)
       .single();
-    if (leaderData) setLeader({ full_name: leaderData.full_name, student_id: leaderData.ctu_id, avatar_url: leaderData.avatar_url });
+    if (leaderData) setLeader({ 
+      full_name: leaderData.full_name, 
+      student_id: leaderData.ctu_id, 
+      avatar_url: leaderData.account_details?.avatar_url 
+    });
 
     const { data, error } = await supabase
       .from('memberships')
@@ -1017,7 +1021,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
         accounts:user_id (
           full_name,
           ctu_id,
-          avatar_url
+          account_details(avatar_url)
         )
       `)
       .eq('community_id', comm.id);
@@ -1027,7 +1031,14 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     }
     
     if (data) {
-      setMembers(data.filter(m => m.status === 'active'));
+      setMembers(data.filter(m => m.status === 'active').map(m => ({
+        ...m,
+        accounts: {
+          ...m.accounts,
+          avatar_url: m.accounts?.account_details?.avatar_url
+        }
+      })));
+      setRequests(data.filter(m => m.status === 'pending'));
       setRequests(data.filter(m => m.status === 'pending'));
     }
     setLoadingMembers(false);
