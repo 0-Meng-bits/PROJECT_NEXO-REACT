@@ -1064,6 +1064,7 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto 14px;
+  overflow: hidden;
 }
 .members-banner-name {
   font-size: 18px;

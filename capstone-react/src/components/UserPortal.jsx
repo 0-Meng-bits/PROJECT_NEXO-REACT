@@ -892,10 +892,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
   useEffect(() => {
     if (!m.user_id) return;
     supabase.rpc('get_user_trust_points', { target_user_id: m.user_id })
-      .then(({ data, error }) => {
-        console.log('Trust points for user:', m.user_id, 'Result:', data, 'Error:', error);
-        setTrustPoints(data || 10);
-      });
+      .then(({ data }) => setTrustPoints(data || 10));
   }, [m.user_id]);
 
   const ranks = [
@@ -1463,7 +1460,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
               <input
                 className="channel-name-input"
                 style={{ flex: 1, padding: '10px 12px', fontSize: 13 }}
-                placeholder="Enter Student ID (e.g. 2024-CTU-DB-001)"
+                placeholder="Enter Student ID (e.g. 8230582)"
                 value={inviteSearch}
                 onChange={e => setInviteSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchInviteStudent()}
@@ -1524,8 +1521,7 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
-      const { data, error } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
-      console.log('Profile trust points for user:', userId, 'Result:', data, 'Error:', error);
+      const { data } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
       setTrustPoints(data || 10);
       setLoading(false);
     };
