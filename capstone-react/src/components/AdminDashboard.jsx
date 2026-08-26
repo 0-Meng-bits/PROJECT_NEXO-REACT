@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
@@ -12,6 +12,7 @@ const SECTIONS = [
   { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
+  { key: 'user_flags',    label: 'User Flags',            icon: 'fa-solid fa-flag' },
   { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-flag' },
   { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
 ];
@@ -1386,6 +1387,274 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ── USER FLAGS ── */}
+        {section === 'user_flags' && (() => {
+          const [flags, setFlags] = useState([]);
+          const [loading, setLoading] = useState(true);
+          const [selectedFlag, setSelectedFlag] = useState(null);
+          const [issuing, setIssuing] = useState(false);
+
+          useEffect(() => {
+            const loadFlags = async () => {
+              setLoading(true);
+              const { data, error } = await supabase
+                .from('user_flags')
+                .select(`
+                  *,
+                  flagged_user:accounts!flagged_user_id(full_name, ctu_id, avatar_url),
+                  flagger:accounts!flagger_id(full_name, ctu_id),
+                  community:communities(name)
+                `)
+                .order('created_at', { ascending: false });
+              
+              if (!error && data) setFlags(data);
+              setLoading(false);
+            };
+            loadFlags();
+          }, []);
+
+          const issueWarning = async (flagId, severity, pointsToDeduct) => {
+            if (!selectedFlag) return;
+            setIssuing(true);
+
+            try {
+              // Create warning
+              const { data: warning, error: warnError } = await supabase
+                .from('user_warnings')
+                .insert([{
+                  user_id: selectedFlag.flagged_user_id,
+                  admin_id: user.id,
+                  type: 'warning',
+                  severity: severity,
+                  points_deducted: pointsToDeduct,
+                  community_id: selectedFlag.community_id,
+                  reason: selectedFlag.reason
+                }])
+                .select()
+                .single();
+
+              if (warnError) throw warnError;
+
+              // Create point transaction
+              await supabase.from('point_transactions').insert([{
+                user_id: selectedFlag.flagged_user_id,
+                amount: -pointsToDeduct,
+                transaction_type: 'warning',
+                reason: `Warning: ${selectedFlag.reason}`,
+                reference_id: warning.id
+              }]);
+
+              // Update flag status
+              await supabase
+                .from('user_flags')
+                .update({ 
+                  status: 'warning_issued',
+                  reviewed_by: user.id,
+                  reviewed_at: new Date().toISOString()
+                })
+                .eq('id', flagId);
+
+              // Refresh flags
+              setFlags(prev => prev.map(f => 
+                f.id === flagId 
+                  ? { ...f, status: 'warning_issued', reviewed_by: user.id } 
+                  : f
+              ));
+              setSelectedFlag(null);
+              alert('Warning issued successfully!');
+            } catch (err) {
+              console.error(err);
+              alert('Failed to issue warning');
+            }
+            setIssuing(false);
+          };
+
+          const dismissFlag = async (flagId) => {
+            await supabase
+              .from('user_flags')
+              .update({ 
+                status: 'dismissed',
+                reviewed_by: user.id,
+                reviewed_at: new Date().toISOString()
+              })
+              .eq('id', flagId);
+
+            setFlags(prev => prev.map(f => 
+              f.id === flagId 
+                ? { ...f, status: 'dismissed', reviewed_by: user.id } 
+                : f
+            ));
+            setSelectedFlag(null);
+          };
+
+          const pendingFlags = flags.filter(f => f.status === 'pending');
+          const reviewedFlags = flags.filter(f => f.status !== 'pending');
+
+          const severityColors = {
+            minor: 'var(--orange)',
+            moderate: 'var(--cyber-yellow)',
+            severe: 'var(--red)',
+            critical: '#ff0000'
+          };
+
+          return (
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <span>User Flags</span>
+                <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>
+                  {pendingFlags.length} pending
+                </span>
+              </div>
+
+              {loading ? (
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i>
+                  <div style={{ marginTop: 10 }}>Loading flags...</div>
+                </div>
+              ) : flags.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <i className="fa-solid fa-circle-check" style={{ fontSize: 32, marginBottom: 10 }}></i>
+                  <div>No flags yet</div>
+                </div>
+              ) : (
+                <>
+                  {/* Pending Flags */}
+                  {pendingFlags.length > 0 && (
+                    <>
+                      <div style={{ padding: '12px 20px', background: 'rgba(252,238,10,0.05)', borderBottom: '1px solid rgba(252,238,10,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
+                        PENDING REVIEW — {pendingFlags.length}
+                      </div>
+                      {pendingFlags.map(flag => (
+                        <div key={flag.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', gap: 14, marginBottom: 12 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(252,238,10,0.1)', border: '2px solid var(--cyber-yellow)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, overflow: 'hidden' }}>
+                              {flag.flagged_user?.avatar_url ? (
+                                <img src={flag.flagged_user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                flag.flagged_user?.full_name?.[0]?.toUpperCase() || '?'
+                              )}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700, fontSize: 14 }}>{flag.flagged_user?.full_name || 'Unknown'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                ID: {flag.flagged_user?.ctu_id} · Circle: {flag.community?.name || 'N/A'}
+                              </div>
+                              <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: `${severityColors[flag.severity]}15`, border: `1px solid ${severityColors[flag.severity]}`, borderRadius: 6, fontSize: 10, fontWeight: 700, color: severityColors[flag.severity], textTransform: 'uppercase', letterSpacing: 1 }}>
+                                {flag.severity}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+                            <strong style={{ color: 'white' }}>Reason:</strong> {flag.reason}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                            Flagged by: {flag.flagger?.full_name} ({flag.flagger?.ctu_id}) · {new Date(flag.created_at).toLocaleString()}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              className="cyber-btn"
+                              onClick={() => setSelectedFlag(flag)}
+                              style={{ flex: 1, background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)' }}
+                            >
+                              <i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>Issue Warning
+                            </button>
+                            <button
+                              className="cyber-btn secondary"
+                              onClick={() => dismissFlag(flag.id)}
+                              style={{ flex: 1 }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Reviewed Flags */}
+                  {reviewedFlags.length > 0 && (
+                    <>
+                      <div style={{ padding: '12px 20px', background: 'rgba(0,240,255,0.05)', borderBottom: '1px solid rgba(0,240,255,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-cyan)', marginTop: 16 }}>
+                        REVIEWED — {reviewedFlags.length}
+                      </div>
+                      {reviewedFlags.slice(0, 10).map(flag => (
+                        <div key={flag.id} style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: 0.6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span>{flag.flagged_user?.full_name} · {flag.community?.name}</span>
+                            <span style={{ color: flag.status === 'warning_issued' ? 'var(--cyber-yellow)' : 'var(--text-muted)' }}>
+                              {flag.status === 'warning_issued' ? 'Warning Issued' : 'Dismissed'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* Issue Warning Modal */}
+              {selectedFlag && (
+                <div className="modal-overlay" onClick={() => setSelectedFlag(null)}>
+                  <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                    <h3 style={{ marginBottom: 16, color: 'var(--cyber-yellow)' }}>
+                      <i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>
+                      Issue Official Warning
+                    </h3>
+
+                    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>{selectedFlag.flagged_user?.full_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                        ID: {selectedFlag.flagged_user?.ctu_id}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        <strong style={{ color: 'white' }}>Reason:</strong> {selectedFlag.reason}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {[
+                        { severity: 'minor', points: 1, label: 'Minor (-1 point)', desc: 'Small violation' },
+                        { severity: 'moderate', points: 3, label: 'Moderate (-3 points)', desc: 'Concerning behavior' },
+                        { severity: 'severe', points: 5, label: 'Severe (-5 points)', desc: 'Serious violation' },
+                        { severity: 'critical', points: 10, label: 'Critical (-10 points)', desc: 'Extreme violation' },
+                      ].map(opt => (
+                        <button
+                          key={opt.severity}
+                          className="cyber-btn"
+                          onClick={() => issueWarning(selectedFlag.id, opt.severity, opt.points)}
+                          disabled={issuing}
+                          style={{
+                            background: `${severityColors[opt.severity]}15`,
+                            color: severityColors[opt.severity],
+                            border: `1px solid ${severityColors[opt.severity]}`,
+                            justifyContent: 'space-between',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 700 }}>{opt.label}</div>
+                            <div style={{ fontSize: 10, opacity: 0.7 }}>{opt.desc}</div>
+                          </div>
+                          <i className="fa-solid fa-gavel"></i>
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      className="cyber-btn secondary"
+                      onClick={() => setSelectedFlag(null)}
+                      style={{ width: '100%', marginTop: 16 }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
 {/* ── REPORTS ── */}
         {section === 'reports' && (
           <div className="adm-card">
