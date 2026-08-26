@@ -277,7 +277,7 @@ ON CONFLICT DO NOTHING;
 
 -- Function to check and apply auto-suspension based on trust points
 CREATE OR REPLACE FUNCTION check_auto_suspension(target_user_id uuid)
-RETURNS void AS $
+RETURNS void AS $$
 DECLARE
   current_points decimal(4,1);
 BEGIN
@@ -356,16 +356,16 @@ BEGIN
       AND (is_banned = true OR suspended_until IS NOT NULL);
   END IF;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Trigger to auto-check suspension after point transactions
 CREATE OR REPLACE FUNCTION trigger_check_suspension()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
   PERFORM check_auto_suspension(NEW.user_id);
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS auto_suspension_trigger ON point_transactions;
 CREATE TRIGGER auto_suspension_trigger
@@ -375,14 +375,14 @@ CREATE TRIGGER auto_suspension_trigger
 
 -- Function to sync trust_points column in account_status (for queries)
 CREATE OR REPLACE FUNCTION sync_trust_points()
-RETURNS void AS $
+RETURNS void AS $$
 BEGIN
   UPDATE account_status
   SET trust_points = (
     SELECT get_user_trust_points(account_status.id)
   );
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Run initial sync
 SELECT sync_trust_points();
