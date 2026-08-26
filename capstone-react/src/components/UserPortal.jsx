@@ -59,6 +59,32 @@ function Toast({ message }) {
   return <div className={`toast ${message ? 'show' : ''}`}>{message?.toUpperCase()}</div>;
 }
 
+// ── TRUST POINTS BADGE ────────────────────────────────────────────────────────
+function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
+  const getColor = (p) => {
+    if (p >= 10) return { bg: 'rgba(62, 207, 142, 0.15)', border: '#3ecf8e', text: '#3ecf8e', label: 'Good Standing' };
+    if (p >= 7) return { bg: 'rgba(252, 238, 10, 0.15)', border: 'var(--cyber-yellow)', text: 'var(--cyber-yellow)', label: 'Low Trust' };
+    if (p >= 4) return { bg: 'rgba(249, 115, 22, 0.15)', border: '#f97316', text: '#f97316', label: 'Restricted' };
+    return { bg: 'rgba(247, 95, 95, 0.15)', border: 'var(--red)', text: 'var(--red)', label: 'Severe Risk' };
+  };
+  
+  const color = getColor(points);
+  const sizes = {
+    small: { font: 10, padding: '2px 8px', iconSize: 9 },
+    medium: { font: 11, padding: '4px 10px', iconSize: 10 },
+    large: { font: 13, padding: '6px 14px', iconSize: 12 },
+  };
+  const s = sizes[size] || sizes.medium;
+  
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
+      <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
+      <span>{points.toFixed(1)}</span>
+      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>• {color.label}</span>}
+    </div>
+  );
+}
+
 // ── BAD WORDS AUTO-DETECTION ─────────────────────────────────────────────────
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol', 'tangina', 'pakyu', 'yawa', 'buang'];
 
@@ -849,6 +875,7 @@ function rankColor(level) {
 // ── MEMBER CARD ───────────────────────────────────────────────────────────────
 function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true, onGivePoints, onFlagUser }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [trustPoints, setTrustPoints] = useState(10);
   const menuRef = useRef(null);
   const name = m.accounts?.full_name || '??';
   const initials = name !== '??'
@@ -860,6 +887,13 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+  
+  // Load trust points
+  useEffect(() => {
+    if (!m.user_id) return;
+    supabase.rpc('get_user_trust_points', { target_user_id: m.user_id })
+      .then(({ data }) => setTrustPoints(data || 10));
+  }, [m.user_id]);
 
   const ranks = [
     { level: 2, label: 'Co-Leader',  capped: coLeaderCount >= 2 },
@@ -885,6 +919,9 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
           <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 8 }}>
             {m.accounts?.ctu_id}
           </span>
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <TrustPointsBadge points={trustPoints} size="small" showLabel={false} />
         </div>
       </div>
       <div className="member-card-actions" ref={menuRef}>
@@ -1465,6 +1502,68 @@ const INTEREST_LABELS = {
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
 const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
 
+// ── PROFILE TRUST POINTS SECTION ─────────────────────────────────────────────
+function ProfileTrustPointsSection({ userId, onViewHistory }) {
+  const [trustPoints, setTrustPoints] = useState(10);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    const load = async () => {
+      const { data } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
+      setTrustPoints(data || 10);
+      setLoading(false);
+    };
+    load();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
+        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 16, color: 'var(--text-muted)' }}></i>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, padding: 16 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>
+        TRUST POINTS
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <TrustPointsBadge points={trustPoints} size="large" showLabel={true} />
+        <button
+          onClick={onViewHistory}
+          style={{
+            background: 'rgba(0,240,255,0.1)',
+            border: '1px solid rgba(0,240,255,0.3)',
+            color: 'var(--cyber-cyan)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <i className="fa-solid fa-history"></i>
+          View History
+        </button>
+      </div>
+      {trustPoints < 10 && (
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          <i className="fa-solid fa-info-circle" style={{ marginRight: 4, color: 'var(--cyber-cyan)' }}></i>
+          You can earn points through peer appreciation and daily good behavior.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PROFILE MODAL ─────────────────────────────────────────────────────────────
 function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
@@ -1481,6 +1580,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showWarningHistory, setShowWarningHistory] = useState(false);
+  const [appealingWarning, setAppealingWarning] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1696,6 +1797,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               ))}
             </div>
 
+            {/* Trust Points Badge */}
+            <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
+
+
             {!editing && profile.interests?.length > 0 && (
               <div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
@@ -1809,6 +1914,24 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           </div>
         </div>
       </div>
+      
+      {/* Warning History Modal */}
+      {showWarningHistory && (
+        <WarningHistoryModal
+          userId={user.id}
+          onClose={() => setShowWarningHistory(false)}
+          onAppeal={(warning) => { setAppealingWarning(warning); setShowWarningHistory(false); }}
+        />
+      )}
+      
+      {/* Appeal Modal */}
+      {appealingWarning && (
+        <AppealModal
+          warning={appealingWarning}
+          userId={user.id}
+          onClose={() => { setAppealingWarning(null); setShowWarningHistory(true); }}
+        />
+      )}
     </div>
   );
 }
@@ -2295,6 +2418,327 @@ function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
                 style={{ flex: 1, background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)' }}
               >
                 {submitting ? 'Submitting...' : <><i className="fa-solid fa-flag" style={{ marginRight: 6 }}></i>Submit Flag</>}
+              </button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── WARNING HISTORY MODAL ─────────────────────────────────────────────────────
+function WarningHistoryModal({ userId, onClose, onAppeal }) {
+  const [warnings, setWarnings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('active'); // 'active' | 'appealed' | 'overturned'
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('user_warnings')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      setWarnings(data || []);
+      setLoading(false);
+    };
+    load();
+  }, [userId]);
+
+  const getSeverityColor = (s) => {
+    if (s === 'critical') return 'var(--red)';
+    if (s === 'severe') return '#ff5555';
+    if (s === 'moderate') return 'var(--cyber-yellow)';
+    return 'var(--orange)';
+  };
+
+  const getStatusBadge = (status) => {
+    const map = {
+      active: { label: 'Active', color: 'var(--red)', bg: 'rgba(247,95,95,0.15)' },
+      appealed: { label: 'Appealed', color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.15)' },
+      overturned: { label: 'Overturned', color: '#3ecf8e', bg: 'rgba(62,207,142,0.15)' },
+      expired: { label: 'Expired', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)' },
+    };
+    const s = map[status] || map.active;
+    return <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, color: s.color, background: s.bg, border: `1px solid ${s.color}` }}>{s.label}</span>;
+  };
+
+  const filtered = warnings.filter(w => {
+    if (tab === 'active') return w.status === 'active';
+    if (tab === 'appealed') return w.status === 'appealed';
+    if (tab === 'overturned') return w.status === 'overturned' || w.status === 'expired';
+    return true;
+  });
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 650, maxHeight: '85vh', overflowY: 'auto' }}>
+        <h3 style={{ marginBottom: 6, color: 'var(--red)' }}>
+          <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 8 }}></i>
+          Warning History
+        </h3>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
+          All warnings issued to your account.
+        </p>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
+          {['active', 'appealed', 'overturned'].map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                background: tab === t ? 'rgba(0,240,255,0.1)' : 'transparent',
+                border: 'none',
+                borderBottom: tab === t ? '2px solid var(--cyber-cyan)' : '2px solid transparent',
+                color: tab === t ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: '0.2s'
+              }}
+            >
+              {t} ({warnings.filter(w => t === 'overturned' ? (w.status === 'overturned' || w.status === 'expired') : w.status === t).length})
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 10 }}></i>
+            <p>Loading warnings...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+            <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: '#3ecf8e', marginBottom: 10 }}></i>
+            <p>No {tab} warnings</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filtered.map(w => (
+              <div
+                key={w.id}
+                style={{
+                  background: 'rgba(0,0,0,0.3)',
+                  border: `1px solid ${getSeverityColor(w.severity)}`,
+                  borderRadius: 10,
+                  padding: 16,
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: getSeverityColor(w.severity), textTransform: 'uppercase', letterSpacing: 1 }}>
+                        {w.severity}
+                      </span>
+                      {getStatusBadge(w.status)}
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>{w.reason}</p>
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--red)', marginLeft: 12 }}>
+                    -{w.points_deducted} pts
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <i className="fa-solid fa-clock" style={{ marginRight: 4 }}></i>
+                  {new Date(w.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </div>
+
+                {w.status === 'active' && (
+                  <button
+                    onClick={() => onAppeal(w)}
+                    style={{
+                      marginTop: 12,
+                      width: '100%',
+                      background: 'rgba(0,240,255,0.1)',
+                      border: '1px solid rgba(0,240,255,0.3)',
+                      color: 'var(--cyber-cyan)',
+                      borderRadius: 8,
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <i className="fa-solid fa-gavel"></i>
+                    Appeal This Warning
+                  </button>
+                )}
+
+                {w.appeal_reason && (
+                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--cyber-yellow)', marginBottom: 4 }}>
+                      <i className="fa-solid fa-gavel" style={{ marginRight: 4 }}></i> Appeal Submitted
+                    </div>
+                    <p style={{ fontSize: 12, margin: 0, color: 'var(--text-primary)' }}>{w.appeal_reason}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', marginTop: 18 }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+// ── APPEAL MODAL ──────────────────────────────────────────────────────────────
+function AppealModal({ warning, onClose, userId }) {
+  const [reason, setReason] = useState('');
+  const [evidence, setEvidence] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (!reason.trim()) return;
+    setSubmitting(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch('/api/appeal-warning', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          warningId: warning.id,
+          userId: userId,
+          appealReason: reason.trim(),
+          evidence: evidence.trim() || null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to submit appeal');
+        setSubmitting(false);
+        return;
+      }
+
+      setDone(true);
+    } catch (err) {
+      setError('Network error. Please try again.');
+      setSubmitting(false);
+    }
+  };
+
+  const getSeverityColor = (s) => {
+    if (s === 'critical') return 'var(--red)';
+    if (s === 'severe') return '#ff5555';
+    if (s === 'moderate') return 'var(--cyber-yellow)';
+    return 'var(--orange)';
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <i className="fa-solid fa-gavel" style={{ fontSize: 36, color: 'var(--cyber-cyan)', marginBottom: 14, display: 'block' }}></i>
+            <h3 style={{ color: 'var(--cyber-cyan)', marginBottom: 8 }}>Appeal Submitted</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
+              A system admin will review your appeal within 24-48 hours.
+            </p>
+            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
+          </div>
+        ) : (
+          <>
+            <h3 style={{ marginBottom: 6, color: 'var(--cyber-cyan)' }}>
+              <i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>
+              Appeal Warning
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Explain why you believe this warning was issued incorrectly.
+            </p>
+
+            {/* Warning being appealed */}
+            <div style={{
+              background: 'rgba(0,0,0,0.3)',
+              border: `1px solid ${getSeverityColor(warning.severity)}`,
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 18
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: getSeverityColor(warning.severity), textTransform: 'uppercase', letterSpacing: 1 }}>
+                  {warning.severity} WARNING
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--red)', marginLeft: 'auto' }}>
+                  -{warning.points_deducted} pts
+                </span>
+              </div>
+              <p style={{ fontSize: 13, lineHeight: 1.5, margin: '6px 0 0' }}>{warning.reason}</p>
+            </div>
+
+            {/* Appeal reason */}
+            <div className="input-group">
+              <label>YOUR APPEAL (REQUIRED)</label>
+              <textarea
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Explain why this warning should be overturned. Be clear and factual."
+                style={{ width: '100%', minHeight: 100, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                maxLength={500}
+              />
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
+                {reason.length}/500
+              </div>
+            </div>
+
+            {/* Evidence (optional) */}
+            <div className="input-group">
+              <label>EVIDENCE (OPTIONAL)</label>
+              <textarea
+                value={evidence}
+                onChange={e => setEvidence(e.target.value)}
+                placeholder="Provide any additional context, screenshots, or proof that supports your appeal."
+                style={{ width: '100%', minHeight: 80, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                maxLength={500}
+              />
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
+                {evidence.length}/500
+              </div>
+            </div>
+
+            {/* Info box */}
+            <div style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-cyan)' }}>
+              <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
+              If your appeal is approved, the points will be restored to your account plus a +1 bonus.
+            </div>
+
+            {error && (
+              <div style={{ background: 'rgba(247,95,95,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--red)' }}>
+                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>
+                {error}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button
+                className="cyber-btn"
+                onClick={submit}
+                disabled={submitting || !reason.trim()}
+                style={{ flex: 1 }}
+              >
+                {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
               </button>
               <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
             </div>
