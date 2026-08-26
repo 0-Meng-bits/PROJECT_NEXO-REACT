@@ -1,71 +1,80 @@
 import { useState, useRef, useCallback } from 'react';
 import { createWorker } from 'tesseract.js';
 
-// Common OCR misreads for digits
+// Common OCR misreads for digits - only allow letter-to-digit confusion, not digit-to-digit
 const OCR_DIGIT_VARIANTS = {
   '0': ['0', 'O', 'o', 'Q', 'D'],
-  '1': ['1', 'l', 'I', 'i', '|', '!'],
+  '1': ['1', 'l', 'I', 'i', '|'],
   '2': ['2', 'Z', 'z'],
-  '3': ['3', 'B'],
-  '4': ['4', 'A'],
+  '3': ['3'],
+  '4': ['4'],
   '5': ['5', 'S', 's'],
   '6': ['6', 'b', 'G'],
-  '7': ['7', 'T'],
+  '7': ['7'],
   '8': ['8', 'B'],
   '9': ['9', 'g', 'q'],
 };
 
-// Build all fuzzy variants of the ID number to match against OCR output
-function buildIdVariants(id) {
-  const digits = id.replace(/[-\s]/g, '').toUpperCase().split('');
-  // Generate combinations of common misreads
-  const variants = new Set();
-  variants.add(digits.join(''));
+// Build fuzzy variants for OCR text matching - only generates letter alternatives
+function buildOcrVariants(ocrText) {
+  // Create reverse map: OCR character -> possible actual digits
+  const reverseMap = {};
+  for (const [digit, variants] of Object.entries(OCR_DIGIT_VARIANTS)) {
+    for (const variant of variants) {
+      if (!reverseMap[variant]) reverseMap[variant] = [];
+      reverseMap[variant].push(digit);
+    }
+  }
 
-  // Replace each digit with its OCR variants one at a time
-  digits.forEach((ch, i) => {
-    const alts = OCR_DIGIT_VARIANTS[ch] || [ch];
-    alts.forEach(alt => {
-      const variant = [...digits];
-      variant[i] = alt;
-      variants.add(variant.join(''));
-    });
+  // Build all possible interpretations of OCR text
+  const chars = ocrText.split('');
+  const possibilities = chars.map(ch => {
+    const upper = ch.toUpperCase();
+    return reverseMap[upper] || [upper];
   });
 
-  // Also add version with spaces stripped and common separators removed
-  variants.add(id.replace(/[\s\-\.]/g, '').toUpperCase());
+  // Generate all combinations (limit to prevent explosion)
+  const variants = new Set();
+  function generate(index, current) {
+    if (index === chars.length) {
+      variants.add(current);
+      if (variants.size > 500) return; // safety limit
+      return;
+    }
+    for (const option of possibilities[index]) {
+      generate(index + 1, current + option);
+      if (variants.size > 500) return;
+    }
+  }
+  generate(0, '');
   return [...variants];
 }
 
 function extractIdFromText(text, typedId) {
-  // Normalize OCR text — remove all whitespace and punctuation for comparison
+  // Normalize OCR text and typed ID
   const ocrRaw = text.toUpperCase();
   const ocrStripped = ocrRaw.replace(/[\s\-\.]/g, '');
-
   const idClean = typedId.replace(/[\s\-\.]/g, '').toUpperCase();
 
-  // 1. Direct match
+  // 1. Direct exact match
   if (ocrStripped.includes(idClean)) return { found: true };
 
-  // 2. Match with spaces allowed between digits (OCR sometimes inserts spaces)
+  // 2. Match with spaces/separators allowed between digits (OCR sometimes inserts spaces)
   const spacedPattern = idClean.split('').join('[\\s\\-\\.]*');
   if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true };
 
-  // 3. Fuzzy match — try all OCR misread variants
-  const variants = buildIdVariants(typedId);
-  for (const variant of variants) {
-    if (ocrStripped.includes(variant)) return { found: true };
-    // Also try spaced version of each variant
-    const spacedVar = variant.split('').join('[\\s\\-\\.]*');
-    if (new RegExp(spacedVar).test(ocrRaw)) return { found: true };
-  }
+  // 3. Fuzzy match — generate all possible interpretations of OCR text
+  // and check if any match the typed ID exactly
+  // This handles cases where OCR reads "O" instead of "0", "l" instead of "1", etc.
+  const ocrVariants = buildOcrVariants(ocrStripped);
+  if (ocrVariants.includes(idClean)) return { found: true };
 
-  // 4. Partial match — if at least 5 consecutive digits match (handles partial OCR reads)
-  if (idClean.length >= 5) {
-    for (let i = 0; i <= idClean.length - 5; i++) {
-      const chunk = idClean.slice(i, i + 5);
-      if (ocrStripped.includes(chunk)) return { found: true };
-    }
+  // Also check with spaces in OCR text
+  const ocrWords = ocrRaw.match(/\S+/g) || [];
+  for (const word of ocrWords) {
+    const wordStripped = word.replace(/[\s\-\.]/g, '');
+    const wordVariants = buildOcrVariants(wordStripped);
+    if (wordVariants.includes(idClean)) return { found: true };
   }
 
   return { found: false };
