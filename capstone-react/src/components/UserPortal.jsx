@@ -1460,7 +1460,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
               <input
                 className="channel-name-input"
                 style={{ flex: 1, padding: '10px 12px', fontSize: 13 }}
-                placeholder="Enter Student ID (e.g. 8230582)"
+                placeholder="Enter Student ID (e.g. 1234567)"
                 value={inviteSearch}
                 onChange={e => setInviteSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchInviteStudent()}
