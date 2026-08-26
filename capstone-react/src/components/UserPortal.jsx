@@ -847,7 +847,7 @@ function rankColor(level) {
 }
 
 // ── MEMBER CARD ───────────────────────────────────────────────────────────────
-function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
+function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const name = m.accounts?.full_name || '??';
@@ -869,7 +869,13 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
 
   return (
     <div className="member-card">
-      <div className="member-card-avatar">{initials}</div>
+      <div className="member-card-avatar">
+        {m.accounts?.avatar_url ? (
+          <img src={m.accounts.avatar_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          initials
+        )}
+      </div>
       <div className="member-card-info">
         <div className="member-card-name">{name}</div>
         <div className="member-card-sub">
@@ -881,37 +887,39 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount }) {
           </span>
         </div>
       </div>
-      <div className="member-card-actions" ref={menuRef}>
-        <button className="member-card-menu-btn" onClick={() => setMenuOpen(o => !o)}>
-          <i className="fa-solid fa-ellipsis-vertical"></i>
-        </button>
-        {menuOpen && (
-          <div className="member-card-dropdown">
-            {ranks.map(r => (
-              <button
-                key={r.level}
-                onClick={() => { if (!r.capped) { onSetRank(m.id, r.level); setMenuOpen(false); } }}
-                style={{ opacity: r.capped ? 0.4 : 1, cursor: r.capped ? 'not-allowed' : 'pointer' }}
-                title={r.capped ? `Cap reached` : ''}
-              >
-                <i className={`fa-solid ${r.level > m.rank_level ? 'fa-arrow-up' : 'fa-arrow-down'}`}></i>
-                Set as {r.label}
-                {r.capped && <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--red)' }}>FULL</span>}
+      {canManage && (
+        <div className="member-card-actions" ref={menuRef}>
+          <button className="member-card-menu-btn" onClick={() => setMenuOpen(o => !o)}>
+            <i className="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+          {menuOpen && (
+            <div className="member-card-dropdown">
+              {ranks.map(r => (
+                <button
+                  key={r.level}
+                  onClick={() => { if (!r.capped) { onSetRank(m.id, r.level); setMenuOpen(false); } }}
+                  style={{ opacity: r.capped ? 0.4 : 1, cursor: r.capped ? 'not-allowed' : 'pointer' }}
+                  title={r.capped ? `Cap reached` : ''}
+                >
+                  <i className={`fa-solid ${r.level > m.rank_level ? 'fa-arrow-up' : 'fa-arrow-down'}`}></i>
+                  Set as {r.label}
+                  {r.capped && <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--red)' }}>FULL</span>}
+                </button>
+              ))}
+              <div style={{ borderTop: '1px solid #222', margin: '4px 0' }}></div>
+              <button onClick={() => { onKick(m.id, name); setMenuOpen(false); }} style={{ color: 'var(--red)' }}>
+                <i className="fa-solid fa-user-xmark"></i> Kick from Circle
               </button>
-            ))}
-            <div style={{ borderTop: '1px solid #222', margin: '4px 0' }}></div>
-            <button onClick={() => { onKick(m.id, name); setMenuOpen(false); }} style={{ color: 'var(--red)' }}>
-              <i className="fa-solid fa-user-xmark"></i> Kick from Circle
-            </button>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 // ── MANAGE GROUP MODAL ────────────────────────────────────────────────────────
-function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
+function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0 }) {
   const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic' });
   const [members, setMembers] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -930,17 +938,17 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
 
   const fetchMembers = useCallback(async () => {
     setLoadingMembers(true);
-    // fetch leader profile
+    // fetch leader profile with avatar
     const { data: leaderData } = await supabase
       .from('accounts')
-      .select('full_name, ctu_id')
+      .select('full_name, ctu_id, avatar_url')
       .eq('id', comm.creator_id)
       .single();
-    if (leaderData) setLeader({ full_name: leaderData.full_name, student_id: leaderData.ctu_id });
+    if (leaderData) setLeader({ full_name: leaderData.full_name, student_id: leaderData.ctu_id, avatar_url: leaderData.avatar_url });
 
     const { data } = await supabase
       .from('memberships')
-      .select('*, accounts!user_id(full_name, ctu_id)')
+      .select('*, accounts!user_id(full_name, ctu_id, avatar_url)')
       .eq('community_id', comm.id);
     if (data) {
       setMembers(data.filter(m => m.status === 'active'));
@@ -1143,7 +1151,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           <button className="manage-close-btn" onClick={onClose}>&times;</button>
         </div>
         <div className="manage-tabs">
-          {viewerIsOwner && (
+          {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
               <i className="fa-solid fa-sliders"></i> Settings
             </button>
@@ -1151,25 +1159,25 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           <button className={`manage-tab ${tab === 'members' ? 'active' : ''}`} onClick={() => setTab('members')}>
             <i className="fa-solid fa-users"></i> Members {members.length > 0 && `(${members.length})`}
           </button>
-          {viewerIsOwner && (
+          {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
               <i className="fa-solid fa-user-clock"></i> Requests
               {requests.length > 0 && <span className="req-badge">{requests.length}</span>}
             </button>
           )}
-          {viewerIsOwner && (
+          {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'Application' ? 'active' : ''}`} onClick={() => setTab('Application')}>
               <i className="fa-solid fa-microphone"></i> Application
             </button>
           )}
-          {viewerIsOwner && (
+          {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'invite' ? 'active' : ''}`} onClick={() => setTab('invite')}>
               <i className="fa-solid fa-user-plus"></i> Invite
             </button>
           )}
         </div>
 
-        {tab === 'settings' && (
+        {tab === 'settings' && (viewerIsOwner || viewerRankLevel >= 2) && (
           <div className="manage-tab-content">
             {/* CIRCLE LOGO */}
             <div className="input-group">
@@ -1239,11 +1247,15 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
             {/* Leader profile banner */}
             <div className="members-banner">
               <div className="members-banner-avatar">
-                <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--cyber-yellow)' }}>
-                  {leader?.full_name
-                    ? leader.full_name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)
-                    : '?'}
-                </span>
+                {leader?.avatar_url ? (
+                  <img src={leader.avatar_url} alt={leader.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--cyber-yellow)' }}>
+                    {leader?.full_name
+                      ? leader.full_name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)
+                      : '?'}
+                  </span>
+                )}
               </div>
               <div className="members-banner-name">{leader?.full_name || '"�'}</div>
               <div className="members-banner-handle">
@@ -1287,6 +1299,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
                               onSetRank={setRank} onKick={kickMember}
                               coLeaderCount={coLeaderCount}
                               moderatorCount={moderatorCount}
+                              canManage={viewerRankLevel >= 2}
                             />
                           ))}
                         </div>
@@ -1299,7 +1312,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           </div>
         )}
 
-        {tab === 'requests' && (
+        {tab === 'requests' && (viewerIsOwner || viewerRankLevel >= 2) && (
           <div className="manage-tab-content">
             {loadingMembers ? (
               <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>Loading...</p>
@@ -1327,7 +1340,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           </div>
         )}
 
-        {tab === 'Application' && viewerIsOwner && (
+        {tab === 'Application' && (viewerIsOwner || viewerRankLevel >= 2) && (
           <div className="manage-tab-content">
             <ApplicationFormBuilder
               comm={comm}
@@ -1344,7 +1357,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner }) {
           </div>
         )}
 
-        {tab === 'invite' && viewerIsOwner && (
+        {tab === 'invite' && (viewerIsOwner || viewerRankLevel >= 2) && (
           <div className="manage-tab-content">
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--cyber-cyan)', marginBottom: 6 }}>
@@ -3033,11 +3046,14 @@ export default function UserPortal() {
                 )}
               </div>
 
-              {/* Moderators can see members but not settings/delete */}
-              {canModerate && (
+              {/* Leaders and Co-Leaders can manage, regular members can view members */}
+              {activeCommId !== 'global' && isMember(activeCommId) && (
                 <>
-                  <div className="sidebar-label" style={{ marginTop: 12 }}>MANAGE</div>
+                  <div className="sidebar-label" style={{ marginTop: 12 }}>
+                    {canModerate ? 'MANAGE' : 'INFO'}
+                  </div>
                   <div className="nav-links">
+                    {/* Leaders see Settings + Delete */}
                     {isOwner && (
                       <>
                         <div className="ls-item" onClick={() => setShowManage(true)}>
@@ -3050,7 +3066,15 @@ export default function UserPortal() {
                         </div>
                       </>
                     )}
-                    {!isOwner && (
+                    {/* Co-Leaders see Settings (no delete) */}
+                    {!isOwner && canModerate && (
+                      <div className="ls-item" onClick={() => setShowManage(true)}>
+                        <i className="nav-icon fa-solid fa-gear"></i>
+                        <span className="node-name">Settings</span>
+                      </div>
+                    )}
+                    {/* Regular members see View Members */}
+                    {!canModerate && (
                       <div className="ls-item" onClick={() => setShowManage(true)}>
                         <i className="nav-icon fa-solid fa-users"></i>
                         <span className="node-name">View Members</span>
@@ -3827,6 +3851,7 @@ export default function UserPortal() {
                       const toShow = circleOnline.length > 0 ? circleOnline : onlineProfiles.slice(0, 5);
                       return toShow.length > 0 ? <OnlineStack onlineProfiles={toShow} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={6} /> : null;
                     })()}
+                    {/* All members can view members list */}
                     <button onClick={() => setShowMembersPanel(p => !p)} title="Toggle members"
                       style={{ background: showMembersPanel ? 'rgba(0,240,255,0.15)' : 'transparent', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 8, color: showMembersPanel ? 'var(--cyber-cyan)' : 'var(--text-muted)', padding: '5px 10px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <i className="fa-solid fa-users" />
@@ -3946,6 +3971,7 @@ export default function UserPortal() {
       {showManage && (
         <ManageGroupModal comm={activeComm} onClose={() => setShowManage(false)}
           viewerIsOwner={isOwner}
+          viewerRankLevel={myRankLevel}
           onSaved={(updated) => {
             setCommunities(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
             showToast('SETTINGS_SAVED');
