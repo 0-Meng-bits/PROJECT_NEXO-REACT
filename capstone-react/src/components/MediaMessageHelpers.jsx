@@ -202,6 +202,14 @@ export function MediaPreview({ file, mediaType, onCancel }) {
 }
 
 export async function uploadMediaFile(file, userId, mediaType) {
+  // Compress image before upload if it's an image
+  let fileToUpload = file;
+  
+  if (file.type.startsWith('image/')) {
+    // Compress images to reduce size
+    fileToUpload = await compressImage(file, 1920, 0.8); // Max 1920px width, 80% quality
+  }
+
   // Convert file to base64
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -232,6 +240,37 @@ export async function uploadMediaFile(file, userId, mediaType) {
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(fileToUpload);
+  });
+}
+
+// Helper function to compress images
+async function compressImage(file, maxWidth, quality) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: file.type }));
+        }, file.type, quality);
+      };
+      img.src = e.target.result;
+    };
     reader.readAsDataURL(file);
   });
 }

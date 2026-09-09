@@ -3,12 +3,22 @@ import { supabaseAdmin } from './_supabase.js';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { action } = req.body;
-
   try {
+    // Handle FormData for file uploads
+    const contentType = req.headers['content-type'] || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      // This is a file upload via FormData
+      // Note: Vercel/Render serverless functions need special handling for FormData
+      // We'll use the raw body approach instead
+      return res.status(400).json({ error: 'Please use JSON with base64 for now' });
+    }
+
+    const { action } = req.body;
+
     // ── UPLOAD MEDIA FILE (IMAGE/VOICE) ─────────────────────────────────
     if (action === 'upload-media') {
-      const { userId, fileData, fileName, contentType } = req.body;
+      const { userId, fileData, fileName, contentType: fileContentType } = req.body;
       if (!userId || !fileData || !fileName) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -24,7 +34,7 @@ export default async function handler(req, res) {
       const { data, error } = await supabaseAdmin.storage
         .from('chat-media')
         .upload(storagePath, buffer, {
-          contentType: contentType || 'application/octet-stream',
+          contentType: fileContentType || 'application/octet-stream',
           cacheControl: '3600',
           upsert: false
         });
