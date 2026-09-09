@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
@@ -132,6 +133,11 @@ export default function Auth() {
         if (data.session) {
           localStorage.setItem('accessToken', data.session.access_token);
           localStorage.setItem('refreshToken', data.session.refresh_token);
+          // Set Supabase session so direct queries work (fixes 406 errors)
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token
+          });
         }
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {

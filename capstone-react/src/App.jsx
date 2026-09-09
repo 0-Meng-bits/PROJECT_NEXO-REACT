@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getApiUrl } from './lib/api';
+import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
 import Landing from './components/Landing';
 import Onboarding from './components/Onboarding';
@@ -18,7 +19,18 @@ function ProtectedRoute({ children, allowedType }) {
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
     const storedUser = localStorage.getItem('currentUser');
+
+    // Restore Supabase session if tokens exist (fixes 406 errors)
+    if (token && refreshToken) {
+      supabase.auth.setSession({
+        access_token: token,
+        refresh_token: refreshToken
+      }).catch(err => {
+        console.error('Failed to restore Supabase session:', err);
+      });
+    }
 
     // Legacy account — no Supabase Auth yet, trust localStorage for now
     if (!token && storedUser) {
