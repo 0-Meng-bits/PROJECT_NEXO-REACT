@@ -1,6 +1,7 @@
 // Media message upload and preview components
 import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/api';
 
 // File size limits
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -201,26 +202,38 @@ export function MediaPreview({ file, mediaType, onCancel }) {
 }
 
 export async function uploadMediaFile(file, userId, mediaType) {
-  const timestamp = Date.now();
-  const fileName = `${userId}/${timestamp}-${file.name}`;
-  
-  const { data, error } = await supabase.storage
-    .from('chat-media')
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
+  // Convert file to base64
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Data = reader.result;
+        
+        // Upload via backend API
+        const res = await fetch(getApiUrl('/api/upload'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upload-media',
+            userId,
+            fileData: base64Data,
+            fileName: file.name,
+            contentType: file.type
+          })
+        });
 
-  if (error) {
-    console.error('Upload error:', error);
-    throw new Error('Failed to upload file');
-  }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from('chat-media')
-    .getPublicUrl(fileName);
-
-  return publicUrl;
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        
+        resolve(data.url);
+      } catch (error) {
+        console.error('Upload error:', error);
+        reject(new Error('Failed to upload file'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 export function MediaMessage({ message }) {
