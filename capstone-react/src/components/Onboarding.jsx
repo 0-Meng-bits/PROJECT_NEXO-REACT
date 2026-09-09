@@ -63,7 +63,7 @@ export default function Onboarding() {
       // Count students with at least one matching interest (only works after migration)
       const { count } = await supabase
         .from('account_details')
-        .select('*'), { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .overlaps('interests', selectedInterests)
         .neq('id', user.id || '');
 
