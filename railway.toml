@@ -1,0 +1,8 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd capstone-react && npm install"
+
+[deploy]
+startCommand = "cd capstone-react && node server-local.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
