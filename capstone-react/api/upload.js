@@ -50,7 +50,23 @@ export default async function handler(req, res) {
       return res.json({ url: avatar });
     }
 
-    // ── UPLOAD COVER ────────────────────────────────────────────────────
+    // ── UPLOAD COVER (USER PROFILE) ────────────────────────────────────
+    if (action === 'upload-cover-user') {
+      const { userId, cover_url } = req.body;
+      if (!userId || !cover_url) {
+        return res.status(400).json({ error: 'Missing userId or cover_url' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('account_details')
+        .update({ cover_url })
+        .eq('id', userId);
+
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ success: true });
+    }
+
+    // ── UPLOAD COVER (COMMUNITY) ────────────────────────────────────────
     if (action === 'upload-cover') {
       const { communityId, logo_url, name, description, category } = req.body;
 

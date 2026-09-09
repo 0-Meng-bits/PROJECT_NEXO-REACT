@@ -1712,11 +1712,37 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.onerror = reject;
         img.src = objectUrl;
       });
+      
+      // Update UI immediately
       setCoverUrl(compressed);
-      await supabase.from('account_details').update({ cover_url: compressed }).eq('id', user.id);
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      localStorage.setItem('currentUser', JSON.stringify({ ...stored, cover_url: compressed }));
-    } catch (err) { console.error(err); }
+      
+      // Save via backend API (has service role permissions)
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/upload'), {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ 
+          action: 'upload-cover-user', 
+          userId: user.id, 
+          cover_url: compressed 
+        }),
+      });
+      
+      if (res.ok) {
+        // Also update localStorage
+        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        localStorage.setItem('currentUser', JSON.stringify({ ...stored, cover_url: compressed }));
+      } else {
+        console.error('Failed to save cover photo');
+        setCoverUrl(user.cover_url || null); // Revert on failure
+      }
+    } catch (err) { 
+      console.error(err); 
+      setCoverUrl(user.cover_url || null); // Revert on error
+    }
     finally { setCoverUploading(false); }
   };
 
