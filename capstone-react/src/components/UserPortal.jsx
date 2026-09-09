@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ApplicationFormBuilder, ApplicationReviewPanel, ApplicationApplicationForm, ApplicationStatusLabel, ApplicationStatusColor } from './ApplicationSystem';
 import ThemePicker from './ThemePicker';
+import ProfileShop from './ProfileShop';
+import CustomizedUsername from './CustomizedUsername';
+import TaskBoard from './TaskBoard';
 import { loadTheme } from '../lib/theme';
+import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 
 function getCategoryIcon(category) {
   const map = {
@@ -543,7 +547,7 @@ function ChatTimeSeparator({ date }) {
 }
 
 // ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readCount, isLastOwn }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readCount, isLastOwn, isGrouped, isLastInGroup, userCustomizations }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -601,15 +605,21 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const showActions = (isOwnerMsg || canDelete || onReport) && hovered && !editing;
 
   return (
-    <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'}`}>
+    <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'} ${isGrouped ? 'grouped' : ''}`}>
       {!isOwnerMsg && (
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
-            style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
-            {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-          </div>
-          {online && (
-            <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
+          {!isGrouped ? (
+            <>
+              <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+                style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
+                {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+              </div>
+              {online && (
+                <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
+              )}
+            </>
+          ) : (
+            <div style={{ width: 40, height: 40 }} />
           )}
         </div>
       )}
@@ -618,19 +628,26 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {!isOwnerMsg && (
+        {!isOwnerMsg && !isGrouped && (
           <div className="chat-meta">
             <span className="chat-name" onClick={() => onViewProfile && onViewProfile(m.student_id)}
               style={{ cursor: onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
               onMouseEnter={e => { if (onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
               onMouseLeave={e => { e.target.style.color = ''; }}>
-              {m.full_name}
+              <CustomizedUsername 
+                studentId={m.student_id} 
+                username={m.full_name}
+                customizations={userCustomizations[m.student_id]}
+              />
             </span>
             {m.role && <span className="chat-role">{m.role}</span>}
+          </div>
+        )}
+        {!isOwnerMsg && isLastInGroup && (
+          <div className="chat-meta">
             <span className="chat-time">{time}</span>
           </div>
         )}
-
         {editing ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input className="msg-edit-input" value={editVal}
@@ -642,13 +659,18 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         ) : (
           <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}
-            style={containsBadWord(m.content) ? { borderColor: 'rgba(247,95,95,0.5)', background: isOwnerMsg ? 'rgba(247,95,95,0.15)' : 'rgba(247,95,95,0.08)' } : {}}>
+            style={{
+              ...(containsBadWord(m.content) ? { borderColor: 'rgba(247,95,95,0.5)', background: isOwnerMsg ? 'rgba(247,95,95,0.15)' : 'rgba(247,95,95,0.08)' } : {}),
+              borderRadius: isOwnerMsg 
+                ? (isGrouped && !isLastInGroup ? '16px 16px 4px 16px' : isGrouped && isLastInGroup ? '16px 4px 16px 16px' : '16px')
+                : (isGrouped && !isLastInGroup ? '16px 16px 16px 4px' : isGrouped && isLastInGroup ? '4px 16px 16px 16px' : '16px')
+            }}>
             {containsBadWord(m.content) && (
               <div style={{ fontSize: 10, color: 'var(--red)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <i className="fa-solid fa-triangle-exclamation"></i> Flagged content
               </div>
             )}
-            {m.content}
+            <MediaMessage message={m} />
           </div>
         )}
 
@@ -716,7 +738,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         {isOwnerMsg && !editing && (
           <div className="chat-meta own">
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
-            <span className="chat-time">{time}</span>
+            {isLastInGroup && <span className="chat-time">{time}</span>}
             {(isLastOwn || (isOwnerMsg && hovered)) && (
               <span style={{ marginLeft: 3, color: readCount > 0 ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 10 }} title={readCount > 0 ? `Seen by ${readCount}` : 'Sent'}>
                 {readCount > 0
@@ -728,17 +750,6 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
       </div>
-
-      {isOwnerMsg && (
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div className="chat-avatar own" style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden' }}>
-            {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-          </div>
-          {online && (
-            <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1363,14 +1374,16 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
               ) : (
                 <>
                   {(() => {
-                    const coLeaderCount = members.filter(m => m.rank_level === 2).length;
-                    const moderatorCount = members.filter(m => m.rank_level === 1).length;
+                    // Filter out the leader from members list to avoid duplicate display
+                    const membersWithoutLeader = members.filter(m => m.user_id !== comm?.creator_id);
+                    const coLeaderCount = membersWithoutLeader.filter(m => m.rank_level === 2).length;
+                    const moderatorCount = membersWithoutLeader.filter(m => m.rank_level === 1).length;
                     return [
                       { label: 'Co-Leaders', filter: m => m.rank_level === 2, cap: 2 },
                       { label: 'Moderators', filter: m => m.rank_level === 1, cap: 3 },
                       { label: 'Members',    filter: m => m.rank_level === 0, cap: null },
                     ].map(({ label, filter, cap }) => {
-                      const group = members.filter(filter);
+                      const group = membersWithoutLeader.filter(filter);
                       if (group.length === 0) return null;
                       return (
                         <div key={label}>
@@ -1593,6 +1606,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [coverUploading, setCoverUploading] = useState(false);
   const [showWarningHistory, setShowWarningHistory] = useState(false);
   const [appealingWarning, setAppealingWarning] = useState(null);
+  const [customizations, setCustomizations] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1609,6 +1623,39 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
     };
     load();
+  }, [user?.id]);
+
+  // Load active customizations
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadCustomizations = async () => {
+      const { data: settings } = await supabase
+        .from('user_profile_settings')
+        .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!settings) return;
+
+      const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border].filter(Boolean);
+      if (itemIds.length === 0) return;
+
+      const { data: items } = await supabase
+        .from('shop_items')
+        .select('*')
+        .in('id', itemIds);
+
+      if (items) {
+        setCustomizations({
+          badge: items.find(i => i.id === settings.active_badge),
+          name_color: items.find(i => i.id === settings.active_name_color),
+          background: items.find(i => i.id === settings.active_background),
+          theme: items.find(i => i.id === settings.active_theme),
+          avatar_border: items.find(i => i.id === settings.active_avatar_border)
+        });
+      }
+    };
+    loadCustomizations();
   }, [user?.id]);
 
   const saveProfile = async () => {
@@ -1720,10 +1767,50 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const gradIdx = (user.student_id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % coverGradients.length;
   const coverBg = coverUrl ? `url(${coverUrl}) center/cover no-repeat` : coverGradients[gradIdx];
 
+  const getBackgroundStyle = () => {
+    if (customizations?.background?.css_data) {
+      const data = typeof customizations.background.css_data === 'string' 
+        ? JSON.parse(customizations.background.css_data) 
+        : customizations.background.css_data;
+      
+      if (data.pattern) {
+        return {
+          background: data.pattern,
+          backgroundSize: data.size || '30px 30px'
+        };
+      }
+      if (data.image) {
+        return { 
+          background: data.image,
+          backgroundSize: data.backgroundSize || 'auto',
+          backgroundRepeat: data.backgroundRepeat || 'repeat'
+        };
+      }
+      if (data.gradient) return { background: data.gradient };
+    }
+    return {};
+  };
+
+  const getThemeStyle = () => {
+    if (customizations?.theme?.css_data) {
+      const data = typeof customizations.theme.css_data === 'string' 
+        ? JSON.parse(customizations.theme.css_data) 
+        : customizations.theme.css_data;
+      
+      return {
+        '--cyber-cyan': data.primary || 'var(--cyber-cyan)',
+        '--cyber-yellow': data.secondary || 'var(--cyber-yellow)'
+      };
+    }
+    return {};
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--card-bg)',
+        backgroundColor: 'var(--card-bg)',
+        ...getBackgroundStyle(),
+        ...getThemeStyle(),
         border: '1px solid rgba(0,240,255,0.15)',
         borderRadius: 16, width: '100%', maxWidth: 680,
         maxHeight: '90vh', overflowY: 'auto',
@@ -1749,7 +1836,21 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         <div style={{ position: 'relative', padding: '0 28px', marginTop: -52 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div style={{ width: 96, height: 96, border: '4px solid var(--card-bg)', borderRadius: '50%', background: 'rgba(0,240,255,0.08)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 800, color: 'var(--cyber-cyan)', boxShadow: '0 0 20px rgba(0,240,255,0.25)' }}>
+              <div style={{ 
+                width: 96, 
+                height: 96, 
+                border: customizations?.avatar_border?.css_data?.border || '4px solid var(--card-bg)', 
+                borderRadius: '50%', 
+                background: 'rgba(0,240,255,0.08)', 
+                overflow: 'hidden', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                fontSize: 32, 
+                fontWeight: 800, 
+                color: 'var(--cyber-cyan)', 
+                boxShadow: customizations?.avatar_border?.css_data?.boxShadow || '0 0 20px rgba(0,240,255,0.25)'
+              }}>
                 {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
               </div>
               {!readOnly && (
@@ -1764,8 +1865,41 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             </div>
 
             <div style={{ paddingBottom: 8, flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 1, lineHeight: 1.2, textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
+              <div style={{ 
+                fontSize: 20, 
+                fontWeight: 800, 
+                ...(customizations?.name_color?.css_data 
+                  ? (typeof customizations.name_color.css_data === 'string' 
+                      ? JSON.parse(customizations.name_color.css_data) 
+                      : customizations.name_color.css_data).gradient 
+                    ? { 
+                        background: (typeof customizations.name_color.css_data === 'string' 
+                          ? JSON.parse(customizations.name_color.css_data) 
+                          : customizations.name_color.css_data).gradient,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text'
+                      }
+                    : { 
+                        color: (typeof customizations.name_color.css_data === 'string' 
+                          ? JSON.parse(customizations.name_color.css_data) 
+                          : customizations.name_color.css_data).color 
+                      }
+                  : { color: 'var(--text-primary)' }
+                ),
+                letterSpacing: 1, 
+                lineHeight: 1.2, 
+                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}>
                 {user.full_name?.toUpperCase()}
+                {customizations?.badge && (
+                  <span style={{ fontSize: 16 }} title={customizations.badge.name}>
+                    {customizations.badge.preview_url}
+                  </span>
+                )}
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
@@ -2772,11 +2906,15 @@ export default function UserPortal() {
   const [activeCommId, setActiveCommId] = useState('global');
   const [section, setSection] = useState('home');
   const [messages, setMessages] = useState([]);
+  const [userCustomizations, setUserCustomizations] = useState({}); // studentId -> customizations
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
   const [profileIdCache, setProfileIdCache] = useState({}); // student_id -> UUID
   const [msgInput, setMsgInput] = useState('');
+  const [pendingMedia, setPendingMedia] = useState(null); // { file, mediaType, duration? }
+  const [uploading, setUploading] = useState(false);
   const [circleChatMessages, setCircleChatMessages] = useState([]);
   const [circleChatInput, setCircleChatInput] = useState('');
+  const [circlePendingMedia, setCirclePendingMedia] = useState(null);
   const [toast, setToast] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -2792,6 +2930,7 @@ export default function UserPortal() {
   const [activeChannelId, setActiveChannelId] = useState(null);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelType, setNewChannelType] = useState('chat'); // chat, gallery, files, notes, tasks
   const [activeCategory, setActiveCategory] = useState('all');
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
   const [announcements, setAnnouncements] = useState([]);
@@ -2812,6 +2951,7 @@ export default function UserPortal() {
   const [viewingProfile, setViewingProfile] = useState(null); // fetched profile object for viewing
   const [showGivePoints, setShowGivePoints] = useState(null); // { targetUser }
   const [showFlagUser, setShowFlagUser] = useState(null); // { targetUser }
+  const [showShop, setShowShop] = useState(false); // Profile Shop modal
   const [messageReads, setMessageReads] = useState({}); // message_id -> read count
 
   const viewUserProfile = useCallback(async (studentId) => {
@@ -3169,17 +3309,82 @@ export default function UserPortal() {
     }
   }, []);
 
+  const loadCustomizationsForMessages = useCallback(async (msgs) => {
+    if (!msgs || msgs.length === 0) return;
+    
+    const studentIds = [...new Set(msgs.map(m => m.student_id).filter(Boolean))];
+    if (studentIds.length === 0) return;
+
+    try {
+      // Get account IDs from student IDs
+      const { data: accounts } = await supabase
+        .from('accounts')
+        .select('id, ctu_id')
+        .in('ctu_id', studentIds);
+
+      if (!accounts || accounts.length === 0) return;
+
+      const accountIds = accounts.map(a => a.id);
+      
+      // Load all customizations at once
+      const { data: settings } = await supabase
+        .from('user_profile_settings')
+        .select(`
+          user_id,
+          active_theme,
+          active_badge,
+          active_name_color,
+          active_background
+        `)
+        .in('user_id', accountIds);
+
+      if (!settings) return;
+
+      // Get shop items for the active customizations
+      const itemIds = settings.flatMap(s => 
+        [s.active_theme, s.active_badge, s.active_name_color, s.active_background].filter(Boolean)
+      );
+
+      const { data: items } = await supabase
+        .from('shop_items')
+        .select('*')
+        .in('id', itemIds);
+
+      if (!items) return;
+
+      // Map back to student IDs
+      const customsMap = {};
+      accounts.forEach(acc => {
+        const setting = settings.find(s => s.user_id === acc.id);
+        if (setting) {
+          customsMap[acc.ctu_id] = {
+            badge: items.find(i => i.id === setting.active_badge),
+            name_color: items.find(i => i.id === setting.active_name_color),
+            background: items.find(i => i.id === setting.active_background),
+            theme: items.find(i => i.id === setting.active_theme)
+          };
+        }
+      });
+
+      setUserCustomizations(prev => ({ ...prev, ...customsMap }));
+    } catch (err) {
+      console.error('Failed to load customizations:', err);
+    }
+  }, []);
+
   const loadMessages = useCallback(async (commId, channelId) => {
     if (commId === 'global') {
       const { data } = await supabase.from('messages').select('*')
         .is('community_id', null).order('created_at', { ascending: true });
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
+      loadCustomizationsForMessages(data || []);
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
+      loadCustomizationsForMessages(data || []);
     } else if (commId) {
       // Only messages that belong to no specific channel (the default "general" flow)
       const { data } = await supabase.from('messages').select('*')
@@ -3188,10 +3393,11 @@ export default function UserPortal() {
         .order('created_at', { ascending: true });
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
+      loadCustomizationsForMessages(data || []);
     } else {
       setMessages([]);
     }
-  }, [fetchAvatarsForMessages]);
+  }, [fetchAvatarsForMessages, loadCustomizationsForMessages]);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
@@ -3201,10 +3407,11 @@ export default function UserPortal() {
       .order('created_at', { ascending: true });
     setCircleChatMessages(data || []);
     fetchAvatarsForMessages(data || []);
+    loadCustomizationsForMessages(data || []);
     markMessagesRead(data || []);
     const myMsgIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
     if (myMsgIds.length) fetchReadCounts(myMsgIds);
-  }, [fetchAvatarsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
+  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
 
   // Initial load + realtime subscription — re-runs when channel/community changes
   useEffect(() => {
@@ -3413,9 +3620,9 @@ export default function UserPortal() {
   };
 
   const sendPost = async () => {
-    if (!msgInput.trim()) return;
+    if (!msgInput.trim() && !pendingMedia) return;
     // Block bad words "� don't send, show error
-    if (containsBadWord(msgInput)) {
+    if (msgInput.trim() && containsBadWord(msgInput)) {
       setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       // Still auto-flag for admin awareness
@@ -3423,46 +3630,109 @@ export default function UserPortal() {
       return;
     }
     setSendError('');
-    const comm = communities.find(c => c.id === activeCommId);
-    const isLeader = comm?.creator_id === user?.id;
-    const payload = {
-      student_id: user.student_id,
-      full_name: user.full_name,
-      content: msgInput,
-      community_id: activeCommId === 'global' ? null : activeCommId,
-      channel_id: activeCommId === 'global' ? null : activeChannelId,
-      role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
-    };
-    const { data, error } = await supabase.from('messages').insert([payload]).select();
-    if (!error && data) {
-      setMessages(prev => [...prev, data[0]]);
-      setMsgInput('');
+    setUploading(true);
+
+    try {
+      const comm = communities.find(c => c.id === activeCommId);
+      const isLeader = comm?.creator_id === user?.id;
+      
+      let mediaUrl = null;
+      let mediaSize = null;
+      let mediaDuration = null;
+      let messageType = 'text';
+
+      // Upload media if present
+      if (pendingMedia) {
+        mediaUrl = await uploadMediaFile(pendingMedia.file, user.id, pendingMedia.mediaType);
+        mediaSize = pendingMedia.file.size;
+        mediaDuration = pendingMedia.duration || null;
+        messageType = pendingMedia.mediaType;
+      }
+
+      const payload = {
+        student_id: user.student_id,
+        full_name: user.full_name,
+        content: msgInput.trim() || '',
+        message_type: messageType,
+        media_url: mediaUrl,
+        media_size: mediaSize,
+        media_duration: mediaDuration,
+        community_id: activeCommId === 'global' ? null : activeCommId,
+        channel_id: activeCommId === 'global' ? null : activeChannelId,
+        role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+      };
+
+      const { data, error } = await supabase.from('messages').insert([payload]).select();
+      if (!error && data) {
+        setMessages(prev => [...prev, data[0]]);
+        setMsgInput('');
+        setPendingMedia(null);
+      } else {
+        throw new Error(error?.message || 'Failed to send');
+      }
+    } catch (err) {
+      setSendError('Failed to send message. Please try again.');
+      setTimeout(() => setSendError(''), 4000);
+      console.error(err);
+    } finally {
+      setUploading(false);
     }
   };
 
   const sendCircleChatPost = async () => {
-    if (!circleChatInput.trim()) return;
-    if (containsBadWord(circleChatInput)) {
+    if (!circleChatInput.trim() && !circlePendingMedia) return;
+    if (circleChatInput.trim() && containsBadWord(circleChatInput)) {
       setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: circleChatInput });
       return;
     }
     setSendError('');
-    const comm = communities.find(c => c.id === activeCommId);
-    const isLeader = comm?.creator_id === user?.id;
-    const payload = {
-      student_id: user.student_id,
-      full_name: user.full_name,
-      content: circleChatInput,
-      community_id: activeCommId,
-      channel_id: null,
-      role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
-    };
-    const { data, error } = await supabase.from('messages').insert([payload]).select();
-    if (!error && data) {
-      setCircleChatMessages(prev => [...prev, data[0]]);
-      setCircleChatInput('');
+    setUploading(true);
+
+    try {
+      const comm = communities.find(c => c.id === activeCommId);
+      const isLeader = comm?.creator_id === user?.id;
+
+      let mediaUrl = null;
+      let mediaSize = null;
+      let mediaDuration = null;
+      let messageType = 'text';
+
+      if (circlePendingMedia) {
+        mediaUrl = await uploadMediaFile(circlePendingMedia.file, user.id, circlePendingMedia.mediaType);
+        mediaSize = circlePendingMedia.file.size;
+        mediaDuration = circlePendingMedia.duration || null;
+        messageType = circlePendingMedia.mediaType;
+      }
+
+      const payload = {
+        student_id: user.student_id,
+        full_name: user.full_name,
+        content: circleChatInput.trim() || '',
+        message_type: messageType,
+        media_url: mediaUrl,
+        media_size: mediaSize,
+        media_duration: mediaDuration,
+        community_id: activeCommId,
+        channel_id: null,
+        role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+      };
+
+      const { data, error } = await supabase.from('messages').insert([payload]).select();
+      if (!error && data) {
+        setCircleChatMessages(prev => [...prev, data[0]]);
+        setCircleChatInput('');
+        setCirclePendingMedia(null);
+      } else {
+        throw new Error(error?.message || 'Failed to send');
+      }
+    } catch (err) {
+      setSendError('Failed to send message. Please try again.');
+      setTimeout(() => setSendError(''), 4000);
+      console.error(err);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -3473,22 +3743,27 @@ export default function UserPortal() {
 
   const deleteCircle = async (id) => {
     if (!confirm('Delete this circle? This cannot be undone.')) return;
+    console.log('[DELETE CIRCLE]', { id });
     const token = localStorage.getItem('accessToken');
     try {
+      const payload = { action: 'delete-community', id: id };
+      console.log('[DELETE CIRCLE] Sending payload:', payload);
       const res = await fetch(`/api/delete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ action: 'delete-community', id: id }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) { showToast(data.message || 'Failed to delete circle.'); return; }
+      console.log('[DELETE CIRCLE] Response:', { status: res.status, data });
+      if (!res.ok) { showToast(data.message || data.error || 'Failed to delete circle.'); return; }
       showToast('Circle deleted.');
       await loadCommunities();
       setActiveCommId('global'); setSection('home');
     } catch (err) {
+      console.error('[DELETE CIRCLE] Error:', err);
       showToast('Network error — could not delete circle.');
     }
   };
@@ -3508,12 +3783,18 @@ export default function UserPortal() {
     const name = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
     if (!name) return;
     const { data, error } = await supabase.from('channels')
-      .insert([{ community_id: activeCommId, name, created_by: user.id }])
+      .insert([{ 
+        community_id: activeCommId, 
+        name, 
+        channel_type: newChannelType,
+        created_by: user.id 
+      }])
       .select();
     if (!error && data) {
       setChannels(prev => [...prev, data[0]]);
       setActiveChannelId(data[0].id);
       setNewChannelName('');
+      setNewChannelType('chat');
       setShowAddChannel(false);
     }
   };
@@ -3636,8 +3917,18 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT "� notifications + user hud */}
+        {/* RIGHT — notifications + user hud */}
         <div className="user-hud">
+          {/* Shop Button */}
+          <button
+            className="notif-bell"
+            onClick={() => setShowShop(true)}
+            title="Profile Shop"
+            style={{ marginRight: 4 }}
+          >
+            <i className="fa-solid fa-store"></i>
+          </button>
+
           {/* Theme Picker Button */}
           <button
             className="notif-bell"
@@ -3846,21 +4137,44 @@ export default function UserPortal() {
                 {/* Add channel "� leaders/co-leaders only */}
                 {canModerate && (
                   showAddChannel ? (
-                    <div style={{ padding: '6px 10px', display: 'flex', gap: 6 }}>
+                    <div style={{ padding: '6px 10px' }}>
                       <input
                         className="channel-name-input"
                         value={newChannelName}
                         onChange={e => setNewChannelName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') addChannel(); if (e.key === 'Escape') setShowAddChannel(false); }}
+                        onKeyDown={e => { if (e.key === 'Enter') addChannel(); if (e.key === 'Escape') { setShowAddChannel(false); setNewChannelType('chat'); } }}
                         placeholder="channel-name"
                         autoFocus
+                        style={{ marginBottom: 6 }}
                       />
-                      <button className="channel-confirm-btn" onClick={addChannel}>
-                        <i className="fa-solid fa-check"></i>
-                      </button>
-                      <button className="channel-cancel-btn" onClick={() => setShowAddChannel(false)}>
-                        <i className="fa-solid fa-xmark"></i>
-                      </button>
+                      <select 
+                        value={newChannelType}
+                        onChange={e => setNewChannelType(e.target.value)}
+                        style={{ 
+                          width: '100%', 
+                          padding: '6px 8px', 
+                          background: 'rgba(0,0,0,0.3)', 
+                          border: '1px solid rgba(0,240,255,0.2)', 
+                          borderRadius: 6, 
+                          color: 'white', 
+                          fontSize: 11,
+                          marginBottom: 6
+                        }}
+                      >
+                        <option value="chat">💬 Chat</option>
+                        <option value="tasks">✅ Tasks</option>
+                        <option value="gallery">🖼️ Gallery</option>
+                        <option value="files">📁 Files</option>
+                        <option value="notes">📝 Notes</option>
+                      </select>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="channel-confirm-btn" onClick={addChannel} style={{ flex: 1 }}>
+                          <i className="fa-solid fa-check"></i> Create
+                        </button>
+                        <button className="channel-cancel-btn" onClick={() => { setShowAddChannel(false); setNewChannelType('chat'); }}>
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="ls-item add-channel-btn" onClick={() => setShowAddChannel(true)}>
@@ -4232,8 +4546,19 @@ export default function UserPortal() {
                   return messages.map((m, idx) => {
                     const isOwnerMsg = m.student_id === user?.student_id;
                     const prev = messages[idx - 1];
+                    const next = messages[idx + 1];
                     const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                    
+                    // Group consecutive messages from same user within 1 minute
+                    const isGrouped = prev && 
+                      prev.student_id === m.student_id && 
+                      (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                    
+                    const isLastInGroup = !next || 
+                      next.student_id !== m.student_id || 
+                      (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                    
                     return (
                       <React.Fragment key={m.id}>
                         {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -4250,6 +4575,9 @@ export default function UserPortal() {
                           online={isOnline(profileIdCache[m.student_id])}
                           readCount={messageReads[m.id] || 0}
                           isLastOwn={isLastOwn}
+                          isGrouped={isGrouped}
+                          isLastInGroup={isLastInGroup}
+                          userCustomizations={userCustomizations}
                         />
                       </React.Fragment>
                     );
@@ -4260,12 +4588,30 @@ export default function UserPortal() {
 
               {user?.is_verified && (
                 <div className="composer">
-                  <div className="c-input-wrap">
+                  {pendingMedia && (
+                    <MediaPreview 
+                      file={pendingMedia.file} 
+                      mediaType={pendingMedia.mediaType}
+                      onCancel={() => setPendingMedia(null)}
+                    />
+                  )}
+                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <MediaUploadButton 
+                      onMediaSelected={setPendingMedia} 
+                      disabled={uploading || !!pendingMedia}
+                    />
+                    <VoiceRecorder 
+                      onVoiceRecorded={setPendingMedia} 
+                      disabled={uploading || !!pendingMedia}
+                    />
                     <input value={msgInput} onChange={e => { setMsgInput(e.target.value); setSendError(''); }}
-                      onKeyDown={e => e.key === 'Enter' && sendPost()}
+                      onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
                       placeholder="Say something to the campus..."
-                      style={sendError ? { borderColor: 'var(--red)' } : {}} />
-                    <button className="cyber-btn" onClick={sendPost}>SEND</button>
+                      disabled={uploading}
+                      style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
+                    <button className="cyber-btn" onClick={sendPost} disabled={uploading}>
+                      {uploading ? 'SENDING...' : 'SEND'}
+                    </button>
                   </div>
                   {sendError && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}><i className="fa-solid fa-triangle-exclamation"></i>{sendError}</div>}
                 </div>
@@ -4614,13 +4960,42 @@ export default function UserPortal() {
                   </div>
                 ) : (
                   (() => {
+                    // Get current channel info
+                    const currentChannel = channels.find(c => c.id === activeChannelId);
+                    const channelType = currentChannel?.channel_type || 'chat';
+
+                    // If it's a task channel, show Task Board
+                    if (activeChannelId && channelType === 'tasks') {
+                      return (
+                        <div style={{ height: '100%', overflow: 'hidden' }}>
+                          <TaskBoard 
+                            channelId={activeChannelId}
+                            canManage={myRankLevel >= 1}
+                            currentUserId={user.id}
+                          />
+                        </div>
+                      );
+                    }
+
+                    // Otherwise show regular chat messages
                     const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
                     return messages.map((m, idx) => {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
                       const prev = messages[idx - 1];
+                      const next = messages[idx + 1];
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      
+                      // Group consecutive messages from same user within 1 minute
+                      const isGrouped = prev && 
+                        prev.student_id === m.student_id && 
+                        (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                      
+                      const isLastInGroup = !next || 
+                        next.student_id !== m.student_id || 
+                        (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                      
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -4638,6 +5013,9 @@ export default function UserPortal() {
                             online={isOnline(profileIdCache[m.student_id])}
                             readCount={messageReads[m.id] || 0}
                             isLastOwn={isLastOwn}
+                            isGrouped={isGrouped}
+                            isLastInGroup={isLastInGroup}
+                            userCustomizations={userCustomizations}
                           />
                         </React.Fragment>
                       );
@@ -4649,11 +5027,30 @@ export default function UserPortal() {
 
               {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && (
                 <div className="composer">
-                  <div className="c-input-wrap">
+                  {pendingMedia && (
+                    <MediaPreview 
+                      file={pendingMedia.file} 
+                      mediaType={pendingMedia.mediaType}
+                      onCancel={() => setPendingMedia(null)}
+                    />
+                  )}
+                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <MediaUploadButton 
+                      onMediaSelected={setPendingMedia} 
+                      disabled={uploading || !!pendingMedia}
+                    />
+                    <VoiceRecorder 
+                      onVoiceRecorded={setPendingMedia} 
+                      disabled={uploading || !!pendingMedia}
+                    />
                     <input value={msgInput} onChange={e => { setMsgInput(e.target.value); setSendError(''); }}
-                      onKeyDown={e => e.key === 'Enter' && sendPost()} placeholder="Write a message..."
-                      style={sendError ? { borderColor: 'var(--red)' } : {}} />
-                    <button className="cyber-btn" onClick={sendPost}>SEND</button>
+                      onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
+                      placeholder="Write a message..."
+                      disabled={uploading}
+                      style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
+                    <button className="cyber-btn" onClick={sendPost} disabled={uploading}>
+                      {uploading ? 'SENDING...' : 'SEND'}
+                    </button>
                   </div>
                   {sendError && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}><i className="fa-solid fa-triangle-exclamation"></i>{sendError}</div>}
                 </div>
@@ -4705,8 +5102,19 @@ export default function UserPortal() {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
                       const prev = circleChatMessages[idx - 1];
+                      const next = circleChatMessages[idx + 1];
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      
+                      // Group consecutive messages from same user within 1 minute
+                      const isGrouped = prev && 
+                        prev.student_id === m.student_id && 
+                        (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                      
+                      const isLastInGroup = !next || 
+                        next.student_id !== m.student_id || 
+                        (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                      
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -4730,6 +5138,9 @@ export default function UserPortal() {
                             online={isOnline(profileIdCache[m.student_id])}
                             readCount={messageReads[m.id] || 0}
                             isLastOwn={isLastOwn}
+                            isGrouped={isGrouped}
+                            isLastInGroup={isLastInGroup}
+                            userCustomizations={userCustomizations}
                           />
                         </React.Fragment>
                       );
@@ -4741,11 +5152,30 @@ export default function UserPortal() {
 
               {isMember(activeCommId) && user?.is_verified && (
                 <div className="composer">
-                  <div className="c-input-wrap">
+                  {circlePendingMedia && (
+                    <MediaPreview 
+                      file={circlePendingMedia.file} 
+                      mediaType={circlePendingMedia.mediaType}
+                      onCancel={() => setCirclePendingMedia(null)}
+                    />
+                  )}
+                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <MediaUploadButton 
+                      onMediaSelected={setCirclePendingMedia} 
+                      disabled={uploading || !!circlePendingMedia}
+                    />
+                    <VoiceRecorder 
+                      onVoiceRecorded={setCirclePendingMedia} 
+                      disabled={uploading || !!circlePendingMedia}
+                    />
                     <input value={circleChatInput} onChange={e => setCircleChatInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendCircleChatPost()}
-                      placeholder={`Message ${activeComm.name}...`} />
-                    <button className="cyber-btn" onClick={sendCircleChatPost}>SEND</button>
+                      onKeyDown={e => e.key === 'Enter' && !uploading && sendCircleChatPost()}
+                      placeholder={`Message ${activeComm.name}...`}
+                      disabled={uploading}
+                      style={{ flex: 1 }} />
+                    <button className="cyber-btn" onClick={sendCircleChatPost} disabled={uploading}>
+                      {uploading ? 'SENDING...' : 'SEND'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -4872,6 +5302,11 @@ export default function UserPortal() {
       )}
       {showReport && (
         <ReportModal data={showReport} user={user} onClose={() => setShowReport(null)} />
+      )}
+
+      {/* Profile Shop Modal */}
+      {showShop && (
+        <ProfileShop user={user} onClose={() => setShowShop(false)} />
       )}
 
       {/* Theme Picker Modal */}

@@ -1435,6 +1435,25 @@ body {
   gap: 8px;
   margin-bottom: 4px;
 }
+.chat-row.grouped {
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+.chat-row.grouped .chat-bubble.other {
+  border-radius: 16px 16px 16px 4px;
+  margin-top: 1px;
+}
+.chat-row.grouped .chat-bubble.own {
+  border-radius: 16px 16px 4px 16px;
+  margin-top: 1px;
+}
+/* First message in group keeps full radius on top */
+.chat-row:not(.grouped) + .chat-row.grouped .chat-bubble.other {
+  border-radius: 16px 16px 16px 4px;
+}
+.chat-row:not(.grouped) + .chat-row.grouped .chat-bubble.own {
+  border-radius: 16px 16px 4px 16px;
+}
 .chat-row.own { flex-direction: row-reverse; padding-right: 4px; }
 
 .chat-avatar {
@@ -4548,4 +4567,14 @@ body {
 @media (max-width: 480px) {
   .lnd-hero-cta, .lnd-hero-secondary { width: 100%; justify-content: center; }
   .lnd-cta-btn, .lnd-cta-btn-secondary { width: 100%; justify-content: center; }
+}
+
+/* Pulse animation for voice recording */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }

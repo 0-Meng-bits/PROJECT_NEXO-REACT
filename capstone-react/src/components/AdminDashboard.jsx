@@ -265,11 +265,21 @@ export default function AdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: req.id, adminId: admin?.id }),
       });
-      if (!res.ok) { const d = await res.json(); showToast(d.message || 'Failed to approve.'); return; }
-    } catch { showToast('Network error.'); return; }
-    showToast(`Circle "${req.name}" approved.`);
-    fetchCircleRequests();
-    fetchData();
+      
+      if (!res.ok) { 
+        const d = await res.json().catch(() => ({ message: 'Unknown error' })); 
+        showToast(d.message || 'Failed to approve.'); 
+        return; 
+      }
+      
+      const result = await res.json();
+      showToast(`Circle "${req.name}" approved.`);
+      await fetchCircleRequests();
+      await fetchData();
+    } catch (err) { 
+      console.error('[APPROVE ERROR]', err);
+      showToast('Network error.'); 
+    }
   };
 
   const rejectCircleRequest = async (req, note) => {
@@ -916,9 +926,10 @@ export default function AdminDashboard() {
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             {loading ? <div className="adm-empty">Loading...</div> : (
-              <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
-                <tbody>
+              <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+                <table className="adm-table">
+                  <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
+                  <tbody>
                   {filtered.map(s => (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(s)}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
@@ -950,6 +961,7 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}
