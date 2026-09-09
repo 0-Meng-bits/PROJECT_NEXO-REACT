@@ -186,3 +186,7 @@ npm run dev:all
 ## ✅ You're Updated!
 
 After following these steps, you'll have all the latest features running locally! 🎉
+
+---
+
+**Questions?** Reach out in the team chat for help!

@@ -21,8 +21,8 @@ export default async function handler(req, res) {
     .eq('id', userId);
 
   if (error) {
-    console.error('[UPDATE PROFILE]', error.message);
-    return res.status(500).json({ message: 'Failed to update profile.' });
+    console.error('[UPDATE PROFILE]', error);
+    return res.status(500).json({ message: 'Failed to update profile.', error: error.message });
   }
 
   res.json({ message: 'Profile updated.' });
