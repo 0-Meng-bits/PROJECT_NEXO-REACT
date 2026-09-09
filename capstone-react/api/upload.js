@@ -3,53 +3,35 @@ import { supabaseAdmin } from './_supabase.js';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const { action } = req.body;
+
   try {
-    // Handle FormData for file uploads
-    const contentType = req.headers['content-type'] || '';
-    
-    if (contentType.includes('multipart/form-data')) {
-      // This is a file upload via FormData
-      // Note: Vercel/Render serverless functions need special handling for FormData
-      // We'll use the raw body approach instead
-      return res.status(400).json({ error: 'Please use JSON with base64 for now' });
-    }
-
-    const { action } = req.body;
-
-    // ── UPLOAD MEDIA FILE (IMAGE/VOICE) ─────────────────────────────────
-    if (action === 'upload-media') {
-      const { userId, fileData, fileName, contentType: fileContentType } = req.body;
-      if (!userId || !fileData || !fileName) {
+    // ── GET SIGNED UPLOAD URL ────────────────────────────────────────────
+    if (action === 'get-upload-url') {
+      const { userId, fileName, contentType } = req.body;
+      if (!userId || !fileName) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
-
-      // Convert base64 to buffer
-      const base64Data = fileData.split(',')[1] || fileData;
-      const buffer = Buffer.from(base64Data, 'base64');
 
       const timestamp = Date.now();
       const storagePath = `${userId}/${timestamp}-${fileName}`;
 
-      // Upload to Supabase Storage using service role
+      // Create a signed upload URL (valid for 60 seconds)
       const { data, error } = await supabaseAdmin.storage
         .from('chat-media')
-        .upload(storagePath, buffer, {
-          contentType: fileContentType || 'application/octet-stream',
-          cacheControl: '3600',
-          upsert: false
-        });
+        .createSignedUploadUrl(storagePath);
 
       if (error) {
-        console.error('Storage upload error:', error);
+        console.error('Signed URL error:', error);
         return res.status(500).json({ error: error.message });
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabaseAdmin.storage
-        .from('chat-media')
-        .getPublicUrl(storagePath);
-
-      return res.json({ url: publicUrl });
+      // Return both the signed URL and the final path
+      return res.json({ 
+        uploadUrl: data.signedUrl,
+        path: storagePath,
+        token: data.token
+      });
     }
 
     // ── UPLOAD AVATAR ───────────────────────────────────────────────────

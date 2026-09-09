@@ -202,78 +202,49 @@ export function MediaPreview({ file, mediaType, onCancel }) {
 }
 
 export async function uploadMediaFile(file, userId, mediaType) {
-  // Compress image before upload if it's an image
-  let fileToUpload = file;
-  
-  if (file.type.startsWith('image/')) {
-    // Compress images to reduce size
-    fileToUpload = await compressImage(file, 1920, 0.8); // Max 1920px width, 80% quality
-  }
+  try {
+    // Step 1: Get a signed upload URL from backend
+    const urlRes = await fetch(getApiUrl('/api/upload'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'get-upload-url',
+        userId,
+        fileName: file.name,
+        contentType: file.type
+      })
+    });
 
-  // Convert file to base64
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64Data = reader.result;
-        
-        // Upload via backend API
-        const res = await fetch(getApiUrl('/api/upload'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'upload-media',
-            userId,
-            fileData: base64Data,
-            fileName: file.name,
-            contentType: file.type
-          })
-        });
+    const urlData = await urlRes.json();
+    if (!urlRes.ok) throw new Error(urlData.error || 'Failed to get upload URL');
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Upload failed');
-        
-        resolve(data.url);
-      } catch (error) {
-        console.error('Upload error:', error);
-        reject(new Error('Failed to upload file'));
+    // Step 2: Upload file directly to Supabase Storage using signed URL
+    const uploadRes = await fetch(urlData.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type,
+        'x-upsert': 'false'
       }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(fileToUpload);
-  });
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error('Failed to upload file to storage');
+    }
+
+    // Step 3: Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('chat-media')
+      .getPublicUrl(urlData.path);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw new Error('Failed to upload file');
+  }
 }
 
-// Helper function to compress images
-async function compressImage(file, maxWidth, quality) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob((blob) => {
-          resolve(new File([blob], file.name, { type: file.type }));
-        }, file.type, quality);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+// Remove the compression function since we're uploading directly now
 
 export function MediaMessage({ message }) {
   const { message_type, media_url, content, media_duration } = message;
