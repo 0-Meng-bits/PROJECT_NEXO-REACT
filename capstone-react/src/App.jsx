@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { getApiUrl } from './lib/api';
 import Auth from './components/Auth';
 import Landing from './components/Landing';
 import Onboarding from './components/Onboarding';
@@ -36,7 +37,7 @@ function ProtectedRoute({ children, allowedType }) {
 
     if (!token) { setStatus('fail'); return; }
 
-    fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(getApiUrl('/api/me'), { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         if (!res.ok) throw new Error('Invalid session');
         return res.json();

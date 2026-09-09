@@ -1,6 +1,7 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/api';
 
 const SECTIONS = [
   { key: 'circle_requests', label: 'Circle Requests',       icon: 'fa-solid fa-circle-nodes' },
@@ -17,7 +18,7 @@ const SECTIONS = [
   { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
 ];
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// -- helpers ------------------------------------------------------------------
 function toDateInput(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -40,7 +41,7 @@ function countInRange(items, dateField, start, end) {
   }).length;
 }
 
-// Simple bar chart — no external lib needed
+// Simple bar chart � no external lib needed
 function MiniBarChart({ data, color }) {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
@@ -90,7 +91,7 @@ function StatCard({ label, value, color, icon }) {
   );
 }
 
-// Inappropriate words filter (basic list — expand as needed)
+// Inappropriate words filter (basic list � expand as needed)
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol'];
 
 function containsBadWord(text) {
@@ -121,13 +122,13 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [circleRequests, setCircleRequests] = useState([]);
 
-  // ── Analytics state ──────────────────────────────────────────────────────
+  // -- Analytics state ------------------------------------------------------
   const [preset, setPreset] = useState('week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]   = useState('');
   const [useCustom, setUseCustom]   = useState(false);
 
-  // ── Campus Feed post composer state ──────────────────────────────────────
+  // -- Campus Feed post composer state --------------------------------------
   const [newAdminPost, setNewAdminPost] = useState({ title: '', content: '', post_type: 'announcement' });
   const [postingAdminPost, setPostingAdminPost] = useState(false);
   // -- Campus Events state
@@ -152,7 +153,7 @@ export default function AdminDashboard() {
     setEventsLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/admin-data', {
+      const res = await fetch(getApiUrl('/api/admin-data'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) { const d = await res.json(); setCampusEvents(d.campusEvents || []); }
@@ -165,7 +166,7 @@ export default function AdminDashboard() {
     setPostingEvent(true);
     const token = localStorage.getItem('accessToken');
     try {
-      const res = await fetch('/api/admin-data', {
+      const res = await fetch(getApiUrl('/api/admin-data'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
@@ -192,7 +193,7 @@ export default function AdminDashboard() {
     if (!confirm('Delete this event?')) return;
     const token = localStorage.getItem('accessToken');
     try {
-      const res = await fetch('/api/admin-data', {
+      const res = await fetch(getApiUrl('/api/admin-data'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ action: 'delete_event', id }),
@@ -232,8 +233,8 @@ export default function AdminDashboard() {
     const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     try {
       const [commRes, adminRes] = await Promise.all([
-        fetch('/api/communities', { headers: authHeaders }),
-        fetch('/api/admin-data', { headers: authHeaders }),
+        fetch(getApiUrl('/api/communities'), { headers: authHeaders }),
+        fetch(getApiUrl('/api/admin-data'), { headers: authHeaders }),
       ]);
       const adminData = adminRes.ok ? await adminRes.json() : {};
       setCommunities(commRes.ok ? await commRes.json() : []);
@@ -252,7 +253,7 @@ export default function AdminDashboard() {
 
   const fetchCircleRequests = useCallback(async () => {
     try {
-      const res = await fetch('/api/circle-requests');
+      const res = await fetch(getApiUrl('/api/circle-requests');
       const data = await res.json();
       setCircleRequests(Array.isArray(data) ? data : []);
     } catch { setCircleRequests([]); }
@@ -260,7 +261,7 @@ export default function AdminDashboard() {
 
   const approveCircleRequest = async (req) => {
     try {
-      const res = await fetch('/api/circle-requests/approve', {
+      const res = await fetch(getApiUrl('/api/circle-requests/approve'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: req.id, adminId: admin?.id }),
@@ -284,7 +285,7 @@ export default function AdminDashboard() {
 
   const rejectCircleRequest = async (req, note) => {
     try {
-      await fetch('/api/circle-requests/reject', {
+      await fetch(getApiUrl('/api/circle-requests/reject'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: req.id, adminId: admin?.id, note }),
@@ -299,7 +300,7 @@ export default function AdminDashboard() {
   // Real-time: new reports appear instantly in admin panel
   useEffect(() => {
     const sub = supabase.channel('admin:reports')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reports' },
+      .on('postgres_changes'), { event: 'INSERT', schema: 'public', table: 'reports' },
         (payload) => {
           setReports(prev => [payload.new, ...prev]);
         }
@@ -320,7 +321,7 @@ export default function AdminDashboard() {
 
   const approveStudent = async (id, name) => {
     if (!confirm('Approve this student?')) return;
-    const res = await fetch(`/api/verify-student?id=${id}`, { method: 'POST' });
+    const res = await fetch(getApiUrl(`/api/verify-student?id=${id}`), { method: 'POST' });
     if (res.ok) {
       // Send notification to the student
       await supabase.from('notifications').insert([{
@@ -396,8 +397,8 @@ export default function AdminDashboard() {
 
     // Send notification to user
     const notifMsg = willSuspend
-      ? `🚫 Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
-      : `⚠️ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
+      ? `?? Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US'), { month: 'long', day: 'numeric', year: 'numeric' })}.`
+      : `?? Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
 
     await supabase.from('notifications').insert([{
       user_id: userId,
@@ -419,7 +420,7 @@ export default function AdminDashboard() {
     }]);
     await supabase.from('notifications').insert([{
       user_id: userId, type: 'audition_update',
-      message: `🚫 Your account has been banned: ${reason}`,
+      message: `?? Your account has been banned: ${reason}`,
     }]);
     showToast(`${userName} has been banned.`);
     fetchData();
@@ -437,7 +438,7 @@ export default function AdminDashboard() {
     // Delete via server (needs service role)
     const token = localStorage.getItem('accessToken');
     try {
-      const res = await fetch(`/api/delete`, {
+      const res = await fetch(getApiUrl(`/api/delete`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -501,7 +502,7 @@ export default function AdminDashboard() {
     s.student_id?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Analytics computed values ─────────────────────────────────────────────
+  // -- Analytics computed values ---------------------------------------------
   const { start: rangeStart, end: rangeEnd } = useCustom && customStart && customEnd
     ? { start: new Date(customStart + 'T00:00:00'), end: new Date(customEnd + 'T23:59:59') }
     : getPresetRange(preset);
@@ -513,7 +514,7 @@ export default function AdminDashboard() {
   const newAuditions  = countInRange(auditions,    'submitted_at', rangeStart, rangeEnd);
   const newPosts      = countInRange(announcements,'created_at',   rangeStart, rangeEnd);
 
-  // Build bar chart data — split range into buckets
+  // Build bar chart data � split range into buckets
   function buildChartData(items, dateField) {
     const diffDays = Math.round((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24));
     const buckets = [];
@@ -562,7 +563,7 @@ export default function AdminDashboard() {
   const messageChartData = buildChartData(globalMessages,'created_at');
 
   const rangeLabel = useCustom && customStart && customEnd
-    ? `${customStart} → ${customEnd}`
+    ? `${customStart} ? ${customEnd}`
     : { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year' }[preset];
 
   const auditionStatusLabel = (status, phase2Result) => {
@@ -624,9 +625,9 @@ export default function AdminDashboard() {
         <div className="adm-topbar">
           <div>
             <h1 className="adm-page-title">
-              {selectedCircle ? `${selectedCircle.name} — Members` : SECTIONS.find(s => s.key === section)?.label}
+              {selectedCircle ? `${selectedCircle.name} � Members` : SECTIONS.find(s => s.key === section)?.label}
             </h1>
-            <p className="adm-page-sub">NEXO Connect — Admin Control Panel</p>
+            <p className="adm-page-sub">NEXO Connect � Admin Control Panel</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {selectedCircle && (
@@ -648,12 +649,12 @@ export default function AdminDashboard() {
           <StatCard label="Circles"        value={communities.length} color="var(--cyber-yellow)" icon="fa-solid fa-network-wired" />
         </div>
 
-        {/* ── ANALYTICS ── */}
+        {/* -- ANALYTICS -- */}
         {/* Circle Requests */}
         {section === 'circle_requests' && (
           <div>
             <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text-muted)' }}>
-              {circleRequests.filter(r => r.status === 'pending').length} pending � {circleRequests.length} total
+              {circleRequests.filter(r => r.status === 'pending').length} pending ? {circleRequests.length} total
             </div>
             {circleRequests.length === 0 ? (
               <div className="adm-empty">No circle requests yet.</div>
@@ -680,7 +681,7 @@ export default function AdminDashboard() {
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         By <strong style={{ color: 'var(--text-primary)' }}>{req.accounts?.full_name || 'Unknown'}</strong>
                         {req.accounts?.ctu_id && ` (${req.accounts.ctu_id})`}
-                        {' � '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {' ? '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                       {req.status === 'rejected' && req.admin_note && (
                         <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Reason: {req.admin_note}</div>
@@ -732,7 +733,7 @@ export default function AdminDashboard() {
                   value={customStart}
                   max={customEnd || toDateInput(new Date())}
                   onChange={e => { setCustomStart(e.target.value); setUseCustom(true); }} />
-                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>→</span>
+                <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>?</span>
                 <input type="date" className="analytics-date-input"
                   value={customEnd}
                   min={customStart}
@@ -847,7 +848,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── VERIFICATION QUEUE ── */}
+        {/* -- VERIFICATION QUEUE -- */}
         {section === 'verification' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -858,7 +859,7 @@ export default function AdminDashboard() {
             : pending.length === 0 ? (
               <div className="adm-empty">
                 <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: 'var(--green)', marginBottom: 12, display: 'block' }}></i>
-                All caught up — no pending verifications.
+                All caught up � no pending verifications.
               </div>
             ) : (
               <table className="adm-table">
@@ -887,7 +888,7 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         {!s.id_photo_url ? (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>�</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>?</span>
                         ) : s.id_verified ? (
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 5 }}>
                             <i className="fa-solid fa-circle-check"></i> Passed
@@ -917,7 +918,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── ALL USERS ── */}
+        {/* -- ALL USERS -- */}
         {section === 'users' && !selectedUser && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1044,7 +1045,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLES ── */}
+        {/* -- CIRCLES -- */}
         {section === 'communities' && !selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1071,7 +1072,7 @@ export default function AdminDashboard() {
                           {c.application_enabled ? 'On' : 'Off'}
                         </span>
                       </td>
-                      <td style={{ color: 'var(--text-muted)' }}>{c.accounts?.full_name || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{c.accounts?.full_name || '�'}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -1091,7 +1092,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CIRCLE MEMBERS DETAIL ── */}
+        {/* -- CIRCLE MEMBERS DETAIL -- */}
         {section === 'communities' && selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1106,8 +1107,8 @@ export default function AdminDashboard() {
                 <tbody>
                   {circleMembers.map(m => (
                     <tr key={m.id}>
-                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{m.accounts?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{m.accounts?.ctu_id || '—'}</span></td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{m.accounts?.full_name || '�'}</td>
+                      <td><span className="adm-mono">{m.accounts?.ctu_id || '�'}</span></td>
                       <td><span style={{ color: rankColor(m.rank_level), fontSize: 12, fontWeight: 700 }}>{rankLabel(m.rank_level)}</span></td>
                       <td><span className={`adm-status ${m.status === 'active' ? 'verified' : 'pending'}`}>{m.status}</span></td>
                     </tr>
@@ -1118,7 +1119,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── GLOBAL FEED MESSAGES ── */}
+        {/* -- GLOBAL FEED MESSAGES -- */}
         {section === 'globalfeed' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1151,7 +1152,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── CAMPUS FEED POSTS ── */}
+        {/* -- CAMPUS FEED POSTS -- */}
         {section === 'announcements' && (
           <div>
             {/* Admin post composer */}
@@ -1301,7 +1302,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── AUDITION APPLICATIONS ── */}
+        {/* -- AUDITION APPLICATIONS -- */}
         {section === 'auditions' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1316,9 +1317,9 @@ export default function AdminDashboard() {
                 <tbody>
                   {auditions.map(a => (
                     <tr key={a.id}>
-                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.accounts?.full_name || '—'}</td>
-                      <td><span className="adm-mono">{a.accounts?.ctu_id || '—'}</span></td>
-                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '—'}</td>
+                      <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.accounts?.full_name || '�'}</td>
+                      <td><span className="adm-mono">{a.accounts?.ctu_id || '�'}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '�'}</td>
                       <td>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
@@ -1405,7 +1406,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── USER FLAGS ── */}
+        {/* -- USER FLAGS -- */}
         {section === 'user_flags' && (() => {
           const [flags, setFlags] = useState([]);
           const [loading, setLoading] = useState(true);
@@ -1423,7 +1424,7 @@ export default function AdminDashboard() {
                   flagger:accounts!flagger_id(full_name, ctu_id),
                   community:communities(name)
                 `)
-                .order('created_at', { ascending: false });
+                .order('created_at'), { ascending: false });
               
               if (!error && data) setFlags(data);
               setLoading(false);
@@ -1540,7 +1541,7 @@ export default function AdminDashboard() {
                   {pendingFlags.length > 0 && (
                     <>
                       <div style={{ padding: '12px 20px', background: 'rgba(252,238,10,0.05)', borderBottom: '1px solid rgba(252,238,10,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
-                        PENDING REVIEW — {pendingFlags.length}
+                        PENDING REVIEW � {pendingFlags.length}
                       </div>
                       {pendingFlags.map(flag => (
                         <div key={flag.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1555,7 +1556,7 @@ export default function AdminDashboard() {
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 700, fontSize: 14 }}>{flag.flagged_user?.full_name || 'Unknown'}</div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                ID: {flag.flagged_user?.ctu_id} · Circle: {flag.community?.name || 'N/A'}
+                                ID: {flag.flagged_user?.ctu_id} � Circle: {flag.community?.name || 'N/A'}
                               </div>
                               <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: `${severityColors[flag.severity]}15`, border: `1px solid ${severityColors[flag.severity]}`, borderRadius: 6, fontSize: 10, fontWeight: 700, color: severityColors[flag.severity], textTransform: 'uppercase', letterSpacing: 1 }}>
                                 {flag.severity}
@@ -1566,7 +1567,7 @@ export default function AdminDashboard() {
                             <strong style={{ color: 'white' }}>Reason:</strong> {flag.reason}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-                            Flagged by: {flag.flagger?.full_name} ({flag.flagger?.ctu_id}) · {new Date(flag.created_at).toLocaleString()}
+                            Flagged by: {flag.flagger?.full_name} ({flag.flagger?.ctu_id}) � {new Date(flag.created_at).toLocaleString()}
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button
@@ -1593,12 +1594,12 @@ export default function AdminDashboard() {
                   {reviewedFlags.length > 0 && (
                     <>
                       <div style={{ padding: '12px 20px', background: 'rgba(0,240,255,0.05)', borderBottom: '1px solid rgba(0,240,255,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-cyan)', marginTop: 16 }}>
-                        REVIEWED — {reviewedFlags.length}
+                        REVIEWED � {reviewedFlags.length}
                       </div>
                       {reviewedFlags.slice(0, 10).map(flag => (
                         <div key={flag.id} style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: 0.6 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                            <span>{flag.flagged_user?.full_name} · {flag.community?.name}</span>
+                            <span>{flag.flagged_user?.full_name} � {flag.community?.name}</span>
                             <span style={{ color: flag.status === 'warning_issued' ? 'var(--cyber-yellow)' : 'var(--text-muted)' }}>
                               {flag.status === 'warning_issued' ? 'Warning Issued' : 'Dismissed'}
                             </span>
@@ -1672,7 +1673,7 @@ export default function AdminDashboard() {
           );
         })()}
 
-{/* ── REPORTS ── */}
+{/* -- REPORTS -- */}
         {section === 'reports' && (
           <div className="adm-card">
             <div className="adm-card-head">
@@ -1694,18 +1695,18 @@ export default function AdminDashboard() {
                   {reports.map(r => (
                     <tr key={r.id}>
                       <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '�'}</div>
                         <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
                       </td>
                       <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '�'}</div>
                         <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
                       </td>
                       <td><span className="adm-tag">{r.content_type}</span></td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 160 }}>{r.reason}</td>
                       <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 180 }}>
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {r.content_preview || '—'}
+                          {r.content_preview || '�'}
                         </div>
                       </td>
                       <td>
@@ -1753,7 +1754,7 @@ export default function AdminDashboard() {
                           </div>
                         )}
                         {r.status !== 'pending' && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || '—'}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || '�'}</span>
                         )}
                       </td>
                     </tr>
@@ -1764,7 +1765,7 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
-        {/* ── CONTENT MONITOR ── */}
+        {/* -- CONTENT MONITOR -- */}
         {section === 'moderation' && (() => {
           const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
           const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
@@ -1838,14 +1839,14 @@ export default function AdminDashboard() {
                             <td><span className="adm-tag" style={{ color: 'var(--orange)', borderColor: 'var(--orange)' }}>
                               {item._type === 'global_message' ? 'Global' : item._type === 'announcement' ? 'Post' : 'Message'}
                             </span></td>
-                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || '—'}</td>
+                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || '�'}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-primary)', maxWidth: 280 }}>
                               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {highlighted}
                               </div>
                             </td>
                             <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                              {item.full_name || item.author_name || '—'}
+                              {item.full_name || item.author_name || '�'}
                             </td>
                             <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                               {new Date(item.created_at).toLocaleDateString()}
@@ -1933,4 +1934,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
+
 

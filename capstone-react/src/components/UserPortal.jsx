@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/api';
 import { ApplicationFormBuilder, ApplicationReviewPanel, ApplicationApplicationForm, ApplicationStatusLabel, ApplicationStatusColor } from './ApplicationSystem';
 import ThemePicker from './ThemePicker';
 import ProfileShop from './ProfileShop';
@@ -802,7 +803,7 @@ function CreateModal({ onClose, onCreated, userId }) {
     else if (userId) headers['x-user-id'] = userId;
 
     try {
-      const res = await fetch('/api/communities', {
+      const res = await fetch(getApiUrl('/api/communities'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon }),
@@ -1069,7 +1070,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // Use service-role API to bypass RLS
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(`/api/upload`, {
+      const res = await fetch(getApiUrl(`/api/upload`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1661,7 +1662,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const saveProfile = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/update-profile?userId=${user.id}`, {
+      const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests }),
@@ -1742,7 +1743,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       });
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
-      const res = await fetch(`/api/upload`, {
+      const res = await fetch(getApiUrl(`/api/upload`), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: compressed }),
       });
@@ -2271,7 +2272,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/moderation', {
+      const res = await fetch(getApiUrl('/api/moderation'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2425,7 +2426,7 @@ function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/moderation', {
+      const res = await fetch(getApiUrl('/api/moderation'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2759,7 +2760,7 @@ function AppealModal({ warning, onClose, userId }) {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/moderation', {
+      const res = await fetch(getApiUrl('/api/moderation'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3020,7 +3021,7 @@ export default function UserPortal() {
   // Heartbeat: update last_seen every 30s
   useEffect(() => {
     if (!user?.id) return;
-    const ping = () => fetch('/api/update-profile?userId=' + user.id, {
+    const ping = () => fetch(getApiUrl('/api/update-profile?userId=' + user.id), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ last_seen: new Date().toISOString() }),
@@ -3090,7 +3091,7 @@ export default function UserPortal() {
   const loadCommunities = useCallback(async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch('/api/communities', {
+      const res = await fetch(getApiUrl('/api/communities'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
@@ -3748,7 +3749,7 @@ export default function UserPortal() {
     try {
       const payload = { action: 'delete-community', id: id };
       console.log('[DELETE CIRCLE] Sending payload:', payload);
-      const res = await fetch(`/api/delete`, {
+      const res = await fetch(getApiUrl(`/api/delete`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3825,7 +3826,7 @@ export default function UserPortal() {
 
   const editMessage = async (msgId, newContent) => {
     try {
-      const res = await fetch('/api/messages', {
+      const res = await fetch(getApiUrl('/api/messages'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: msgId, content: newContent, studentId: user?.student_id }),
@@ -4776,7 +4777,7 @@ export default function UserPortal() {
                           // Save via server (uses service role key, bypasses RLS)
                           let saved = false;
                           try {
-                            const serverRes = await fetch(`/api/upload`, {
+                            const serverRes = await fetch(getApiUrl(`/api/upload`), {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ action: 'upload-cover', logo_url: compressed, communityId: activeComm.id }),
@@ -5320,4 +5321,6 @@ export default function UserPortal() {
     </div>
   );
 }
+
+
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getApiUrl } from '../lib/api';
 import IdVerifier from './IdVerifier';
 
 export default function Auth() {
@@ -49,7 +50,7 @@ export default function Auth() {
         id_photo_ext = idPhotoFile.name?.split('.').pop() || 'jpg';
       }
 
-      const res = await fetch('/api/signup', {
+      const res = await fetch(getApiUrl('/api/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,7 +88,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/forgot-password', {
+      const res = await fetch(getApiUrl('/api/forgot-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: form.ctuId }),
@@ -111,7 +112,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(getApiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: form.ctuId, password: form.password }),

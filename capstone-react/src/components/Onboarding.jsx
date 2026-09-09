@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/api';
 
 const COURSES = [
   'BEED',
@@ -62,7 +63,7 @@ export default function Onboarding() {
       // Count students with at least one matching interest (only works after migration)
       const { count } = await supabase
         .from('account_details')
-        .select('*', { count: 'exact', head: true })
+        .select('*'), { count: 'exact', head: true })
         .overlaps('interests', selectedInterests)
         .neq('id', user.id || '');
 
@@ -139,7 +140,7 @@ export default function Onboarding() {
         });
 
         const token = localStorage.getItem('accessToken');
-        const res = await fetch('/api/upload', {
+        const res = await fetch(getApiUrl('/api/upload'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -360,3 +361,6 @@ export default function Onboarding() {
     </div>
   );
 }
+
+
+
