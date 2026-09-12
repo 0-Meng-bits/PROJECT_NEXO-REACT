@@ -1905,7 +1905,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                           : customizations.name_color.css_data).gradient,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text'
+                        backgroundClip: 'text',
+                        color: 'transparent'
                       }
                     : { 
                         color: (typeof customizations.name_color.css_data === 'string' 
@@ -1916,7 +1917,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 ),
                 letterSpacing: 1, 
                 lineHeight: 1.2, 
-                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                textShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8
