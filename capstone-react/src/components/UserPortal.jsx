@@ -1906,6 +1906,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                         backgroundImage: (typeof customizations.name_color.css_data === 'string' 
                           ? JSON.parse(customizations.name_color.css_data) 
                           : customizations.name_color.css_data).gradient,
+                        backgroundSize: '100% 100%',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         MozBackgroundClip: 'text',

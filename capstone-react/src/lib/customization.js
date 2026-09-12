@@ -61,10 +61,13 @@ export function getUserNameStyle(customizations) {
   if (data.gradient) {
     return {
       background: data.gradient,
+      backgroundSize: '100% 100%',
       WebkitBackgroundClip: 'text',
       WebkitTextFillColor: 'transparent',
       backgroundClip: 'text',
-      fontWeight: 700
+      color: 'transparent',
+      fontWeight: 700,
+      display: 'inline-block'
     };
   }
 
