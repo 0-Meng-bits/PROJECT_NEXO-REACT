@@ -1903,10 +1903,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                         background: (typeof customizations.name_color.css_data === 'string' 
                           ? JSON.parse(customizations.name_color.css_data) 
                           : customizations.name_color.css_data).gradient,
+                        backgroundImage: (typeof customizations.name_color.css_data === 'string' 
+                          ? JSON.parse(customizations.name_color.css_data) 
+                          : customizations.name_color.css_data).gradient,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
+                        MozBackgroundClip: 'text',
+                        MozTextFillColor: 'transparent',
                         backgroundClip: 'text',
-                        color: 'transparent'
+                        color: 'transparent',
+                        display: 'inline-block'
                       }
                     : { 
                         color: (typeof customizations.name_color.css_data === 'string' 
