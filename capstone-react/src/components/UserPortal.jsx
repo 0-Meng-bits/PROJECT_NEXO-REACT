@@ -1979,11 +1979,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
 
             {!editing && profile.interests?.length > 0 && (
-              <div>
+              <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {profile.interests.map(id => (
-                    <span key={id} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)' }}>
+                    <span key={id} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)', fontWeight: 600 }}>
                       {INTEREST_LABELS[id] || id}
                     </span>
                   ))}
@@ -2082,11 +2082,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
               {!readOnly && (
-                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11 }}>
+                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11, background: 'rgba(247,95,95,0.15)', borderColor: 'var(--red)', fontWeight: 700 }}>
                   <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
                 </button>
               )}
-              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11 }}>CLOSE</button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.3)', fontWeight: 700 }}>CLOSE</button>
             </div>
           </div>
         </div>
