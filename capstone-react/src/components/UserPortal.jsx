@@ -1967,7 +1967,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 profile.course && { label: 'COURSE', value: profile.course },
                 profile.year_level && { label: 'YEAR', value: profile.year_level },
               ].filter(Boolean).map((item, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,240,255,0.1)', borderRadius: 10, padding: '10px 14px' }}>
+                <div key={i} style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: item.accent || 'var(--cyber-cyan)', fontFamily: item.mono ? 'monospace' : 'inherit' }}>{item.value}</div>
                 </div>
