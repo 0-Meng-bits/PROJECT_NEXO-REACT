@@ -1893,43 +1893,40 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
             <div style={{ paddingBottom: 8, flex: 1, minWidth: 0 }}>
               <div style={{ 
-                fontSize: 20, 
-                fontWeight: 800, 
-                ...(customizations?.name_color?.css_data 
-                  ? (typeof customizations.name_color.css_data === 'string' 
-                      ? JSON.parse(customizations.name_color.css_data) 
-                      : customizations.name_color.css_data).gradient 
-                    ? { 
-                        background: (typeof customizations.name_color.css_data === 'string' 
-                          ? JSON.parse(customizations.name_color.css_data) 
-                          : customizations.name_color.css_data).gradient,
-                        backgroundImage: (typeof customizations.name_color.css_data === 'string' 
-                          ? JSON.parse(customizations.name_color.css_data) 
-                          : customizations.name_color.css_data).gradient,
-                        backgroundSize: '100% 100%',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        MozBackgroundClip: 'text',
-                        MozTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                        color: 'transparent',
-                        display: 'inline-block'
-                      }
-                    : { 
-                        color: (typeof customizations.name_color.css_data === 'string' 
-                          ? JSON.parse(customizations.name_color.css_data) 
-                          : customizations.name_color.css_data).color 
-                      }
-                  : { color: 'var(--text-primary)' }
-                ),
-                letterSpacing: 1, 
-                lineHeight: 1.2, 
-                textShadow: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8
               }}>
-                {user.full_name?.toUpperCase()}
+                <span style={{
+                  fontSize: 20, 
+                  fontWeight: 800,
+                  letterSpacing: 1, 
+                  lineHeight: 1.2,
+                  ...(customizations?.name_color?.css_data 
+                    ? (typeof customizations.name_color.css_data === 'string' 
+                        ? JSON.parse(customizations.name_color.css_data) 
+                        : customizations.name_color.css_data).gradient 
+                      ? { 
+                          background: (typeof customizations.name_color.css_data === 'string' 
+                            ? JSON.parse(customizations.name_color.css_data) 
+                            : customizations.name_color.css_data).gradient,
+                          backgroundSize: '100%',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                          color: 'transparent',
+                          display: 'inline-block'
+                        }
+                      : { 
+                          color: (typeof customizations.name_color.css_data === 'string' 
+                            ? JSON.parse(customizations.name_color.css_data) 
+                            : customizations.name_color.css_data).color 
+                        }
+                    : { color: 'var(--text-primary)' }
+                  )
+                }}>
+                  {user.full_name?.toUpperCase()}
+                </span>
                 {customizations?.badge && (
                   <span style={{ fontSize: 16 }} title={customizations.badge.name}>
                     {customizations.badge.preview_url}
