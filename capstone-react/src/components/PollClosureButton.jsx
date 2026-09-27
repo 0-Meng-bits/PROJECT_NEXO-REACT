@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getApiUrl } from '../lib/api';
 
 export default function PollClosureButton({ 
   announcementId, 
@@ -29,16 +30,25 @@ export default function PollClosureButton({
         'Authorization': `Bearer ${token}`
       };
 
-      const response = await fetch('/api/close-poll', {
+      const response = await fetch(getApiUrl('/api/close-poll'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ announcementId, communityId })
       });
 
-      const data = await response.json();
+      // Check if response has content before parsing
+      const text = await response.text();
+      let data;
+      
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('Failed to parse response:', text);
+        throw new Error('Server returned invalid response. Response: ' + text.substring(0, 100));
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to close poll');
+        throw new Error(data.message || data.error || `Failed to close poll (${response.status})`);
       }
 
       // Success!
