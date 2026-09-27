@@ -657,6 +657,195 @@ app.post('/api/forgot-password', async (req, res) => {
   res.json({ message: 'Password reset email sent.' });
 });
 
+// ── CLOSE POLL & CREATE EVENT ────────────────────────────────────────────────
+app.post('/api/close-poll', requireAuth, async (req, res) => {
+  const { announcementId, communityId } = req.body;
+  
+  if (!announcementId || !communityId) {
+    return res.status(400).json({ error: 'BAD_REQUEST', message: 'announcementId and communityId required' });
+  }
+  
+  const closerId = req.authUser.id; // Derived from verified JWT
+  
+  try {
+    // 1. Authorization: Verify user is community leader with approved/active status
+    const { data: membership, error: memberError } = await supabaseAdmin
+      .from('memberships')
+      .select('rank_level')
+      .eq('user_id', closerId)
+      .eq('community_id', communityId)
+      .eq('status', 'active')
+      .single();
+    
+    if (memberError || !membership || membership.rank_level <= 0) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Only community leaders can close polls' });
+    }
+    
+    // 2. Fetch poll data
+    const { data: poll, error: pollError } = await supabaseAdmin
+      .from('announcements')
+      .select('*')
+      .eq('id', announcementId)
+      .single();
+    
+    if (pollError || !poll) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'Poll not found' });
+    }
+    
+    // 3. Verify this is actually a poll post
+    if (poll.post_type !== 'poll') {
+      return res.status(400).json({ error: 'INVALID_TYPE', message: 'This announcement is not a poll' });
+    }
+    
+    // 4. Check if already closed
+    if (poll.event_metadata?.is_closed) {
+      return res.status(409).json({ error: 'ALREADY_CLOSED', message: 'Poll already closed' });
+    }
+    
+    // 5. Determine winning option
+    const pollOptions = poll.poll_options || [];
+    const pollVotes = poll.poll_votes || {};
+    
+    if (pollOptions.length === 0) {
+      return res.status(400).json({ error: 'INVALID_POLL', message: 'Poll has no options' });
+    }
+    
+    // Count votes per option
+    const voteCounts = {};
+    pollOptions.forEach(option => {
+      voteCounts[option] = (pollVotes[option] || []).length;
+    });
+    
+    // Find max vote count
+    const maxVotes = Math.max(...Object.values(voteCounts));
+    
+    // Find first option with max votes (handles ties and zero votes)
+    let winningOption = pollOptions[0]; // Default for zero votes
+    if (maxVotes > 0) {
+      for (const option of pollOptions) {
+        if (voteCounts[option] === maxVotes) {
+          winningOption = option;
+          break;
+        }
+      }
+    }
+    
+    // 6. If event metadata exists, validate and generate event
+    let generatedEventId = null;
+    if (poll.event_metadata?.event_date) {
+      try {
+        const metadata = poll.event_metadata;
+        
+        // Validate date
+        if (!metadata.event_date) throw new Error('Event date is required');
+        const eventDate = new Date(metadata.event_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (eventDate < today) throw new Error('Event date cannot be in the past');
+        
+        // Validate time format
+        if (!metadata.event_time) throw new Error('Event time is required');
+        const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+        if (!timeRegex.test(metadata.event_time)) {
+          throw new Error('Event time must be in HH:MM format (24-hour)');
+        }
+        
+        // Validate location
+        if (!metadata.location || metadata.location.trim() === '') {
+          throw new Error('Location is required');
+        }
+        if (metadata.location.length > 200) {
+          throw new Error('Location cannot exceed 200 characters');
+        }
+        
+        // Fetch creator info
+        const { data: creator } = await supabaseAdmin
+          .from('accounts')
+          .select('id, full_name, user_type')
+          .eq('id', poll.author_id)
+          .single();
+        
+        if (!creator) throw new Error('Poll creator not found');
+        
+        // Create event
+        const { data: newEvent, error: eventError } = await supabaseAdmin
+          .from('campus_events')
+          .insert({
+            title: winningOption,
+            description: `This event was created from the poll '${poll.title}' - winning option: '${winningOption}'`,
+            start_date: metadata.event_date,
+            start_time: `${metadata.event_time}:00`, // Convert HH:MM to HH:MM:SS
+            location: metadata.location,
+            poster_id: creator.id,
+            poster_name: creator.full_name,
+            poster_type: creator.user_type,
+            category: 'social',
+            is_official: false
+          })
+          .select()
+          .single();
+        
+        if (eventError) throw eventError;
+        generatedEventId = newEvent.id;
+        
+        // Notify voters
+        const voterIds = new Set();
+        Object.values(pollVotes).forEach(voters => {
+          voters.forEach(voterId => voterIds.add(voterId));
+        });
+        
+        if (voterIds.size > 0) {
+          const notifications = Array.from(voterIds).map(voterId => ({
+            user_id: voterId,
+            type: 'event_from_poll',
+            message: `The poll '${poll.title}' has closed! Event created: ${winningOption}`,
+            link_comm_id: communityId,
+            is_read: false
+          }));
+          
+          await supabaseAdmin.from('notifications').insert(notifications);
+        }
+        
+      } catch (validationError) {
+        // If event generation fails, still close poll but notify creator
+        console.error('[CLOSE POLL] Event generation failed:', validationError.message);
+        await supabaseAdmin.from('notifications').insert({
+          user_id: poll.author_id,
+          type: 'event_generation_failed',
+          message: `Your poll "${poll.title}" was closed but the event could not be created: ${validationError.message}`,
+          link_comm_id: communityId
+        });
+      }
+    }
+    
+    // 7. Update poll to closed status
+    const { error: updateError } = await supabaseAdmin
+      .from('announcements')
+      .update({
+        event_metadata: {
+          ...poll.event_metadata,
+          is_closed: true,
+          closed_at: new Date().toISOString(),
+          closed_by: closerId,
+          winning_option: winningOption,
+          ...(generatedEventId && { generated_event_id: generatedEventId })
+        }
+      })
+      .eq('id', announcementId);
+    
+    if (updateError) {
+      console.error('[CLOSE POLL] Update error:', updateError.message);
+      return res.status(500).json({ error: 'UPDATE_FAILED', message: 'Failed to update poll status' });
+    }
+    
+    return res.status(200).json({ success: true, eventId: generatedEventId });
+    
+  } catch (error) {
+    console.error('[CLOSE POLL] Unexpected error:', error.message);
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message });
+  }
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
