@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { getApiUrl } from '../lib/api';
 
 export default function PollClosureButton({ 
   announcementId, 
@@ -30,7 +29,7 @@ export default function PollClosureButton({
         'Authorization': `Bearer ${token}`
       };
 
-      const response = await fetch(getApiUrl('/api/close-poll'), {
+      const response = await fetch('/api/close-poll', {
         method: 'POST',
         headers,
         body: JSON.stringify({ announcementId, communityId })
