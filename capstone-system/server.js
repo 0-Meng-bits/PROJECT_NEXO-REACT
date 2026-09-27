@@ -2,9 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const nodemailer = require('nodemailer');
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
+
+// Enable CORS for all routes
+app.use(cors());
 
 // Use service role for admin operations (verify, reject)
 const supabaseAdmin = createClient(
