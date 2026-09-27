@@ -135,15 +135,18 @@ export default function ShowcaseTagBar({
         }
 
         // Check if user is member of community
-        const { data: membership, error: memberError } = await supabase
+        const { data: memberships, error: memberError } = await supabase
           .from('memberships')
-          .select('id')
+          .select('id, status')
           .eq('user_id', currentUserId)
-          .eq('community_id', communityId)
-          .eq('status', 'approved')
-          .single();
+          .eq('community_id', communityId);
 
-        if (memberError || !membership) {
+        if (memberError) {
+          throw new Error('Error checking membership');
+        }
+
+        const activeMembership = memberships?.find(m => m.status === 'active');
+        if (!activeMembership) {
           throw new Error('You must be a member of this community to give feedback');
         }
 
