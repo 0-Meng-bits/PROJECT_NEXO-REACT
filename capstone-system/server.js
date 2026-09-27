@@ -777,8 +777,8 @@ app.post('/api/close-poll', requireAuth, async (req, res) => {
           .insert({
             title: winningOption,
             description: `This event was created from the poll '${poll.title}' - winning option: '${winningOption}'`,
-            start_date: metadata.event_date,
-            start_time: `${metadata.event_time}:00`, // Convert HH:MM to HH:MM:SS
+            event_date: metadata.event_date,
+            event_time: `${metadata.event_time}:00`, // Convert HH:MM to HH:MM:SS
             location: metadata.location,
             poster_id: creator.id,
             poster_name: creator.full_name,
