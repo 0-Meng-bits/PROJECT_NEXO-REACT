@@ -8,6 +8,10 @@ import ProfileShop from './ProfileShop';
 import CustomizedUsername from './CustomizedUsername';
 import TaskBoard from './TaskBoard';
 import ShowcaseTagBar from './ShowcaseTagBar';
+import PollEventMetadataForm from './PollEventMetadataForm';
+import EventPollBadge from './EventPollBadge';
+import PollClosureButton from './PollClosureButton';
+import GeneratedEventLink from './GeneratedEventLink';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 
@@ -131,6 +135,23 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const pollVotes = isPoll ? (a.poll_votes || {}) : {};
   const totalVotes = Object.values(pollVotes).reduce((s, v) => s + (v?.length || 0), 0);
   const myVote = isPoll ? pollOptions.find(opt => (pollVotes[opt] || []).includes(user?.id)) : null;
+
+  // Fetch user's rank level for this community (for PollClosureButton)
+  const [userRankLevel, setUserRankLevel] = useState(0);
+  
+  useEffect(() => {
+    if (a.community_id && user?.id) {
+      supabase.from('memberships')
+        .select('rank_level')
+        .eq('user_id', user.id)
+        .eq('community_id', a.community_id)
+        .eq('status', 'active')
+        .single()
+        .then(({ data }) => {
+          setUserRankLevel(data?.rank_level || 0);
+        });
+    }
+  }, [a.community_id, user?.id]);
 
   // Detect showcase posts
   const isShowcase = a.post_type === 'showcase';
@@ -341,9 +362,12 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             const votes = (pollVotes[opt] || []).length;
             const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
             const isMyChoice = myVote === opt;
+            const isClosed = a.event_metadata?.is_closed;
+            const isWinning = isClosed && opt === a.event_metadata?.winning_option;
             return (
-              <button key={i} onClick={() => onVote && onVote(a.id, opt, pollVotes)} disabled={!!myVote}
-                style={{ position: 'relative', overflow: 'hidden', width: '100%', textAlign: 'left', background: isMyChoice ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isMyChoice ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '10px 14px', cursor: myVote ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--text-primary)', transition: 'border-color 0.2s' }}>
+              <button key={i} onClick={() => onVote && !isClosed && onVote(a.id, opt, pollVotes)} disabled={!!myVote || isClosed}
+                className={isWinning ? 'poll-winning-option' : ''}
+                style={{ position: 'relative', overflow: 'hidden', width: '100%', textAlign: 'left', background: isMyChoice ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isMyChoice ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '10px 14px', cursor: myVote || isClosed ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--text-primary)', transition: 'border-color 0.2s' }}>
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
@@ -353,9 +377,56 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` � You voted "${myVote}"` : ' � Click to vote'}
+            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` � You voted "${myVote}"` : a.event_metadata?.is_closed ? ' � Poll Closed' : ' � Click to vote'}
           </div>
         </div>
+      )}
+
+      {/* ── EVENT POLL BADGE ── */}
+      {isPoll && a.event_metadata?.event_date && (
+        <EventPollBadge
+          eventDate={a.event_metadata.event_date}
+          eventTime={a.event_metadata.event_time}
+          location={a.event_metadata.location}
+        />
+      )}
+
+      {/* ── POLL CLOSED BANNER ── */}
+      {isPoll && a.event_metadata?.is_closed && (
+        <div className="poll-closed-banner">
+          <i className="fa-solid fa-lock"></i>
+          <span>
+            Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
+            {a.event_metadata.winning_option && ` • Winning option: ${a.event_metadata.winning_option}`}
+          </span>
+        </div>
+      )}
+
+      {/* ── POLL CLOSURE BUTTON ── */}
+      {isPoll && user && a.community_id && (
+        <PollClosureButton
+          announcementId={a.id}
+          communityId={a.community_id}
+          userRankLevel={userRankLevel}
+          hasEventMetadata={!!a.event_metadata?.event_date}
+          isClosed={!!a.event_metadata?.is_closed}
+          onPollClosed={(eventId) => {
+            // Reload announcements to show updated state
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* ── GENERATED EVENT LINK ── */}
+      {isPoll && a.event_metadata?.generated_event_id && (
+        <GeneratedEventLink
+          eventId={a.event_metadata.generated_event_id}
+          eventTitle={a.event_metadata.winning_option || 'Campus Event'}
+          onNavigate={(eventId) => {
+            // Navigate to calendar view showing this event
+            alert(`Navigate to event ${eventId} in calendar view`);
+          }}
+        />
       )}
 
       {/* ── SHOWCASE TAG BAR ── */}
@@ -3001,8 +3072,8 @@ export default function UserPortal() {
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
-  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''] });
-  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''] });
+  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
+  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -3240,6 +3311,7 @@ export default function UserPortal() {
       post_type: type,
       community_id: null,
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
+      ...(type === 'poll' && newPost.event_metadata ? { event_metadata: newPost.event_metadata } : {}),
     }]);
     setPostingAnnouncement(false);
     if (!error) {
@@ -3255,7 +3327,7 @@ export default function UserPortal() {
           });
         }
       }
-      setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''] });
+      setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
       loadAnnouncements();
     }
   };
@@ -3280,10 +3352,11 @@ export default function UserPortal() {
       post_type: newCirclePost.post_type,
       community_id: commId,
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
+      ...(newCirclePost.post_type === 'poll' && newCirclePost.event_metadata ? { event_metadata: newCirclePost.event_metadata } : {}),
     }]);
     setPostingAnnouncement(false);
     if (!error) {
-      setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''] });
+      setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
       loadCircleAnnouncements(commId);
 
       // Notify all active members
@@ -4384,35 +4457,42 @@ export default function UserPortal() {
                   )}
                   {/* Poll options */}
                   {newPost.post_type === 'poll' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                      {newPost.pollOptions.map((opt, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 6 }}>
-                          <input
-                            className="home-composer-title"
-                            style={{ marginBottom: 0, flex: 1 }}
-                            placeholder={`Option ${i + 1}`}
-                            value={opt}
-                            onChange={e => {
-                              const opts = [...newPost.pollOptions];
-                              opts[i] = e.target.value;
-                              setNewPost(p => ({ ...p, pollOptions: opts }));
-                            }}
-                          />
-                          {newPost.pollOptions.length > 2 && (
-                            <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
-                              style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
-                              <i className="fa-solid fa-xmark"></i>
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {newPost.pollOptions.length < 6 && (
-                        <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
-                          style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
-                          <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
-                        </button>
-                      )}
-                    </div>
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                        {newPost.pollOptions.map((opt, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              className="home-composer-title"
+                              style={{ marginBottom: 0, flex: 1 }}
+                              placeholder={`Option ${i + 1}`}
+                              value={opt}
+                              onChange={e => {
+                                const opts = [...newPost.pollOptions];
+                                opts[i] = e.target.value;
+                                setNewPost(p => ({ ...p, pollOptions: opts }));
+                              }}
+                            />
+                            {newPost.pollOptions.length > 2 && (
+                              <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
+                                style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
+                                <i className="fa-solid fa-xmark"></i>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        {newPost.pollOptions.length < 6 && (
+                          <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
+                            style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
+                            <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
+                          </button>
+                        )}
+                      </div>
+                      {/* Event metadata form - only for global feed (no community restriction) */}
+                      <PollEventMetadataForm
+                        communityCategory="social"
+                        onChange={(metadata) => setNewPost(p => ({ ...p, event_metadata: metadata }))}
+                      />
+                    </>
                   )}
                   <div className="home-composer-footer">
                     <div className="home-composer-types">
@@ -4950,37 +5030,44 @@ export default function UserPortal() {
                         )}
                         {/* Poll options */}
                         {newCirclePost.post_type === 'poll' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                            {newCirclePost.pollOptions.map((opt, i) => (
-                              <div key={i} style={{ display: 'flex', gap: 6 }}>
-                                <input
-                                  className="home-composer-title"
-                                  style={{ marginBottom: 0, flex: 1 }}
-                                  placeholder={`Option ${i + 1}`}
-                                  value={opt}
-                                  onChange={e => {
-                                    const opts = [...newCirclePost.pollOptions];
-                                    opts[i] = e.target.value;
-                                    setNewCirclePost(p => ({ ...p, pollOptions: opts }));
-                                  }}
-                                />
-                                {newCirclePost.pollOptions.length > 2 && (
-                                  <button type="button"
-                                    onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
-                                    style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
-                                    <i className="fa-solid fa-xmark"></i>
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                            {newCirclePost.pollOptions.length < 6 && (
-                              <button type="button"
-                                onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
-                                style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
-                                <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
-                              </button>
-                            )}
-                          </div>
+                          <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                              {newCirclePost.pollOptions.map((opt, i) => (
+                                <div key={i} style={{ display: 'flex', gap: 6 }}>
+                                  <input
+                                    className="home-composer-title"
+                                    style={{ marginBottom: 0, flex: 1 }}
+                                    placeholder={`Option ${i + 1}`}
+                                    value={opt}
+                                    onChange={e => {
+                                      const opts = [...newCirclePost.pollOptions];
+                                      opts[i] = e.target.value;
+                                      setNewCirclePost(p => ({ ...p, pollOptions: opts }));
+                                    }}
+                                  />
+                                  {newCirclePost.pollOptions.length > 2 && (
+                                    <button type="button"
+                                      onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
+                                      style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
+                                      <i className="fa-solid fa-xmark"></i>
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              {newCirclePost.pollOptions.length < 6 && (
+                                <button type="button"
+                                  onClick={() => setNewCirclePost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
+                                  style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
+                                  <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
+                                </button>
+                              )}
+                            </div>
+                            {/* Event metadata form - only for social communities */}
+                            <PollEventMetadataForm
+                              communityCategory={activeComm?.category}
+                              onChange={(metadata) => setNewCirclePost(p => ({ ...p, event_metadata: metadata }))}
+                            />
+                          </>
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
