@@ -4578,3 +4578,47 @@ body {
     opacity: 0.5;
   }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/* SHOWCASE POST STYLING */
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+.announcement-card.showcase {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.05),
+    rgba(245, 158, 11, 0.02)
+  );
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+.showcase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid #f59e0b;
+  color: #f59e0b;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+/* Tag button base styles - inline styles in component override these if needed */
+.tag-button {
+  font-family: inherit;
+}
+
+.tag-button:hover:not(.disabled) {
+  transform: translateY(-1px);
+}
+
+.tag-button.disabled {
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}

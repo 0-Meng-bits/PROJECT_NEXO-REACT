@@ -7,6 +7,7 @@ import ThemePicker from './ThemePicker';
 import ProfileShop from './ProfileShop';
 import CustomizedUsername from './CustomizedUsername';
 import TaskBoard from './TaskBoard';
+import ShowcaseTagBar from './ShowcaseTagBar';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 
@@ -106,7 +107,17 @@ const POST_TYPE = {
   shoutout:     { label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
   general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
   poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
+  showcase:     { label: 'Showcase',      color: '#f59e0b',             icon: 'fa-solid fa-palette' },
 };
+
+// ── FEEDBACK TAGS CONFIG ──────────────────────────────────────────────────────
+const FEEDBACK_TAGS = [
+  { id: 'effort',    label: 'Effort',    emoji: '👏', color: '#22c55e' },
+  { id: 'creative',  label: 'Creative',  emoji: '💡', color: '#a855f7' },
+  { id: 'technique', label: 'Technique', emoji: '🎯', color: '#3b82f6' },
+  { id: 'style',     label: 'Style',     emoji: '🎨', color: '#ec4899' },
+  { id: 'impact',    label: 'Impact',    emoji: '🔥', color: '#ef4444' },
+];
 
 function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
@@ -120,6 +131,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const pollVotes = isPoll ? (a.poll_votes || {}) : {};
   const totalVotes = Object.values(pollVotes).reduce((s, v) => s + (v?.length || 0), 0);
   const myVote = isPoll ? pollOptions.find(opt => (pollVotes[opt] || []).includes(user?.id)) : null;
+
+  // Detect showcase posts
+  const isShowcase = a.post_type === 'showcase';
 
   // Detect Application announcements by title pattern
   const isApplicationPost = a.title?.includes('Application Open') || a.title?.includes('Internal Application Open');
@@ -231,10 +245,15 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   };
 
   return (
-    <div className={`announcement-card ${a.pinned ? 'pinned' : ''}`}>
+    <div className={`announcement-card ${a.pinned ? 'pinned' : ''} ${isShowcase ? 'showcase' : ''}`}>
       {a.pinned && (
         <div className="announcement-pin-badge">
           <i className="fa-solid fa-thumbtack"></i> Pinned
+        </div>
+      )}
+      {isShowcase && (
+        <div className="showcase-badge">
+          <i className="fa-solid fa-palette"></i> SHOWCASE
         </div>
       )}
       <div className="announcement-header">
@@ -337,6 +356,21 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` � You voted "${myVote}"` : ' � Click to vote'}
           </div>
         </div>
+      )}
+
+      {/* ── SHOWCASE TAG BAR ── */}
+      {isShowcase && user && (
+        <ShowcaseTagBar
+          announcementId={a.id}
+          authorId={a.author_id}
+          communityId={a.community_id}
+          currentUserId={user.id}
+          currentUserName={user.full_name || user.student_id || 'User'}
+          onShowToast={(msg) => {
+            // Use existing toast system if available, or console.error
+            console.error(msg);
+          }}
+        />
       )}
 
       {/* ── COMMENT SECTION ── */}
@@ -4950,7 +4984,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['announcement', 'event', 'shoutout', 'general', 'poll'].map(t => {
+                            {['announcement', 'event', 'shoutout', 'general', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
