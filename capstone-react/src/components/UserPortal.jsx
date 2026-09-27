@@ -422,10 +422,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         <GeneratedEventLink
           eventId={a.event_metadata.generated_event_id}
           eventTitle={a.event_metadata.winning_option || 'Campus Event'}
-          onNavigate={(eventId) => {
-            // Navigate to calendar view showing this event
-            alert(`Navigate to event ${eventId} in calendar view`);
-          }}
+          isAdmin={user?.user_type === 'Admin'}
         />
       )}
 
