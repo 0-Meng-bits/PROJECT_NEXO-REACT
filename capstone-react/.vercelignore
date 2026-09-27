@@ -1,3 +1,2 @@
-# Ignore API folder - these are for local development only
-api/
+# Ignore local development server
 server-local.js
