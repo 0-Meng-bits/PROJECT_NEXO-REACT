@@ -9,7 +9,16 @@ export default function EventCard({ event, showCircleName = false }) {
     general: '#6b7280',
   };
   
+  const categoryIcons = {
+    academic: 'fa-solid fa-graduation-cap',
+    social: 'fa-solid fa-users',
+    sports: 'fa-solid fa-basketball',
+    cultural: 'fa-solid fa-palette',
+    general: 'fa-solid fa-calendar',
+  };
+  
   const color = categoryColors[event.category] || categoryColors.general;
+  const icon = categoryIcons[event.category] || categoryIcons.general;
   
   const formatDate = (date) => {
     if (!date) return '';
@@ -31,50 +40,62 @@ export default function EventCard({ event, showCircleName = false }) {
   
   return (
     <div className="event-card">
-      <span 
-        className="event-category-badge"
-        style={{ 
-          backgroundColor: `${color}20`,
-          border: `1px solid ${color}`,
-          color: color
-        }}
-      >
-        {event.category}
-      </span>
-      
-      {showCircleName && event.communities && (
-        <div className="event-circle-name">
-          <i className="fa-solid fa-circle" style={{ fontSize: 6, marginRight: 6 }}></i>
-          {event.communities.name}
-        </div>
-      )}
-      
-      <h4 className="event-title">{event.title}</h4>
-      
-      <div className="event-details">
-        <div className="event-detail-row">
-          <i className="fa-solid fa-calendar"></i>
-          <span>{formatDate(event.event_date)}</span>
-        </div>
-        
-        {event.event_time && (
-          <div className="event-detail-row">
-            <i className="fa-solid fa-clock"></i>
-            <span>{formatTime(event.event_time)}</span>
-          </div>
-        )}
-        
-        {event.location && (
-          <div className="event-detail-row">
-            <i className="fa-solid fa-location-dot"></i>
-            <span>{event.location}</span>
-          </div>
-        )}
+      <div className="event-card-icon" style={{ 
+        background: `linear-gradient(135deg, ${color}20, ${color}10)`,
+        borderColor: `${color}40`,
+        color: color
+      }}>
+        <i className={icon}></i>
       </div>
       
-      {event.description && (
-        <p className="event-description">{event.description}</p>
-      )}
+      <div className="event-card-content">
+        <div className="event-card-header">
+          <span 
+            className="event-category-badge"
+            style={{ 
+              backgroundColor: `${color}20`,
+              border: `1px solid ${color}`,
+              color: color
+            }}
+          >
+            {event.category}
+          </span>
+          
+          {showCircleName && event.communities && (
+            <span className="event-circle-name">
+              <i className="fa-solid fa-circle" style={{ fontSize: 6 }}></i>
+              {event.communities.name}
+            </span>
+          )}
+        </div>
+        
+        <h4 className="event-title">{event.title}</h4>
+        
+        <div className="event-details">
+          <div className="event-detail-row">
+            <i className="fa-solid fa-calendar"></i>
+            <span>{formatDate(event.event_date)}</span>
+          </div>
+          
+          {event.event_time && (
+            <div className="event-detail-row">
+              <i className="fa-solid fa-clock"></i>
+              <span>{formatTime(event.event_time)}</span>
+            </div>
+          )}
+          
+          {event.location && (
+            <div className="event-detail-row">
+              <i className="fa-solid fa-location-dot"></i>
+              <span>{event.location}</span>
+            </div>
+          )}
+        </div>
+        
+        {event.description && (
+          <p className="event-description">{event.description}</p>
+        )}
+      </div>
     </div>
   );
 }
