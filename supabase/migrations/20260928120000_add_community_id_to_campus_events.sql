@@ -52,12 +52,12 @@ USING (
   -- Campus-wide events (community_id IS NULL) visible to everyone
   community_id IS NULL
   OR
-  -- Circle events visible only to approved members
+  -- Circle events visible only to active members
   EXISTS (
     SELECT 1 FROM memberships
     WHERE memberships.community_id = campus_events.community_id
       AND memberships.user_id = auth.uid()
-      AND memberships.status = 'approved'
+      AND memberships.status = 'active'
   )
 );
 
