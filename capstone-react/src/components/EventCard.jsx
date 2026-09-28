@@ -54,13 +54,13 @@ export default function EventCard({ event, showCircleName = false }) {
       <div className="event-details">
         <div className="event-detail-row">
           <i className="fa-solid fa-calendar"></i>
-          <span>{formatDate(event.start_date)}</span>
+          <span>{formatDate(event.event_date)}</span>
         </div>
         
-        {event.start_time && (
+        {event.event_time && (
           <div className="event-detail-row">
             <i className="fa-solid fa-clock"></i>
-            <span>{formatTime(event.start_time)}</span>
+            <span>{formatTime(event.event_time)}</span>
           </div>
         )}
         

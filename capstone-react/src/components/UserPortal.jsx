@@ -3168,10 +3168,9 @@ export default function UserPortal() {
         community_id,
         title,
         description,
-        start_date,
-        start_time,
-        end_date,
-        end_time,
+        event_date,
+        event_time,
+        event_end_date,
         location,
         category,
         is_official,
@@ -3181,9 +3180,9 @@ export default function UserPortal() {
           category
         )
       `)
-      .gte('start_date', today)
-      .order('start_date', { ascending: true })
-      .order('start_time', { ascending: true })
+      .gte('event_date', today)
+      .order('event_date', { ascending: true })
+      .order('event_time', { ascending: true })
       .limit(50);
     
     if (!error && data) {
