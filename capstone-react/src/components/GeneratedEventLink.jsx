@@ -18,7 +18,7 @@ export default function GeneratedEventLink({ eventId, eventTitle, isAdmin }) {
       }, 100);
     } else {
       // Regular users: show informative message
-      alert(`Event created successfully!\n\nThis event has been added to the campus events calendar and is visible to all students. Admins can view and manage all campus events from the Admin Dashboard.`);
+      alert(`Event created successfully!\n\nClick the date/time in the navigation bar to view this event and other upcoming events from your circles.`);
     }
   };
 

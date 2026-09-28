@@ -12,6 +12,7 @@ import PollEventMetadataForm from './PollEventMetadataForm';
 import EventPollBadge from './EventPollBadge';
 import PollClosureButton from './PollClosureButton';
 import GeneratedEventLink from './GeneratedEventLink';
+import EventCard from './EventCard';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 
@@ -3087,6 +3088,10 @@ export default function UserPortal() {
   const [showFlagUser, setShowFlagUser] = useState(null); // { targetUser }
   const [showShop, setShowShop] = useState(false); // Profile Shop modal
   const [messageReads, setMessageReads] = useState({}); // message_id -> read count
+  const [showEventsModal, setShowEventsModal] = useState(false);
+  const [campusEvents, setCampusEvents] = useState([]);
+  const [circleEvents, setCircleEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   const viewUserProfile = useCallback(async (studentId) => {
     if (!studentId) return;
@@ -3147,6 +3152,53 @@ export default function UserPortal() {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
   });
+
+  // Load campus events
+  const loadEvents = useCallback(async () => {
+    if (!user) return;
+    setEventsLoading(true);
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Single query - RLS automatically filters by membership
+    const { data, error } = await supabase
+      .from('campus_events')
+      .select(`
+        id,
+        community_id,
+        title,
+        description,
+        start_date,
+        start_time,
+        end_date,
+        end_time,
+        location,
+        category,
+        is_official,
+        communities:community_id (
+          id,
+          name,
+          category
+        )
+      `)
+      .gte('start_date', today)
+      .order('start_date', { ascending: true })
+      .order('start_time', { ascending: true })
+      .limit(50);
+    
+    if (!error && data) {
+      // Separate campus-wide from circle events
+      const campus = data.filter(e => e.community_id === null);
+      const circles = data.filter(e => e.community_id !== null);
+      
+      setCampusEvents(campus);
+      setCircleEvents(circles);
+    } else if (error) {
+      console.error('Failed to load events:', error);
+    }
+    
+    setEventsLoading(false);
+  }, [user]);
 
   // ── ONLINE PRESENCE ──────────────────────────────────────────────────────────
   const [onlineUsers, setOnlineUsers] = useState(new Set()); // set of profile UUIDs
@@ -3997,7 +4049,17 @@ export default function UserPortal() {
           <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(o => !o)}>
             <i className="fa-solid fa-bars"></i>
           </button>
-          <div className="nav-clock">
+          <div 
+            className="nav-clock" 
+            onClick={() => {
+              setShowEventsModal(true);
+              loadEvents();
+            }}
+            style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
+            onMouseLeave={e => e.currentTarget.style.opacity = 1}
+            title="View campus events"
+          >
           <span className="nav-clock-time">
             {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
@@ -5466,6 +5528,72 @@ export default function UserPortal() {
           onClose={() => setShowThemePicker(false)}
           onThemeChange={(t) => setCurrentTheme(t)}
         />
+      )}
+
+      {/* ── EVENTS MODAL ── */}
+      {showEventsModal && (
+        <div className="modal-overlay" onClick={() => setShowEventsModal(false)}>
+          <div className="events-modal" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="events-modal-header">
+              <h2>
+                <i className="fa-solid fa-calendar-days" style={{ marginRight: 10 }}></i>
+                Campus Events
+              </h2>
+              <button onClick={() => setShowEventsModal(false)} className="modal-close-btn">
+                &times;
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="events-modal-content">
+              {eventsLoading ? (
+                <div className="events-loading">
+                  <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
+                  Loading events...
+                </div>
+              ) : (
+                <>
+                  {/* Campus-Wide Events Section */}
+                  <div className="events-section">
+                    <h3 className="events-section-title">
+                      <i className="fa-solid fa-university"></i> Campus-Wide
+                    </h3>
+                    {campusEvents.length === 0 ? (
+                      <div className="events-empty">No upcoming campus events</div>
+                    ) : (
+                      <div className="events-list">
+                        {campusEvents.map(event => (
+                          <EventCard key={event.id} event={event} showCircleName={false} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Circle Events Section */}
+                  <div className="events-section">
+                    <h3 className="events-section-title">
+                      <i className="fa-solid fa-users"></i> Your Circles
+                    </h3>
+                    {circleEvents.length === 0 ? (
+                      <div className="events-empty">
+                        {communities.length === 0 
+                          ? "Join circles to see their events"
+                          : "No upcoming events from your circles"}
+                      </div>
+                    ) : (
+                      <div className="events-list">
+                        {circleEvents.map(event => (
+                          <EventCard key={event.id} event={event} showCircleName={true} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

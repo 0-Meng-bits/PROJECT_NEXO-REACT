@@ -277,7 +277,9 @@ app.post('/api/admin-data', async (req, res) => {
   const { action, id, ...payload } = req.body;
   try {
     if (action === 'add_event') {
-      const { data, error } = await supabaseAdmin.from('campus_events').insert([payload]).select().single();
+      // Explicitly set community_id to NULL for campus-wide events
+      const eventData = { ...payload, community_id: null };
+      const { data, error } = await supabaseAdmin.from('campus_events').insert([eventData]).select().single();
       if (error) return res.status(400).json({ message: error.message });
       return res.json({ event: data });
     }
@@ -775,6 +777,7 @@ app.post('/api/close-poll', requireAuth, async (req, res) => {
         const { data: newEvent, error: eventError } = await supabaseAdmin
           .from('campus_events')
           .insert({
+            community_id: communityId,  // Circle-specific event (visible to members only)
             title: winningOption,
             description: `This event was created from the poll '${poll.title}' - winning option: '${winningOption}'`,
             event_date: metadata.event_date,
