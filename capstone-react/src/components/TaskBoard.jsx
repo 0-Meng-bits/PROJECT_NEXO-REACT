@@ -1,14 +1,42 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
+// Role configuration constants
+const ROLE_COLORS = {
+  Leader: '#fbbf24',      // amber
+  Developer: '#60a5fa',   // blue
+  Designer: '#f472b6',    // pink
+  Tester: '#34d399',      // emerald
+  Other: '#a78bfa'        // purple
+};
+
+const ROLE_ICONS = {
+  Leader: '👑',
+  Developer: '💻',
+  Designer: '🎨',
+  Tester: '🧪',
+  Other: '📋'
+};
+
+const getRoleColor = (role) => {
+  return ROLE_COLORS[role] || 'var(--text-muted)';
+};
+
+const getRoleIcon = (role) => {
+  return ROLE_ICONS[role] || '';
+};
+
 export default function TaskBoard({ channelId, canManage, currentUserId }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
+  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium', assignedTo: '' });
+  const [roleFilter, setRoleFilter] = useState('All');
+  const [members, setMembers] = useState([]);
 
   useEffect(() => {
     loadTasks();
+    loadMembers();
     
     // Real-time subscription
     const channel = supabase
@@ -28,14 +56,62 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
 
   const loadTasks = async () => {
     setLoading(true);
+    
+    // Get channel's community_id first
+    const { data: channel } = await supabase
+      .from('channels')
+      .select('community_id')
+      .eq('id', channelId)
+      .single();
+    
+    if (!channel) {
+      setLoading(false);
+      return;
+    }
+    
+    // Load tasks
     const { data, error } = await supabase
       .from('task_items')
       .select('*, assigned_user:assigned_to(full_name, ctu_id), creator:created_by(full_name)')
       .eq('channel_id', channelId)
       .order('created_at', { ascending: false });
-
+    
+    // Enrich with role data (scoped to community)
+    if (data) {
+      for (const task of data) {
+        if (task.assigned_to) {
+          const { data: membership } = await supabase
+            .from('memberships')
+            .select('project_role')
+            .eq('user_id', task.assigned_to)
+            .eq('community_id', channel.community_id)
+            .single();
+          
+          task.assignee_role = membership?.project_role || null;
+        }
+      }
+    }
+    
     if (!error) setTasks(data || []);
     setLoading(false);
+  };
+
+  const loadMembers = async () => {
+    const { data: channelData } = await supabase
+      .from('channels')
+      .select('community_id')
+      .eq('id', channelId)
+      .single();
+    
+    if (!channelData) return;
+    
+    const { data } = await supabase
+      .from('memberships')
+      .select('id, user_id, project_role, accounts:user_id(full_name)')
+      .eq('community_id', channelData.community_id)
+      .in('status', ['approved', 'active']);
+    
+    setMembers(data || []);
   };
 
   const addTask = async () => {
@@ -55,7 +131,8 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
         description: newTask.description.trim(),
         priority: newTask.priority,
         status: 'todo',
-        created_by: currentUserId
+        created_by: currentUserId,
+        assigned_to: newTask.assignedTo || null
       }])
       .select();
 
@@ -66,7 +143,7 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
     }
 
     console.log('Task created successfully:', data);
-    setNewTask({ title: '', description: '', priority: 'medium' });
+    setNewTask({ title: '', description: '', priority: 'medium', assignedTo: '' });
     setShowAddTask(false);
     loadTasks();
   };
@@ -95,10 +172,20 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
     loadTasks();
   };
 
+  const getFilteredTasks = () => {
+    if (roleFilter === 'All') return tasks;
+    
+    if (roleFilter === 'No Role') {
+      return tasks.filter(t => t.assigned_to && !t.assignee_role);
+    }
+    
+    return tasks.filter(t => t.assignee_role === roleFilter);
+  };
+
   const tasksByStatus = {
-    todo: tasks.filter(t => t.status === 'todo'),
-    in_progress: tasks.filter(t => t.status === 'in_progress'),
-    done: tasks.filter(t => t.status === 'done')
+    todo: getFilteredTasks().filter(t => t.status === 'todo'),
+    in_progress: getFilteredTasks().filter(t => t.status === 'in_progress'),
+    done: getFilteredTasks().filter(t => t.status === 'done')
   };
 
   const priorityColors = {
@@ -129,6 +216,38 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
             Add Task
           </button>
         )}
+      </div>
+
+      {/* Role Filter */}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>
+          Filter by role:
+        </span>
+        {['All', 'Leader', 'Developer', 'Designer', 'Tester', 'Other', 'No Role'].map(role => (
+          <button
+            key={role}
+            onClick={() => setRoleFilter(role)}
+            style={{
+              padding: '4px 12px',
+              fontSize: 11,
+              borderRadius: 12,
+              border: roleFilter === role 
+                ? `1px solid ${getRoleColor(role)}` 
+                : '1px solid rgba(0,240,255,0.2)',
+              background: roleFilter === role 
+                ? getRoleColor(role) + '22' 
+                : 'rgba(0,0,0,0.3)',
+              color: roleFilter === role 
+                ? getRoleColor(role) 
+                : 'var(--text-muted)',
+              cursor: 'pointer',
+              fontWeight: roleFilter === role ? 700 : 400,
+              transition: 'all 0.2s'
+            }}
+          >
+            {role !== 'All' && role !== 'No Role' && getRoleIcon(role)} {role}
+          </button>
+        ))}
       </div>
 
       {/* Add Task Modal */}
@@ -171,6 +290,24 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
                 <option value="high">🔴 High</option>
               </select>
             </div>
+
+            {canManage && members.length > 0 && (
+              <div className="input-group">
+                <label>ASSIGN TO</label>
+                <select
+                  value={newTask.assignedTo}
+                  onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                  style={{ width: '100%', padding: 10, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, color: 'white' }}
+                >
+                  <option value="">Unassigned</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.accounts?.full_name}{m.project_role ? ` (${m.project_role})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="modal-actions">
               <button className="cyber-btn" onClick={addTask} disabled={!newTask.title.trim()}>
@@ -304,6 +441,43 @@ function TaskCard({ task, onStatusChange, onDelete, canManage, priorityColors })
       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>
         by {task.creator?.full_name || 'Unknown'}
       </div>
+
+      {/* Assigned User & Role */}
+      {task.assigned_user && (
+        <div style={{ fontSize: 10, marginBottom: 8 }}>
+          <span style={{ color: 'var(--text-muted)' }}>Assigned: </span>
+          <span style={{ color: 'var(--cyber-cyan)' }}>
+            {task.assigned_user.full_name}
+          </span>
+          {task.assignee_role && (
+            <span style={{
+              marginLeft: 6,
+              padding: '2px 6px',
+              borderRadius: 10,
+              fontSize: 9,
+              background: getRoleColor(task.assignee_role) + '22',
+              color: getRoleColor(task.assignee_role),
+              border: `1px solid ${getRoleColor(task.assignee_role)}44`,
+              fontWeight: 600
+            }}>
+              {getRoleIcon(task.assignee_role)} {task.assignee_role}
+            </span>
+          )}
+          {!task.assignee_role && (
+            <span style={{
+              marginLeft: 6,
+              padding: '2px 6px',
+              borderRadius: 10,
+              fontSize: 9,
+              background: 'rgba(148,163,184,0.1)',
+              color: 'var(--text-muted)',
+              border: '1px solid rgba(148,163,184,0.2)'
+            }}>
+              No Role
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Status Buttons */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

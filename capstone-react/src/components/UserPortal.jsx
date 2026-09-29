@@ -988,7 +988,7 @@ function rankColor(level) {
 }
 
 // ── MEMBER CARD ───────────────────────────────────────────────────────────────
-function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true, onGivePoints, onFlagUser }) {
+function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true, onGivePoints, onFlagUser, communityCategory, onUpdateRole }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [trustPoints, setTrustPoints] = useState(10);
   const menuRef = useRef(null);
@@ -1038,6 +1038,33 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
         <div style={{ marginTop: 6 }}>
           <TrustPointsBadge points={trustPoints} size="small" showLabel={false} />
         </div>
+        {/* Project Role Dropdown - only for project communities */}
+        {communityCategory === 'project' && canManage && (
+          <div style={{ marginTop: 8 }}>
+            <select
+              value={m.project_role || ''}
+              onChange={(e) => onUpdateRole && onUpdateRole(m.id, e.target.value)}
+              disabled={!canManage}
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                fontSize: 10,
+                background: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(0,240,255,0.2)',
+                borderRadius: 4,
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">No Role</option>
+              <option value="Leader">👑 Leader</option>
+              <option value="Developer">💻 Developer</option>
+              <option value="Designer">🎨 Designer</option>
+              <option value="Tester">🧪 Tester</option>
+              <option value="Other">📋 Other</option>
+            </select>
+          </div>
+        )}
       </div>
       <div className="member-card-actions" ref={menuRef}>
         <button className="member-card-menu-btn" onClick={() => setMenuOpen(o => !o)}>
@@ -1297,6 +1324,19 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     }
   };
 
+  const updateMemberRole = async (membershipId, newRole) => {
+    const { error } = await supabase
+      .from('memberships')
+      .update({ project_role: newRole || null })
+      .eq('id', membershipId);
+    
+    if (error) {
+      alert('Failed to update role: ' + error.message);
+    } else {
+      fetchMembers();
+    }
+  };
+
   const searchInviteStudent = async () => {
     if (!inviteSearch.trim()) return;
     setInviteSearching(true);
@@ -1506,6 +1546,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                               canManage={viewerRankLevel >= 2}
                               onGivePoints={onGivePoints}
                               onFlagUser={viewerRankLevel >= 2 ? onFlagUser : null}
+                              communityCategory={comm.category}
+                              onUpdateRole={updateMemberRole}
                             />
                           ))}
                         </div>
