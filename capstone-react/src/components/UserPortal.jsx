@@ -113,6 +113,21 @@ const POST_TYPE = {
   general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
   poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
   showcase:     { label: 'Showcase',      color: '#f59e0b',             icon: 'fa-solid fa-palette' },
+  question:     { label: 'Question',      color: '#22d3ee',             icon: 'fa-solid fa-circle-question' },
+};
+
+// ── TIME SINCE HELPER ────────────────────────────────────────────────────────
+const timeSince = (dateStr) => {
+  const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months > 1 ? 's' : ''} ago`;
 };
 
 // ── FEEDBACK TAGS CONFIG ──────────────────────────────────────────────────────
@@ -124,7 +139,7 @@ const FEEDBACK_TAGS = [
   { id: 'impact',    label: 'Impact',    emoji: '🔥', color: '#ef4444' },
 ];
 
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
@@ -157,6 +172,15 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   // Detect showcase posts
   const isShowcase = a.post_type === 'showcase';
 
+  // Detect question posts
+  const isQuestion = a.post_type === 'question';
+  const isSolved = isQuestion && !!a.solution_comment_id;
+  const [markingSolution, setMarkingSolution] = useState(false);
+  const isAuthorizedSolver = isQuestion && (
+    user?.id === a.author_id ||
+    user?.id === communityCreatorId
+  );
+
   // Detect Application announcements by title pattern
   const isApplicationPost = a.title?.includes('Application Open') || a.title?.includes('Internal Application Open');
 
@@ -186,6 +210,37 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       .order('created_at', { ascending: true });
     setComments(data || []);
     setLoadingComments(false);
+  };
+
+  const markSolution = async (commentId) => {
+    // Validate comment belongs to this question
+    const targetComment = comments.find(c => c.id === commentId);
+    if (!targetComment || targetComment.announcement_id !== a.id) {
+      console.error('Comment does not belong to this question');
+      return;
+    }
+    setMarkingSolution(true);
+    // Toggle: if already solution → NULL, otherwise → commentId
+    const newValue = a.solution_comment_id === commentId ? null : commentId;
+    const { error } = await supabase
+      .from('announcements')
+      .update({ solution_comment_id: newValue })
+      .eq('id', a.id);
+    if (error) {
+      alert('Failed to update solution: ' + error.message);
+    } else {
+      // Notify comment author on mark (not unmark, not self)
+      if (newValue && targetComment.author_id !== user.id) {
+        await supabase.from('notifications').insert([{
+          user_id: targetComment.author_id,
+          type: 'solution_marked',
+          message: `Your answer was marked as the solution in "${a.title}"`,
+          link_comm_id: a.community_id,
+        }]);
+      }
+      onReload?.();
+    }
+    setMarkingSolution(false);
   };
 
   const toggleComments = () => {
@@ -303,6 +358,16 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             <span style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10 }}>
               <i className={type.icon} style={{ marginRight: 4 }}></i>{type.label}
             </span>
+            {isQuestion && (
+              <span style={{
+                fontSize: 10, padding: '1px 7px', borderRadius: 10, marginLeft: 6, fontWeight: 700,
+                background: isSolved ? 'rgba(34,211,238,0.1)' : 'rgba(251,191,36,0.1)',
+                color: isSolved ? '#22d3ee' : '#fbbf24',
+                border: `1px solid ${isSolved ? 'rgba(34,211,238,0.3)' : 'rgba(251,191,36,0.3)'}`,
+              }}>
+                {isSolved ? '✅ Solved' : '❓ Unanswered'}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
             {isAnon ? 'Anonymous' : a.author_type} � {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -463,13 +528,24 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
               <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No comments yet. Be the first!</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                {comments.map(c => (
+                {comments.map(c => {
+                  const isSolutionComment = c.id === a.solution_comment_id;
+                  return (
                   <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     {/* Avatar */}
                     <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
                       {(c.author_name || 'U')[0].toUpperCase()}
                     </div>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${containsBadWord(c.content) ? 'rgba(247,95,95,0.3)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 12px' }}>
+                    <div style={{ flex: 1, background: isSolutionComment ? 'rgba(34,211,238,0.04)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isSolutionComment ? 'rgba(34,211,238,0.4)' : containsBadWord(c.content) ? 'rgba(247,95,95,0.3)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 12px' }}>
+                      {/* Solution badge */}
+                      {isSolutionComment && (
+                        <div style={{ fontSize: 10, color: '#22d3ee', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          ✅ Accepted Answer
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
+                            · solved {timeSince(c.created_at)}
+                          </span>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{c.author_name}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -503,6 +579,21 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                         </div>
                       )}
                       <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>{c.content}</p>
+                      {/* Mark / Unmark Solution button */}
+                      {isQuestion && isAuthorizedSolver && (
+                        <button
+                          onClick={() => markSolution(c.id)}
+                          disabled={markingSolution}
+                          style={{
+                            marginTop: 6, fontSize: 10, padding: '2px 8px', borderRadius: 8, cursor: 'pointer',
+                            border: isSolutionComment ? '1px solid rgba(34,211,238,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                            background: isSolutionComment ? 'rgba(34,211,238,0.1)' : 'transparent',
+                            color: isSolutionComment ? '#22d3ee' : 'var(--text-muted)',
+                          }}
+                        >
+                          {isSolutionComment ? '✅ Unmark Solution' : '○ Mark as Solution'}
+                        </button>
+                      )}
                     </div>
                     {/* Reply button */}
                     {user?.is_verified && (
@@ -532,7 +623,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -3112,6 +3204,7 @@ export default function UserPortal() {
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
+  const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
@@ -3687,6 +3780,7 @@ export default function UserPortal() {
   useEffect(() => {
     loadChannels(activeCommId);
     loadCircleAnnouncements(activeCommId);
+    setQaFilter('all'); // reset Q&A filter when switching communities
     // Load members for the panel whenever we switch circles
     if (activeCommId && activeCommId !== 'global') {
       supabase.from('memberships')
@@ -5171,7 +5265,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['announcement', 'event', 'shoutout', 'general', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : [])].map(t => {
+                            {['announcement', 'event', 'shoutout', 'general', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
@@ -5194,21 +5288,48 @@ export default function UserPortal() {
                         </div>
                       </div>
                     )}
+                    {/* Q&A Filter bar — academic circles only */}
+                    {activeComm?.category === 'academic' && (
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                        {[
+                          { key: 'all', label: 'All Posts' },
+                          { key: 'questions', label: '❓ Questions' },
+                          { key: 'unanswered', label: '🔴 Unanswered' },
+                        ].map(f => (
+                          <button key={f.key} onClick={() => setQaFilter(f.key)} style={{
+                            padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer',
+                            border: qaFilter === f.key ? '1px solid #22d3ee' : '1px solid rgba(0,240,255,0.2)',
+                            background: qaFilter === f.key ? 'rgba(34,211,238,0.1)' : 'rgba(0,0,0,0.3)',
+                            color: qaFilter === f.key ? '#22d3ee' : 'var(--text-muted)',
+                            fontWeight: qaFilter === f.key ? 700 : 400, transition: 'all 0.2s'
+                          }}>{f.label}</button>
+                        ))}
+                      </div>
+                    )}
                     {circleAnnouncements.length === 0 ? (
                       <div className="post" style={{ textAlign: 'center', padding: 40 }}>
                         <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}></i>
                         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No announcements yet.</p>
                       </div>
                     ) : (
-                      circleAnnouncements.map(a => (
-                        <AnnouncementCard key={a.id} a={a} user={user}
-                          avatarCache={avatarCache}
-                          onPin={togglePin}
-                          onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
-                          onVote={handleCircleVote}
-                          onReport={(data) => setShowReport(data)}
-                          onApply={() => setShowApplicationForm({ comm: activeComm })} />
-                      ))
+                      (() => {
+                        const filtered = qaFilter === 'questions'
+                          ? circleAnnouncements.filter(a => a.post_type === 'question')
+                          : qaFilter === 'unanswered'
+                          ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
+                          : circleAnnouncements;
+                        return filtered.map(a => (
+                          <AnnouncementCard key={a.id} a={a} user={user}
+                            avatarCache={avatarCache}
+                            onPin={togglePin}
+                            onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
+                            onVote={handleCircleVote}
+                            onReport={(data) => setShowReport(data)}
+                            onApply={() => setShowApplicationForm({ comm: activeComm })}
+                            communityCreatorId={activeComm?.creator_id}
+                            onReload={() => loadCircleAnnouncements(activeCommId)} />
+                        ));
+                      })()
                     )}
                   </div>
                 ) : (
