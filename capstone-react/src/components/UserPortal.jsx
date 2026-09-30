@@ -3252,7 +3252,7 @@ export default function UserPortal() {
         .from('memberships')
         .select('community_id, communities(id, name, icon, cover_url, logo_url, category)')
         .eq('user_id', data.id)
-        .eq('status', 'active');
+        .in('status', ['active', 'approved']);
       const circles = (memberships || []).map(m => m.communities).filter(Boolean);
       setViewingProfile({ ...flat, _circles: circles });
     } else {
@@ -5213,7 +5213,9 @@ export default function UserPortal() {
                               const url = avatarCache[m.student_id] || m.avatar_url;
                               const initials = (m.full_name || '?')[0].toUpperCase();
                               return (
-                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45 }}>
+                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}
+                                  onClick={() => { setShowOnlineModal(false); viewUserProfile(m.student_id); }}>
+
                                   <div style={{ position: 'relative', flexShrink: 0 }}>
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
                                       {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
