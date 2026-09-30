@@ -3250,10 +3250,19 @@ export default function UserPortal() {
       // fetch their active circle memberships
       const { data: memberships } = await supabase
         .from('memberships')
-        .select('community_id, communities(id, name, icon, cover_url, logo_url, category)')
+        .select('community_id')
         .eq('user_id', data.id)
         .in('status', ['active', 'approved']);
-      const circles = (memberships || []).map(m => m.communities).filter(Boolean);
+      
+      let circles = [];
+      if (memberships?.length) {
+        const commIds = memberships.map(m => m.community_id);
+        const { data: comms } = await supabase
+          .from('communities')
+          .select('id, name, icon, cover_url, logo_url, category')
+          .in('id', commIds);
+        circles = comms || [];
+      }
       setViewingProfile({ ...flat, _circles: circles });
     } else {
       console.error('viewUserProfile error:', error, 'studentId:', studentId);
