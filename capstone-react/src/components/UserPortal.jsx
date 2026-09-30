@@ -657,7 +657,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
 }
 
 // ── ONLINE USERS STACK ───────────────────────────────────────────────────────
-function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5 }) {
+function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5, onClick }) {
   if (!onlineProfiles.length) return null;
 
   // Sort: circle mates first, then others
@@ -671,7 +671,11 @@ function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5 }
   const rest = onlineProfiles.length - shown.length;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: onClick ? 'pointer' : 'default' }}
+      title={onClick ? 'See who\'s online' : undefined}
+    >
       <div style={{ display: 'flex', alignItems: 'center' }}>
         {shown.map((p, i) => {
           const url = avatarCache[p.student_id] || p.avatar_url;
@@ -3189,6 +3193,7 @@ export default function UserPortal() {
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [circleChatMembers, setCircleChatMembers] = useState([]); // members for the panel
   const [showApplicationForm, setShowApplicationForm] = useState(null); // { comm, Application? }
   const [myApplications, setMyApplications] = useState([]);
@@ -5167,7 +5172,7 @@ export default function UserPortal() {
                         {(() => {
                           const circleOnline = onlineProfiles.filter(p => circleMateIds.has(p.id) || p.id === user?.id);
                           return circleOnline.length > 0
-                            ? <OnlineStack onlineProfiles={circleOnline} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={5} />
+                            ? <OnlineStack onlineProfiles={circleOnline} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={5} onClick={() => setShowOnlineModal(true)} />
                             : null;
                         })()}
                       </div>
@@ -5178,6 +5183,59 @@ export default function UserPortal() {
                   </div>
                 </div>
               </div>{/* end banner wrapper */}
+
+              {/* Online Members Modal */}
+              {showOnlineModal && (
+                <div className="modal-overlay" onClick={() => setShowOnlineModal(false)}>
+                  <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 340, padding: 0, overflow: 'hidden' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: 14, color: 'var(--cyber-cyan)' }}>
+                        <i className="fa-solid fa-users" style={{ marginRight: 8 }}></i>
+                        Circle Members
+                      </h3>
+                      <button onClick={() => setShowOnlineModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                    <div style={{ padding: '12px 0', maxHeight: 400, overflowY: 'auto' }}>
+                      {[
+                        { label: 'ONLINE', filter: m => isOnline(m.id) },
+                        { label: 'OFFLINE', filter: m => !isOnline(m.id) },
+                      ].map(({ label, filter }) => {
+                        const group = circleChatMembers.filter(filter);
+                        if (!group.length) return null;
+                        return (
+                          <div key={label}>
+                            <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
+                              {label} — {group.length}
+                            </div>
+                            {group.map(m => {
+                              const url = avatarCache[m.student_id] || m.avatar_url;
+                              const initials = (m.full_name || '?')[0].toUpperCase();
+                              return (
+                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45 }}>
+                                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
+                                      {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                                    </div>
+                                    {isOnline(m.id) && (
+                                      <div style={{ position: 'absolute', bottom: 0, right: 0, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--card-bg)' }} />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{m.full_name}</div>
+                                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m.student_id}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="c-feed fade-in" style={{ margin: '0 20px 20px 0', borderRadius: '0 0 15px 15px', flex: 1 }}>
                 {/* Access gate for non-members */}
