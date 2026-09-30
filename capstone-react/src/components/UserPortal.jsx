@@ -3199,7 +3199,7 @@ export default function UserPortal() {
   const [activeChannelId, setActiveChannelId] = useState(null);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
-  const [newChannelType, setNewChannelType] = useState('chat'); // chat, gallery, files, notes, tasks
+  const [newChannelType, setNewChannelType] = useState('chat'); // chat, tasks (tasks only for project circles)
   const [activeCategory, setActiveCategory] = useState('all');
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
   const [announcements, setAnnouncements] = useState([]);
@@ -4467,52 +4467,60 @@ export default function UserPortal() {
                   </div>
                 ))}
 
-                {/* Add channel "� leaders/co-leaders only */}
+                {/* Add channel - leaders/co-leaders only */}
                 {canModerate && (
                   showAddChannel ? (
-                    <div style={{ padding: '6px 10px' }}>
+                    <div
+                      style={{ padding: "6px 10px" }}
+                      onBlur={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget)) {
+                          setShowAddChannel(false);
+                          setNewChannelType("chat");
+                          setNewChannelName("");
+                        }
+                      }}
+                    >
                       <input
                         className="channel-name-input"
                         value={newChannelName}
                         onChange={e => setNewChannelName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') addChannel(); if (e.key === 'Escape') { setShowAddChannel(false); setNewChannelType('chat'); } }}
+                        onKeyDown={e => { if (e.key === "Enter") addChannel(); if (e.key === "Escape") { setShowAddChannel(false); setNewChannelType("chat"); } }}
                         placeholder="channel-name"
                         autoFocus
                         style={{ marginBottom: 6 }}
                       />
-                      <select 
-                        value={newChannelType}
-                        onChange={e => setNewChannelType(e.target.value)}
-                        style={{ 
-                          width: '100%', 
-                          padding: '6px 8px', 
-                          background: 'rgba(0,0,0,0.3)', 
-                          border: '1px solid rgba(0,240,255,0.2)', 
-                          borderRadius: 6, 
-                          color: 'white', 
-                          fontSize: 11,
-                          marginBottom: 6
-                        }}
-                      >
-                        <option value="chat">💬 Chat</option>
-                        <option value="tasks">✅ Tasks</option>
-                        <option value="gallery">🖼️ Gallery</option>
-                        <option value="files">📁 Files</option>
-                        <option value="notes">📝 Notes</option>
-                      </select>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      {activeComm?.category === "project" && (
+                        <select
+                          value={newChannelType}
+                          onChange={e => setNewChannelType(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            background: "rgba(0,0,0,0.3)",
+                            border: "1px solid rgba(0,240,255,0.2)",
+                            borderRadius: 6,
+                            color: "white",
+                            fontSize: 11,
+                            marginBottom: 6
+                          }}
+                        >
+                          <option value="chat">Chat</option>
+                          <option value="tasks">Tasks</option>
+                        </select>
+                      )}
+                      <div style={{ display: "flex", gap: 6 }}>
                         <button className="channel-confirm-btn" onClick={addChannel} style={{ flex: 1 }}>
                           <i className="fa-solid fa-check"></i> Create
                         </button>
-                        <button className="channel-cancel-btn" onClick={() => { setShowAddChannel(false); setNewChannelType('chat'); }}>
+                        <button className="channel-cancel-btn" onClick={() => { setShowAddChannel(false); setNewChannelType("chat"); setNewChannelName(""); }}>
                           <i className="fa-solid fa-xmark"></i>
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="ls-item add-channel-btn" onClick={() => setShowAddChannel(true)}>
-                      <i className="channel-hash" style={{ color: 'var(--text-muted)' }}>+</i>
-                      <span className="node-name" style={{ color: 'var(--text-muted)', fontSize: 12 }}>Add Channel</span>
+                      <i className="channel-hash" style={{ color: "var(--text-muted)" }}>+</i>
+                      <span className="node-name" style={{ color: "var(--text-muted)", fontSize: 12 }}>Add Channel</span>
                     </div>
                   )
                 )}
