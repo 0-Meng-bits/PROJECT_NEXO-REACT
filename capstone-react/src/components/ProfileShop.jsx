@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearCustomizationCache } from '../lib/customization';
-import { getApiUrl } from '../lib/api';
+
+const SHOP_API = '/api/shop';
 
 export default function ProfileShop({ user, onClose }) {
   const [items, setItems] = useState([]);
@@ -32,12 +33,12 @@ export default function ProfileShop({ user, onClose }) {
       setTrustPoints(statusData?.trust_points || 0);
 
       // Load shop items
-      const itemsRes = await fetch(getApiUrl('/api/shop'), { headers });
+      const itemsRes = await fetch(SHOP_API, { headers });
       const itemsData = await itemsRes.json();
       setItems(itemsData);
 
       // Load user purchases
-      const purchasesRes = await fetch(getApiUrl('/api/shop'), {
+      const purchasesRes = await fetch(SHOP_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ action: 'get-purchases', userId: user.id })
@@ -46,7 +47,7 @@ export default function ProfileShop({ user, onClose }) {
       setPurchases(purchasesData);
 
       // Load user settings
-      const settingsRes = await fetch(getApiUrl('/api/shop'), {
+      const settingsRes = await fetch(SHOP_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ action: 'get-settings', userId: user.id })
@@ -74,7 +75,7 @@ export default function ProfileShop({ user, onClose }) {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/shop'), {
+      const res = await fetch(SHOP_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ export default function ProfileShop({ user, onClose }) {
   const applyItem = async (type, itemId) => {
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/shop'), {
+      const res = await fetch(SHOP_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
