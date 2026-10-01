@@ -3256,12 +3256,12 @@ export default function UserPortal() {
       
       let circles = [];
       if (memberships?.length) {
-        const commIds = memberships.map(m => m.community_id);
+        const commIds = new Set(memberships.map(m => m.community_id));
+        // Use already-loaded communities state to avoid RLS quirks on secondary queries
         const { data: comms } = await supabase
           .from('communities')
-          .select('id, name, icon, cover_url, logo_url, category')
-          .in('id', commIds);
-        circles = comms || [];
+          .select('id, name, icon, cover_url, logo_url, category');
+        circles = (comms || []).filter(c => commIds.has(c.id));
       }
       setViewingProfile({ ...flat, _circles: circles });
     } else {
