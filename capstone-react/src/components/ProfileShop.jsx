@@ -41,6 +41,7 @@ export default function ProfileShop({ user, onClose }) {
 
       // Load shop items
       const itemsRes = await fetch(SHOP_API, { headers });
+      if (!itemsRes.ok) throw new Error(`Shop GET failed: ${itemsRes.status} ${itemsRes.statusText}`);
       const itemsData = await itemsRes.json();
       setItems(itemsData);
 
