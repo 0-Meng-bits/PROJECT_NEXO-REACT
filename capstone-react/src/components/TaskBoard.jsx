@@ -199,7 +199,7 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
   }
 
   return (
-    <div style={{ padding: 20, height: '100%', overflow: 'auto' }}>
+    <div style={{ padding: 16, height: '100%', overflow: 'auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h3 style={{ margin: 0, color: 'var(--cyber-cyan)' }}>
@@ -219,10 +219,7 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
       </div>
 
       {/* Role Filter */}
-      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>
-          Filter by role:
-        </span>
+      <div style={{ marginBottom: 16, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {['All', 'Leader', 'Developer', 'Designer', 'Tester', 'Other', 'No Role'].map(role => (
           <button
             key={role}
@@ -323,7 +320,7 @@ export default function TaskBoard({ channelId, canManage, currentUserId }) {
       )}
 
       {/* Kanban Board */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, minHeight: 400 }}>
+      <div className="task-board-columns" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, minHeight: 400 }}>
         {/* TODO Column */}
         <div>
           <div style={{ background: 'rgba(148,163,184,0.1)', padding: '8px 12px', borderRadius: '8px 8px 0 0', borderBottom: '2px solid var(--text-muted)' }}>

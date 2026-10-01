@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearCustomizationCache } from '../lib/customization';
 
@@ -238,7 +238,7 @@ export default function ProfileShop({ user, onClose }) {
                 </div>
 
                 {/* Items Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
                   {filteredItems.map(item => (
                     <div
                       key={item.id}
@@ -330,7 +330,7 @@ export default function ProfileShop({ user, onClose }) {
                     You haven't purchased anything yet. Check out the shop!
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
                     {purchases.map(p => (
                       <div
                         key={p.id}

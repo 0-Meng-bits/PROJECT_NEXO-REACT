@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -2197,7 +2197,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         </div>
 
         {/* BODY */}
-        <div style={{ padding: '20px 28px 28px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20 }}>
+        <div className="profile-modal-body" style={{ padding: '20px 28px 28px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20 }}>
 
           {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -3219,6 +3219,7 @@ export default function UserPortal() {
   const notifRef = useRef(null);
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
+  const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
@@ -3812,6 +3813,10 @@ export default function UserPortal() {
     }
     setShowCircleAnnouncements(false);
     setSection(prev => prev === 'circle-chat' ? 'circles' : prev);
+    if (openAnnouncementsOnEnter.current) {
+      openAnnouncementsOnEnter.current = false;
+      setShowCircleAnnouncements(true);
+    }
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
   // Avatar is persisted in localStorage "� no DB sync needed on mount
@@ -4420,6 +4425,30 @@ export default function UserPortal() {
                   </div>
                 ))}
               </div>
+
+              {/* MY CIRCLES — quick jump shortcut */}
+              {myCircles.filter(c => c.id !== 'global').length > 0 && (
+                <>
+                  <div className="sidebar-label" style={{ marginTop: 12 }}>MY CIRCLES</div>
+                  <div className="nav-links">
+                    {myCircles.filter(c => c.id !== 'global').map(c => (
+                      <div key={c.id}
+                        className={`ls-item ${activeCommId === c.id ? 'active' : ''}`}
+                        onClick={() => {
+                          openAnnouncementsOnEnter.current = true;
+                          setActiveCommId(c.id);
+                          setActiveChannelId(null);
+                          setSection('circles');
+                          setMobileSidebarOpen(false);
+                        }}
+                      >
+                        <i className="nav-icon fa-solid fa-circle-nodes" style={{ fontStyle: 'normal' }}></i>
+                        <span className="node-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               </div>
             </>
           ) : (
@@ -4890,7 +4919,7 @@ export default function UserPortal() {
           {section === 'global' && (
             <>
               {/* Global feed header — stays visible, doesn't scroll */}
-              <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
+              <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
                     <i className="fa-solid fa-network-wired" style={{ marginRight: 10 }}></i>GLOBAL FEED
@@ -4901,7 +4930,7 @@ export default function UserPortal() {
                   Campus-wide chat — open to all verified students and faculty.
                 </p>
               </div>
-              <div className="c-feed fade-in" style={{ margin: '0 20px 20px 0', borderRadius: '0 0 15px 15px', flex: 1 }}>
+              <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
 
                 {(() => {
                   const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
@@ -4949,7 +4978,7 @@ export default function UserPortal() {
               </div>
 
               {user?.is_verified && (
-                <div className="composer">
+                <div className="composer composer-chat">
                   {pendingMedia && (
                     <MediaPreview 
                       file={pendingMedia.file} 
@@ -4957,7 +4986,7 @@ export default function UserPortal() {
                       onCancel={() => setPendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <MediaUploadButton 
                       onMediaSelected={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
@@ -4971,8 +5000,8 @@ export default function UserPortal() {
                       placeholder="Say something to the campus..."
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
-                    <button className="cyber-btn" onClick={sendPost} disabled={uploading}>
-                      {uploading ? 'SENDING...' : 'SEND'}
+                    <button className="chat-send-btn" onClick={sendPost} disabled={uploading} title="Send">
+                      <i className="fa-solid fa-paper-plane"></i>
                     </button>
                   </div>
                   {sendError && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}><i className="fa-solid fa-triangle-exclamation"></i>{sendError}</div>}
@@ -5008,7 +5037,7 @@ export default function UserPortal() {
                       const pending = isPending(c.id);
                       const myApplication = getMyApplication(c.id);
                       return (
-                        <div key={c.id} className="post" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div key={c.id} className="post circle-explore-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                               <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
@@ -5094,7 +5123,7 @@ export default function UserPortal() {
           {section === 'circles' && (
             <>
               {/* Banner sits outside the scrollable feed — stays visible */}
-              <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', overflow: 'hidden', flexShrink: 0 }}>
+              <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', overflow: 'hidden', flexShrink: 0 }}>
                 <div className="circle-cover-banner" style={{
                   borderRadius: 0,
                   background: activeComm.cover_url
@@ -5255,7 +5284,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              <div className="c-feed fade-in" style={{ margin: '0 20px 20px 0', borderRadius: '0 0 15px 15px', flex: 1 }}>
+              <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
                 {/* Access gate for non-members */}
                 {!isMember(activeCommId) ? (
                   <div className="post" style={{ textAlign: 'center', padding: 40 }}>
@@ -5483,8 +5512,8 @@ export default function UserPortal() {
                 <div ref={feedBottomRef} />
               </div>
 
-              {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && (
-                <div className="composer">
+              {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && channels.find(c => c.id === activeChannelId)?.channel_type !== 'tasks' && (
+                <div className="composer composer-chat">
                   {pendingMedia && (
                     <MediaPreview 
                       file={pendingMedia.file} 
@@ -5492,7 +5521,7 @@ export default function UserPortal() {
                       onCancel={() => setPendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <MediaUploadButton 
                       onMediaSelected={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
@@ -5506,8 +5535,8 @@ export default function UserPortal() {
                       placeholder="Write a message..."
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
-                    <button className="cyber-btn" onClick={sendPost} disabled={uploading}>
-                      {uploading ? 'SENDING...' : 'SEND'}
+                    <button className="chat-send-btn" onClick={sendPost} disabled={uploading} title="Send">
+                      <i className="fa-solid fa-paper-plane"></i>
                     </button>
                   </div>
                   {sendError && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}><i className="fa-solid fa-triangle-exclamation"></i>{sendError}</div>}
@@ -5545,7 +5574,7 @@ export default function UserPortal() {
               </div>
 
               {/* Chat + optional members panel side by side */}
-              <div style={{ display: 'flex', flex: 1, margin: '0 20px 20px 0', overflow: 'hidden', gap: 0 }}>
+              <div style={{ display: 'flex', flex: 1, margin: '0 0 0 0', overflow: 'hidden', gap: 0 }}>
                 <div className="c-feed fade-in" style={{ margin: 0, borderRadius: showMembersPanel ? '0 0 0 15px' : '0 0 15px 15px', flex: 1 }}>
 
                 {!isMember(activeCommId) ? (
@@ -5609,7 +5638,7 @@ export default function UserPortal() {
               </div>
 
               {isMember(activeCommId) && user?.is_verified && (
-                <div className="composer">
+                <div className="composer composer-chat">
                   {circlePendingMedia && (
                     <MediaPreview 
                       file={circlePendingMedia.file} 
@@ -5617,7 +5646,7 @@ export default function UserPortal() {
                       onCancel={() => setCirclePendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <MediaUploadButton 
                       onMediaSelected={setCirclePendingMedia} 
                       disabled={uploading || !!circlePendingMedia}
@@ -5631,8 +5660,8 @@ export default function UserPortal() {
                       placeholder={`Message ${activeComm.name}...`}
                       disabled={uploading}
                       style={{ flex: 1 }} />
-                    <button className="cyber-btn" onClick={sendCircleChatPost} disabled={uploading}>
-                      {uploading ? 'SENDING...' : 'SEND'}
+                    <button className="chat-send-btn" onClick={sendCircleChatPost} disabled={uploading} title="Send">
+                      <i className="fa-solid fa-paper-plane"></i>
                     </button>
                   </div>
                 </div>

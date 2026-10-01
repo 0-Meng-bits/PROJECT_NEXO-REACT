@@ -289,14 +289,14 @@ export function MediaMessage({ message }) {
 
   if (message_type === 'voice') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 260 }}>
         <audio 
           src={media_url} 
           controls 
-          style={{ flex: 1, height: 32 }}
+          style={{ flex: 1, height: 36, maxWidth: 220 }}
         />
         {media_duration && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
             {Math.floor(media_duration / 60)}:{(media_duration % 60).toString().padStart(2, '0')}
           </span>
         )}
