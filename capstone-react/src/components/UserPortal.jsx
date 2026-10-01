@@ -3233,7 +3233,7 @@ export default function UserPortal() {
   const [circleEvents, setCircleEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
-  const viewUserProfile = useCallback(async (studentId) => {
+  const viewUserProfile = async (studentId) => {
     if (!studentId) return;
     const { data, error } = await supabase
       .from('accounts')
@@ -3256,18 +3256,18 @@ export default function UserPortal() {
       
       let circles = [];
       if (memberships?.length) {
-        const commIds = new Set(memberships.map(m => m.community_id));
-        // Use already-loaded communities state to avoid RLS quirks on secondary queries
+        const commIds = memberships.map(m => m.community_id);
         const { data: comms } = await supabase
           .from('communities')
-          .select('id, name, icon, cover_url, logo_url, category');
-        circles = (comms || []).filter(c => commIds.has(c.id));
+          .select('id, name, icon, cover_url, logo_url, category')
+          .in('id', commIds);
+        circles = comms || [];
       }
       setViewingProfile({ ...flat, _circles: circles });
     } else {
       console.error('viewUserProfile error:', error, 'studentId:', studentId);
     }
-  }, []);
+  };
 
   // Fetch read counts for a batch of messages
   const fetchReadCounts = useCallback(async (msgIds) => {
@@ -5223,7 +5223,14 @@ export default function UserPortal() {
                               const initials = (m.full_name || '?')[0].toUpperCase();
                               return (
                                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}
-                                  onClick={() => { setShowOnlineModal(false); viewUserProfile(m.student_id); }}>
+                                  onClick={() => { 
+                                  setShowOnlineModal(false); 
+                                  if (m.student_id === user?.student_id || m.student_id === user?.ctu_id) {
+                                    setShowProfile(true);
+                                  } else {
+                                    viewUserProfile(m.student_id); 
+                                  }
+                                }}>
 
                                   <div style={{ position: 'relative', flexShrink: 0 }}>
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
