@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearCustomizationCache } from '../lib/customization';
 
-// Shop API is a Vercel serverless function - always use production URL
-const SHOP_API = import.meta.env.VITE_SITE_URL 
-  ? `${import.meta.env.VITE_SITE_URL}/api/shop`
-  : 'https://nexo.cebutech.digital/api/shop';
+// Shop API - use relative URL (works on Vercel), show warning on localhost
+const IS_LOCAL = window.location.hostname === 'localhost';
+const SHOP_API = '/api/shop';
 
 export default function ProfileShop({ user, onClose }) {
   const [items, setItems] = useState([]);
@@ -22,6 +21,11 @@ export default function ProfileShop({ user, onClose }) {
 
   const loadData = async () => {
     setLoading(true);
+    if (IS_LOCAL) {
+      // Shop API (Vercel functions) not available on localhost
+      setLoading(false);
+      return;
+    }
     try {
       const token = localStorage.getItem('accessToken');
       const headers = { ...(token ? { Authorization: `Bearer ${token}` } : {}) };
@@ -181,6 +185,11 @@ export default function ProfileShop({ user, onClose }) {
             <strong>Minimum Balance:</strong> You must keep at least <strong style={{ color: 'var(--cyber-yellow)' }}>10 Trust Points</strong> at all times. Items that would drop you below this limit cannot be purchased.
           </div>
         </div>
+        {IS_LOCAL && (
+          <div style={{ margin: '12px 0', padding: '10px 14px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, fontSize: 12, color: '#fbbf24' }}>
+            ⚠️ Shop items only load on the deployed site. Open <strong>nexo.cebutech.digital</strong> to use the shop.
+          </div>
+        )}
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid rgba(0,240,255,0.2)', paddingBottom: 10 }}>
