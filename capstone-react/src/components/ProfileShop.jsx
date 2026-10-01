@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearCustomizationCache } from '../lib/customization';
+import { getApiUrl } from '../lib/api';
 
-const SHOP_API = '/api/shop';
+// Use Vercel function on production, backend on localhost
+const SHOP_API = window.location.hostname === 'localhost' 
+  ? getApiUrl('/api/shop')
+  : '/api/shop';
 
 export default function ProfileShop({ user, onClose }) {
   const [items, setItems] = useState([]);
