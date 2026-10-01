@@ -19,7 +19,7 @@ REFERENCES post_comments(id) ON DELETE SET NULL;
 -- Creator override applies regardless of OP's current membership status
 CREATE POLICY "OP or creator can mark solution"
   ON announcements FOR UPDATE
-  TO authenticated
+  TO authenticated  
   USING (
     auth.uid() = author_id
     OR EXISTS (

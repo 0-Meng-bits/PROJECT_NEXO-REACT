@@ -50,6 +50,14 @@ app.all('/api/update-profile', updateProfile);
 app.all('/api/upload', upload);
 app.all('/api/verify-student', verifyStudent);
 
+// Serve built frontend static files
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// SPA fallback — all non-API routes serve index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`✅ API server running on http://localhost:${PORT}`);
   console.log(`📡 API endpoints available at http://localhost:${PORT}/api/*`);

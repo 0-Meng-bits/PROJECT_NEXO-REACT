@@ -853,6 +853,98 @@ app.post('/api/close-poll', requireAuth, async (req, res) => {
   }
 });
 
+// ── SHOP ──────────────────────────────────────────────────────────────────────
+app.get('/api/shop', async (req, res) => {
+  try {
+    const { data: items, error } = await supabaseAdmin
+      .from('shop_items')
+      .select('*')
+      .eq('is_active', true)
+      .order('price', { ascending: true });
+    if (error) throw error;
+    return res.json(items || []);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/shop', requireAuth, async (req, res) => {
+  const { action, userId, itemId, type } = req.body;
+
+  try {
+    if (action === 'get-purchases') {
+      const { data, error } = await supabaseAdmin
+        .from('user_purchases')
+        .select('*, shop_items(*)')
+        .eq('user_id', userId);
+      if (error) throw error;
+      return res.json(data || []);
+    }
+
+    if (action === 'get-settings') {
+      const { data, error } = await supabaseAdmin
+        .from('user_profile_settings')
+        .select(`*, theme:active_theme(*), badge:active_badge(*), background:active_background(*), name_color:active_name_color(*), avatar_border:active_avatar_border(*), music:active_music(*)`)
+        .eq('user_id', userId)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return res.json(data || null);
+    }
+
+    if (action === 'buy-item') {
+      const { data: item, error: itemErr } = await supabaseAdmin
+        .from('shop_items').select('*').eq('id', itemId).eq('is_active', true).single();
+      if (itemErr || !item) return res.status(404).json({ error: 'Item not found' });
+
+      const { data: existing } = await supabaseAdmin
+        .from('user_purchases').select('id').eq('user_id', userId).eq('item_id', itemId).single();
+      if (existing) return res.status(400).json({ error: 'You already own this item' });
+
+      const { data: pts } = await supabaseAdmin
+        .from('account_status').select('trust_points').eq('id', userId).single();
+      const current = pts?.trust_points || 0;
+      if (current < item.price) return res.status(400).json({ error: `Not enough trust points. You have ${current}, need ${item.price}` });
+
+      const newPoints = current - item.price;
+      const { error: ptErr } = await supabaseAdmin
+        .from('account_status').update({ trust_points: newPoints }).eq('id', userId);
+      if (ptErr) throw ptErr;
+
+      const { error: purchaseErr } = await supabaseAdmin
+        .from('user_purchases').insert([{ user_id: userId, item_id: itemId }]);
+      if (purchaseErr) {
+        await supabaseAdmin.from('account_status').update({ trust_points: current }).eq('id', userId);
+        throw purchaseErr;
+      }
+
+      await supabaseAdmin.from('point_transactions').insert([{
+        user_id: userId, amount: -item.price,
+        transaction_type: 'shop_purchase', reason: `Bought: ${item.name}`
+      }]);
+
+      return res.json({ success: true, newPoints, item });
+    }
+
+    if (action === 'apply-customization') {
+      if (itemId) {
+        const { data: owned } = await supabaseAdmin
+          .from('user_purchases').select('id').eq('user_id', userId).eq('item_id', itemId).single();
+        if (!owned) return res.status(403).json({ error: 'You do not own this item' });
+      }
+      const { error } = await supabaseAdmin
+        .from('user_profile_settings')
+        .upsert({ user_id: userId, [`active_${type}`]: itemId, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      return res.json({ success: true });
+    }
+
+    return res.status(400).json({ error: 'Invalid action' });
+  } catch (err) {
+    console.error('Shop error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
