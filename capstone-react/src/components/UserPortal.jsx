@@ -1875,7 +1875,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .from('user_profile_settings')
         .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!settings) return;
 
