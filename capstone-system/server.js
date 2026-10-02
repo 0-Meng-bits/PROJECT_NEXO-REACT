@@ -158,6 +158,22 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/signup', async (req, res) => {
   const { email, password, fullName, studentId, user_type } = req.body;
 
+  // Clean up any orphaned DB rows from a previous failed signup attempt
+  const { data: existingAccount } = await supabaseAdmin
+    .from('accounts').select('id').eq('ctu_id', studentId).single();
+  if (existingAccount) {
+    // Check if auth user exists for this account
+    const { data: authCheck } = await supabaseAdmin.auth.admin.getUserById(existingAccount.id);
+    if (!authCheck?.user) {
+      // Orphaned DB row — clean it up so signup can proceed
+      await supabaseAdmin.from('account_details').delete().eq('id', existingAccount.id);
+      await supabaseAdmin.from('account_status').delete().eq('id', existingAccount.id);
+      await supabaseAdmin.from('accounts').delete().eq('id', existingAccount.id);
+    } else {
+      return res.status(400).json({ message: 'This CTU ID is already registered.' });
+    }
+  }
+
   // 1. Create Supabase Auth user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email, password, email_confirm: true,
