@@ -4,18 +4,18 @@ import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 
 const SECTIONS = [
-  { key: 'circle_requests', label: 'Circle Requests',       icon: 'fa-solid fa-circle-nodes' },
-  { key: 'analytics',     label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
   { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
+  { key: 'circle_requests', label: 'Circle Requests',     icon: 'fa-solid fa-paper-plane' },
+  { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-triangle-exclamation' },
   { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
   { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
+  { key: 'analytics',     label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
   { key: 'events',        label: 'Campus Events',         icon: 'fa-solid fa-calendar-days' },
-  { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
+  { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
   { key: 'user_flags',    label: 'User Flags',            icon: 'fa-solid fa-flag' },
-  { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-flag' },
-  { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield-halved' },
+  { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield' },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
