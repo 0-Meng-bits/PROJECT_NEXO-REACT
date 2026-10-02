@@ -1923,12 +1923,20 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     if (!file) return;
     setIdUploading(true);
     try {
-      const reader = new FileReader();
-      const dataUrl = await new Promise(r => { reader.onload = ev => r(ev.target.result); reader.readAsDataURL(file); });
-      const { error } = await supabase.from('account_details').update({ id_photo_url: dataUrl }).eq('id', user.id);
-      if (!error) setIdUploaded(true);
-    } catch (err) { console.error(err); }
-    finally { setIdUploading(false); }
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `id-photos/${user.id}_${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('id-photos')
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('id-photos').getPublicUrl(path);
+      const { error: dbError } = await supabase.from('account_details').update({ id_photo_url: urlData.publicUrl }).eq('id', user.id);
+      if (dbError) throw dbError;
+      setIdUploaded(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload ID photo. Please try again.');
+    } finally { setIdUploading(false); }
   };
 
   const handleCoverChange = async (e) => {
