@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ message: 'Missing student id.' });
 
-  await supabaseAdmin.from('account_status').update({ is_verified: true }).eq('id', id);
+  const { error } = await supabaseAdmin.from('account_status').update({ is_verified: true }).eq('id', id);
 
   if (error) return res.status(400).json(error);
   res.json({ message: 'Student verified!' });

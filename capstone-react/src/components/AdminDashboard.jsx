@@ -238,7 +238,11 @@ export default function AdminDashboard() {
       ]);
       const adminData = adminRes.ok ? await adminRes.json() : {};
       setCommunities(commRes.ok ? await commRes.json() : []);
-      setStudents(adminData.students || []);
+      setStudents((adminData.students || []).map(s => {
+        const { id: _asId, ...accountStatus } = s.account_status || {};
+        const { id: _adId, ...accountDetails } = s.account_details || {};
+        return { ...s, ...accountStatus, ...accountDetails };
+      }));
       setAnnouncements(adminData.announcements || []);
       setAuditions(adminData.auditions || []);
       setGlobalMessages(adminData.messages || []);
@@ -330,7 +334,8 @@ export default function AdminDashboard() {
         message: 'Your account has been verified! You now have full access to NEXO Connect.',
       }]);
       showToast(`${name} approved.`);
-      fetchData();
+      // Optimistically remove from pending list
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, is_verified: true } : s));
     } else showToast('Failed to approve.');
   };
 
@@ -465,10 +470,11 @@ export default function AdminDashboard() {
 
   const forceVerifyEmail = async (userId, userName) => {
     if (!confirm(`Force verify email for ${userName}?`)) return;
-    await supabase.from('account_status').update({ is_verified: true }).eq('id', userId);
+    const res = await fetch(getApiUrl(`/api/verify-student/${userId}`), { method: 'POST' });
+    if (!res.ok) { showToast('Failed to verify.'); return; }
     showToast(`${userName} verified.`);
     if (selectedUser?.id === userId) setSelectedUser(prev => ({ ...prev, is_verified: true }));
-    fetchData();
+    setStudents(prev => prev.map(s => s.id === userId ? { ...s, is_verified: true } : s));
   };
 
   const resolveReport = async (reportId, status, note) => {
@@ -654,7 +660,7 @@ export default function AdminDashboard() {
         {section === 'circle_requests' && (
           <div>
             <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text-muted)' }}>
-              {circleRequests.filter(r => r.status === 'pending').length} pending � {circleRequests.length} total
+              {circleRequests.filter(r => r.status === 'pending').length} pending &bull; {circleRequests.length} total
             </div>
             {circleRequests.length === 0 ? (
               <div className="adm-empty">No circle requests yet.</div>
@@ -889,7 +895,9 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         {!s.id_photo_url ? (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>�</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            <i className="fa-solid fa-minus"></i>
+                          </span>
                         ) : s.id_verified ? (
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 5 }}>
                             <i className="fa-solid fa-circle-check"></i> Passed
@@ -934,7 +942,17 @@ export default function AdminDashboard() {
                   <thead><tr><th>CTU ID</th><th>Full Name</th><th>Email</th><th>Type</th><th>Status</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead>
                   <tbody>
                   {filtered.map(s => (
-                    <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedUser(s)}>
+                    <tr key={s.id} style={{ cursor: 'pointer' }} onClick={async () => {
+                      setSelectedUser(s);
+                      // Always fetch fresh photo data on click from both tables
+                      const [{ data: ad }, { data: prof }] = await Promise.all([
+                        supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).single(),
+                        supabase.from('profiles').select('id_photo_url, id_verified').eq('id', s.id).single(),
+                      ]);
+                      const photo = ad?.id_photo_url || prof?.id_photo_url || null;
+                      const idVerified = ad?.id_verified ?? prof?.id_verified ?? false;
+                      setSelectedUser(prev => ({ ...prev, id_photo_url: photo, id_verified: idVerified }));
+                    }}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td style={{ color: 'var(--text-muted)' }}>{s.email}</td>
@@ -995,8 +1013,8 @@ export default function AdminDashboard() {
                     { label: 'CTU ID',     value: selectedUser.student_id, mono: true },
                     { label: 'EMAIL',      value: selectedUser.email },
                     { label: 'USER TYPE',  value: selectedUser.user_type },
-                    { label: 'STATUS',     value: selectedUser.is_banned ? '?? Banned' : selectedUser.is_verified ? '? Verified' : '? Pending' },
-                    { label: 'ID VERIFIED', value: selectedUser.id_photo_url ? '? Yes' : '? No' },
+                    { label: 'STATUS',     value: selectedUser.is_banned ? 'Banned' : selectedUser.is_verified ? 'Verified' : 'Pending' },
+                    { label: 'ID VERIFIED', value: selectedUser.id_verified ? 'Yes' : 'No' },
                     { label: 'JOINED',     value: new Date(selectedUser.created_at).toLocaleString() },
                     { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 3}/3` },
                     { label: 'WARNINGS',   value: selectedUser.warning_count || 0 },
