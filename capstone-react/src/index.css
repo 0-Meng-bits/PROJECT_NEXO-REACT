@@ -1968,6 +1968,7 @@ body {
 
 .adm-main {
   flex: 1;
+  min-height: 0; /* allows flex child to scroll instead of expanding */
   overflow-y: auto;
   padding: 32px;
   display: flex;
