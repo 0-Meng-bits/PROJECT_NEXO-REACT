@@ -77,8 +77,11 @@ export default function Auth() {
         setMode('email-sent');
       }
     } catch (err) {
-      console.error('[SIGNUP ERROR]', err);
-      alert('TERMINAL_OFFLINE: ' + (err?.message || 'Connection failed.'));
+      if (err?.message?.includes('fetch') || err?.message?.includes('network') || err?.message?.includes('Failed')) {
+        alert('TERMINAL_OFFLINE: The server took too long to respond. This can happen after inactivity — please wait 30 seconds and try again.');
+      } else {
+        alert('TERMINAL_OFFLINE: ' + (err?.message || 'Connection failed.'));
+      }
       setSignupStep('form');
     } finally {
       setLoading(false);
@@ -152,6 +155,8 @@ export default function Auth() {
         } else if (data.suspended) {
           setSuspendedUntil(data.suspended_until);
           setMode('suspended');
+        } else if (data.message?.includes('CTU_ID not found')) {
+          alert('SYSTEM_ALERT: This CTU ID is not registered. Please sign up first.');
         } else {
           alert('SYSTEM_ALERT: ' + data.message);
         }
