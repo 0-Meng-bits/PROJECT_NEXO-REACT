@@ -580,9 +580,38 @@ app.post('/api/upload-avatar', async (req, res) => {
 
 // ── ADMIN: VERIFY STUDENT ─────────────────────────────────────────────────────
 app.post('/api/verify-student/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  // Check current status to avoid double-granting
+  const { data: current } = await supabaseAdmin
+    .from('account_status')
+    .select('is_verified, trust_points')
+    .eq('id', userId)
+    .single();
+
   const { error } = await supabaseAdmin
-    .from('account_status').update({ is_verified: true }).eq('id', req.params.id);
+    .from('account_status')
+    .update({ is_verified: true })
+    .eq('id', userId);
+
   if (error) return res.status(400).json(error);
+
+  // Grant 50 TP welcome bonus if not already verified
+  if (!current?.is_verified) {
+    const currentPoints = current?.trust_points || 0;
+    await supabaseAdmin
+      .from('account_status')
+      .update({ trust_points: currentPoints + 50 })
+      .eq('id', userId);
+
+    await supabaseAdmin.from('point_transactions').insert([{
+      user_id: userId,
+      amount: 50,
+      transaction_type: 'welcome_bonus',
+      reason: 'Welcome bonus for verified student'
+    }]);
+  }
+
   res.json({ message: 'Student verified!' });
 });
 
