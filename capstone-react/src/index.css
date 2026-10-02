@@ -2923,9 +2923,7 @@ body {
 
 /* Tablet — hide dock, collapse sidebar */
 @media (max-width: 900px) {
-  .circle-dock { display: none; }
   .mobile-only-create-circle { display: flex; }
-
   .sidebar {
     width: 220px;
     margin: 10px;
@@ -2950,9 +2948,6 @@ body {
   .portal-layout { flex-direction: column; }
 
   .main { flex-direction: column; position: relative; }
-
-  /* Ensure dock is hidden on mobile */
-  .circle-dock { display: none !important; }
 
   /* Hide sidebar by default on mobile — toggled via hamburger */
   .sidebar {

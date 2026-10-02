@@ -4485,32 +4485,7 @@ export default function UserPortal() {
                 ))}
               </div>
 
-              {/* MY CIRCLES — mobile only (dock handles this on desktop) */}
-              {myCircles.filter(c => c.id !== 'global').length > 0 && (
-                <div className="mobile-only-create-circle">
-                  <div className="sidebar-label" style={{ marginTop: 12 }}>MY CIRCLES</div>
-                  <div className="nav-links">
-                    {myCircles.filter(c => c.id !== 'global').map(c => (
-                      <div key={c.id}
-                        className={`ls-item ${activeCommId === c.id ? 'active' : ''}`}
-                        onClick={() => {
-                          openAnnouncementsOnEnter.current = true;
-                          setActiveCommId(c.id);
-                          setActiveChannelId(null);
-                          setSection('circles');
-                          setMobileSidebarOpen(false);
-                        }}
-                      >
-                        {c.logo_url
-                          ? <img src={c.logo_url} alt="" className="nav-icon" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
-                          : <i className={`nav-icon ${c.icon || getCategoryIcon(c.category)}`} style={{ fontStyle: 'normal' }}></i>
-                        }
-                        <span className="node-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Create Circle — mobile only, shown below categories since dock handles circles */}
               {user?.is_verified && (
                 <div className="ls-item mobile-only-create-circle" style={{ marginTop: 8, color: 'var(--cyber-cyan)', borderColor: 'rgba(0,240,255,0.2)' }}
                   onClick={() => { setShowCreate(true); setMobileSidebarOpen(false); }}>
