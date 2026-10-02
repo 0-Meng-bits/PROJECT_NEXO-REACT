@@ -3181,7 +3181,8 @@ function AppealModal({ warning, onClose, userId }) {
 // ── MAIN PORTAL ───────────────────────────────────────────────────────────────
 export default function UserPortal() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('currentUser'));
+  const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')));
+  const user = currentUser;
   const [communities, setCommunities] = useState([GLOBAL_COMM]);
   const [myMemberships, setMyMemberships] = useState([]); // { community_id, role, status }
   const [activeCommId, setActiveCommId] = useState('global');
@@ -3360,6 +3361,18 @@ export default function UserPortal() {
 
   // ── ONLINE PRESENCE ──────────────────────────────────────────────────────────
   const [onlineUsers, setOnlineUsers] = useState(new Set()); // set of profile UUIDs
+
+  // On mount: re-check is_verified from DB in case admin approved after login
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('account_status').select('is_verified').eq('id', user.id).single().then(({ data }) => {
+      if (data && data.is_verified !== user.is_verified) {
+        const updated = { ...user, is_verified: data.is_verified };
+        localStorage.setItem('currentUser', JSON.stringify(updated));
+        setCurrentUser(updated);
+      }
+    });
+  }, [user?.id]);
 
   // Heartbeat: update last_seen every 30s
   useEffect(() => {
