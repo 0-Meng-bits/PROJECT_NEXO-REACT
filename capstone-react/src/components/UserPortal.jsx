@@ -3791,6 +3791,27 @@ export default function UserPortal() {
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
 
+  // Intercept browser back button / Android swipe-back to prevent accidental logout
+  useEffect(() => {
+    // Push a dummy history entry so the back button has somewhere to go within the app
+    window.history.pushState({ portal: true }, '');
+
+    const handlePopState = (e) => {
+      // Push state again to keep user on the portal
+      window.history.pushState({ portal: true }, '');
+      // Show confirm only if they keep trying to go back
+      if (confirm('Are you sure you want to log out?')) {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        navigate('/auth');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
     loadChannels(activeCommId);
