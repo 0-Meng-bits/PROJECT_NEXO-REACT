@@ -4660,7 +4660,7 @@ export default function UserPortal() {
               {/* Hero banner */}
               <div className="home-hero">
                 <div className="home-hero-text">
-                  <p className="home-hero-welcome">Welcome, Technologist.</p>
+                  <p className="home-hero-welcome">Welcome, {user?.full_name || 'Technologist'}.</p>
                   <h1>Find Your Circle<br/>at CTU</h1>
                   <p>Discover communities built around your interests, join the conversation, and make your campus experience count.</p>
                   <button className="cyber-btn" style={{ width: 'auto', padding: '10px 24px', marginTop: 16 }}
@@ -4670,32 +4670,34 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* Welcome + stats "� kept from before */}
-              <div className="welcome-grid">
-                <div className="post" style={{ borderLeft: '4px solid var(--cyber-yellow)' }}>
-                  <h2 style={{ fontSize: 18, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
-                    WELCOME, {user?.full_name?.toUpperCase() || 'TECHNOLOGIST'}!
-                  </h2>
-                  {user?.is_verified ? (
-                    <div className="verified-badge">
-                      <i className="fa-solid fa-shield-halved" style={{ marginRight: 6 }}></i> Verified {user?.user_type || 'Student'} ✓
-                    </div>
-                  ) : (
-                    <div className="verified-badge" style={{ borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}>
-                      <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i> Pending Verification
-                    </div>
-                  )}
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 15 }}>
-                    Monitoring real-time network activity across all CTU circles.
-                  </p>
-                </div>
-                <div className="stats-card">
-                  <h4 style={{ fontSize: 11, color: 'var(--cyber-yellow)', marginBottom: 15, letterSpacing: 2 }}>QUICK_STATS</h4>
-                  <div className="stat-line">My Circles <span className="stat-val">{myCircles.length}</span></div>
-                  <div className="stat-line">Network Status <span className="stat-val" style={{ color: '#00ff00' }}>ONLINE</span></div>
-                  <div className="stat-line">Clearance <span className="stat-val">{user?.user_type?.toUpperCase()}</span></div>
-                </div>
-              </div>
+              {/* Popular Right Now — moved up, replaces redundant welcome/stats cards */}
+              {communities.filter(c => c.id !== 'global').length > 0 && (
+                <>
+                  <div className="home-section-header" style={{ marginTop: 8 }}>
+                    <span>Popular Right Now</span>
+                    <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
+                      <div key={c.id} className="popular-row"
+                        onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                        <div className="popular-row-icon" style={{
+                          background: c.cover_url ? undefined : categoryGradient(c.category),
+                          backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                          backgroundSize: 'cover', backgroundPosition: 'center',
+                        }}>
+                          {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
+                        </div>
+                        <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {/* ── POST COMPOSER "� verified users only ── */}
               {user?.is_verified && (
@@ -4906,35 +4908,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* Popular by category */}
-              {communities.filter(c => c.id !== 'global').length > 0 && (
-                <>
-                  <div className="home-section-header" style={{ marginTop: 8 }}>
-                    <span>Popular Right Now</span>
-                    <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
-                      <div key={c.id} className="popular-row"
-                        onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
-                        <div className="popular-row-icon" style={{
-                          background: c.cover_url ? undefined : categoryGradient(c.category),
-                          backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}>
-                          {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
-                        </div>
-                        <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              {/* Popular by category — now shown above, removed from here */}
 
             </div>
           )}
