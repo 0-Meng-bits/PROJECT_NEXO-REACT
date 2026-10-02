@@ -4455,14 +4455,21 @@ export default function UserPortal() {
             /* ── CIRCLE sidebar ── */
             <>
               <div className="sidebar-brand-area" style={{ paddingBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
-                    <i className={activeComm.icon || activeComm.faIcon || getCategoryIcon(activeComm.category)} style={{ color: 'var(--cyber-cyan)' }}></i>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                      <i className={activeComm.icon || activeComm.faIcon || getCategoryIcon(activeComm.category)} style={{ color: 'var(--cyber-cyan)' }}></i>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeComm.name}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{activeComm.category || 'circle'}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 1 }}>{activeComm.name}</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{activeComm.category || 'circle'}</div>
-                  </div>
+                  <button onClick={() => { setActiveCommId('global'); setSection('home'); setMobileSidebarOpen(false); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cyber-cyan)', padding: '4px 6px', borderRadius: 6, flexShrink: 0, fontSize: 14 }}
+                    title="Back to Home">
+                    <i className="fa-solid fa-arrow-left"></i>
+                  </button>
                 </div>
               </div>
 
@@ -4611,16 +4618,12 @@ export default function UserPortal() {
 
               <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(0,240,255,0.08)', flexShrink: 0 }}>
                 {!isOwner && isMember(activeCommId) && activeCommId !== 'global' && (
-                  <div className="ls-item" style={{ color: 'var(--red)', marginBottom: 4 }}
+                  <div className="ls-item" style={{ color: 'var(--red)' }}
                     onClick={() => leaveCircle(activeCommId)}>
                     <i className="nav-icon fa-solid fa-right-from-bracket"></i>
                     <span className="node-name">Leave Circle</span>
                   </div>
                 )}
-                <div className="ls-item" onClick={() => { setActiveCommId('global'); setSection('home'); }}>
-                  <i className="nav-icon fa-solid fa-arrow-left"></i>
-                  <span className="node-name">Back to Home</span>
-                </div>
               </div>
             </>
           )}

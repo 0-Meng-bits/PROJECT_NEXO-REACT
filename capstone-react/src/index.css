@@ -2961,6 +2961,8 @@ body {
     width: 85vw;
     max-width: 360px;
     height: calc(100vh - 60px);
+    height: calc(100dvh - 60px); /* dvh accounts for mobile browser chrome */
+    padding-bottom: env(safe-area-inset-bottom, 16px);
     margin: 0;
     border-radius: 0;
     z-index: 500;
