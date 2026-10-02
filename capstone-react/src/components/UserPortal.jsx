@@ -4695,7 +4695,9 @@ export default function UserPortal() {
                     <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {communities.filter(c => c.id !== 'global').slice(0, 3).map(c => (
+                    {communities.filter(c => c.id !== 'global')
+                      .sort((a, b) => (memberCounts[b.id] || 0) - (memberCounts[a.id] || 0))
+                      .slice(0, 3).map(c => (
                       <div key={c.id} className="popular-row"
                         onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
                         <div className="popular-row-icon" style={{
