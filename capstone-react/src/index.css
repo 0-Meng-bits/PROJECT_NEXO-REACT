@@ -655,6 +655,8 @@ body {
 
 /* Hidden on desktop — dock handles create circle there */
 .mobile-create-circle-btn { display: none; }
+/* Hidden on desktop sidebar — dock + button handles it */
+.mobile-only-create-circle { display: none; }
 .hud-chip {
   background: rgba(21, 21, 30, 0.8);
   border: 1px solid rgba(0, 240, 255, 0.2);
@@ -2922,6 +2924,7 @@ body {
 /* Tablet — hide dock, collapse sidebar */
 @media (max-width: 900px) {
   .circle-dock { display: none; }
+  .mobile-only-create-circle { display: flex; }
 
   .sidebar {
     width: 220px;

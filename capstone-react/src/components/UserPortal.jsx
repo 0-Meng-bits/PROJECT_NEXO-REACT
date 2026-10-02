@@ -4512,7 +4512,7 @@ export default function UserPortal() {
                 </>
               )}
               {user?.is_verified && (
-                <div className="ls-item" style={{ marginTop: 8, color: 'var(--cyber-cyan)', borderColor: 'rgba(0,240,255,0.2)' }}
+                <div className="ls-item mobile-only-create-circle" style={{ marginTop: 8, color: 'var(--cyber-cyan)', borderColor: 'rgba(0,240,255,0.2)' }}
                   onClick={() => { setShowCreate(true); setMobileSidebarOpen(false); }}>
                   <i className="fa-solid fa-plus nav-icon" style={{ fontStyle: 'normal', color: 'var(--cyber-cyan)' }}></i>
                   <span className="node-name">Create Circle</span>
