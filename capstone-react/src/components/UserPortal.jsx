@@ -4330,6 +4330,17 @@ export default function UserPortal() {
 
         {/* RIGHT — notifications + user hud */}
         <div className="user-hud">
+          {/* Create Circle — mobile only (dock is hidden on mobile) */}
+          {user?.is_verified && (
+            <button
+              className="notif-bell mobile-create-circle-btn"
+              onClick={() => setShowCreate(true)}
+              title="Create Circle"
+              style={{ marginRight: 4 }}
+            >
+              <i className="fa-solid fa-plus"></i>
+            </button>
+          )}
           {/* Shop Button */}
           <button
             className="notif-bell"
