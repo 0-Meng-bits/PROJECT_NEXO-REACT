@@ -4648,6 +4648,7 @@ body {
 }
 @media (max-width: 768px) {
   .lnd-nav-inner { padding: 0 20px; }
+  .lnd-nav-signup { display: none; } /* Sign in covers both login+signup on mobile */
   .lnd-stats-bar { flex-direction: column; gap: 14px; padding: 18px; }
   .lnd-stat-sep { width: 60px; height: 1px; }
   .lnd-section { padding: 64px 20px; }
