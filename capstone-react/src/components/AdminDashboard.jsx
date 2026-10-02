@@ -321,7 +321,7 @@ export default function AdminDashboard() {
 
   const approveStudent = async (id, name) => {
     if (!confirm('Approve this student?')) return;
-    const res = await fetch(getApiUrl(`/api/verify-student?id=${id}`), { method: 'POST' });
+    const res = await fetch(getApiUrl(`/api/verify-student/${id}`), { method: 'POST' });
     if (res.ok) {
       // Send notification to the student
       await supabase.from('notifications').insert([{
