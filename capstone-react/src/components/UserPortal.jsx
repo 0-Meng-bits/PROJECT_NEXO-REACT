@@ -3221,6 +3221,7 @@ export default function UserPortal() {
   const feedBottomRef = useRef(null);
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [memberCounts, setMemberCounts] = useState({});
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
   const [showReport, setShowReport] = useState(null); // { type, id, preview, reportedUserId }
@@ -3790,6 +3791,22 @@ export default function UserPortal() {
   }, [activeCommId, activeChannelId]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
+
+  // Load member counts for all communities
+  useEffect(() => {
+    const ids = communities.filter(c => c.id !== 'global').map(c => c.id);
+    if (ids.length === 0) return;
+    supabase.from('memberships')
+      .select('community_id')
+      .in('community_id', ids)
+      .eq('status', 'active')
+      .then(({ data }) => {
+        if (!data) return;
+        const counts = {};
+        data.forEach(m => { counts[m.community_id] = (counts[m.community_id] || 0) + 1; });
+        setMemberCounts(counts);
+      });
+  }, [communities]);
 
   // Intercept browser back button / Android swipe-back to prevent accidental logout
   useEffect(() => {
@@ -4690,7 +4707,14 @@ export default function UserPortal() {
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>{c.category}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>
+                            {c.category}
+                            {memberCounts[c.id] > 0 && (
+                              <span style={{ marginLeft: 8, color: 'var(--cyber-cyan)' }}>
+                                · {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
                       </div>
