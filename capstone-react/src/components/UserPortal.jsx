@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -18,7 +18,7 @@ import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaM
 
 function getCategoryIcon(category) {
   const map = {
-    academic: 'fa-solid fa-graduatiâ†on-cap',
+    academic: 'fa-solid fa-graduati�on-cap',
     project:  'fa-solid fa-flask',
     hobby:    'fa-solid fa-gamepad',
     social:   'fa-solid fa-user-group',
@@ -70,7 +70,7 @@ function Toast({ message }) {
   return <div className={`toast ${message ? 'show' : ''}`}>{message?.toUpperCase()}</div>;
 }
 
-// ── TRUST POINTS BADGE ────────────────────────────────────────────────────────
+// -- TRUST POINTS BADGE --------------------------------------------------------
 function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
   const getColor = (p) => {
     if (p >= 10) return { bg: 'rgba(62, 207, 142, 0.15)', border: '#3ecf8e', text: '#3ecf8e', label: 'Good Standing' };
@@ -91,12 +91,12 @@ function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
       <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
       <span>{points.toFixed(1)}</span>
-      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>• {color.label}</span>}
+      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>� {color.label}</span>}
     </div>
   );
 }
 
-// ── BAD WORDS AUTO-DETECTION ─────────────────────────────────────────────────
+// -- BAD WORDS AUTO-DETECTION -------------------------------------------------
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol', 'tangina', 'pakyu', 'yawa', 'buang'];
 
 function containsBadWord(text) {
@@ -105,7 +105,7 @@ function containsBadWord(text) {
   return BAD_WORDS.some(w => lower.includes(w));
 }
 
-// ── POST TYPE CONFIG ──────────────────────────────────────────────────────────
+// -- POST TYPE CONFIG ----------------------------------------------------------
 const POST_TYPE = {
   announcement: { label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
   event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
@@ -116,7 +116,7 @@ const POST_TYPE = {
   question:     { label: 'Question',      color: '#22d3ee',             icon: 'fa-solid fa-circle-question' },
 };
 
-// ── TIME SINCE HELPER ────────────────────────────────────────────────────────
+// -- TIME SINCE HELPER --------------------------------------------------------
 const timeSince = (dateStr) => {
   const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000);
   if (seconds < 60) return 'just now';
@@ -130,13 +130,13 @@ const timeSince = (dateStr) => {
   return `${months} month${months > 1 ? 's' : ''} ago`;
 };
 
-// ── FEEDBACK TAGS CONFIG ──────────────────────────────────────────────────────
+// -- FEEDBACK TAGS CONFIG ------------------------------------------------------
 const FEEDBACK_TAGS = [
-  { id: 'effort',    label: 'Effort',    emoji: '👏', color: '#22c55e' },
-  { id: 'creative',  label: 'Creative',  emoji: '💡', color: '#a855f7' },
-  { id: 'technique', label: 'Technique', emoji: '🎯', color: '#3b82f6' },
-  { id: 'style',     label: 'Style',     emoji: '🎨', color: '#ec4899' },
-  { id: 'impact',    label: 'Impact',    emoji: '🔥', color: '#ef4444' },
+  { id: 'effort',    label: 'Effort',    emoji: '??', color: '#22c55e' },
+  { id: 'creative',  label: 'Creative',  emoji: '??', color: '#a855f7' },
+  { id: 'technique', label: 'Technique', emoji: '??', color: '#3b82f6' },
+  { id: 'style',     label: 'Style',     emoji: '??', color: '#ec4899' },
+  { id: 'impact',    label: 'Impact',    emoji: '??', color: '#ef4444' },
 ];
 
 function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload }) {
@@ -220,7 +220,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       return;
     }
     setMarkingSolution(true);
-    // Toggle: if already solution → NULL, otherwise → commentId
+    // Toggle: if already solution ? NULL, otherwise ? commentId
     const newValue = a.solution_comment_id === commentId ? null : commentId;
     const { error } = await supabase
       .from('announcements')
@@ -365,12 +365,12 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 color: isSolved ? '#22d3ee' : '#fbbf24',
                 border: `1px solid ${isSolved ? 'rgba(34,211,238,0.3)' : 'rgba(251,191,36,0.3)'}`,
               }}>
-                {isSolved ? '✅ Solved' : '❓ Unanswered'}
+                {isSolved ? '? Solved' : '? Unanswered'}
               </span>
             )}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} � {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} ? {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
@@ -386,7 +386,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             </button>
           </div>
         )}
-        {/* Report button "� always visible to non-owners */}
+        {/* Report button "? always visible to non-owners */}
         {onReport && user?.user_type !== 'Admin' && a.author_id !== user?.id && (
           <button className="chat-action-btn" onClick={() => onReport({ type: 'announcement', id: a.id, preview: `${a.title}: ${a.content}`, reportedUserId: a.author_id })}
             title="Report this post"
@@ -409,7 +409,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       <h3 className="announcement-title">{a.title}</h3>
       {a.content && <p className="announcement-body">{a.content}</p>}
 
-      {/* ── Application APPLY BUTTON ── */}
+      {/* -- Application APPLY BUTTON -- */}
       {isApplicationPost && onApply && (
         <div style={{ marginTop: 14 }}>
           <button onClick={() => onApply(a)}
@@ -421,7 +421,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         </div>
       )}
 
-      {/* ── POLL OPTIONS ── */}
+      {/* -- POLL OPTIONS -- */}
       {isPoll && pollOptions.length > 0 && (
         <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {pollOptions.map((opt, i) => {
@@ -437,18 +437,18 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% � {votes}</span>}
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% ? {votes}</span>}
                 </div>
               </button>
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` � You voted "${myVote}"` : a.event_metadata?.is_closed ? ' � Poll Closed' : ' � Click to vote'}
+            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` ? You voted "${myVote}"` : a.event_metadata?.is_closed ? ' ? Poll Closed' : ' ? Click to vote'}
           </div>
         </div>
       )}
 
-      {/* ── EVENT POLL BADGE ── */}
+      {/* -- EVENT POLL BADGE -- */}
       {isPoll && a.event_metadata?.event_date && (
         <EventPollBadge
           eventDate={a.event_metadata.event_date}
@@ -457,18 +457,18 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         />
       )}
 
-      {/* ── POLL CLOSED BANNER ── */}
+      {/* -- POLL CLOSED BANNER -- */}
       {isPoll && a.event_metadata?.is_closed && (
         <div className="poll-closed-banner">
           <i className="fa-solid fa-lock"></i>
           <span>
             Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` • Winning option: ${a.event_metadata.winning_option}`}
+            {a.event_metadata.winning_option && ` � Winning option: ${a.event_metadata.winning_option}`}
           </span>
         </div>
       )}
 
-      {/* ── POLL CLOSURE BUTTON ── */}
+      {/* -- POLL CLOSURE BUTTON -- */}
       {isPoll && user && a.community_id && (
         <PollClosureButton
           announcementId={a.id}
@@ -483,7 +483,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         />
       )}
 
-      {/* ── GENERATED EVENT LINK ── */}
+      {/* -- GENERATED EVENT LINK -- */}
       {isPoll && a.event_metadata?.generated_event_id && (
         <GeneratedEventLink
           eventId={a.event_metadata.generated_event_id}
@@ -492,7 +492,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         />
       )}
 
-      {/* ── SHOWCASE TAG BAR ── */}
+      {/* -- SHOWCASE TAG BAR -- */}
       {isShowcase && user && (
         <ShowcaseTagBar
           announcementId={a.id}
@@ -507,7 +507,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         />
       )}
 
-      {/* ── COMMENT SECTION ── */}
+      {/* -- COMMENT SECTION -- */}
       <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
         {/* Toggle comments button */}
         <button onClick={toggleComments}
@@ -540,9 +540,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                       {/* Solution badge */}
                       {isSolutionComment && (
                         <div style={{ fontSize: 10, color: '#22d3ee', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          ✅ Accepted Answer
+                          ? Accepted Answer
                           <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-                            · solved {timeSince(c.created_at)}
+                            � solved {timeSince(c.created_at)}
                           </span>
                         </div>
                       )}
@@ -591,7 +591,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                             color: isSolutionComment ? '#22d3ee' : 'var(--text-muted)',
                           }}
                         >
-                          {isSolutionComment ? '✅ Unmark Solution' : '○ Mark as Solution'}
+                          {isSolutionComment ? '? Unmark Solution' : '? Mark as Solution'}
                         </button>
                       )}
                     </div>
@@ -656,7 +656,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   );
 }
 
-// ── ONLINE USERS STACK ───────────────────────────────────────────────────────
+// -- ONLINE USERS STACK -------------------------------------------------------
 function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5, onClick }) {
   if (!onlineProfiles.length) return null;
 
@@ -724,7 +724,7 @@ function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5, 
   );
 }
 
-// ── CHAT TIME SEPARATOR ───────────────────────────────────────────────────────
+// -- CHAT TIME SEPARATOR -------------------------------------------------------
 function ChatTimeSeparator({ date }) {
   const now = new Date();
   const d = new Date(date);
@@ -746,7 +746,7 @@ function ChatTimeSeparator({ date }) {
   );
 }
 
-// ── MESSAGE ITEM ──────────────────────────────────────────────────────────────
+// -- MESSAGE ITEM --------------------------------------------------------------
 function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readCount, isLastOwn, isGrouped, isLastInGroup, userCustomizations }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
@@ -874,7 +874,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {/* Inline action bar "� appears below bubble on hover */}
+        {/* Inline action bar "? appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
             {/* Emoji reaction button */}
@@ -884,7 +884,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               </button>
               {showEmojiPicker && (
                 <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) => (
+                  {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
@@ -924,7 +924,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-            {[['heart','❤️'],['laugh','😂'],['sad','😢']].map(([type, emoji]) =>
+            {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <button key={type} onClick={() => toggleReaction(type)}
                   style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
@@ -982,7 +982,7 @@ const CATEGORY_ICONS = {
   ],
 };
 
-// ── CREATE MODAL ──────────────────────────────────────────────────────────────
+// -- CREATE MODAL --------------------------------------------------------------
 function CreateModal({ onClose, onCreated, userId }) {
   const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap' });
   const [loading, setLoading] = useState(false);
@@ -1013,7 +1013,7 @@ function CreateModal({ onClose, onCreated, userId }) {
       alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
       onClose();
     } catch {
-      alert('Network error — could not submit request.');
+      alert('Network error � could not submit request.');
     }
     setLoading(false);
   };
@@ -1083,7 +1083,7 @@ function rankColor(level) {
   return 'var(--text-muted)';
 }
 
-// ── MEMBER CARD ───────────────────────────────────────────────────────────────
+// -- MEMBER CARD ---------------------------------------------------------------
 function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true, onGivePoints, onFlagUser, communityCategory, onUpdateRole }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [trustPoints, setTrustPoints] = useState(10);
@@ -1153,11 +1153,11 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
               }}
             >
               <option value="">No Role</option>
-              <option value="Leader">👑 Leader</option>
-              <option value="Developer">💻 Developer</option>
-              <option value="Designer">🎨 Designer</option>
-              <option value="Tester">🧪 Tester</option>
-              <option value="Other">📋 Other</option>
+              <option value="Leader">?? Leader</option>
+              <option value="Developer">?? Developer</option>
+              <option value="Designer">?? Designer</option>
+              <option value="Tester">?? Tester</option>
+              <option value="Other">?? Other</option>
             </select>
           </div>
         )}
@@ -1220,7 +1220,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
   );
 }
 
-// ── MANAGE GROUP MODAL ────────────────────────────────────────────────────────
+// -- MANAGE GROUP MODAL --------------------------------------------------------
 function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, onGivePoints, onFlagUser }) {
   const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic' });
   const [members, setMembers] = useState([]);
@@ -1595,7 +1595,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                   </span>
                 )}
               </div>
-              <div className="members-banner-name">{leader?.full_name || '"�'}</div>
+              <div className="members-banner-name">{leader?.full_name || '"?'}</div>
               <div className="members-banner-handle">
                 <span style={{ color: 'var(--cyber-yellow)', fontSize: 11, border: '1px solid var(--cyber-yellow)', padding: '2px 10px', borderRadius: 20 }}>
                   Leader / Founder
@@ -1757,7 +1757,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
   );
 }
 
-// ── PROFILE MODAL ─────────────────────────────────────────────────────────────
+// -- PROFILE MODAL -------------------------------------------------------------
 const INTEREST_LABELS = {
   art: 'Art', coding: 'Coding', design: 'Design', gaming: 'Gaming',
   music: 'Music', sports: 'Sports', research: 'Research',
@@ -1768,7 +1768,7 @@ const INTEREST_LABELS = {
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
 const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
 
-// ── PROFILE TRUST POINTS SECTION ─────────────────────────────────────────────
+// -- PROFILE TRUST POINTS SECTION ---------------------------------------------
 function ProfileTrustPointsSection({ userId, onViewHistory }) {
   const [trustPoints, setTrustPoints] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -1829,7 +1829,7 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
   );
 }
 
-// ── PROFILE MODAL ─────────────────────────────────────────────────────────────
+// -- PROFILE MODAL -------------------------------------------------------------
 function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
@@ -2184,7 +2184,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
-                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'} ✓</span>
+                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'} ?</span>
                   : <span className="verified-badge" style={{ fontSize: 11, borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending Verification</span>
                 }
               </div>
@@ -2286,7 +2286,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 </div>
                 {idUploaded && (
                   <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
-                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted — awaiting admin review
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted � awaiting admin review
                   </div>
                 )}
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
@@ -2370,7 +2370,7 @@ function ApplicationDetailModal({ data, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{ maxWidth: 500, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "� {c.name}</h3>
+        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "? {c.name}</h3>
 
         {/* Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: `${statusColor}10`, border: `1px solid ${statusColor}40`, borderRadius: 8 }}>
@@ -2387,7 +2387,7 @@ function ApplicationDetailModal({ data, onClose }) {
         {r.status === 'phase2' && r.phase2_details && (
           <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
             <div style={{ fontSize: 11, color: 'var(--cyber-yellow)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
-              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "� LIVE SCREENING
+              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "? LIVE SCREENING
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{r.phase2_details}</p>
           </div>
@@ -2421,7 +2421,7 @@ function ApplicationDetailModal({ data, onClose }) {
                   : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)' }}>
-                  {r.answers?.[q.id] || '"�'}
+                  {r.answers?.[q.id] || '"?'}
                 </div>
               )}
             </div>
@@ -2435,7 +2435,7 @@ function ApplicationDetailModal({ data, onClose }) {
 }
 
 async function autoFlagContent({ reporterId, reportedUserId, contentType, contentId, contentPreview }) {
-  // Create the report only "� admin reviews and decides on formal warnings
+  // Create the report only "? admin reviews and decides on formal warnings
   await supabase.from('reports').insert([{
     reporter_id: reporterId,
     reported_user_id: reportedUserId,
@@ -2445,7 +2445,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
     reason: 'Auto-detected: inappropriate language',
     status: 'pending',
   }]);
-  // Send a mild alert to the user (no point deduction "� admin decides that)
+  // Send a mild alert to the user (no point deduction "? admin decides that)
   if (reportedUserId) {
     await supabase.from('notifications').insert([{
       user_id: reportedUserId,
@@ -2455,7 +2455,7 @@ async function autoFlagContent({ reporterId, reportedUserId, contentType, conten
   }
 }
 
-// ── REPORT MODAL ─────────────────────────────────────────────────────────────
+// -- REPORT MODAL -------------------------------------------------------------
 function ReportModal({ data, user, onClose }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -2534,7 +2534,7 @@ function ReportModal({ data, user, onClose }) {
   );
 }
 
-// ── GIVE POINTS MODAL ─────────────────────────────────────────────────────────
+// -- GIVE POINTS MODAL ---------------------------------------------------------
 function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRankLevel }) {
   const [amount, setAmount] = useState(0);
   const [reason, setReason] = useState('');
@@ -2661,7 +2661,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
             {/* Daily limit info */}
             <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-yellow)' }}>
               <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
-              Daily limit: {maxRecipients} recipients · Cooldown: 12 hours per person
+              Daily limit: {maxRecipients} recipients � Cooldown: 12 hours per person
             </div>
 
             {error && (
@@ -2684,7 +2684,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
   );
 }
 
-// ── FLAG USER MODAL ───────────────────────────────────────────────────────────
+// -- FLAG USER MODAL -----------------------------------------------------------
 function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
   const [reason, setReason] = useState('');
   const [severity, setSeverity] = useState('moderate');
@@ -2856,7 +2856,7 @@ function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
   );
 }
 
-// ── WARNING HISTORY MODAL ─────────────────────────────────────────────────────
+// -- WARNING HISTORY MODAL -----------------------------------------------------
 function WarningHistoryModal({ userId, onClose, onAppeal }) {
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3025,7 +3025,7 @@ function WarningHistoryModal({ userId, onClose, onAppeal }) {
   );
 }
 
-// ── APPEAL MODAL ──────────────────────────────────────────────────────────────
+// -- APPEAL MODAL --------------------------------------------------------------
 function AppealModal({ warning, onClose, userId }) {
   const [reason, setReason] = useState('');
   const [evidence, setEvidence] = useState('');
@@ -3178,7 +3178,7 @@ function AppealModal({ warning, onClose, userId }) {
   );
 }
 
-// ── MAIN PORTAL ───────────────────────────────────────────────────────────────
+// -- MAIN PORTAL ---------------------------------------------------------------
 export default function UserPortal() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')));
@@ -3230,6 +3230,7 @@ export default function UserPortal() {
   const feedBottomRef = useRef(null);
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showDock, setShowDock] = useState(false);
   const [memberCounts, setMemberCounts] = useState({});
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(loadTheme);
@@ -3359,7 +3360,7 @@ export default function UserPortal() {
     setEventsLoading(false);
   }, [user]);
 
-  // ── ONLINE PRESENCE ──────────────────────────────────────────────────────────
+  // -- ONLINE PRESENCE ----------------------------------------------------------
   const [onlineUsers, setOnlineUsers] = useState(new Set()); // set of profile UUIDs
 
   // On mount: re-check is_verified from DB in case admin approved after login
@@ -3402,7 +3403,7 @@ export default function UserPortal() {
         ...a, student_id: a.ctu_id, avatar_url: a.account_details?.avatar_url,
       }));
       setOnlineUsers(new Set(profiles.map(p => p.id)));
-      // Keep self in the list for display — just mark them differently if needed
+      // Keep self in the list for display � just mark them differently if needed
       setOnlineProfiles(profiles);
     };
     fetchOnline();
@@ -3772,12 +3773,12 @@ export default function UserPortal() {
     if (myMsgIds.length) fetchReadCounts(myMsgIds);
   }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
 
-  // Initial load + realtime subscription — re-runs when channel/community changes
+  // Initial load + realtime subscription � re-runs when channel/community changes
   useEffect(() => {
     loadMessages(activeCommId, activeChannelId);
   }, [activeCommId, activeChannelId]); // eslint-disable-line
 
-  // Realtime subscription — separate from load so it doesn't cause extra reloads
+  // Realtime subscription � separate from load so it doesn't cause extra reloads
   useEffect(() => {
     const channelName = activeCommId === 'global'
       ? 'realtime:messages:global'
@@ -3878,7 +3879,7 @@ export default function UserPortal() {
     }
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
-  // Avatar is persisted in localStorage "� no DB sync needed on mount
+  // Avatar is persisted in localStorage "? no DB sync needed on mount
 
   // Realtime home feed (campus-wide announcements)
   useEffect(() => {
@@ -3938,7 +3939,7 @@ export default function UserPortal() {
     return () => supabase.removeChannel(sub);
   }, [activeCommId]);
 
-  // Circle chat "� load and realtime
+  // Circle chat "? load and realtime
   useEffect(() => {
     if (!activeCommId || activeCommId === 'global' || section !== 'circle-chat') return;
     loadCircleChatMessages(activeCommId);
@@ -4022,9 +4023,9 @@ export default function UserPortal() {
 
   const sendPost = async () => {
     if (!msgInput.trim() && !pendingMedia) return;
-    // Block bad words "� don't send, show error
+    // Block bad words "? don't send, show error
     if (msgInput.trim() && containsBadWord(msgInput)) {
-      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
+      setSendError('?? Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       // Still auto-flag for admin awareness
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: msgInput });
@@ -4083,7 +4084,7 @@ export default function UserPortal() {
   const sendCircleChatPost = async () => {
     if (!circleChatInput.trim() && !circlePendingMedia) return;
     if (circleChatInput.trim() && containsBadWord(circleChatInput)) {
-      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
+      setSendError('?? Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: circleChatInput });
       return;
@@ -4162,7 +4163,7 @@ export default function UserPortal() {
       setActiveCommId('global'); setSection('home');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error — could not delete circle.');
+      showToast('Network error � could not delete circle.');
     }
   };
 
@@ -4254,9 +4255,13 @@ export default function UserPortal() {
 
       {/* TOP NAV */}
       <nav className="top-nav-bar">
-        {/* LEFT "� hamburger (mobile) + date & time */}
+        {/* LEFT "? hamburger (mobile) + date & time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(o => !o)}>
+          <button className="mobile-menu-btn" onClick={() => {
+            const next = !showDock;
+            setShowDock(next);
+            setMobileSidebarOpen(next);
+          }}>
             <i className="fa-solid fa-bars"></i>
           </button>
           <div 
@@ -4279,7 +4284,7 @@ export default function UserPortal() {
         </div>
         </div>
 
-        {/* CENTER "� search */}
+        {/* CENTER "? search */}
         <div className="nav-search-wrap">
           <i className="fa-solid fa-magnifying-glass nav-search-icon"></i>
           <input
@@ -4325,7 +4330,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT — notifications + user hud */}
+        {/* RIGHT � notifications + user hud */}
         <div className="user-hud">
           {/* Shop Button */}
           <button
@@ -4410,40 +4415,41 @@ export default function UserPortal() {
       </nav>
 
       <div className="main">
-        {/* CIRCLE DOCK "� only joined circles */}
-        <div className="circle-dock">
+        {/* CIRCLE DOCK � always visible on desktop, toggle overlay on mobile */}
+        <div className={`circle-dock${(showDock || mobileSidebarOpen) ? " dock-mobile-open" : ""}`}>
           <div className="dock-branding">
             <img src="/logoo.png" className="brand-logo-small" alt="NEXO" />
           </div>
           {myCircles.map(c => (
-            <div key={c.id} className={`dock-icon ${activeCommId === c.id ? 'active' : ''}`}
+            <div key={c.id} className={`dock-icon ${activeCommId === c.id ? "active" : ""}`}
               title={c.name} onClick={() => {
                 setActiveCommId(c.id);
                 setActiveChannelId(null);
-                setSection(c.id === 'global' ? 'home' : 'circles');
+                setSection(c.id === "global" ? "home" : "circles");
+                setShowDock(false);
+                setMobileSidebarOpen(true);
               }}>
-              {c.id === 'global'
+              {c.id === "global"
                 ? <i className="fa-solid fa-earth-asia"></i>
                 : c.logo_url
-                  ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
+                  ? <img src={c.logo_url} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} />
                   : <i className={c.icon || getCategoryIcon(c.category)}></i>
               }
             </div>
           ))}
           {user?.is_verified && (
-            <div className="dock-add-btn" title="Create Circle" onClick={() => setShowCreate(true)}>+</div>
+            <div className="dock-add-btn" title="Create Circle" onClick={() => { setShowCreate(true); setShowDock(false); }}>+</div>
           )}
         </div>
-
-        {/* SIDEBAR BACKDROP (mobile) */}
-        {mobileSidebarOpen && (
-          <div className="sidebar-backdrop show" onClick={() => setMobileSidebarOpen(false)} />
+        {/* Backdrop � closes dock + sidebar on mobile */}
+        {(showDock || mobileSidebarOpen) && (
+          <div className="sidebar-backdrop show" onClick={() => { setShowDock(false); setMobileSidebarOpen(false); }} />
         )}
 
-        {/* SIDEBAR "� context aware */}
+        {/* SIDEBAR "? context aware */}
         <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
           {activeCommId === 'global' ? (
-            /* ── GLOBAL / HOME sidebar ── */
+            /* -- GLOBAL / HOME sidebar -- */
             <>
               <div className="sidebar-brand-area">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -4454,15 +4460,15 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">MAIN</div>
               <div className="nav-links">
-                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); }}>
+                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); loadMessages('global', null); setMobileSidebarOpen(false); }}>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); setMobileSidebarOpen(false); }}>
+                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
                 </div>
@@ -4488,7 +4494,7 @@ export default function UserPortal() {
               </div>
             </>
           ) : (
-            /* ── CIRCLE sidebar ── */
+            /* -- CIRCLE sidebar -- */
             <>
               <div className="sidebar-brand-area" style={{ paddingBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -4501,7 +4507,8 @@ export default function UserPortal() {
                       <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{activeComm.category || 'circle'}</div>
                     </div>
                   </div>
-                  <button onClick={() => { setActiveCommId('global'); setSection('home'); setMobileSidebarOpen(false); }}
+                  <button onClick={() => { setActiveCommId('global'); setSection('home'); setMobileSidebarOpen(false); setShowDock(false); }}
+                    className="mobile-menu-btn"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cyber-cyan)', padding: '4px 6px', borderRadius: 6, flexShrink: 0, fontSize: 14 }}
                     title="Back to Home">
                     <i className="fa-solid fa-arrow-left"></i>
@@ -4512,7 +4519,7 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
-                {/* Announcements — always first, powered by announcements table */}
+                {/* Announcements � always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
                   onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
@@ -4524,7 +4531,7 @@ export default function UserPortal() {
                   )}
                 </div>
 
-                {/* General — virtual default channel, stores channel_id=null messages */}
+                {/* General � virtual default channel, stores channel_id=null messages */}
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                   onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); setSection('circles'); loadMessages(activeCommId, null); }}
@@ -4668,7 +4675,7 @@ export default function UserPortal() {
         {/* CONTENT */}
         <div className="content">
 
-          {/* ── HOME ── */}
+          {/* -- HOME -- */}
           {section === 'home' && (
             <div className="c-feed fade-in">
 
@@ -4685,7 +4692,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* Popular Right Now — moved up, replaces redundant welcome/stats cards */}
+              {/* Popular Right Now � moved up, replaces redundant welcome/stats cards */}
               {communities.filter(c => c.id !== 'global').length > 0 && (
                 <>
                   <div className="home-section-header" style={{ marginTop: 8 }}>
@@ -4711,7 +4718,7 @@ export default function UserPortal() {
                             {c.category}
                             {memberCounts[c.id] > 0 && (
                               <span style={{ marginLeft: 8, color: 'var(--cyber-cyan)' }}>
-                                · {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? 's' : ''}
+                                � {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? 's' : ''}
                               </span>
                             )}
                           </div>
@@ -4723,7 +4730,7 @@ export default function UserPortal() {
                 </>
               )}
 
-              {/* ── POST COMPOSER "� verified users only ── */}
+              {/* -- POST COMPOSER "? verified users only -- */}
               {user?.is_verified && (
                 <div className="home-post-composer">
                   <div className="home-composer-header">
@@ -4807,7 +4814,7 @@ export default function UserPortal() {
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously "� click to use your name' : 'Post anonymously'}>
+                        title={newPost.anonymous ? 'Posting anonymously "? click to use your name' : 'Post anonymously'}>
                         <i className="fa-solid fa-user-secret"></i>
                         <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
                       </button>
@@ -4824,7 +4831,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* ── CAMPUS FEED ── */}
+              {/* -- CAMPUS FEED -- */}
               <div className="home-section-header" style={{ marginTop: 4 }}>
                 <span><i className="fa-solid fa-bullhorn" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>Campus Feed</span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
@@ -4932,15 +4939,15 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* Popular by category — now shown above, removed from here */}
+              {/* Popular by category � now shown above, removed from here */}
 
             </div>
           )}
 
-          {/* ── GLOBAL FEED "� campus-wide chat ── */}
+          {/* -- GLOBAL FEED "? campus-wide chat -- */}
           {section === 'global' && (
             <>
-              {/* Global feed header — stays visible, doesn't scroll */}
+              {/* Global feed header � stays visible, doesn't scroll */}
               <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
@@ -4949,7 +4956,7 @@ export default function UserPortal() {
                   <OnlineStack onlineProfiles={onlineProfiles} circleMateIds={circleMateIds} avatarCache={avatarCache} />
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-                  Campus-wide chat — open to all verified students and faculty.
+                  Campus-wide chat � open to all verified students and faculty.
                 </p>
               </div>
               <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
@@ -5032,7 +5039,7 @@ export default function UserPortal() {
             </>
           )}
 
-          {/* ── ACTIVITY HUB "� discover & join circles ── */}
+          {/* -- ACTIVITY HUB "? discover & join circles -- */}
           {section === 'activity' && (
             <div className="c-feed fade-in">
               <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
@@ -5141,10 +5148,10 @@ export default function UserPortal() {
             </div>
           )}
 
-          {/* ── MY CIRCLES / CIRCLE FEED ── */}
+          {/* -- MY CIRCLES / CIRCLE FEED -- */}
           {section === 'circles' && (
             <>
-              {/* Banner sits outside the scrollable feed — stays visible */}
+              {/* Banner sits outside the scrollable feed � stays visible */}
               <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', overflow: 'hidden', flexShrink: 0 }}>
                 <div className="circle-cover-banner" style={{
                   borderRadius: 0,
@@ -5152,7 +5159,7 @@ export default function UserPortal() {
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button "� top-right, only for creator */}
+                  {/* Cover photo edit button "? top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -5267,7 +5274,7 @@ export default function UserPortal() {
                         return (
                           <div key={label}>
                             <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                              {label} — {group.length}
+                              {label} � {group.length}
                             </div>
                             {group.map(m => {
                               const url = avatarCache[m.student_id] || m.avatar_url;
@@ -5335,9 +5342,9 @@ export default function UserPortal() {
                     )}
                   </div>
                 ) : showCircleAnnouncements ? (
-                  /* ── CIRCLE ANNOUNCEMENTS VIEW ── */
+                  /* -- CIRCLE ANNOUNCEMENTS VIEW -- */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer "� all members can post */}
+                    {/* Post composer "? all members can post */}
                     {isMember(activeCommId) && user?.is_verified && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
@@ -5423,13 +5430,13 @@ export default function UserPortal() {
                         </div>
                       </div>
                     )}
-                    {/* Q&A Filter bar — academic circles only */}
+                    {/* Q&A Filter bar � academic circles only */}
                     {activeComm?.category === 'academic' && (
                       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                         {[
                           { key: 'all', label: 'All Posts' },
-                          { key: 'questions', label: '❓ Questions' },
-                          { key: 'unanswered', label: '🔴 Unanswered' },
+                          { key: 'questions', label: '? Questions' },
+                          { key: 'unanswered', label: '?? Unanswered' },
                         ].map(f => (
                           <button key={f.key} onClick={() => setQaFilter(f.key)} style={{
                             padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer',
@@ -5567,10 +5574,10 @@ export default function UserPortal() {
             </>
           )}
 
-          {/* ── CIRCLE CHAT ── */}
+          {/* -- CIRCLE CHAT -- */}
           {section === 'circle-chat' && activeCommId !== 'global' && (
             <>
-              {/* Circle chat header — fixed, doesn't scroll */}
+              {/* Circle chat header � fixed, doesn't scroll */}
               <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
@@ -5690,7 +5697,7 @@ export default function UserPortal() {
               )}
               {showMembersPanel && (
                 <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
-                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS — {circleChatMembers.length}</div>
+                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS � {circleChatMembers.length}</div>
                   {[
                     { label: 'ONLINE', filter: m => isOnline(m.id) },
                     { label: 'OFFLINE', filter: m => !isOnline(m.id) },
@@ -5700,7 +5707,7 @@ export default function UserPortal() {
                     return (
                       <div key={label}>
                         <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                          {label} — {group.length}
+                          {label} � {group.length}
                         </div>
                         {group.map(m => {
                           const url = avatarCache[m.student_id] || m.avatar_url;
@@ -5827,7 +5834,7 @@ export default function UserPortal() {
         />
       )}
 
-      {/* ── EVENTS MODAL ── */}
+      {/* -- EVENTS MODAL -- */}
       {showEventsModal && (
         <div className="modal-overlay" onClick={() => setShowEventsModal(false)}>
           <div className="events-modal" onClick={e => e.stopPropagation()}>
