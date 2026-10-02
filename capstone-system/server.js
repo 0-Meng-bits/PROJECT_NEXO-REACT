@@ -121,7 +121,7 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    return res.status(401).json({ message: 'Invalid credentials. Please check your CTU ID and password.' });
   }
 
   // Build flat profile-compatible response (same shape as before so frontend doesn't break)

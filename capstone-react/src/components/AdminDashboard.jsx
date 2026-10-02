@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                 All caught up — no pending verifications.
               </div>
             ) : (
-              <table className="adm-table">
+              <div style={{ overflowX: "auto" }}><table className="adm-table">
                 <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
@@ -913,7 +913,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div></table>
             )}
           </div>
         )}
@@ -1087,7 +1087,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div></table>
             )}
           </div>
         )}
@@ -1114,7 +1114,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div></table>
             )}
           </div>
         )}
@@ -1334,7 +1334,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div></table>
             )}
           </div>
         )}
@@ -1825,7 +1825,7 @@ export default function AdminDashboard() {
                     No inappropriate content detected.
                   </div>
                 ) : (
-                  <table className="adm-table">
+                  <div style={{ overflowX: "auto" }}><table className="adm-table">
                     <thead><tr><th>TYPE</th><th>CIRCLE</th><th>CONTENT</th><th>AUTHOR</th><th>DATE</th><th>ACTION</th></tr></thead>
                     <tbody>
                       {allFlagged.map((item, i) => {
@@ -1864,7 +1864,7 @@ export default function AdminDashboard() {
                         );
                       })}
                     </tbody>
-                  </table>
+                  </table></div></table>
                 )}
               </div>
 
@@ -1878,7 +1878,7 @@ export default function AdminDashboard() {
                   return warnedUsers.length === 0 ? (
                     <div className="adm-empty">No warnings or bans issued yet.</div>
                   ) : (
-                    <table className="adm-table">
+                    <div style={{ overflowX: "auto" }}><table className="adm-table">
                       <thead><tr><th>CTU ID</th><th>NAME</th><th>WARNINGS</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
                       <tbody>
                         {warnedUsers.map(s => (
@@ -1934,4 +1934,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
