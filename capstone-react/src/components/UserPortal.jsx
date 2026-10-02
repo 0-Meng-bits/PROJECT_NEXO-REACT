@@ -4428,7 +4428,10 @@ export default function UserPortal() {
             /* ── GLOBAL / HOME sidebar ── */
             <>
               <div className="sidebar-brand-area">
-                <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src="/logoo.png" alt="NEXO" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                  <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
+                </div>
               </div>
               <div className="sidebar-scroll">
               <div className="sidebar-label">MAIN</div>
