@@ -2948,6 +2948,9 @@ body {
 
   .main { flex-direction: column; position: relative; }
 
+  /* Ensure dock is hidden on mobile */
+  .circle-dock { display: none !important; }
+
   /* Hide sidebar by default on mobile — toggled via hamburger */
   .sidebar {
     position: fixed;
