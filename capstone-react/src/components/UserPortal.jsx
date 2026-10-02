@@ -4500,7 +4500,10 @@ export default function UserPortal() {
                           setMobileSidebarOpen(false);
                         }}
                       >
-                        <i className={`nav-icon ${c.icon || getCategoryIcon(c.category)}`} style={{ fontStyle: 'normal' }}></i>
+                        {c.logo_url
+                          ? <img src={c.logo_url} alt="" className="nav-icon" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
+                          : <i className={`nav-icon ${c.icon || getCategoryIcon(c.category)}`} style={{ fontStyle: 'normal' }}></i>
+                        }
                         <span className="node-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                       </div>
                     ))}
