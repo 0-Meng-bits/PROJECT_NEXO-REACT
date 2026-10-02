@@ -4500,7 +4500,7 @@ export default function UserPortal() {
                           setMobileSidebarOpen(false);
                         }}
                       >
-                        <i className="nav-icon fa-solid fa-users" style={{ fontStyle: 'normal' }}></i>
+                        <i className={`nav-icon ${c.icon || getCategoryIcon(c.category)}`} style={{ fontStyle: 'normal' }}></i>
                         <span className="node-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                       </div>
                     ))}
