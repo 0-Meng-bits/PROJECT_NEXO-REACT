@@ -944,14 +944,9 @@ export default function AdminDashboard() {
                   {filtered.map(s => (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={async () => {
                       setSelectedUser(s);
-                      // Always fetch fresh photo data on click from both tables
-                      const [{ data: ad }, { data: prof }] = await Promise.all([
-                        supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).single(),
-                        supabase.from('profiles').select('id_photo_url, id_verified').eq('id', s.id).single(),
-                      ]);
-                      const photo = ad?.id_photo_url || prof?.id_photo_url || null;
-                      const idVerified = ad?.id_verified ?? prof?.id_verified ?? false;
-                      setSelectedUser(prev => ({ ...prev, id_photo_url: photo, id_verified: idVerified }));
+                      // Fetch fresh photo from account_details on click
+                      const { data: ad } = await supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).single();
+                      setSelectedUser(prev => ({ ...prev, id_photo_url: ad?.id_photo_url || null, id_verified: ad?.id_verified ?? false }));
                     }}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
