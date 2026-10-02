@@ -341,8 +341,15 @@ export default function Auth() {
               </div>
               <div className="input-group">
                 <label>PASSWORD</label>
-                <input name="password" type="password" value={form.password} onChange={update}
-                  placeholder="••••••••" required disabled={loading} minLength={6} />
+                <div style={{ position: 'relative' }}>
+                  <input name="password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update}
+                    placeholder="••••••••" required disabled={loading} minLength={6} style={{ paddingRight: 40 }} />
+                  <button type="button" onClick={() => setShowPassword(v => !v)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '4px', display: 'flex', alignItems: 'center' }}
+                    tabIndex={-1}>
+                    <i className={showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
+                  </button>
+                </div>
               </div>
             </>
           ) : (
