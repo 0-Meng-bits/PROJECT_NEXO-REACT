@@ -2032,7 +2032,7 @@ body {
   background: rgba(13,13,18,0.8);
   border: 1px solid rgba(0,240,255,0.08);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* Tables inside cards scroll horizontally on small screens */

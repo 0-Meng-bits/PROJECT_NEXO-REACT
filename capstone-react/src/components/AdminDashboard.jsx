@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                 All caught up — no pending verifications.
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}><table className="adm-table">
+              <div style={{ overflowX: 'auto' }}><table className="adm-table">
                 <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
