@@ -4485,9 +4485,9 @@ export default function UserPortal() {
                 ))}
               </div>
 
-              {/* MY CIRCLES — quick jump shortcut */}
+              {/* MY CIRCLES — mobile only (dock handles this on desktop) */}
               {myCircles.filter(c => c.id !== 'global').length > 0 && (
-                <>
+                <div className="mobile-only-create-circle">
                   <div className="sidebar-label" style={{ marginTop: 12 }}>MY CIRCLES</div>
                   <div className="nav-links">
                     {myCircles.filter(c => c.id !== 'global').map(c => (
@@ -4509,7 +4509,7 @@ export default function UserPortal() {
                       </div>
                     ))}
                   </div>
-                </>
+                </div>
               )}
               {user?.is_verified && (
                 <div className="ls-item mobile-only-create-circle" style={{ marginTop: 8, color: 'var(--cyber-cyan)', borderColor: 'rgba(0,240,255,0.2)' }}
