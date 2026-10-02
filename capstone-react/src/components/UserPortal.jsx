@@ -4147,15 +4147,12 @@ export default function UserPortal() {
     console.log('[DELETE CIRCLE]', { id });
     const token = localStorage.getItem('accessToken');
     try {
-      const payload = { action: 'delete-community', id: id };
-      console.log('[DELETE CIRCLE] Sending payload:', payload);
-      const res = await fetch(getApiUrl(`/api/delete`), {
-        method: 'POST',
+      const res = await fetch(getApiUrl(`/api/delete-community?id=${id}`), {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(payload),
       });
       const data = await res.json();
       console.log('[DELETE CIRCLE] Response:', { status: res.status, data });
