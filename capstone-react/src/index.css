@@ -1773,20 +1773,12 @@ body {
   padding: 8px 8px 8px 14px !important;
 }
 
-/* Hide media/voice buttons when input is focused */
+/* Media/voice buttons — always visible */
 .chat-input-wrap .chat-action-btn {
-  transition: opacity 0.2s, width 0.2s, margin 0.2s, padding 0.2s;
+  transition: opacity 0.2s;
   opacity: 1;
   max-width: 40px;
   overflow: visible;
-}
-.chat-input-wrap:focus-within .chat-action-btn {
-  opacity: 0;
-  max-width: 0;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 /* Send button — small icon circle */
