@@ -4433,9 +4433,9 @@ export default function UserPortal() {
                   <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
                 </div>
               </div>
-              <div className="sidebar-scroll">
+              {/* MAIN nav — always visible, not scrolled */}
               <div className="sidebar-label">MAIN</div>
-              <div className="nav-links">
+              <div className="nav-links" style={{ flexShrink: 0 }}>
                 <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); }}>
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
@@ -4444,12 +4444,14 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); }}>
+                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); setMobileSidebarOpen(false); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
                 </div>
               </div>
-              <div className="sidebar-label" style={{ marginTop: 12 }}>CATEGORIES</div>
+              <div style={{ height: 1, background: 'rgba(0,240,255,0.08)', margin: '8px 0', flexShrink: 0 }} />
+              <div className="sidebar-scroll">
+              <div className="sidebar-label" style={{ marginTop: 4 }}>CATEGORIES</div>
               <div className="nav-links">
                 {[
                   { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-graduation-cap' },
