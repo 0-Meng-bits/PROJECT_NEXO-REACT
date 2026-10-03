@@ -7,6 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    lock: false, // prevent NavigatorLockAcquireTimeoutError across tabs
   },
   global: {
     headers: {

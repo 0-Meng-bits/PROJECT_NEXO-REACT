@@ -27,7 +27,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   const [saving, setSaving] = useState(false);
 
   const loadApplications = useCallback(async () => {
-    const { data } = await supabase.from('Applications')
+    const { data } = await supabase.from('applications')
       .select('*, application_submissions(count)')
       .eq('community_id', comm.id)
       .order('created_at', { ascending: false });
@@ -38,8 +38,8 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   useEffect(() => { loadApplications(); }, [loadApplications]);
 
   const loadQuestions = useCallback(async (ApplicationId) => {
-    const { data } = await supabase.from('Application_questions')
-      .select('*').eq('Application_id', ApplicationId).order('order_index');
+    const { data } = await supabase.from('application_questions')
+      .select('*').eq('application_id', ApplicationId).order('order_index');
     setQuestions(data || []);
   }, []);
 
@@ -50,7 +50,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   const createApplication = async () => {
     if (!newForm.title.trim()) return;
     setCreating(true);
-    const { data, error } = await supabase.from('Applications').insert([{
+    const { data, error } = await supabase.from('applications').insert([{
       community_id: comm.id,
       title: newForm.title.trim(),
       description: newForm.description.trim(),
@@ -101,9 +101,9 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
       for (let i = 0; i < newQuestions.length; i++) {
         const q = newQuestions[i];
         if (!q.question.trim()) continue;
-        await supabase.from('Application_questions').insert([{
+        await supabase.from('application_questions').insert([{
           community_id: comm.id,
-          Application_id: data.id,
+          application_id: data.id,
           question: q.question.trim(),
           type: q.type,
           options: q.options || [],
@@ -124,13 +124,13 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   };
 
   const toggleApplicationOpen = async (aud) => {
-    await supabase.from('Applications').update({ is_open: !aud.is_open }).eq('id', aud.id);
+    await supabase.from('applications').update({ is_open: !aud.is_open }).eq('id', aud.id);
     loadApplications();
   };
 
   const deleteApplication = async (id) => {
     if (!confirm('Delete this Application and all its applications?')) return;
-    await supabase.from('Applications').delete().eq('id', id);
+    await supabase.from('applications').delete().eq('id', id);
     if (selectedApplication?.id === id) setSelectedApplication(null);
     loadApplications();
   };
@@ -149,7 +149,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
 
   const addQuestion = () => {
     setQuestions(prev => [...prev, {
-      id: 'new_' + Date.now(), Application_id: selectedApplication.id,
+      id: 'new_' + Date.now(), application_id: selectedApplication.id,
       community_id: comm.id, question: '', type: 'text', options: [], order_index: prev.length, _new: true
     }]);
   };
@@ -160,7 +160,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
 
   const removeQuestion = async (idx) => {
     const q = questions[idx];
-    if (!q._new) await supabase.from('Application_questions').delete().eq('id', q.id);
+    if (!q._new) await supabase.from('application_questions').delete().eq('id', q.id);
     setQuestions(prev => prev.filter((_, i) => i !== idx));
   };
 
@@ -171,14 +171,14 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
       if (!q.question.trim()) continue;
       const payload = {
         community_id: comm.id,
-        Application_id: selectedApplication.id,
+        application_id: selectedApplication.id,
         question: q.question.trim(),
         type: q.type, options: q.options || [], order_index: i
       };
       if (q._new) {
-        await supabase.from('Application_questions').insert([payload]);
+        await supabase.from('application_questions').insert([payload]);
       } else {
-        await supabase.from('Application_questions').update(payload).eq('id', q.id);
+        await supabase.from('application_questions').update(payload).eq('id', q.id);
       }
     }
     await loadQuestions(selectedApplication.id);
@@ -445,7 +445,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
 }
 
 // -- Application APPLICATION FORM (applicant side) --------------------------------
-// Now accepts an Application object with Application_id
+// Now accepts an Application object with application_id
 export function ApplicationApplicationForm({ comm, Application, applicantId, onSubmitted, onCancel }) {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
@@ -453,10 +453,10 @@ export function ApplicationApplicationForm({ comm, Application, applicantId, onS
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Load questions for this specific Application if Application_id exists, else fall back to community
+    // Load questions for this specific Application if application_id exists, else fall back to community
     const query = Application?.id
-      ? supabase.from('Application_questions').select('*').eq('Application_id', Application.id).order('order_index')
-      : supabase.from('Application_questions').select('*').eq('community_id', comm.id).order('order_index');
+      ? supabase.from('application_questions').select('*').eq('application_id', Application.id).order('order_index')
+      : supabase.from('application_questions').select('*').eq('community_id', comm.id).order('order_index');
     query.then(({ data }) => { setQuestions(data || []); setLoading(false); });
   }, [comm.id, Application]);
 
@@ -476,7 +476,7 @@ export function ApplicationApplicationForm({ comm, Application, applicantId, onS
     setSubmitting(true);
     const { error } = await supabase.from('application_submissions').insert([{
       community_id: comm.id,
-      Application_id: Application?.id || null,
+      application_id: Application?.id || null,
       applicant_id: applicantId,
       answers,
       status: 'pending',
@@ -563,7 +563,7 @@ export function ApplicationReviewPanel({ comm }) {
         .select('*, accounts!applicant_id(full_name, ctu_id), Applications(title)')
         .eq('community_id', comm.id)
         .order('submitted_at', { ascending: false }),
-      supabase.from('Application_questions')
+      supabase.from('application_questions')
         .select('*').eq('community_id', comm.id).order('order_index')
     ]);
     setResponses(rRes.data || []);
@@ -644,7 +644,7 @@ export function ApplicationReviewPanel({ comm }) {
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selected.accounts?.ctu_id} � {selected.Applications?.title || 'General Application'}</div>
           </div>
           <div className="Application-section-label" style={{ marginBottom: 12 }}><span>Submitted Answers</span></div>
-          {questions.filter(q => !q.Application_id || q.Application_id === selected.Application_id).map(q => (
+          {questions.filter(q => !q.application_id || q.application_id === selected.application_id).map(q => (
             <div key={q.id} style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>{q.question}</div>
               {q.type === 'file' ? (

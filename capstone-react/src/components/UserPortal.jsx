@@ -18,7 +18,7 @@ import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaM
 
 function getCategoryIcon(category) {
   const map = {
-    academic: 'fa-solid fa-graduati�on-cap',
+    academic: 'fa-solid fa-graduati?on-cap',
     project:  'fa-solid fa-flask',
     hobby:    'fa-solid fa-gamepad',
     social:   'fa-solid fa-user-group',
@@ -91,7 +91,7 @@ function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
       <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
       <span>{points.toFixed(1)}</span>
-      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>� {color.label}</span>}
+      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>· {color.label}</span>}
     </div>
   );
 }
@@ -463,7 +463,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           <i className="fa-solid fa-lock"></i>
           <span>
             Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` � Winning option: ${a.event_metadata.winning_option}`}
+            {a.event_metadata.winning_option && ` ? Winning option: ${a.event_metadata.winning_option}`}
           </span>
         </div>
       )}
@@ -542,7 +542,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                         <div style={{ fontSize: 10, color: '#22d3ee', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                           ? Accepted Answer
                           <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-                            � solved {timeSince(c.created_at)}
+                            ? solved {timeSince(c.created_at)}
                           </span>
                         </div>
                       )}
@@ -1013,7 +1013,7 @@ function CreateModal({ onClose, onCreated, userId }) {
       alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
       onClose();
     } catch {
-      alert('Network error � could not submit request.');
+      alert('Network error ? could not submit request.');
     }
     setLoading(false);
   };
@@ -1102,8 +1102,11 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
   // Load trust points
   useEffect(() => {
     if (!m.user_id) return;
-    supabase.rpc('get_user_trust_points', { target_user_id: m.user_id })
-      .then(({ data }) => setTrustPoints(data || 10));
+    supabase.from('account_status')
+      .select('trust_points')
+      .eq('id', m.user_id)
+      .single()
+      .then(({ data }) => setTrustPoints(data?.trust_points ?? 10));
   }, [m.user_id]);
 
   const ranks = [
@@ -1776,8 +1779,12 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
-      const { data } = await supabase.rpc('get_user_trust_points', { target_user_id: userId });
-      setTrustPoints(data || 10);
+      const { data } = await supabase
+        .from('account_status')
+        .select('trust_points')
+        .eq('id', userId)
+        .single();
+      setTrustPoints(data?.trust_points ?? 10);
       setLoading(false);
     };
     load();
@@ -2286,7 +2293,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 </div>
                 {idUploaded && (
                   <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
-                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted � awaiting admin review
+                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted ? awaiting admin review
                   </div>
                 )}
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
@@ -2661,7 +2668,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
             {/* Daily limit info */}
             <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-yellow)' }}>
               <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
-              Daily limit: {maxRecipients} recipients � Cooldown: 12 hours per person
+              Daily limit: {maxRecipients} recipients ? Cooldown: 12 hours per person
             </div>
 
             {error && (
@@ -3403,7 +3410,7 @@ export default function UserPortal() {
         ...a, student_id: a.ctu_id, avatar_url: a.account_details?.avatar_url,
       }));
       setOnlineUsers(new Set(profiles.map(p => p.id)));
-      // Keep self in the list for display � just mark them differently if needed
+      // Keep self in the list for display ? just mark them differently if needed
       setOnlineProfiles(profiles);
     };
     fetchOnline();
@@ -3773,12 +3780,12 @@ export default function UserPortal() {
     if (myMsgIds.length) fetchReadCounts(myMsgIds);
   }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
 
-  // Initial load + realtime subscription � re-runs when channel/community changes
+  // Initial load + realtime subscription ? re-runs when channel/community changes
   useEffect(() => {
     loadMessages(activeCommId, activeChannelId);
   }, [activeCommId, activeChannelId]); // eslint-disable-line
 
-  // Realtime subscription � separate from load so it doesn't cause extra reloads
+  // Realtime subscription ? separate from load so it doesn't cause extra reloads
   useEffect(() => {
     const channelName = activeCommId === 'global'
       ? 'realtime:messages:global'
@@ -4163,7 +4170,7 @@ export default function UserPortal() {
       setActiveCommId('global'); setSection('home');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error � could not delete circle.');
+      showToast('Network error ? could not delete circle.');
     }
   };
 
@@ -4330,7 +4337,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT � notifications + user hud */}
+        {/* RIGHT ? notifications + user hud */}
         <div className="user-hud">
           {/* Shop Button */}
           <button
@@ -4415,7 +4422,7 @@ export default function UserPortal() {
       </nav>
 
       <div className="main">
-        {/* CIRCLE DOCK � always visible on desktop, toggle overlay on mobile */}
+        {/* CIRCLE DOCK ? always visible on desktop, toggle overlay on mobile */}
         <div className={`circle-dock${(showDock || mobileSidebarOpen) ? " dock-mobile-open" : ""}`}>
           <div className="dock-branding">
             <img src="/logoo.png" className="brand-logo-small" alt="NEXO" />
@@ -4441,7 +4448,7 @@ export default function UserPortal() {
             <div className="dock-add-btn" title="Create Circle" onClick={() => { setShowCreate(true); setShowDock(false); }}>+</div>
           )}
         </div>
-        {/* Backdrop � closes dock + sidebar on mobile */}
+        {/* Backdrop ? closes dock + sidebar on mobile */}
         {(showDock || mobileSidebarOpen) && (
           <div className="sidebar-backdrop show" onClick={() => { setShowDock(false); setMobileSidebarOpen(false); }} />
         )}
@@ -4453,7 +4460,6 @@ export default function UserPortal() {
             <>
               <div className="sidebar-brand-area">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <img src="/logoo.png" alt="NEXO" style={{ width: 28, height: 28, objectFit: 'contain' }} />
                   <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
                 </div>
               </div>
@@ -4519,7 +4525,7 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">CHANNELS</div>
               <div className="nav-links">
-                {/* Announcements � always first, powered by announcements table */}
+                {/* Announcements ? always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
                   onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
@@ -4531,7 +4537,7 @@ export default function UserPortal() {
                   )}
                 </div>
 
-                {/* General � virtual default channel, stores channel_id=null messages */}
+                {/* General ? virtual default channel, stores channel_id=null messages */}
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                   onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); setSection('circles'); loadMessages(activeCommId, null); }}
@@ -4692,7 +4698,7 @@ export default function UserPortal() {
                 </div>
               </div>
 
-              {/* Popular Right Now � moved up, replaces redundant welcome/stats cards */}
+              {/* Popular Right Now ? moved up, replaces redundant welcome/stats cards */}
               {communities.filter(c => c.id !== 'global').length > 0 && (
                 <>
                   <div className="home-section-header" style={{ marginTop: 8 }}>
@@ -4718,7 +4724,7 @@ export default function UserPortal() {
                             {c.category}
                             {memberCounts[c.id] > 0 && (
                               <span style={{ marginLeft: 8, color: 'var(--cyber-cyan)' }}>
-                                � {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? 's' : ''}
+                                <i className="fa-solid fa-user" style={{ fontSize: 9, marginRight: 3 }}></i> {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? "s" : ""}
                               </span>
                             )}
                           </div>
@@ -4939,7 +4945,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              {/* Popular by category � now shown above, removed from here */}
+              {/* Popular by category ? now shown above, removed from here */}
 
             </div>
           )}
@@ -4947,7 +4953,7 @@ export default function UserPortal() {
           {/* -- GLOBAL FEED "? campus-wide chat -- */}
           {section === 'global' && (
             <>
-              {/* Global feed header � stays visible, doesn't scroll */}
+              {/* Global feed header ? stays visible, doesn't scroll */}
               <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
@@ -4956,7 +4962,7 @@ export default function UserPortal() {
                   <OnlineStack onlineProfiles={onlineProfiles} circleMateIds={circleMateIds} avatarCache={avatarCache} />
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-                  Campus-wide chat � open to all verified students and faculty.
+                  Campus-wide chat ? open to all verified students and faculty.
                 </p>
               </div>
               <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
@@ -5151,7 +5157,7 @@ export default function UserPortal() {
           {/* -- MY CIRCLES / CIRCLE FEED -- */}
           {section === 'circles' && (
             <>
-              {/* Banner sits outside the scrollable feed � stays visible */}
+              {/* Banner sits outside the scrollable feed ? stays visible */}
               <div className="circle-banner-wrap" style={{ margin: '10px 0 0 0', borderRadius: '15px 15px 0 0', overflow: 'hidden', flexShrink: 0 }}>
                 <div className="circle-cover-banner" style={{
                   borderRadius: 0,
@@ -5274,7 +5280,7 @@ export default function UserPortal() {
                         return (
                           <div key={label}>
                             <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                              {label} � {group.length}
+                              {label} ? {group.length}
                             </div>
                             {group.map(m => {
                               const url = avatarCache[m.student_id] || m.avatar_url;
@@ -5430,7 +5436,7 @@ export default function UserPortal() {
                         </div>
                       </div>
                     )}
-                    {/* Q&A Filter bar � academic circles only */}
+                    {/* Q&A Filter bar ? academic circles only */}
                     {activeComm?.category === 'academic' && (
                       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                         {[
@@ -5577,7 +5583,7 @@ export default function UserPortal() {
           {/* -- CIRCLE CHAT -- */}
           {section === 'circle-chat' && activeCommId !== 'global' && (
             <>
-              {/* Circle chat header � fixed, doesn't scroll */}
+              {/* Circle chat header ? fixed, doesn't scroll */}
               <div style={{ margin: '20px 20px 0 0', borderRadius: '15px 15px 0 0', background: 'rgba(13,13,18,0.4)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', padding: '18px 25px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)', display: 'flex', alignItems: 'center' }}>
@@ -5697,7 +5703,7 @@ export default function UserPortal() {
               )}
               {showMembersPanel && (
                 <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
-                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS � {circleChatMembers.length}</div>
+                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS ? {circleChatMembers.length}</div>
                   {[
                     { label: 'ONLINE', filter: m => isOnline(m.id) },
                     { label: 'OFFLINE', filter: m => !isOnline(m.id) },
@@ -5707,7 +5713,7 @@ export default function UserPortal() {
                     return (
                       <div key={label}>
                         <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                          {label} � {group.length}
+                          {label} ? {group.length}
                         </div>
                         {group.map(m => {
                           const url = avatarCache[m.student_id] || m.avatar_url;
