@@ -50,12 +50,19 @@ export default function Landing({ onEnter }) {
 
   useEffect(() => {
     const fetch = async () => {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const [{ count: total }, { count: todayCount }] = await Promise.all([
+      const now = new Date();
+      const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const weekAgoUTC = new Date(todayUTC); weekAgoUTC.setUTCDate(weekAgoUTC.getUTCDate() - 7);
+      const [{ count: total }, { count: todayCount }, { count: weekCount }] = await Promise.all([
         supabase.from('account_status').select('*', { count: 'exact', head: true }).eq('is_verified', true),
-        supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+        supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', todayUTC.toISOString()),
+        supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoUTC.toISOString()),
       ]);
-      setPulse({ online: total || 0, connections: todayCount || 0 });
+      setPulse({
+        online: total || 0,
+        connections: todayCount || 0,
+        weekly: weekCount || 0,
+      });
     };
     fetch();
   }, []);
@@ -127,8 +134,7 @@ export default function Landing({ onEnter }) {
           </Reveal>
           <Reveal delay={280}>
             <p className="lnd-hero-sub">
-              NEXO Connect is CTU's private online community — a safe space where verified students,
-              faculty, and organizations can meet, chat, share, and grow together.
+              NEXO Connect is CTU's private online community, a safe space where verified users and organizations can meet, chat, share, and grow together.
             </p>
           </Reveal>
           <Reveal delay={400}>
@@ -139,8 +145,8 @@ export default function Landing({ onEnter }) {
               </div>
               <div className="lnd-stat-sep" />
               <div className="lnd-stat">
-                <span className="lnd-stat-num">{pulse.connections}</span>
-                <span className="lnd-stat-lbl">Joined Today</span>
+                <span className="lnd-stat-num">{pulse.connections > 0 ? pulse.connections : pulse.weekly}</span>
+                <span className="lnd-stat-lbl">{pulse.connections > 0 ? 'Joined Today' : 'Joined This Week'}</span>
               </div>
               <div className="lnd-stat-sep" />
               <div className="lnd-stat">
@@ -180,7 +186,7 @@ export default function Landing({ onEnter }) {
                 NEXO Connect is an online platform made exclusively for Cebu Technological University users.
                 It's one place where you can find your classmates, join clubs, get announcements, and chat, all verified and safe.
               </p>
-              <div className="lnd-explainer-points">
+              <div className="lnd-explainer-points" style={{ marginTop: 28 }}>
                 {[
                   { icon: 'fa-solid fa-lock', label: 'School-only access', desc: 'Only real CTU users with a verified ID can join.' },
                   { icon: 'fa-solid fa-bell', label: 'Never miss anything', desc: 'Get announcements, events, and updates in one feed.' },

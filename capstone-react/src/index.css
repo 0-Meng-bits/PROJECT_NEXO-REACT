@@ -490,8 +490,14 @@ body {
 .cyber-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cyber-btn.secondary {
   background: transparent;
-  color: var(--text-muted);
-  border: 1px solid #333;
+  color: var(--red);
+  border: 1px solid var(--red);
+  opacity: 0.85;
+  transition: opacity 0.2s, background 0.2s;
+}
+.cyber-btn.secondary:hover {
+  background: rgba(247, 95, 95, 0.1);
+  opacity: 1;
 }
 .cyber-btn.danger {
   background: rgba(247, 95, 95, 0.1);
@@ -1284,6 +1290,13 @@ body {
 }
 .manage-tab:hover { color: white; background: rgba(255,255,255,0.03); }
 .manage-tab.active { color: var(--cyber-yellow); border-bottom-color: var(--cyber-yellow); }
+
+/* On small screens — icon only, no text */
+@media (max-width: 480px) {
+  .manage-tab { padding: 10px 4px; font-size: 10px; gap: 0; }
+  .manage-tab span { display: none; }
+  .manage-tab i { font-size: 14px; }
+}
 
 .manage-tab-content {
   padding: 24px;
@@ -4404,8 +4417,7 @@ body {
   border-radius: 14px;
   padding: 14px 20px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
-.lnd-stat { display: flex; flex-direction: column; align-items: center; padding: 0 18px; gap: 4px; }
+}.lnd-stat { display: flex; flex-direction: column; align-items: center; padding: 0 18px; gap: 4px; }
 .lnd-stat-num { font-size: 22px; font-weight: 800; color: var(--cyber-cyan); line-height: 1; }
 .lnd-stat-lbl { font-size: 9px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; text-align: center; white-space: nowrap; }
 .lnd-stat-sep { width: 1px; height: 34px; background: var(--border); flex-shrink: 0; }
@@ -4876,10 +4888,11 @@ body {
 @media (max-width: 768px) {
   .lnd-nav-inner { padding: 0 20px; }
   .lnd-nav-signup { display: none; } /* Sign in covers both login+signup on mobile */
-  .lnd-stats-bar { flex-direction: column; gap: 14px; padding: 18px; }
+  .lnd-stats-bar { flex-direction: column; gap: 14px; padding: 18px; width: 100%; box-sizing: border-box; }
   .lnd-stat-sep { width: 60px; height: 1px; }
   .lnd-section { padding: 64px 20px; }
-  .lnd-cta-box { padding: 40px 24px; }
+  .lnd-cta-box { padding: 32px 20px; }
+  .lnd-cta-section { padding: 40px 20px; }
   .lnd-footer-inner { flex-direction: column; text-align: center; }
   .lnd-hero-visual { width: 280px; height: 280px; }
   .lnd-ring-1 { width: 280px; height: 280px; }
@@ -5321,6 +5334,23 @@ body {
 }
 
 /* Responsive */
+
+@media (max-width: 640px) {
+  .lnd-hero { padding: 100px 24px 60px; }
+  .lnd-hero-title { text-align: center; }
+  .lnd-hero-badge { align-self: center; margin: 0 auto 28px; display: flex; width: fit-content; }
+  .lnd-hero-sub { text-align: justify; }
+  .lnd-stats-bar { align-self: stretch; }
+  .lnd-section-title { text-align: center; }
+  .lnd-section-body { text-align: justify; }
+  .lnd-eyebrow { text-align: center; }
+  .lnd-explainer-point-desc { text-align: justify; }
+  .lnd-about-card p { text-align: justify; }
+  .lnd-feature-desc { text-align: justify; }
+  .lnd-step-desc { text-align: justify; }
+  .lnd-cta-body { text-align: justify; }
+}
+
 @media (max-width: 768px) {
   .events-modal {
     width: 95%;

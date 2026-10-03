@@ -1495,26 +1495,26 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
         <div className="manage-tabs">
           {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
-              <i className="fa-solid fa-sliders"></i> Settings
+              <i className="fa-solid fa-sliders"></i><span> Settings</span>
             </button>
           )}
           <button className={`manage-tab ${tab === 'members' ? 'active' : ''}`} onClick={() => setTab('members')}>
-            <i className="fa-solid fa-users"></i> Members {members.length > 0 && `(${members.length})`}
+            <i className="fa-solid fa-users"></i><span> Members {members.length > 0 && `(${members.length})`}</span>
           </button>
           {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
-              <i className="fa-solid fa-user-clock"></i> Requests
+              <i className="fa-solid fa-user-clock"></i><span> Requests</span>
               {requests.length > 0 && <span className="req-badge">{requests.length}</span>}
             </button>
           )}
           {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'Application' ? 'active' : ''}`} onClick={() => setTab('Application')}>
-              <i className="fa-solid fa-microphone"></i> Application
+              <i className="fa-solid fa-microphone"></i><span> Application</span>
             </button>
           )}
           {(viewerIsOwner || viewerRankLevel >= 2) && (
             <button className={`manage-tab ${tab === 'invite' ? 'active' : ''}`} onClick={() => setTab('invite')}>
-              <i className="fa-solid fa-user-plus"></i> Invite
+              <i className="fa-solid fa-user-plus"></i><span> Invite</span>
             </button>
           )}
         </div>
@@ -3318,6 +3318,7 @@ export default function UserPortal() {
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
+  const [sendError, setSendError] = useState('');
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
@@ -4555,12 +4556,6 @@ export default function UserPortal() {
                       <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{activeComm.category || 'circle'}</div>
                     </div>
                   </div>
-                  <button onClick={() => { setActiveCommId('global'); setSection('home'); setMobileSidebarOpen(false); setShowDock(false); }}
-                    className="mobile-menu-btn"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cyber-cyan)', padding: '4px 6px', borderRadius: 6, flexShrink: 0, fontSize: 14 }}
-                    title="Back to Home">
-                    <i className="fa-solid fa-arrow-left"></i>
-                  </button>
                 </div>
               </div>
 
