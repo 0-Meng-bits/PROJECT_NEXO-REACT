@@ -36,6 +36,7 @@ function notifIcon(type) {
     application_update:  'fa-solid fa-microphone',
     new_announcement: 'fa-solid fa-bullhorn',
     invite_accepted:  'fa-solid fa-envelope-open-text',
+    circle_invite:    'fa-solid fa-envelope',
   };
   return map[type] || 'fa-solid fa-bell';
 }
@@ -139,7 +140,7 @@ const FEEDBACK_TAGS = [
   { id: 'impact',    label: 'Impact',    emoji: '??', color: '#ef4444' },
 ];
 
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
@@ -443,7 +444,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? 's' : ''}{myVote ? ` ? You voted "${myVote}"` : a.event_metadata?.is_closed ? ' ? Poll Closed' : ' ? Click to vote'}
+            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` � You voted "${myVote}"` : a.event_metadata?.is_closed ? " � Poll Closed" : " � Click to vote"}
           </div>
         </div>
       )}
@@ -463,7 +464,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           <i className="fa-solid fa-lock"></i>
           <span>
             Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` ? Winning option: ${a.event_metadata.winning_option}`}
+            {a.event_metadata.winning_option && ` � Winning option: ${a.event_metadata.winning_option}`}
           </span>
         </div>
       )}
@@ -489,6 +490,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           eventId={a.event_metadata.generated_event_id}
           eventTitle={a.event_metadata.winning_option || 'Campus Event'}
           isAdmin={user?.user_type === 'Admin'}
+          onViewEvents={onViewEvents}
         />
       )}
 
@@ -1466,21 +1468,20 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       community_id: comm.id,
       user_id: inviteResult.id,
       rank_level: 0,
-      status: 'active',
+      status: 'invited',
     }]);
     if (!error) {
       await supabase.from('notifications').insert([{
         user_id: inviteResult.id,
-        type: 'invite_accepted',
-        message: `You have been personally invited to join "${comm.name}"!`,
+        type: 'circle_invite',
+        message: `You've been invited to join "${comm.name}"! Visit Explore to accept or decline.`,
         link_comm_id: comm.id,
       }]);
       setInviteSearch('');
       setInviteResult(null);
-      fetchMembers();
-      alert(`${inviteResult.full_name} has been invited and added to the circle!`);
+      alert(`Invite sent to ${inviteResult.full_name}. They can accept or decline from their notifications.`);
     } else {
-      alert('Failed to invite member.');
+      alert('Failed to send invite.');
     }
     setInviting(false);
   };
@@ -3315,7 +3316,8 @@ export default function UserPortal() {
     } catch (_) {}
   }, [user?.id, user?.student_id, fetchReadCounts]);
 
-  const [sendError, setSendError] = useState(''); // inline error for bad word block
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef(null);
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
@@ -3442,6 +3444,12 @@ export default function UserPortal() {
 
   useEffect(() => {
     const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) setShowMoreMenu(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -4018,6 +4026,7 @@ export default function UserPortal() {
     return m?.status === 'active';
   };
   const isPending = (commId) => getMembership(commId)?.status === 'pending';
+  const isInvited = (commId) => getMembership(commId)?.status === 'invited';
   const getMyApplication = (commId) => myApplications.find(a => a.community_id === commId);
 
   const requestJoin = async (commId) => {
@@ -4026,6 +4035,26 @@ export default function UserPortal() {
     }]);
     if (!error) { await loadMyMemberships(); showToast('Request sent!'); }
     else showToast('Already requested.');
+  };
+
+  const acceptInvite = async (commId) => {
+    const membership = myMemberships.find(m => m.community_id === commId && m.status === 'invited');
+    if (!membership) return;
+    const { error } = await supabase.from('memberships').update({ status: 'active' }).eq('id', membership.id);
+    if (!error) {
+      await loadMyMemberships();
+      showToast('You joined the circle!');
+      setActiveCommId(commId);
+      setSection('circles');
+    } else showToast('Failed to accept invite.');
+  };
+
+  const declineInvite = async (commId) => {
+    const membership = myMemberships.find(m => m.community_id === commId && m.status === 'invited');
+    if (!membership) return;
+    const { error } = await supabase.from('memberships').delete().eq('id', membership.id);
+    if (!error) { await loadMyMemberships(); showToast('Invite declined.'); }
+    else showToast('Failed to decline invite.');
   };
 
   const sendPost = async () => {
@@ -4280,7 +4309,7 @@ export default function UserPortal() {
             style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
             onMouseLeave={e => e.currentTarget.style.opacity = 1}
-            title="View campus events"
+            title="Click to view Campus Events"
           >
           <span className="nav-clock-time">
             {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -4337,27 +4366,32 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT ? notifications + user hud */}
+        {/* RIGHT — notifications + user hud */}
         <div className="user-hud">
-          {/* Shop Button */}
-          <button
-            className="notif-bell"
-            onClick={() => setShowShop(true)}
-            title="Profile Shop"
-            style={{ marginRight: 4 }}
-          >
+          {/* Desktop-only: Shop + Theme + Calendar buttons */}
+          <button className="notif-bell desktop-only-btn" onClick={() => setShowShop(true)} title="Profile Shop">
             <i className="fa-solid fa-store"></i>
           </button>
-
-          {/* Theme Picker Button */}
-          <button
-            className="notif-bell"
-            onClick={() => setShowThemePicker(true)}
-            title="Change Theme"
-            style={{ marginRight: 4 }}
-          >
+          <button className="notif-bell desktop-only-btn" onClick={() => setShowThemePicker(true)} title="Change Theme">
             <i className="fa-solid fa-palette"></i>
           </button>
+
+          {/* Mobile-only: ⋯ more menu */}
+          <div className="notif-wrap mobile-more-wrap" ref={moreMenuRef}>
+            <button className="notif-bell mobile-only-btn" onClick={() => setShowMoreMenu(o => !o)} title="More">
+              <i className="fa-solid fa-ellipsis"></i>
+            </button>
+            {showMoreMenu && (
+              <div className="more-dropdown">
+                <button onClick={() => { setShowShop(true); setShowMoreMenu(false); }}>
+                  <i className="fa-solid fa-store"></i> Profile Shop
+                </button>
+                <button onClick={() => { setShowThemePicker(true); setShowMoreMenu(false); }}>
+                  <i className="fa-solid fa-palette"></i> Appearance
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Notification Bell */}
           <div className="notif-wrap" ref={notifRef}>
@@ -4389,7 +4423,15 @@ export default function UserPortal() {
                     <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
                       onClick={() => {
                         markRead(n.id);
-                        if (n.link_comm_id) { setActiveCommId(n.link_comm_id); setActiveChannelId(null); setSection('circles'); }
+                        if (n.type === 'circle_invite' && n.link_comm_id) {
+                          setActiveCommId('global');
+                          setSection('activity');
+                          setActiveCategory('all');
+                        } else if (n.link_comm_id) {
+                          setActiveCommId(n.link_comm_id);
+                          setActiveChannelId(null);
+                          setSection('circles');
+                        }
                         setShowNotifications(false);
                       }}>
                       <div className="notif-icon">
@@ -4409,7 +4451,7 @@ export default function UserPortal() {
           </div>
 
           <div className="hud-chip">
-            <span className="hud-label">USER_ID:</span>
+            <span className="hud-label">SCHOOL_ID:</span>
             <span className="hud-value">{user?.student_id}</span>
           </div>
           <div className="hud-avatar" onClick={() => setShowProfile(true)}>
@@ -4900,7 +4942,8 @@ export default function UserPortal() {
                             : communities.find(c => ann.title?.includes(c.name));
                           if (comm) setShowApplicationForm({ comm });
                           else alert('Could not find the Application circle. Try visiting the circle directly.');
-                        }} />
+                        }}
+                        onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                     ))}
                   </div>
                 );
@@ -4962,7 +5005,7 @@ export default function UserPortal() {
                   <OnlineStack onlineProfiles={onlineProfiles} circleMateIds={circleMateIds} avatarCache={avatarCache} />
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
-                  Campus-wide chat ? open to all verified students and faculty.
+                  Campus-wide chat, open to all verified users.
                 </p>
               </div>
               <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
@@ -5070,6 +5113,7 @@ export default function UserPortal() {
                       const owned = c.creator_id === user?.id;
                       const joined = isMember(c.id);
                       const pending = isPending(c.id);
+                      const invited = isInvited(c.id);
                       const myApplication = getMyApplication(c.id);
                       return (
                         <div key={c.id} className="post circle-explore-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -5097,6 +5141,23 @@ export default function UserPortal() {
                                   <i className="fa-solid fa-right-from-bracket"></i>
                                 </button>
                               )}
+                            </div>
+                          ) : invited ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                              <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1 }}>
+                                <i className="fa-solid fa-envelope" style={{ marginRight: 5 }}></i>INVITED
+                              </span>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="group-action-btn manage"
+                                  onClick={() => acceptInvite(c.id)}
+                                  style={{ background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+                                  <i className="fa-solid fa-check"></i> ACCEPT
+                                </button>
+                                <button className="group-action-btn terminate"
+                                  onClick={() => declineInvite(c.id)}>
+                                  <i className="fa-solid fa-xmark"></i> DECLINE
+                                </button>
+                              </div>
                             </div>
                           ) : !user?.is_verified ? (
                             <span style={{ fontSize: 11, color: 'var(--text-muted)', border: '1px solid #333', padding: '5px 12px', borderRadius: 20 }}>
@@ -5475,7 +5536,8 @@ export default function UserPortal() {
                             onReport={(data) => setShowReport(data)}
                             onApply={() => setShowApplicationForm({ comm: activeComm })}
                             communityCreatorId={activeComm?.creator_id}
-                            onReload={() => loadCircleAnnouncements(activeCommId)} />
+                            onReload={() => loadCircleAnnouncements(activeCommId)}
+                            onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                         ));
                       })()
                     )}

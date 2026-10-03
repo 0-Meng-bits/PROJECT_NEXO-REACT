@@ -8,34 +8,28 @@ import { supabase, supabaseAdmin } from './_supabase.js';
  * @throws {Error} If validation fails
  */
 function validateEventMetadata(metadata) {
-  // Validate date
   if (!metadata.event_date) {
     throw new Error('Event date is required');
   }
-  
+
   const eventDate = new Date(metadata.event_date);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   if (eventDate < today) {
     throw new Error('Event date cannot be in the past');
   }
-  
-  // Validate time format
+
   if (!metadata.event_time) {
     throw new Error('Event time is required');
   }
-  
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
   if (!timeRegex.test(metadata.event_time)) {
     throw new Error('Event time must be in HH:MM format (24-hour)');
   }
-  
-  // Validate location
   if (!metadata.location || metadata.location.trim() === '') {
     throw new Error('Location is required');
   }
-  
   if (metadata.location.length > 200) {
     throw new Error('Location cannot exceed 200 characters');
   }
