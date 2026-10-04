@@ -3991,21 +3991,15 @@ export default function UserPortal() {
     if (comm === 'global') setActiveChannelId(null);
   }, [searchParams]);
 
-  // Guard: when the user is on home (the stack root), intercept back and ask before logging out
+  // Guard: intercept back button ONLY when it would leave /portal entirely
   useEffect(() => {
-    // Push a sentinel so there's always one entry to catch
+    // Push a sentinel so there's always one entry below the current position
     window.history.pushState({ nexoGuard: true }, '');
 
-    const handlePopState = (e) => {
-      const sec = new URLSearchParams(window.location.search).get('section') || 'home';
-      const comm = new URLSearchParams(window.location.search).get('commId') || 'global';
-
-      // If we're navigating back to somewhere inside the portal, let it happen naturally
-      if (sec !== 'home' || comm !== 'global') return;
-
-      // We're at the root — intercept and ask
-      e.preventDefault();
-      // Re-push so we stay on the same URL
+    const handlePopState = () => {
+      // After popstate, check if we're still on /portal
+      if (window.location.pathname.includes('/portal')) return; // still inside, do nothing
+      // We've been popped off the portal — re-push and ask
       window.history.pushState({ nexoGuard: true }, '');
       if (window.confirm('Do you want to log out?')) {
         localStorage.removeItem('currentUser');
