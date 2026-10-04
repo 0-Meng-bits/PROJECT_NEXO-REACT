@@ -3383,6 +3383,7 @@ export default function UserPortal() {
   const [showGivePoints, setShowGivePoints] = useState(null); // { targetUser }
   const [showFlagUser, setShowFlagUser] = useState(null); // { targetUser }
   const [showShop, setShowShop] = useState(false); // Profile Shop modal
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [messageReads, setMessageReads] = useState({}); // message_id -> read count
   const [showEventsModal, setShowEventsModal] = useState(false);
   const [campusEvents, setCampusEvents] = useState([]);
@@ -3997,15 +3998,11 @@ export default function UserPortal() {
     window.history.pushState({ nexoGuard: true }, '');
 
     const handlePopState = (e) => {
-      // If the new location is still /portal, let it go (normal in-app back)
-      if (window.location.pathname.includes('/portal')) return;
-      // We're leaving — push back to stay, then ask
-      window.history.pushState({ nexoGuard: true }, window.location.href);
-      if (window.confirm('Do you want to log out?')) {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        navigate('/auth');
+      // Always re-push to stay on /portal
+      window.history.pushState({ nexoGuard: true }, '');
+      // Only show logout confirm if we popped our sentinel (i.e. user went past portal history)
+      if (e.state && e.state.nexoGuard) {
+        setShowLogoutConfirm(true);
       }
     };
 
@@ -4155,12 +4152,14 @@ export default function UserPortal() {
     ? user.full_name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
   const logout = () => {
-    if (confirm('TERMINATE_SESSION?')) {
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      navigate('/auth');
-    }
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    navigate('/auth');
   };
 
   // Membership helpers
@@ -6104,6 +6103,29 @@ export default function UserPortal() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirm Modal */}
+      {showLogoutConfirm && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--card-bg)', border: '1px solid rgba(247,95,95,0.4)',
+            borderRadius: 16, padding: 28, maxWidth: 340, width: '90%',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.8)', textAlign: 'center',
+          }}>
+            <i className="fa-solid fa-right-from-bracket" style={{ fontSize: 32, color: 'var(--red)', marginBottom: 14, display: 'block' }} />
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: 1 }}>LOG OUT?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Are you sure you want to end your session?</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="cyber-btn secondary" onClick={() => setShowLogoutConfirm(false)}
+                style={{ flex: 1, fontSize: 13 }}>Cancel</button>
+              <button className="cyber-btn" onClick={confirmLogout}
+                style={{ flex: 1, fontSize: 13, background: 'rgba(180,30,30,0.85)', borderColor: 'var(--red)', color: '#fff' }}>
+                Log Out
+              </button>
             </div>
           </div>
         </div>
