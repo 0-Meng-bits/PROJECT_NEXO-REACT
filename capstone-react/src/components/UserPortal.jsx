@@ -3372,6 +3372,7 @@ export default function UserPortal() {
   const notifRef = useRef(null);
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
+  const sectionRef = useRef(section); // track current section for popstate handler
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showDock, setShowDock] = useState(false);
@@ -3992,6 +3993,9 @@ export default function UserPortal() {
     if (comm === 'global') setActiveChannelId(null);
   }, [searchParams]);
 
+  // Keep sectionRef in sync so popstate handler can read current section
+  useEffect(() => { sectionRef.current = section; }, [section]);
+
   // Guard: when back button would leave /portal, ask first
   useEffect(() => {
     // Push one sentinel so there's a history entry to catch
@@ -4000,8 +4004,8 @@ export default function UserPortal() {
     const handlePopState = (e) => {
       // Always re-push to stay on /portal
       window.history.pushState({ nexoGuard: true }, '');
-      // Only show logout confirm if we popped our sentinel (i.e. user went past portal history)
-      if (e.state && e.state.nexoGuard) {
+      // Only show logout confirm when user is at home feed (the root) and presses back
+      if (e.state && e.state.nexoGuard && sectionRef.current === 'home') {
         setShowLogoutConfirm(true);
       }
     };
