@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
@@ -3392,9 +3392,7 @@ export default function UserPortal() {
   const [eventsLoading, setEventsLoading] = useState(false);
 
   // Block navigation away from /portal when on home feed — show logout modal instead
-  const blocker = useBlocker(({ nextLocation }) =>
-    !nextLocation.pathname.includes('/portal') && section === 'home'
-  );
+  const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
 
   useEffect(() => {
     if (blocker.state === 'blocked') {
@@ -3402,10 +3400,9 @@ export default function UserPortal() {
     }
   }, [blocker.state]);
 
-  // When user cancels logout, reset the blocker
+  // When user cancels logout, just close the modal
   const handleCancelLogout = () => {
     setShowLogoutConfirm(false);
-    if (blocker.state === 'blocked') blocker.reset?.();
   };
 
   // When user confirms logout
@@ -3414,8 +3411,7 @@ export default function UserPortal() {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    if (blocker.state === 'blocked') blocker.proceed?.();
-    else navigate('/auth');
+    navigate('/auth');
   };
 
   const viewUserProfile = async (studentId) => {
@@ -4020,8 +4016,30 @@ export default function UserPortal() {
     if (comm === 'global') setActiveChannelId(null);
   }, [searchParams]);
 
-  // Keep sectionRef in sync so popstate handler can read current section
+  // Keep sectionRef in sync so the popstate handler always has the latest section
   useEffect(() => { sectionRef.current = section; }, [section]);
+
+  // Guard: intercept Android/iOS back button when on home feed
+  // Strategy: always keep at least one history entry above the pre-portal stack
+  // by pushing a sentinel on mount. When that sentinel gets popped, we're at the
+  // bottom of the portal history — show logout modal and re-push to stay.
+  useEffect(() => {
+    // Push sentinel on mount
+    window.history.pushState({ portalSentinel: true }, '');
+
+    const onPopState = () => {
+      // Re-push immediately to cancel the navigation regardless
+      window.history.pushState({ portalSentinel: true }, '');
+      // Only show logout if user is on home feed
+      if (sectionRef.current === 'home') {
+        setShowLogoutConfirm(true);
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // When arriving at home, push an extra history entry as a buffer.
   // That way the first back from home just returns to this buffer entry (same page),
