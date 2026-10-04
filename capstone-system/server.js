@@ -990,6 +990,26 @@ app.post('/api/shop', requireAuth, async (req, res) => {
   }
 });
 
+// ── UPLOAD MEDIA (signed URL for chat-media bucket) ──────────────────────────
+app.post('/api/upload-media', async (req, res) => {
+  const { userId, fileName, contentType } = req.body;
+  if (!userId || !fileName) return res.status(400).json({ error: 'Missing userId or fileName.' });
+
+  const timestamp = Date.now();
+  const storagePath = `${userId}/${timestamp}-${fileName}`;
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('chat-media')
+    .createSignedUploadUrl(storagePath);
+
+  if (error) {
+    console.error('[UPLOAD MEDIA] Signed URL error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.json({ uploadUrl: data.signedUrl, path: storagePath, token: data.token });
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });

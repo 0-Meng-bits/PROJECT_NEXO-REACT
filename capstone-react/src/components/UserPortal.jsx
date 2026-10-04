@@ -2010,14 +2010,13 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       
       // Save via backend API (has service role permissions)
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/upload'), {
+      const res = await fetch(getApiUrl('/api/update-profile'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ 
-          action: 'upload-cover-user', 
           userId: user.id, 
           cover_url: compressed 
         }),
@@ -2061,9 +2060,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       });
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
-      const res = await fetch(getApiUrl(`/api/upload`), {
+      const res = await fetch(getApiUrl(`/api/upload-avatar`), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: compressed }),
+        body: JSON.stringify({ userId: user.id, avatar: compressed }),
       });
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (res.ok) {

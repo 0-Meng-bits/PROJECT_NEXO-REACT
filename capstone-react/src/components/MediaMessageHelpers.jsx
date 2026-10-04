@@ -204,11 +204,10 @@ export function MediaPreview({ file, mediaType, onCancel }) {
 export async function uploadMediaFile(file, userId, mediaType) {
   try {
     // Step 1: Get a signed upload URL from backend
-    const urlRes = await fetch(getApiUrl('/api/upload'), {
+    const urlRes = await fetch(getApiUrl('/api/upload-media'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'get-upload-url',
         userId,
         fileName: file.name,
         contentType: file.type
