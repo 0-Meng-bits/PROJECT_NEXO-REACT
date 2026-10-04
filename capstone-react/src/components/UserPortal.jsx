@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
+import { clearCustomizationCache } from '../lib/customization';
 import { ApplicationFormBuilder, ApplicationReviewPanel, ApplicationApplicationForm, ApplicationStatusLabel, ApplicationStatusColor } from './ApplicationSystem';
 import ThemePicker from './ThemePicker';
 import ProfileShop from './ProfileShop';
@@ -15,6 +16,10 @@ import GeneratedEventLink from './GeneratedEventLink';
 import EventCard from './EventCard';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
+
+const SHOP_API = window.location.hostname === 'localhost'
+  ? '/api/shop'
+  : `${import.meta.env.VITE_API_URL || ''}/api/shop`;
 
 function getCategoryIcon(category) {
   const map = {
@@ -1857,6 +1862,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [showWarningHistory, setShowWarningHistory] = useState(false);
   const [appealingWarning, setAppealingWarning] = useState(null);
   const [customizations, setCustomizations] = useState(null);
+  const [ownedItems, setOwnedItems] = useState([]);
+  const [custSettings, setCustSettings] = useState(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1875,7 +1882,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     load();
   }, [user?.id]);
 
-  // Load active customizations
+  // Load active customizations + owned items
   useEffect(() => {
     if (!user?.id) return;
     const loadCustomizations = async () => {
@@ -1885,26 +1892,31 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!settings) return;
+      setCustSettings(settings || {});
 
-      const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
-      if (itemIds.length === 0) return;
-
-      const { data: items } = await supabase
-        .from('shop_items')
-        .select('*')
-        .in('id', itemIds);
-
-      if (items) {
-        setCustomizations({
-          badge: items.find(i => i.id === settings.active_badge),
-          name_color: items.find(i => i.id === settings.active_name_color),
-          background: items.find(i => i.id === settings.active_background),
-          theme: items.find(i => i.id === settings.active_theme),
-          avatar_border: items.find(i => i.id === settings.active_avatar_border),
-          companion: items.find(i => i.id === settings.active_companion),
-        });
+      if (settings) {
+        const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
+        if (itemIds.length > 0) {
+          const { data: items } = await supabase.from('shop_items').select('*').in('id', itemIds);
+          if (items) {
+            setCustomizations({
+              badge: items.find(i => i.id === settings.active_badge),
+              name_color: items.find(i => i.id === settings.active_name_color),
+              background: items.find(i => i.id === settings.active_background),
+              theme: items.find(i => i.id === settings.active_theme),
+              avatar_border: items.find(i => i.id === settings.active_avatar_border),
+              companion: items.find(i => i.id === settings.active_companion),
+            });
+          }
+        }
       }
+
+      // Load owned items for the customize panel
+      const { data: purchases } = await supabase
+        .from('user_purchases')
+        .select('item_id, shop_items(*)')
+        .eq('user_id', user.id);
+      if (purchases) setOwnedItems(purchases);
     };
     loadCustomizations();
   }, [user?.id]);
@@ -1925,6 +1937,28 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
     } catch (err) { console.error(err); }
     finally { setSaving(false); }
+  };
+
+  const applyCustomization = async (type, itemId) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(SHOP_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'apply-customization', userId: user.id, type, itemId }),
+      });
+      if (!res.ok) return;
+      clearCustomizationCache(user.id);
+      // Update local settings state
+      setCustSettings(prev => ({ ...prev, [`active_${type}`]: itemId }));
+      // Reload customizations display
+      if (itemId) {
+        const { data: item } = await supabase.from('shop_items').select('*').eq('id', itemId).single();
+        if (item) setCustomizations(prev => ({ ...prev, [type]: item }));
+      } else {
+        setCustomizations(prev => ({ ...prev, [type]: null }));
+      }
+    } catch (err) { console.error(err); }
   };
 
   const handleIdPhotoUpload = async (e) => {
@@ -2105,16 +2139,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         ...getBackgroundStyle(),
         ...getThemeStyle(),
         border: '1px solid rgba(0,240,255,0.15)',
-        borderRadius: 16, width: '100%', maxWidth: 680,
-        maxHeight: '90vh', overflowY: 'auto',
+        borderRadius: 16, width: '100%', maxWidth: 820,
+        maxHeight: '92vh', overflowY: 'auto',
         boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
         scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,240,255,0.2) transparent',
       }}>
 
         {/* COVER */}
-        <div style={{ position: 'relative', height: 180, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0 }}>
+        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0 }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
-          {!readOnly && (
+          {!readOnly && editing && (
             <>
               <button onClick={() => coverInputRef.current?.click()} disabled={coverUploading} title="Change cover"
                 style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(6px)' }}>
@@ -2126,12 +2160,12 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         </div>
 
         {/* AVATAR + NAME ROW */}
-        <div style={{ position: 'relative', padding: '0 28px', marginTop: -52 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18 }}>
+        <div style={{ position: 'relative', padding: '0 28px', marginTop: -60 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div style={{ 
-                width: 96, 
-                height: 96, 
+              <div className="profile-modal-avatar" style={{ 
+                width: 116, 
+                height: 116, 
                 border: customizations?.avatar_border?.css_data?.border || '4px solid var(--card-bg)', 
                 borderRadius: '50%', 
                 background: 'rgba(0,240,255,0.08)', 
@@ -2139,7 +2173,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                fontSize: 32, 
+                fontSize: 38, 
                 fontWeight: 800, 
                 color: 'var(--cyber-cyan)', 
                 boxShadow: customizations?.avatar_border?.css_data?.boxShadow || '0 0 20px rgba(0,240,255,0.25)'
@@ -2155,20 +2189,21 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   <img
                     src={d.url}
                     alt="companion"
+                    className="profile-modal-companion"
                     style={{
                       position: 'absolute',
-                      bottom: -14,
-                      right: -22,
-                      width: '52px',
+                      bottom: -18,
+                      right: -28,
+                      width: '72px',
                       height: 'auto',
                       pointerEvents: 'none',
-                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+                      filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.7))',
                       zIndex: 2,
                     }}
                   />
                 );
               })()}
-              {!readOnly && (
+              {!readOnly && editing && (
                 <>
                   <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change photo"
                     style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: '50%', background: 'var(--cyber-cyan)', color: '#000', border: '2px solid var(--card-bg)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2185,8 +2220,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 alignItems: 'center',
                 gap: 8
               }}>
-                <span style={{
-                  fontSize: 20, 
+                <span className="profile-modal-name" style={{
+                  fontSize: 24, 
                   fontWeight: 800,
                   letterSpacing: 1, 
                   lineHeight: 1.2,
@@ -2223,18 +2258,18 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
-                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'} ?</span>
+                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'}<i className="fa-solid fa-certificate" style={{ marginLeft: 6, color: 'var(--cyber-cyan)' }} /></span>
                   : <span className="verified-badge" style={{ fontSize: 11, borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending Verification</span>
                 }
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0 }}>
+            <div className="profile-edit-actions" style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0, marginLeft: 'auto' }}>
               {!readOnly && (!editing
-                ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '7px 14px' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
+                ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
                 : <>
-                    <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ fontSize: 11, padding: '7px 14px' }}>CANCEL</button>
-                    <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ fontSize: 11, padding: '7px 14px' }}>
+                    <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>CANCEL</button>
+                    <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
                       {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />SAVING</> : 'SAVE'}
                     </button>
                   </>
@@ -2249,24 +2284,53 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                { label: 'STUDENT ID', value: user.student_id, mono: true, accent: 'var(--cyber-yellow)' },
-                { label: 'CIRCLES', value: communities.length, accent: 'var(--cyber-cyan)' },
-                profile.course && { label: 'COURSE', value: profile.course },
-                profile.year_level && { label: 'YEAR', value: profile.year_level },
-              ].filter(Boolean).map((item, i) => (
-                <div key={i} style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: item.accent || 'var(--cyber-cyan)', fontFamily: item.mono ? 'monospace' : 'inherit' }}>{item.value}</div>
-                </div>
-              ))}
+              {/* Student ID — always read-only */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>STUDENT ID</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</div>
+              </div>
+              {/* Circles — always read-only */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>CIRCLES</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{communities.length}</div>
+              </div>
+              {/* Course — editable inline */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>COURSE</div>
+                {editing ? (
+                  <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
+                    className="dark-select"
+                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700, padding: 0, outline: 'none', cursor: 'pointer' }}>
+                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select course</option>
+                    {COURSES.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.course || '—'}</div>
+                )}
+              </div>
+              {/* Year — editable inline, students only */}
+              {user.user_type !== 'Faculty' && (
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>YEAR</div>
+                {editing ? (
+                  <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
+                    className="dark-select"
+                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700, padding: 0, outline: 'none', cursor: 'pointer' }}>
+                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select year</option>
+                    {['1st Year','2nd Year','3rd Year','4th Year'].map(y => <option key={y} value={y} style={{ background: '#1a1a2e', color: 'white' }}>{y}</option>)}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.year_level || '—'}</div>
+                )}
+              </div>
+              )}
             </div>
 
             {/* Trust Points Badge */}
             <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
 
-
-            {!editing && profile.interests?.length > 0 && (
+            {/* Interests — view or edit inline */}
+            {(!editing && profile.interests?.length > 0) && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
@@ -2278,43 +2342,70 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 </div>
               </div>
             )}
-
             {!readOnly && editing && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>EDIT PROFILE</div>
-                <div>
-                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>COURSE</label>
-                  <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}
-                    className="dark-select">
-                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select course</option>
-                    {COURSES.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
-                  </select>
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {INTEREST_BUBBLES.map(({ id, label }) => (
+                    <span key={id}
+                      onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
+                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                        background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
+                        color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                      {label}
+                    </span>
+                  ))}
                 </div>
-                <div>
-                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>YEAR LEVEL</label>
-                  <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 6, color: 'white', padding: '7px 10px', fontSize: 12 }}
-                    className="dark-select">
-                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select year</option>
-                    {['1st Year','2nd Year','3rd Year','4th Year','Graduate'].map(y => <option key={y} value={y} style={{ background: '#1a1a2e', color: 'white' }}>{y}</option>)}
-                  </select>
+              </div>
+            )}
+
+            {/* CUSTOMIZE panel — shown in edit mode */}
+            {!readOnly && editing && (
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>
+                  <i className="fa-solid fa-palette" style={{ marginRight: 6 }} />CUSTOMIZE
                 </div>
-                <div>
-                  <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 8 }}>INTERESTS</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {INTEREST_BUBBLES.map(({ id, label }) => (
-                      <span key={id}
-                        onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
-                        style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                          background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                          color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                        {label}
-                      </span>
-                    ))}
+                {ownedItems.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>You don't own any items yet. Visit the Profile Shop to get some!</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {['badge', 'name_color', 'avatar_border', 'background', 'companion', 'theme'].map(type => {
+                      const typeItems = ownedItems.filter(p => p.shop_items?.type === type);
+                      if (typeItems.length === 0) return null;
+                      const activeId = custSettings?.[`active_${type}`];
+                      return (
+                        <div key={type}>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 7, textTransform: 'uppercase' }}>
+                            {type.replace('_', ' ')}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button onClick={() => applyCustomization(type, null)}
+                              style={{ padding: '5px 11px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
+                                background: !activeId ? 'var(--cyber-cyan)' : 'rgba(0,0,0,0.4)',
+                                color: !activeId ? '#000' : 'var(--text-muted)',
+                                border: `1px solid ${!activeId ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.2)'}` }}>
+                              None
+                            </button>
+                            {typeItems.map(p => (
+                              <button key={p.item_id} onClick={() => applyCustomization(type, p.item_id)}
+                                title={p.shop_items.name}
+                                style={{ padding: '5px 11px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
+                                  background: activeId === p.item_id ? 'var(--cyber-cyan)' : 'rgba(0,0,0,0.4)',
+                                  color: activeId === p.item_id ? '#000' : 'var(--text-primary)',
+                                  border: `1px solid ${activeId === p.item_id ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.2)'}` }}>
+                                {/* Show emoji for badges, name for everything else */}
+                                {p.shop_items.type === 'badge' && p.shop_items.preview_url
+                                  ? <>{p.shop_items.preview_url} {p.shop_items.name}</>
+                                  : p.shop_items.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -2370,11 +2461,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
               {!readOnly && (
-                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11, background: 'rgba(247,95,95,0.15)', borderColor: 'var(--red)', fontWeight: 700 }}>
+                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11, background: 'rgba(180,30,30,0.85)', borderColor: 'var(--red)', color: '#fff', fontWeight: 700, backdropFilter: 'blur(8px)' }}>
                   <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
                 </button>
               )}
-              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.3)', fontWeight: 700 }}>CLOSE</button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.5)', color: 'var(--cyber-cyan)', fontWeight: 700 }}>CLOSE</button>
             </div>
           </div>
         </div>

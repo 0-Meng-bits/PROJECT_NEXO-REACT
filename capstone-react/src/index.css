@@ -1069,7 +1069,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(0, 240, 255, 0.05);
+  background: rgba(0, 10, 20, 0.72);
   border: 1px solid var(--cyber-cyan);
   color: var(--cyber-cyan);
   padding: 4px 12px;
@@ -1077,6 +1077,7 @@ body {
   font-size: 11px;
   font-weight: 600;
   margin-top: 10px;
+  backdrop-filter: blur(6px);
 }
 
 .stat-line {
@@ -5442,6 +5443,34 @@ body {
     grid-template-columns: 1fr !important;
     padding: 16px !important;
     gap: 14px !important;
+  }
+
+  /* Profile modal cover + avatar — scale down on mobile */
+  .profile-modal-cover {
+    height: 160px !important;
+  }
+  .profile-modal-avatar {
+    width: 88px !important;
+    height: 88px !important;
+    font-size: 28px !important;
+  }
+  .profile-modal-name {
+    font-size: 18px !important;
+  }
+  .profile-modal-companion {
+    width: 56px !important;
+    bottom: -14px !important;
+    right: -20px !important;
+  }
+
+  /* Edit/Cancel/Save buttons — push to new row on mobile */
+  .profile-edit-actions {
+    margin-left: 0 !important;
+    width: 100%;
+    padding-bottom: 4px !important;
+  }
+  .profile-edit-actions button {
+    flex: 1;
   }
 
   /* Theme picker — 2 columns instead of 3 */

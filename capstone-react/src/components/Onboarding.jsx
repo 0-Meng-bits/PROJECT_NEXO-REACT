@@ -16,7 +16,7 @@ const COURSES = [
   'BTLED-HE',
 ];
 
-const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th', 'Graduate'];
+const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th'];
 
 const INTEREST_BUBBLES = [
   { id: 'coding',            label: '💻 Coding',             color: '#00f0ff' },
