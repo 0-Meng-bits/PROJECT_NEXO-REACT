@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
@@ -3391,6 +3391,33 @@ export default function UserPortal() {
   const [circleEvents, setCircleEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
+  // Block navigation away from /portal when on home feed — show logout modal instead
+  const blocker = useBlocker(({ nextLocation }) =>
+    !nextLocation.pathname.includes('/portal') && section === 'home'
+  );
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      setShowLogoutConfirm(true);
+    }
+  }, [blocker.state]);
+
+  // When user cancels logout, reset the blocker
+  const handleCancelLogout = () => {
+    setShowLogoutConfirm(false);
+    if (blocker.state === 'blocked') blocker.reset?.();
+  };
+
+  // When user confirms logout
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    if (blocker.state === 'blocked') blocker.proceed?.();
+    else navigate('/auth');
+  };
+
   const viewUserProfile = async (studentId) => {
     if (!studentId) return;
     const { data, error } = await supabase
@@ -4162,13 +4189,6 @@ export default function UserPortal() {
 
   const logout = () => {
     setShowLogoutConfirm(true);
-  };
-
-  const confirmLogout = () => {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    navigate('/auth');
   };
 
   // Membership helpers
@@ -6129,7 +6149,7 @@ export default function UserPortal() {
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, letterSpacing: 1 }}>LOG OUT?</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Are you sure you want to end your session?</div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="cyber-btn secondary" onClick={() => setShowLogoutConfirm(false)}
+              <button className="cyber-btn secondary" onClick={handleCancelLogout}
                 style={{ flex: 1, fontSize: 13 }}>Cancel</button>
               <button className="cyber-btn" onClick={confirmLogout}
                 style={{ flex: 1, fontSize: 13, background: 'rgba(180,30,30,0.85)', borderColor: 'var(--red)', color: '#fff' }}>
