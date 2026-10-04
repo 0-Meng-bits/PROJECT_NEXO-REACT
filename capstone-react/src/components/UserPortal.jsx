@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
@@ -3310,12 +3310,13 @@ function AppealModal({ warning, onClose, userId }) {
 // -- MAIN PORTAL ---------------------------------------------------------------
 export default function UserPortal() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')));
   const user = currentUser;
   const [communities, setCommunities] = useState([GLOBAL_COMM]);
   const [myMemberships, setMyMemberships] = useState([]); // { community_id, role, status }
-  const [activeCommId, setActiveCommId] = useState('global');
-  const [section, setSection] = useState('home');
+  const [activeCommId, setActiveCommId] = useState(() => searchParams.get('commId') || 'global');
+  const [section, setSection] = useState(() => searchParams.get('section') || 'home');
   const [messages, setMessages] = useState([]);
   const [userCustomizations, setUserCustomizations] = useState({}); // studentId -> customizations
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
@@ -3340,6 +3341,20 @@ export default function UserPortal() {
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
   const [activeChannelId, setActiveChannelId] = useState(null);
+
+  // Helper: update section + community in both state and URL so back/refresh work
+  const navTo = useCallback((newSection, newCommId) => {
+    const comm = newCommId !== undefined ? newCommId : activeCommId;
+    setSection(newSection);
+    if (newCommId !== undefined) setActiveCommId(newCommId);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('section', newSection);
+      if (comm && comm !== 'global') next.set('commId', comm);
+      else next.delete('commId');
+      return next;
+    }, { replace: false }); // push to history so back button steps through
+  }, [activeCommId, setSearchParams]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelType, setNewChannelType] = useState('chat'); // chat, tasks (tasks only for project circles)
@@ -3967,26 +3982,14 @@ export default function UserPortal() {
       });
   }, [communities]);
 
-  // Intercept browser back button / Android swipe-back to prevent accidental logout
+  // Sync state back from URL when user presses back/forward
   useEffect(() => {
-    // Push a dummy history entry so the back button has somewhere to go within the app
-    window.history.pushState({ portal: true }, '');
-
-    const handlePopState = (e) => {
-      // Push state again to keep user on the portal
-      window.history.pushState({ portal: true }, '');
-      // Show confirm only if they keep trying to go back
-      if (confirm('Are you sure you want to log out?')) {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        navigate('/auth');
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [navigate]);
+    const sec = searchParams.get('section') || 'home';
+    const comm = searchParams.get('commId') || 'global';
+    setSection(sec);
+    setActiveCommId(comm);
+    if (comm === 'global') setActiveChannelId(null);
+  }, [searchParams]);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
@@ -4166,8 +4169,7 @@ export default function UserPortal() {
     if (!error) {
       await loadMyMemberships();
       showToast('You joined the circle!');
-      setActiveCommId(commId);
-      setSection('circles');
+      navTo('circles', commId);
     } else showToast('Failed to accept invite.');
   };
 
@@ -4318,7 +4320,7 @@ export default function UserPortal() {
       if (!res.ok) { showToast(data.message || data.error || 'Failed to delete circle.'); return; }
       showToast('Circle deleted.');
       await loadCommunities();
-      setActiveCommId('global'); setSection('home');
+      navTo('home', 'global');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
       showToast('Network error ? could not delete circle.');
@@ -4333,7 +4335,7 @@ export default function UserPortal() {
     if (error) { showToast('Failed to leave circle.'); return; }
     showToast('You have left the circle.');
     await loadMyMemberships();
-    setActiveCommId('global'); setSection('home');
+    navTo('home', 'global');
   };
 
   const addChannel = async () => {
@@ -4468,7 +4470,7 @@ export default function UserPortal() {
                     .slice(0, 4)
                     .map(c => (
                       <div key={c.id} className="search-result-item" onClick={() => {
-                        setActiveCommId(c.id); setActiveChannelId(null); setSection('circles'); setSearch('');
+                        setActiveChannelId(null); navTo('circles', c.id); setSearch('');
                       }}>
                         <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', marginRight: 10 }}></i>
                         <div>
@@ -4546,13 +4548,11 @@ export default function UserPortal() {
                       onClick={() => {
                         markRead(n.id);
                         if (n.type === 'circle_invite' && n.link_comm_id) {
-                          setActiveCommId('global');
-                          setSection('activity');
+                          navTo('activity', 'global');
                           setActiveCategory('all');
                         } else if (n.link_comm_id) {
-                          setActiveCommId(n.link_comm_id);
                           setActiveChannelId(null);
-                          setSection('circles');
+                          navTo('circles', n.link_comm_id);
                         }
                         setShowNotifications(false);
                       }}>
@@ -4594,9 +4594,8 @@ export default function UserPortal() {
           {myCircles.map(c => (
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? "active" : ""}`}
               title={c.name} onClick={() => {
-                setActiveCommId(c.id);
+                navTo(c.id === "global" ? "home" : "circles", c.id);
                 setActiveChannelId(null);
-                setSection(c.id === "global" ? "home" : "circles");
                 setShowDock(false);
                 setMobileSidebarOpen(true);
               }}>
@@ -4630,15 +4629,15 @@ export default function UserPortal() {
               <div className="sidebar-scroll">
               <div className="sidebar-label">MAIN</div>
               <div className="nav-links">
-                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { setSection('home'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { setSection('global'); setActiveCommId('global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { setSection('activity'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
                 </div>
@@ -4653,7 +4652,7 @@ export default function UserPortal() {
                 ].map(cat => (
                   <div key={cat.key}
                     className={`ls-item ${section === 'activity' && activeCategory === cat.key ? 'active' : ''}`}
-                    onClick={() => { setSection('activity'); setActiveCategory(cat.key); }}
+                    onClick={() => { navTo('activity', 'global'); setActiveCategory(cat.key); }}
                   >
                     <i className={`nav-icon ${cat.icon}`} style={{ fontStyle: 'normal' }}></i>
                     <span className="node-name">{cat.label}</span>
@@ -4686,7 +4685,7 @@ export default function UserPortal() {
                 {/* Announcements ? always first, powered by announcements table */}
                 <div
                   className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
-                  onClick={() => { setShowCircleAnnouncements(true); setSection('circles'); }}
+                  onClick={() => { setShowCircleAnnouncements(true); navTo('circles', activeCommId); }}
                 >
                   <i className="channel-hash">#</i>
                   <span className="node-name">announcements</span>
@@ -4698,7 +4697,7 @@ export default function UserPortal() {
                 {/* General ? virtual default channel, stores channel_id=null messages */}
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
-                  onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); setSection('circles'); loadMessages(activeCommId, null); }}
+                  onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null); }}
                 >
                   <i className="channel-hash">#</i>
                   <span className="node-name">general</span>
@@ -4710,7 +4709,7 @@ export default function UserPortal() {
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
-                    onClick={() => { setActiveChannelId(ch.id); setSection('circles'); setShowCircleAnnouncements(false); }}
+                    onClick={() => { setActiveChannelId(ch.id); navTo('circles', activeCommId); setShowCircleAnnouncements(false); }}
                   >
                     <i className="channel-hash">#</i>
                     <span className="node-name">{ch.name}</span>
@@ -4850,7 +4849,7 @@ export default function UserPortal() {
                   <h1>Find Your Circle<br/>at CTU</h1>
                   <p>Discover communities built around your interests, join the conversation, and make your campus experience count.</p>
                   <button className="cyber-btn" style={{ width: 'auto', padding: '10px 24px', marginTop: 16 }}
-                    onClick={() => { setSection('activity'); setActiveCategory('all'); }}>
+                    onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}>
                     <i className="fa-solid fa-compass" style={{ marginRight: 8 }}></i>Explore Circles
                   </button>
                 </div>
@@ -4861,14 +4860,14 @@ export default function UserPortal() {
                 <>
                   <div className="home-section-header" style={{ marginTop: 8 }}>
                     <span>Popular Right Now</span>
-                    <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
+                    <span className="home-see-all" onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}>See all</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {communities.filter(c => c.id !== 'global')
                       .sort((a, b) => (memberCounts[b.id] || 0) - (memberCounts[a.id] || 0))
                       .slice(0, 3).map(c => (
                       <div key={c.id} className="popular-row"
-                        onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                        onClick={() => { navTo('circles', c.id); }}>
                         <div className="popular-row-icon" style={{
                           background: c.cover_url ? undefined : categoryGradient(c.category),
                           backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
@@ -5068,7 +5067,7 @@ export default function UserPortal() {
               {/* Featured Communities */}
               <div className="home-section-header" style={{ marginTop: 16 }}>
                 <span>Featured Circles</span>
-                <span className="home-see-all" onClick={() => { setSection('activity'); setActiveCategory('all'); }}>See all</span>
+                <span className="home-see-all" onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}>See all</span>
               </div>
               {communities.filter(c => c.id !== 'global').length === 0 ? (
                 <div className="post" style={{ textAlign: 'center', padding: 32 }}>
@@ -5085,7 +5084,7 @@ export default function UserPortal() {
                 <div className="featured-grid">
                   {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
                     <div key={c.id} className="featured-card"
-                      onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                      onClick={() => { navTo('circles', c.id); }}>
                       <div className="featured-card-bg" style={{
                         background: c.cover_url ? undefined : categoryGradient(c.category),
                         backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
@@ -5247,7 +5246,7 @@ export default function UserPortal() {
                           {owned || joined ? (
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button className="group-action-btn manage"
-                                onClick={() => { setActiveCommId(c.id); setSection('circles'); }}>
+                                onClick={() => { navTo('circles', c.id); }}>
                                 <i className="fa-solid fa-arrow-right-to-bracket"></i> ENTER
                               </button>
                               {!owned && (
