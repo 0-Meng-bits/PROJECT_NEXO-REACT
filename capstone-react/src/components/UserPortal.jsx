@@ -4019,26 +4019,25 @@ export default function UserPortal() {
   // Keep sectionRef in sync so the popstate handler always has the latest section
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Guard: intercept Android/iOS back button when on home feed
-  // Strategy: always keep at least one history entry above the pre-portal stack
-  // by pushing a sentinel on mount. When that sentinel gets popped, we're at the
-  // bottom of the portal history — show logout modal and re-push to stay.
+  // Push a sentinel entry whenever the user lands on home.
+  // This gives one extra back-step buffer at the home screen.
   useEffect(() => {
-    // Push sentinel on mount
-    window.history.pushState({ portalSentinel: true }, '');
-
-    const onPopState = () => {
-      // Re-push immediately to cancel the navigation regardless
+    if (section === 'home') {
       window.history.pushState({ portalSentinel: true }, '');
-      // Only show logout if user is on home feed
-      if (sectionRef.current === 'home') {
+    }
+  }, [section]);
+
+  // Guard: when the sentinel is popped (user backed past home), show logout modal
+  useEffect(() => {
+    const onPopState = (e) => {
+      if (e.state?.portalSentinel) {
+        // Re-push to stay on home, then show the modal
+        window.history.pushState({ portalSentinel: true }, '');
         setShowLogoutConfirm(true);
       }
     };
-
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When arriving at home, push an extra history entry as a buffer.
