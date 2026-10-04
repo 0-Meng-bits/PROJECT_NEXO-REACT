@@ -3996,23 +3996,28 @@ export default function UserPortal() {
   // Keep sectionRef in sync so popstate handler can read current section
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Guard: when back button would leave /portal, ask first
+  // When arriving at home, push an extra history entry as a buffer.
+  // That way the first back from home just returns to this buffer entry (same page),
+  // and we can intercept the second back to show the logout modal.
   useEffect(() => {
-    // Push one sentinel so there's a history entry to catch
-    window.history.pushState({ nexoGuard: true }, '');
+    if (section === 'home') {
+      window.history.pushState({ nexoBuffer: true }, '');
+    }
+  }, [section]);
 
+  // Guard: intercept back from the home buffer entry
+  useEffect(() => {
     const handlePopState = (e) => {
-      // Always re-push to stay on /portal
-      window.history.pushState({ nexoGuard: true }, '');
-      // Only show logout confirm when user is at home feed (the root) and presses back
-      if (e.state && e.state.nexoGuard && sectionRef.current === 'home') {
+      if (e.state && e.state.nexoBuffer) {
+        // Re-push so cancel keeps user on home
+        window.history.pushState({ nexoBuffer: true }, '');
         setShowLogoutConfirm(true);
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [navigate]);
+  }, []);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
