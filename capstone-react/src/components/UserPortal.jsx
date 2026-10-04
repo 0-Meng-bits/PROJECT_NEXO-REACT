@@ -5380,10 +5380,14 @@ export default function UserPortal() {
                           // Save via server (uses service role key, bypasses RLS)
                           let saved = false;
                           try {
+                            const token = localStorage.getItem('accessToken');
                             const serverRes = await fetch(getApiUrl(`/api/upload`), {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'upload-cover', logo_url: compressed, communityId: activeComm.id }),
+                              headers: {
+                                'Content-Type': 'application/json',
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                              },
+                              body: JSON.stringify({ action: 'upload-cover', cover_url: compressed, communityId: activeComm.id }),
                             });
                             if (serverRes.ok) {
                               saved = true;
