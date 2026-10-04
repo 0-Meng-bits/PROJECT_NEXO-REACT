@@ -2157,12 +2157,12 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     alt="companion"
                     style={{
                       position: 'absolute',
-                      bottom: -10,
-                      right: -18,
-                      width: d.size || '64px',
+                      bottom: -14,
+                      right: -22,
+                      width: '52px',
                       height: 'auto',
                       pointerEvents: 'none',
-                      filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
                       zIndex: 2,
                     }}
                   />
