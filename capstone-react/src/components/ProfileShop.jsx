@@ -1,8 +1,8 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { clearCustomizationCache } from '../lib/customization';
 
-// Use relative URL on localhost (Vite proxy → server-local.js), absolute on prod
+// Use relative URL on localhost (Vite proxy ? server-local.js), absolute on prod
 const SHOP_API = window.location.hostname === 'localhost'
   ? '/api/shop'
   : `${import.meta.env.VITE_API_URL || ''}/api/shop`;
@@ -71,7 +71,7 @@ export default function ProfileShop({ user, onClose }) {
     const pointsAfterPurchase = trustPoints - item.price;
     
     if (pointsAfterPurchase < MINIMUM_POINTS) {
-      alert(`❌ Cannot purchase: You must maintain at least ${MINIMUM_POINTS} trust points.\n\nYou have: ${trustPoints} TP\nItem costs: ${item.price} TP\nYou'd have: ${pointsAfterPurchase} TP (below minimum)`);
+      alert(`? Cannot purchase: You must maintain at least ${MINIMUM_POINTS} trust points.\n\nYou have: ${trustPoints} TP\nItem costs: ${item.price} TP\nYou'd have: ${pointsAfterPurchase} TP (below minimum)`);
       return;
     }
 
@@ -99,7 +99,7 @@ export default function ProfileShop({ user, onClose }) {
       }
 
       setTrustPoints(data.newPoints);
-      alert(`✅ Purchased "${item.name}"!`);
+      alert(`? Purchased "${item.name}"!`);
       loadData();
     } catch (err) {
       alert('Network error. Please try again.');
@@ -131,7 +131,7 @@ export default function ProfileShop({ user, onClose }) {
       // Clear cache so changes are reflected immediately
       clearCustomizationCache(user.id);
       
-      alert('✅ Customization applied! Refresh the page to see changes.');
+      alert('? Customization applied! Refresh the page to see changes.');
       loadData();
     } catch (err) {
       alert('Network error. Please try again.');
@@ -217,7 +217,7 @@ export default function ProfileShop({ user, onClose }) {
               <>
                 {/* Type Filter */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                  {['all', 'theme', 'badge', 'name_color', 'avatar_border', 'background'].map(type => (
+                  {['all', 'theme', 'badge', 'name_color', 'avatar_border', 'background', 'companion'].map(type => (
                     <button
                       key={type}
                       onClick={() => setSelectedType(type)}
@@ -355,7 +355,7 @@ export default function ProfileShop({ user, onClose }) {
             {/* CUSTOMIZE TAB */}
             {tab === 'customize' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {['theme', 'badge', 'name_color', 'avatar_border', 'background'].map(type => {
+                {['theme', 'badge', 'name_color', 'avatar_border', 'background', 'companion'].map(type => {
                   const ownedItems = purchases.filter(p => p.shop_items.type === type);
                   const activeId = settings?.[`active_${type}`];
 

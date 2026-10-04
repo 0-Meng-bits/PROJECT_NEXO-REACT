@@ -1793,14 +1793,14 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
 
   if (loading) {
     return (
-      <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
+      <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
         <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 16, color: 'var(--text-muted)' }}></i>
       </div>
     );
   }
 
   return (
-    <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
+    <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
       <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>
         TRUST POINTS
       </div>
@@ -1881,13 +1881,13 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     const loadCustomizations = async () => {
       const { data: settings } = await supabase
         .from('user_profile_settings')
-        .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border')
+        .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border, active_companion')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (!settings) return;
 
-      const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border].filter(Boolean);
+      const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
       if (itemIds.length === 0) return;
 
       const { data: items } = await supabase
@@ -1901,7 +1901,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           name_color: items.find(i => i.id === settings.active_name_color),
           background: items.find(i => i.id === settings.active_background),
           theme: items.find(i => i.id === settings.active_theme),
-          avatar_border: items.find(i => i.id === settings.active_avatar_border)
+          avatar_border: items.find(i => i.id === settings.active_avatar_border),
+          companion: items.find(i => i.id === settings.active_companion),
         });
       }
     };
@@ -2063,6 +2064,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           backgroundSize: data.size || '30px 30px'
         };
       }
+      if (data.backgroundImage) {
+        return {
+          backgroundImage: data.backgroundImage,
+          backgroundSize: data.backgroundSize || 'cover',
+          backgroundPosition: data.backgroundPosition || 'center',
+          backgroundRepeat: data.backgroundRepeat || 'no-repeat',
+        };
+      }
       if (data.image) {
         return { 
           background: data.image,
@@ -2137,6 +2146,28 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               }}>
                 {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
               </div>
+              {/* Companion sticker */}
+              {customizations?.companion?.css_data && (() => {
+                const d = typeof customizations.companion.css_data === 'string'
+                  ? JSON.parse(customizations.companion.css_data)
+                  : customizations.companion.css_data;
+                return (
+                  <img
+                    src={d.url}
+                    alt="companion"
+                    style={{
+                      position: 'absolute',
+                      bottom: -10,
+                      right: -18,
+                      width: d.size || '64px',
+                      height: 'auto',
+                      pointerEvents: 'none',
+                      filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))',
+                      zIndex: 2,
+                    }}
+                  />
+                );
+              })()}
               {!readOnly && (
                 <>
                   <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change photo"
@@ -2224,7 +2255,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 profile.course && { label: 'COURSE', value: profile.course },
                 profile.year_level && { label: 'YEAR', value: profile.year_level },
               ].filter(Boolean).map((item, i) => (
-                <div key={i} style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
+                <div key={i} style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>{item.label}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: item.accent || 'var(--cyber-cyan)', fontFamily: item.mono ? 'monospace' : 'inherit' }}>{item.value}</div>
                 </div>
@@ -2236,7 +2267,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
 
             {!editing && profile.interests?.length > 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {profile.interests.map(id => (
@@ -2249,7 +2280,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             )}
 
             {!readOnly && editing && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>EDIT PROFILE</div>
                 <div>
                   <label style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, display: 'block', marginBottom: 5 }}>COURSE</label>
@@ -2311,14 +2342,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
           {/* RIGHT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(252,238,10,0.3)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+            <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(252,238,10,0.3)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: 'var(--cyber-yellow)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>STATS</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--cyber-cyan)', lineHeight: 1 }}>{communities.length}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginTop: 4 }}>CIRCLES JOINED</div>
             </div>
 
             {communities.length > 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {communities.slice(0, 6).map(c => (
@@ -2343,7 +2374,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
                 </button>
               )}
-              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,240,255,0.3)', fontWeight: 700 }}>CLOSE</button>
+              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.3)', fontWeight: 700 }}>CLOSE</button>
             </div>
           </div>
         </div>

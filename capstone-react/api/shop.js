@@ -174,6 +174,7 @@ export default async function handler(req, res) {
           background:active_background(*),
           name_color:active_name_color(*),
           avatar_border:active_avatar_border(*),
+          companion:active_companion(*),
           music:active_music(*)
         `)
         .eq('user_id', userId)
