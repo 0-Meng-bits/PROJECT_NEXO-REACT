@@ -3991,6 +3991,34 @@ export default function UserPortal() {
     if (comm === 'global') setActiveChannelId(null);
   }, [searchParams]);
 
+  // Guard: when the user is on home (the stack root), intercept back and ask before logging out
+  useEffect(() => {
+    // Push a sentinel so there's always one entry to catch
+    window.history.pushState({ nexoGuard: true }, '');
+
+    const handlePopState = (e) => {
+      const sec = new URLSearchParams(window.location.search).get('section') || 'home';
+      const comm = new URLSearchParams(window.location.search).get('commId') || 'global';
+
+      // If we're navigating back to somewhere inside the portal, let it happen naturally
+      if (sec !== 'home' || comm !== 'global') return;
+
+      // We're at the root — intercept and ask
+      e.preventDefault();
+      // Re-push so we stay on the same URL
+      window.history.pushState({ nexoGuard: true }, '');
+      if (window.confirm('Do you want to log out?')) {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        navigate('/auth');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
     loadChannels(activeCommId);
