@@ -3993,19 +3993,21 @@ export default function UserPortal() {
 
   // Guard: intercept back button ONLY when it would leave /portal entirely
   useEffect(() => {
-    // Push a sentinel so there's always one entry below the current position
+    // Push two sentinels — first back consumes one (silently, still on portal history),
+    // second back hits the other and we intercept before leaving
+    window.history.pushState({ nexoGuard: true }, '');
     window.history.pushState({ nexoGuard: true }, '');
 
-    const handlePopState = () => {
-      // After popstate, check if we're still on /portal
-      if (window.location.pathname.includes('/portal')) return; // still inside, do nothing
-      // We've been popped off the portal — re-push and ask
-      window.history.pushState({ nexoGuard: true }, '');
-      if (window.confirm('Do you want to log out?')) {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        navigate('/auth');
+    const handlePopState = (e) => {
+      // If the popped state is our sentinel, we're at the exit boundary — ask and re-push
+      if (e.state && e.state.nexoGuard) {
+        window.history.pushState({ nexoGuard: true }, '');
+        if (window.confirm('Do you want to log out?')) {
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          navigate('/auth');
+        }
       }
     };
 
