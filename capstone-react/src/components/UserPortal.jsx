@@ -1306,13 +1306,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // Use service-role API to bypass RLS
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl(`/api/upload`), {
+      const res = await fetch(getApiUrl(`/api/upload-cover`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ action: 'upload-cover', ...updates, communityId: comm.id }),
+        body: JSON.stringify({ ...updates, communityId: comm.id }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -5381,13 +5381,13 @@ export default function UserPortal() {
                           let saved = false;
                           try {
                             const token = localStorage.getItem('accessToken');
-                            const serverRes = await fetch(getApiUrl(`/api/upload`), {
+                            const serverRes = await fetch(getApiUrl(`/api/upload-cover`), {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
                                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
                               },
-                              body: JSON.stringify({ action: 'upload-cover', cover_url: compressed, communityId: activeComm.id }),
+                              body: JSON.stringify({ cover_url: compressed, communityId: activeComm.id }),
                             });
                             if (serverRes.ok) {
                               saved = true;
