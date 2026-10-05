@@ -3347,14 +3347,12 @@ export default function UserPortal() {
     const comm = newCommId !== undefined ? newCommId : activeCommId;
     setSection(newSection);
     if (newCommId !== undefined) setActiveCommId(newCommId);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('section', newSection);
-      if (comm && comm !== 'global') next.set('commId', comm);
-      else next.delete('commId');
-      return next;
-    }, { replace: true }); // replace, not push — back button is handled manually
-  }, [activeCommId, setSearchParams]);
+    // Update URL silently for bookmarking/refresh — does NOT trigger popstate
+    const params = new URLSearchParams();
+    params.set('section', newSection);
+    if (comm && comm !== 'global') params.set('commId', comm);
+    window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?' + params.toString());
+  }, [activeCommId]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelType, setNewChannelType] = useState('chat'); // chat, tasks (tasks only for project circles)
@@ -4011,8 +4009,7 @@ export default function UserPortal() {
   useEffect(() => { sectionRef.current = section; }, [section]);
 
   // Ref that always holds the latest state values needed by the back handler.
-  // This avoids stale closures — the popstate listener is registered once but
-  // always reads current values through this ref.
+  // Avoids stale closures — listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
   useEffect(() => {
     backStateRef.current = {
@@ -4023,53 +4020,62 @@ export default function UserPortal() {
     };
   });
 
+  // Guard flag: set to true when WE trigger replaceState/pushState so popstate
+  // caused by our own navigation is ignored.
+  const ignoringPopState = useRef(false);
+
   // Back-button / swipe-back handler — registered ONCE on mount.
-  // Pattern:
-  //   1. On mount → push one "trap" entry onto the history stack.
-  //   2. User navigates inside portal via navTo (replace:true) → stack stays at 2 entries.
-  //   3. Back pressed → trap entry pops → popstate fires → we re-push trap immediately
-  //      so the browser never actually navigates away, then decide what to do:
-  //        a. Modal open? Close it.
-  //        b. Not on home? Go home.
-  //        c. On home? Show logout modal.
+  //
+  // History stack on mount:  [...browser history] | /portal?section=home | TRAP
+  //
+  // navTo uses window.history.replaceState (not pushState, not setSearchParams)
+  // so navigating inside the portal never adds entries — the stack stays the same.
+  //
+  // When user presses back:
+  //   TRAP pops → popstate fires → we re-push TRAP immediately (re-arm)
+  //   then decide: close modal / go home / show logout modal
   useEffect(() => {
     window.history.pushState({ portalTrap: true }, '');
 
-    const onPopState = () => {
-      // Re-arm the trap immediately so back never escapes the portal
+    const onPopState = (e) => {
+      // Ignore events we caused ourselves
+      if (ignoringPopState.current) { ignoringPopState.current = false; return; }
+
+      // Re-arm the trap so back never escapes the portal
+      ignoringPopState.current = true;
       window.history.pushState({ portalTrap: true }, '');
 
       const s = backStateRef.current;
 
-      // a. Close open overlays (priority order)
-      if (s.showProfile)        { setShowProfile(false);        return; }
-      if (s.viewingProfile)     { setViewingProfile(null);      return; }
-      if (s.showManage)         { setShowManage(false);         return; }
-      if (s.showMembersPanel)   { setShowMembersPanel(false);   return; }
-      if (s.showNotifications)  { setShowNotifications(false);  return; }
-      if (s.showShop)           { setShowShop(false);           return; }
-      if (s.showThemePicker)    { setShowThemePicker(false);    return; }
-      if (s.showEventsModal)    { setShowEventsModal(false);    return; }
-      if (s.showCreate)         { setShowCreate(false);         return; }
-      if (s.showApplicationForm){ setShowApplicationForm(null); return; }
-      if (s.viewingApplication) { setViewingApplication(null); return; }
+      // a. Close open overlays first
+      if (s.showProfile)         { setShowProfile(false);        return; }
+      if (s.viewingProfile)      { setViewingProfile(null);      return; }
+      if (s.showManage)          { setShowManage(false);         return; }
+      if (s.showMembersPanel)    { setShowMembersPanel(false);   return; }
+      if (s.showNotifications)   { setShowNotifications(false);  return; }
+      if (s.showShop)            { setShowShop(false);           return; }
+      if (s.showThemePicker)     { setShowThemePicker(false);    return; }
+      if (s.showEventsModal)     { setShowEventsModal(false);    return; }
+      if (s.showCreate)          { setShowCreate(false);         return; }
+      if (s.showApplicationForm) { setShowApplicationForm(null); return; }
+      if (s.viewingApplication)  { setViewingApplication(null); return; }
 
       // b. Not on home → go home
       if (s.section !== 'home') {
         setSection('home');
         setActiveCommId('global');
         setActiveChannelId(null);
-        setSearchParams({ section: 'home' }, { replace: true });
+        window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?section=home');
         return;
       }
 
-      // c. On home → show logout modal
+      // c. Already on home → show logout modal
       setShowLogoutConfirm(true);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []); // empty deps — registered once, reads fresh values via backStateRef
+  }, []); // empty — registered once, always reads fresh state via backStateRef
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
