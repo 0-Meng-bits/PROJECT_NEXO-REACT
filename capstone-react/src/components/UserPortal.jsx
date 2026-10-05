@@ -5491,9 +5491,11 @@ export default function UserPortal() {
                         )}
                       </h2>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                        <div className="verified-badge" style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.3)' }}>
-                          GROUP: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
-                        </div>
+                        {activeCommId !== 'global' && (
+                          <div className="verified-badge" style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.3)' }}>
+                            CIRCLE: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
+                          </div>
+                        )}
                         {(() => {
                           const circleOnline = onlineProfiles.filter(p => circleMateIds.has(p.id) || p.id === user?.id);
                           return circleOnline.length > 0
