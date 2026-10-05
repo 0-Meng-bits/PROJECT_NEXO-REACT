@@ -4024,15 +4024,17 @@ export default function UserPortal() {
   // pushState never fires popstate — only the user's back gesture does.
   // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
-    // Push TWO trap entries:
-    // - Entry 1 absorbs the back press when user is on a sub-section (goes to home)
-    // - Entry 2 absorbs the back press when user is on home (shows logout modal)
-    // This ensures the browser can never navigate away from the portal unexpectedly.
+    // If we just reloaded from a "back on home" press, show logout modal immediately
+    // and clear the flag so it doesn't re-trigger on next mount.
+    if (sessionStorage.getItem('portalShowLogout') === '1') {
+      sessionStorage.removeItem('portalShowLogout');
+      setShowLogoutConfirm(true);
+    }
+
     window.history.pushState({ portalTrap: 1 }, '');
     window.history.pushState({ portalTrap: 2 }, '');
 
     const onPopState = () => {
-      // Always re-push a trap entry to keep the buffer intact
       window.history.pushState({ portalTrap: true }, '');
 
       const s = backStateRef.current;
@@ -4059,15 +4061,15 @@ export default function UserPortal() {
         return;
       }
 
-      // c. Already on home → reload to get a clean history stack.
-      // After reload the page mounts fresh with new trap entries, so the
-      // next back press will correctly show the logout modal.
+      // c. Already on home → set flag then reload to clean the history stack.
+      // On next mount the flag is detected and logout modal shows immediately.
+      sessionStorage.setItem('portalShowLogout', '1');
       window.location.replace(window.location.pathname + '?section=home');
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []); // empty — registered once, always reads fresh state via backStateRef
+  }, []);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
