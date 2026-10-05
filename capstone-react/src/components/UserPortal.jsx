@@ -4024,10 +4024,15 @@ export default function UserPortal() {
   // pushState never fires popstate — only the user's back gesture does.
   // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
-    window.history.pushState({ portalTrap: true }, '');
+    // Push TWO trap entries:
+    // - Entry 1 absorbs the back press when user is on a sub-section (goes to home)
+    // - Entry 2 absorbs the back press when user is on home (shows logout modal)
+    // This ensures the browser can never navigate away from the portal unexpectedly.
+    window.history.pushState({ portalTrap: 1 }, '');
+    window.history.pushState({ portalTrap: 2 }, '');
 
     const onPopState = () => {
-      // Re-arm the trap so back never escapes the portal
+      // Always re-push a trap entry to keep the buffer intact
       window.history.pushState({ portalTrap: true }, '');
 
       const s = backStateRef.current;
