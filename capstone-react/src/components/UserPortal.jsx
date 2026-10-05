@@ -4024,15 +4024,8 @@ export default function UserPortal() {
   // pushState never fires popstate — only the user's back gesture does.
   // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
-    // If we just reloaded from a "back on home" press, show logout modal immediately
-    // and clear the flag so it doesn't re-trigger on next mount.
-    if (sessionStorage.getItem('portalShowLogout') === '1') {
-      sessionStorage.removeItem('portalShowLogout');
-      setShowLogoutConfirm(true);
-    }
-
-    window.history.pushState({ portalTrap: 1 }, '');
-    window.history.pushState({ portalTrap: 2 }, '');
+    // Push a trap entry so we can intercept the back button
+    window.history.pushState({ portalTrap: true }, '');
 
     const onPopState = () => {
       window.history.pushState({ portalTrap: true }, '');
@@ -4052,7 +4045,7 @@ export default function UserPortal() {
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
       if (s.viewingApplication)  { setViewingApplication(null); return; }
 
-      // b. Not on home → go to home feed first
+      // b. Not on home → go to home feed
       if (s.section !== 'home') {
         setSection('home');
         setActiveCommId('global');
@@ -4061,10 +4054,8 @@ export default function UserPortal() {
         return;
       }
 
-      // c. Already on home → set flag then reload to clean the history stack.
-      // On next mount the flag is detected and logout modal shows immediately.
-      sessionStorage.setItem('portalShowLogout', '1');
-      window.location.replace(window.location.pathname + '?section=home');
+      // c. On home → show logout modal
+      setShowLogoutConfirm(true);
     };
 
     window.addEventListener('popstate', onPopState);
