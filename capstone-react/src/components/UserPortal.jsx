@@ -3552,24 +3552,50 @@ export default function UserPortal() {
   };
 
   // Fetch read receipts (reader profiles) for a batch of messages
+  // Also treats reactors as implicit readers since reacting means they saw the message
   const fetchReadCounts = useCallback(async (msgIds) => {
     if (!msgIds?.length) return;
-    const { data } = await supabase
+
+    // Fetch actual reads
+    const { data: reads } = await supabase
       .from('message_reads')
       .select('message_id, reader_id, accounts:reader_id(full_name, account_details(avatar_url))')
       .in('message_id', msgIds);
-    if (data) {
-      const grouped = {};
-      data.forEach(r => {
-        if (!grouped[r.message_id]) grouped[r.message_id] = [];
+
+    // Fetch reactors (implicit reads)
+    const { data: reacts } = await supabase
+      .from('message_reactions')
+      .select('message_id, student_id, accounts:student_id(id, full_name, account_details(avatar_url))')
+      .in('message_id', msgIds);
+
+    const grouped = {};
+    msgIds.forEach(id => { grouped[id] = []; });
+
+    // Add actual readers
+    (reads || []).forEach(r => {
+      if (!grouped[r.message_id]) grouped[r.message_id] = [];
+      if (!grouped[r.message_id].find(x => x.reader_id === r.reader_id)) {
         grouped[r.message_id].push({
           reader_id: r.reader_id,
           full_name: r.accounts?.full_name || '',
           avatar_url: r.accounts?.account_details?.avatar_url || null,
         });
-      });
-      setMessageReads(prev => ({ ...prev, ...grouped }));
-    }
+      }
+    });
+
+    // Add reactors as implicit readers
+    (reacts || []).forEach(r => {
+      if (!grouped[r.message_id]) grouped[r.message_id] = [];
+      if (!grouped[r.message_id].find(x => x.reader_id === r.student_id)) {
+        grouped[r.message_id].push({
+          reader_id: r.student_id,
+          full_name: r.accounts?.full_name || '',
+          avatar_url: r.accounts?.account_details?.avatar_url || null,
+        });
+      }
+    });
+
+    setMessageReads(prev => ({ ...prev, ...grouped }));
   }, []);
 
   // Mark visible messages as read
