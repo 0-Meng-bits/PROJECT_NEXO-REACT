@@ -3369,6 +3369,7 @@ export default function UserPortal() {
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
+  const [showComposer, setShowComposer] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -4970,6 +4971,23 @@ export default function UserPortal() {
               {/* -- POST COMPOSER "? verified users only -- */}
               {user?.is_verified && (
                 <div className="home-post-composer">
+                  {/* Collapsed prompt — click to expand */}
+                  {!showComposer ? (
+                    <div className="home-composer-header" onClick={() => setShowComposer(true)}
+                      style={{ cursor: 'pointer' }}>
+                      <div className="home-composer-avatar">
+                        {navAvatarUrl
+                          ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : initials
+                        }
+                      </div>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 13, flex: 1 }}>
+                        What's on your mind? Share news, events, shoutouts...
+                      </span>
+                      <i className="fa-solid fa-pen-to-square" style={{ color: 'var(--cyber-cyan)', fontSize: 14 }}></i>
+                    </div>
+                  ) : (
+                    <>
                   <div className="home-composer-header">
                     <div className="home-composer-avatar">
                       {navAvatarUrl
@@ -4977,13 +4995,18 @@ export default function UserPortal() {
                         : initials
                       }
                     </div>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>Share something with the campus</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', flex: 1 }}>Share something with the campus</span>
+                    <button onClick={() => { setShowComposer(false); setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null }); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
                   </div>
                   <input
                     className="home-composer-title"
                     placeholder="Title"
                     value={newPost.title}
                     onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
+                    autoFocus
                   />
                   {newPost.post_type !== 'poll' && (
                     <textarea
@@ -5026,7 +5049,6 @@ export default function UserPortal() {
                           </button>
                         )}
                       </div>
-                      {/* Event metadata form - only for global feed (no community restriction) */}
                       <PollEventMetadataForm
                         communityCategory="social"
                         onChange={(metadata) => setNewPost(p => ({ ...p, event_metadata: metadata }))}
@@ -5051,20 +5073,22 @@ export default function UserPortal() {
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously "? click to use your name' : 'Post anonymously'}>
+                        title={newPost.anonymous ? 'Posting anonymously — click to use your name' : 'Post anonymously'}>
                         <i className="fa-solid fa-user-secret"></i>
                         <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
                       </button>
                       <button className="cyber-btn"
                         style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
                         disabled={postingAnnouncement || !newPost.title.trim() || (newPost.post_type !== 'poll' && !newPost.content.trim())}
-                        onClick={postAnnouncement}>
+                        onClick={() => { postAnnouncement(); setShowComposer(false); }}>
                         {postingAnnouncement
                           ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
                           : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
                       </button>
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
               )}
 
