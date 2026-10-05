@@ -4050,12 +4050,9 @@ export default function UserPortal() {
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
       if (s.viewingApplication)  { setViewingApplication(null); return; }
 
-      // b. Not on home → go home
+      // b. Not on home → reload portal at home (clean history stack, trap re-arms fresh)
       if (s.section !== 'home') {
-        setSection('home');
-        setActiveCommId('global');
-        setActiveChannelId(null);
-        window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?section=home');
+        window.location.replace(window.location.pathname + '?section=home');
         return;
       }
 
