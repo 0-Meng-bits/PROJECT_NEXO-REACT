@@ -957,15 +957,18 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               )}
             </div>
 
-            {/* Unified reactions popup */}
+            {/* Unified reactions popup — rendered as fixed overlay to avoid layout glitch */}
             {showReactors && (
-              <div style={{
-                position: 'absolute', bottom: 'calc(100% + 8px)',
-                [isOwnerMsg ? 'right' : 'left']: 0,
-                background: 'rgba(15,15,28,0.98)', border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 14, zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                minWidth: 220, maxWidth: 280, overflow: 'hidden',
-              }}>
+              <>
+                {/* Backdrop to close on outside click */}
+                <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => setShowReactors(false)} />
+                <div style={{
+                  position: 'absolute', bottom: 'calc(100% + 8px)',
+                  [isOwnerMsg ? 'right' : 'left']: 0,
+                  background: 'rgba(15,15,28,0.98)', border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 14, zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                  minWidth: 220, maxWidth: 280, overflow: 'hidden',
+                }}>
                 {/* Tabs */}
                 <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '6px 8px', gap: 4, overflowX: 'auto' }}>
                   {/* All tab */}
@@ -1010,6 +1013,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                   }
                 </div>
               </div>
+              </>
             )}
           </div>
         )}
