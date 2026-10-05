@@ -761,6 +761,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const [reactions, setReactions] = useState({});
   const [reactorNames, setReactorNames] = useState({}); // studentId -> full_name
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showReactors, setShowReactors] = useState(null); // type of reaction being viewed
 
   useEffect(() => {
     const load = async () => {
@@ -845,7 +846,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
       <div className="chat-body"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseLeave={() => { setHovered(false); setShowReactors(null); }}
       >
         {!isOwnerMsg && !isGrouped && (
           <div className="chat-meta">
@@ -946,22 +947,30 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
             {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <div key={type} style={{ position: 'relative' }}>
-                  <button onClick={() => toggleReaction(type)}
+                  <button onClick={() => setShowReactors(showReactors === type ? null : type)}
                     style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
                     {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
                   </button>
-                  {/* Reactor names — show on hover via CSS */}
-                  <div style={{
-                    position: 'absolute', bottom: 'calc(100% + 6px)',
-                    [isOwnerMsg ? 'right' : 'left']: 0,
-                    background: 'rgba(20,20,35,0.97)', border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 8, padding: '5px 10px', fontSize: 11, color: 'rgba(255,255,255,0.85)',
-                    whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 200,
-                    opacity: 0, transition: 'opacity 0.15s',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  }} className="reaction-names-tooltip">
-                    {reactions[type].map(id => reactorNames[id] || '...').join(', ')}
-                  </div>
+                  {showReactors === type && (
+                    <div style={{
+                      position: 'absolute', bottom: 'calc(100% + 6px)',
+                      [isOwnerMsg ? 'right' : 'left']: 0,
+                      background: 'rgba(20,20,35,0.97)', border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 10, padding: '8px 12px', fontSize: 12, color: 'rgba(255,255,255,0.85)',
+                      whiteSpace: 'nowrap', zIndex: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                      minWidth: 120,
+                    }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 1 }}>
+                        {emoji} REACTED
+                      </div>
+                      {reactions[type].map(id => (
+                        <div key={id} style={{ padding: '2px 0', color: id === currentStudentId ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.85)' }}>
+                          {reactorNames[id] || '...'}
+                          {id === currentStudentId && <span style={{ fontSize: 10, marginLeft: 4, color: 'var(--text-muted)' }}>(you)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : null
             )}
