@@ -942,11 +942,11 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {isOwnerMsg && !editing && (isLastInGroup || m.edited || isLastOwn || hovered) && (
+        {isOwnerMsg && !editing && (isLastInGroup || m.edited) && (
           <div className="chat-meta own">
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             {isLastInGroup && <span className="chat-time">{time}</span>}
-            {(isLastOwn || (isOwnerMsg && hovered)) && (
+            {(isLastOwn || hovered) && (
               <span style={{ marginLeft: 3, color: readCount > 0 ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 10 }} title={readCount > 0 ? `Seen by ${readCount}` : 'Sent'}>
                 {readCount > 0
                   ? <i className="fa-solid fa-check-double" />
