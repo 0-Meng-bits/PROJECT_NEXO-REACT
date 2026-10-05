@@ -761,7 +761,8 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const [reactions, setReactions] = useState({});
   const [reactorNames, setReactorNames] = useState({}); // studentId -> full_name
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showReactors, setShowReactors] = useState(null); // type of reaction being viewed
+  const [showReactors, setShowReactors] = useState(false); // show the reactions modal
+  const [reactorTab, setReactorTab] = useState('all'); // active tab in the modal
 
   useEffect(() => {
     const load = async () => {
@@ -846,7 +847,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
       <div className="chat-body"
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => { setHovered(false); setShowReactors(null); }}
+        onMouseLeave={() => setHovered(false)}
       >
         {!isOwnerMsg && !isGrouped && (
           <div className="chat-meta">
@@ -943,36 +944,72 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         )}
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-            {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
-              reactions[type]?.length > 0 ? (
-                <div key={type} style={{ position: 'relative' }}>
-                  <button onClick={() => setShowReactors(showReactors === type ? null : type)}
+          <div style={{ position: 'relative' }}>
+            {/* Single row of all reaction chips — click any to open the unified popup */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
+              {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
+                reactions[type]?.length > 0 ? (
+                  <button key={type} onClick={() => { setShowReactors(true); setReactorTab(type); }}
                     style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
                     {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
                   </button>
-                  {showReactors === type && (
-                    <div style={{
-                      position: 'absolute', bottom: 'calc(100% + 6px)',
-                      [isOwnerMsg ? 'right' : 'left']: 0,
-                      background: 'rgba(20,20,35,0.97)', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 10, padding: '8px 12px', fontSize: 12, color: 'rgba(255,255,255,0.85)',
-                      whiteSpace: 'nowrap', zIndex: 200, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                      minWidth: 120,
-                    }}>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 1 }}>
-                        {emoji} REACTED
-                      </div>
-                      {reactions[type].map(id => (
-                        <div key={id} style={{ padding: '2px 0', color: id === currentStudentId ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.85)' }}>
-                          {reactorNames[id] || '...'}
-                          {id === currentStudentId && <span style={{ fontSize: 10, marginLeft: 4, color: 'var(--text-muted)' }}>(you)</span>}
-                        </div>
-                      ))}
-                    </div>
+                ) : null
+              )}
+            </div>
+
+            {/* Unified reactions popup */}
+            {showReactors && (
+              <div style={{
+                position: 'absolute', bottom: 'calc(100% + 8px)',
+                [isOwnerMsg ? 'right' : 'left']: 0,
+                background: 'rgba(15,15,28,0.98)', border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 14, zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                minWidth: 220, maxWidth: 280, overflow: 'hidden',
+              }}>
+                {/* Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '6px 8px', gap: 4, overflowX: 'auto' }}>
+                  {/* All tab */}
+                  {(() => {
+                    const total = Object.values(reactions).reduce((s, arr) => s + arr.length, 0);
+                    return (
+                      <button onClick={() => setReactorTab('all')}
+                        style={{ background: reactorTab === 'all' ? 'rgba(0,240,255,0.15)' : 'none', border: `1px solid ${reactorTab === 'all' ? 'var(--cyber-cyan)' : 'transparent'}`, borderRadius: 20, padding: '3px 10px', fontSize: 11, cursor: 'pointer', color: reactorTab === 'all' ? 'var(--cyber-cyan)' : 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        All {total}
+                      </button>
+                    );
+                  })()}
+                  {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
+                    reactions[type]?.length > 0 ? (
+                      <button key={type} onClick={() => setReactorTab(type)}
+                        style={{ background: reactorTab === type ? 'rgba(0,240,255,0.15)' : 'none', border: `1px solid ${reactorTab === type ? 'var(--cyber-cyan)' : 'transparent'}`, borderRadius: 20, padding: '3px 8px', fontSize: 12, cursor: 'pointer', color: reactorTab === type ? 'var(--cyber-cyan)' : 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {emoji} {reactions[type].length}
+                      </button>
+                    ) : null
                   )}
+                  <button onClick={() => setShowReactors(false)}
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', flexShrink: 0 }}>
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
                 </div>
-              ) : null
+                {/* Reactor list */}
+                <div style={{ padding: '6px 4px', maxHeight: 180, overflowY: 'auto' }}>
+                  {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']]
+                    .filter(([type]) => reactorTab === 'all' || reactorTab === type)
+                    .flatMap(([type, emoji]) =>
+                      (reactions[type] || []).map(id => ({ id, emoji, type }))
+                    )
+                    .map(({ id, emoji }) => (
+                      <div key={`${emoji}-${id}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', borderRadius: 8 }}>
+                        <span style={{ fontSize: 13, color: id === currentStudentId ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.85)' }}>
+                          {reactorNames[id] || '...'}
+                          {id === currentStudentId && <span style={{ fontSize: 10, marginLeft: 6, color: 'var(--text-muted)' }}>you</span>}
+                        </span>
+                        <span style={{ fontSize: 16 }}>{emoji}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
             )}
           </div>
         )}
