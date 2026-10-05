@@ -4298,7 +4298,7 @@ export default function UserPortal() {
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
-        setMessages(prev => [...prev, data[0]]);
+        setMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
         setMsgInput('');
         setPendingMedia(null);
       } else {
@@ -4355,7 +4355,7 @@ export default function UserPortal() {
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
-        setCircleChatMessages(prev => [...prev, data[0]]);
+        setCircleChatMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
         setCircleChatInput('');
         setCirclePendingMedia(null);
       } else {
