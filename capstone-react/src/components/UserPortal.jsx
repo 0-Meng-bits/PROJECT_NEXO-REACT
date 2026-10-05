@@ -1494,7 +1494,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     <div className="modal-overlay" onClick={onClose}>
       <div className="manage-modal-box" onClick={e => e.stopPropagation()}>
         <div className="manage-modal-header">
-          <h2><i className="fa-solid fa-gear" style={{ marginRight: 10 }}></i>GROUP SETTINGS</h2>
+          <h2><i className="fa-solid fa-gear" style={{ marginRight: 10 }}></i>CIRCLE SETTINGS</h2>
           <button className="manage-close-btn" onClick={onClose}>&times;</button>
         </div>
         <div className="manage-tabs">
