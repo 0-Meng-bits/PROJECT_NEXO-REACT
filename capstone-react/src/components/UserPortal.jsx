@@ -4048,14 +4048,18 @@ export default function UserPortal() {
       if (showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalHome: true }, ''); return; }
       if (viewingApplication) { setViewingApplication(null); window.history.pushState({ portalHome: true }, ''); return; }
 
+      // Read section from URL directly — more reliable than the ref which may lag
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentSection = urlParams.get('section') || 'home';
+
       // If not on home, go to home feed
-      if (sectionRef.current !== 'home') {
+      if (currentSection !== 'home') {
         backHandlerActive.current = true; // prevent searchParams sync from overriding
         setSection('home');
         setActiveCommId('global');
         setActiveChannelId(null);
         sectionRef.current = 'home';
-        // Replace the current URL entry to home so searchParams stays correct
+        // Replace URL to home so searchParams stays in sync
         window.history.replaceState(null, '', window.location.pathname + '?section=home');
         // Push sentinel so next back from home shows logout
         window.history.pushState({ portalHome: true }, '');
