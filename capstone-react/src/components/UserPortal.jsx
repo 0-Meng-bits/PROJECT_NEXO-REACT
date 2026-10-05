@@ -4020,28 +4020,14 @@ export default function UserPortal() {
   });
 
   // Guard flag: set to true when WE trigger replaceState/pushState so popstate
-  // caused by our own navigation is ignored.
-  const ignoringPopState = useRef(false);
-
   // Back-button / swipe-back handler — registered ONCE on mount.
-  //
-  // History stack on mount:  [...browser history] | /portal?section=home | TRAP
-  //
-  // navTo uses window.history.replaceState (not pushState, not setSearchParams)
-  // so navigating inside the portal never adds entries — the stack stays the same.
-  //
-  // When user presses back:
-  //   TRAP pops → popstate fires → we re-push TRAP immediately (re-arm)
-  //   then decide: close modal / go home / show logout modal
+  // pushState never fires popstate — only the user's back gesture does.
+  // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
     window.history.pushState({ portalTrap: true }, '');
 
-    const onPopState = (e) => {
-      // Ignore events we caused ourselves
-      if (ignoringPopState.current) { ignoringPopState.current = false; return; }
-
+    const onPopState = () => {
       // Re-arm the trap so back never escapes the portal
-      ignoringPopState.current = true;
       window.history.pushState({ portalTrap: true }, '');
 
       const s = backStateRef.current;
