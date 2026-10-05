@@ -3320,11 +3320,11 @@ export default function UserPortal() {
   const [userCustomizations, setUserCustomizations] = useState({}); // studentId -> customizations
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
   const [profileIdCache, setProfileIdCache] = useState({}); // student_id -> UUID
-  const [msgInput, setMsgInput] = useState('');
+  const msgInputRef = useRef('');
+  const circleChatInputRef = useRef('');
   const [pendingMedia, setPendingMedia] = useState(null); // { file, mediaType, duration? }
   const [uploading, setUploading] = useState(false);
   const [circleChatMessages, setCircleChatMessages] = useState([]);
-  const [circleChatInput, setCircleChatInput] = useState('');
   const [circlePendingMedia, setCirclePendingMedia] = useState(null);
   const [toast, setToast] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -4254,12 +4254,11 @@ export default function UserPortal() {
   };
 
   const sendPost = async () => {
+    const msgInput = msgInputRef.current?.value || '';
     if (!msgInput.trim() && !pendingMedia) return;
-    // Block bad words "? don't send, show error
     if (msgInput.trim() && containsBadWord(msgInput)) {
-      setSendError('?? Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
-      // Still auto-flag for admin awareness
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: msgInput });
       return;
     }
@@ -4275,7 +4274,6 @@ export default function UserPortal() {
       let mediaDuration = null;
       let messageType = 'text';
 
-      // Upload media if present
       if (pendingMedia) {
         mediaUrl = await uploadMediaFile(pendingMedia.file, user.id, pendingMedia.mediaType);
         mediaSize = pendingMedia.file.size;
@@ -4299,7 +4297,7 @@ export default function UserPortal() {
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
         setMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
-        setMsgInput('');
+        if (msgInputRef.current) msgInputRef.current.value = '';
         setPendingMedia(null);
       } else {
         throw new Error(error?.message || 'Failed to send');
@@ -4314,9 +4312,10 @@ export default function UserPortal() {
   };
 
   const sendCircleChatPost = async () => {
+    const circleChatInput = circleChatInputRef.current?.value || '';
     if (!circleChatInput.trim() && !circlePendingMedia) return;
     if (circleChatInput.trim() && containsBadWord(circleChatInput)) {
-      setSendError('?? Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: circleChatInput });
       return;
@@ -4356,7 +4355,7 @@ export default function UserPortal() {
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
         setCircleChatMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
-        setCircleChatInput('');
+        if (circleChatInputRef.current) circleChatInputRef.current.value = '';
         setCirclePendingMedia(null);
       } else {
         throw new Error(error?.message || 'Failed to send');
@@ -5260,7 +5259,7 @@ export default function UserPortal() {
                       onVoiceRecorded={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
                     />
-                    <input value={msgInput} onChange={e => { setMsgInput(e.target.value); setSendError(''); }}
+                    <input ref={msgInputRef} onChange={() => setSendError('')}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
                       placeholder="Say something to the campus..."
                       disabled={uploading}
@@ -5820,7 +5819,7 @@ export default function UserPortal() {
                       onVoiceRecorded={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
                     />
-                    <input value={msgInput} onChange={e => { setMsgInput(e.target.value); setSendError(''); }}
+                    <input ref={msgInputRef} onChange={() => setSendError('')}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
                       placeholder="Write a message..."
                       disabled={uploading}
@@ -5945,7 +5944,7 @@ export default function UserPortal() {
                       onVoiceRecorded={setCirclePendingMedia} 
                       disabled={uploading || !!circlePendingMedia}
                     />
-                    <input value={circleChatInput} onChange={e => setCircleChatInput(e.target.value)}
+                    <input ref={circleChatInputRef}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendCircleChatPost()}
                       placeholder={`Message ${activeComm.name}...`}
                       disabled={uploading}
