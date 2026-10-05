@@ -3353,7 +3353,7 @@ export default function UserPortal() {
       if (comm && comm !== 'global') next.set('commId', comm);
       else next.delete('commId');
       return next;
-    }, { replace: false }); // push to history so back button steps through
+    }, { replace: true }); // replace, not push — back button is handled manually
   }, [activeCommId, setSearchParams]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
@@ -4007,75 +4007,51 @@ export default function UserPortal() {
       });
   }, [communities]);
 
-  // Flag so the searchParams sync doesn't override our back-handler navigation
-  const backHandlerActive = useRef(false);
-
-  // Sync state back from URL when user presses back/forward
-  // (skip if our own back handler already handled the navigation)
-  useEffect(() => {
-    if (backHandlerActive.current) { backHandlerActive.current = false; return; }
-    const sec = searchParams.get('section') || 'home';
-    const comm = searchParams.get('commId') || 'global';
-    setSection(sec);
-    setActiveCommId(comm);
-    if (comm === 'global') setActiveChannelId(null);
-  }, [searchParams]);
-
-  // Keep sectionRef in sync so the popstate handler always has the latest section
+  // Keep sectionRef in sync
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Push ONE sentinel entry on mount so the first back press is interceptable.
-  useEffect(() => {
-    window.history.pushState({ portalHome: true }, '');
-  }, []);
-
   // Back-button / swipe-back handler.
-  // - If any modal/panel is open → close it, re-push sentinel.
-  // - If on a non-home section → go to home feed, replace URL, re-push sentinel.
-  // - If already on home → show logout modal.
+  // navTo always uses replace:true so internal navigation never pushes browser history.
+  // The sentinel is the only extra entry — back always pops it, we intercept here.
+  // Priority: close open modal → go home if not there → show logout modal.
   useEffect(() => {
+    // Push sentinel once on mount
+    window.history.pushState({ portalSentinel: true }, '');
+
     const onPopState = () => {
-      // Close any open overlays first
-      if (showProfile) { setShowProfile(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (viewingProfile) { setViewingProfile(null); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showManage) { setShowManage(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showMembersPanel) { setShowMembersPanel(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showNotifications) { setShowNotifications(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showShop) { setShowShop(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showThemePicker) { setShowThemePicker(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showEventsModal) { setShowEventsModal(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showCreate) { setShowCreate(false); window.history.pushState({ portalHome: true }, ''); return; }
-      if (showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalHome: true }, ''); return; }
-      if (viewingApplication) { setViewingApplication(null); window.history.pushState({ portalHome: true }, ''); return; }
+      // Always re-push the sentinel so we keep intercepting future back presses
+      window.history.pushState({ portalSentinel: true }, '');
 
-      // Read section from URL directly — more reliable than the ref which may lag
-      const urlParams = new URLSearchParams(window.location.search);
-      const currentSection = urlParams.get('section') || 'home';
+      // 1. Close any open overlay first
+      if (showProfile) { setShowProfile(false); return; }
+      if (viewingProfile) { setViewingProfile(null); return; }
+      if (showManage) { setShowManage(false); return; }
+      if (showMembersPanel) { setShowMembersPanel(false); return; }
+      if (showNotifications) { setShowNotifications(false); return; }
+      if (showShop) { setShowShop(false); return; }
+      if (showThemePicker) { setShowThemePicker(false); return; }
+      if (showEventsModal) { setShowEventsModal(false); return; }
+      if (showCreate) { setShowCreate(false); return; }
+      if (showApplicationForm) { setShowApplicationForm(null); return; }
+      if (viewingApplication) { setViewingApplication(null); return; }
 
-      // If not on home, go to home feed
-      if (currentSection !== 'home') {
-        backHandlerActive.current = true; // prevent searchParams sync from overriding
-        setSection('home');
-        setActiveCommId('global');
-        setActiveChannelId(null);
-        sectionRef.current = 'home';
-        // Replace URL to home so searchParams stays in sync
-        window.history.replaceState(null, '', window.location.pathname + '?section=home');
-        // Push sentinel so next back from home shows logout
-        window.history.pushState({ portalHome: true }, '');
+      // 2. If not on home, go to home
+      const urlSection = new URLSearchParams(window.location.search).get('section') || 'home';
+      if (urlSection !== 'home') {
+        navTo('home', 'global');
         return;
       }
 
-      // Already on home — show logout confirmation
-      window.history.pushState({ portalHome: true }, ''); // stay on page
+      // 3. Already on home — show logout confirmation
       setShowLogoutConfirm(true);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showProfile, viewingProfile, showManage, showMembersPanel, showNotifications,
       showShop, showThemePicker, showEventsModal, showCreate, showApplicationForm,
-      viewingApplication]);
+      viewingApplication, navTo]);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
