@@ -3346,11 +3346,17 @@ export default function UserPortal() {
     const comm = newCommId !== undefined ? newCommId : activeCommId;
     setSection(newSection);
     if (newCommId !== undefined) setActiveCommId(newCommId);
-    // Update URL silently for bookmarking/refresh — does NOT trigger popstate
+    // Push a real history entry when leaving home so back returns here first.
+    // Replace when already on a non-home section (no need to stack multiple entries).
     const params = new URLSearchParams();
     params.set('section', newSection);
     if (comm && comm !== 'global') params.set('commId', comm);
-    window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?' + params.toString());
+    const url = window.location.pathname + '?' + params.toString();
+    if (newSection !== 'home' && (new URLSearchParams(window.location.search).get('section') || 'home') === 'home') {
+      window.history.pushState({ portalNav: true }, '', url);
+    } else {
+      window.history.replaceState({ portalNav: true }, '', url);
+    }
   }, [activeCommId]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
