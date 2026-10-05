@@ -4050,14 +4050,19 @@ export default function UserPortal() {
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
       if (s.viewingApplication)  { setViewingApplication(null); return; }
 
-      // b. Not on home → reload portal at home (clean history stack, trap re-arms fresh)
+      // b. Not on home → go to home feed first
       if (s.section !== 'home') {
-        window.location.replace(window.location.pathname + '?section=home');
+        setSection('home');
+        setActiveCommId('global');
+        setActiveChannelId(null);
+        window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?section=home');
         return;
       }
 
-      // c. Already on home → show logout modal
-      setShowLogoutConfirm(true);
+      // c. Already on home → reload to get a clean history stack.
+      // After reload the page mounts fresh with new trap entries, so the
+      // next back press will correctly show the logout modal.
+      window.location.replace(window.location.pathname + '?section=home');
     };
 
     window.addEventListener('popstate', onPopState);
