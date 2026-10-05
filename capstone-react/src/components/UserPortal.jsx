@@ -759,6 +759,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
   const [reactions, setReactions] = useState({});
+  const [reactorNames, setReactorNames] = useState({}); // studentId -> full_name
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
@@ -772,6 +773,17 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           grouped[r.reaction].push(r.student_id);
         });
         setReactions(grouped);
+        // Fetch names for all reactors
+        const ids = [...new Set(data.map(r => r.student_id).filter(Boolean))];
+        if (ids.length) {
+          const { data: accounts } = await supabase
+            .from('accounts').select('ctu_id, full_name').in('ctu_id', ids);
+          if (accounts) {
+            const map = {};
+            accounts.forEach(a => { map[a.ctu_id] = a.full_name; });
+            setReactorNames(map);
+          }
+        }
       }
     };
     load();
@@ -890,7 +902,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 <i className="fa-regular fa-face-smile"></i>
               </button>
               {showEmojiPicker && (
-                <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                <div style={{ position: 'absolute', bottom: '100%', [isOwnerMsg ? 'right' : 'left']: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
                   {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
@@ -934,6 +946,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
             {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <button key={type} onClick={() => toggleReaction(type)}
+                  title={reactions[type].map(id => reactorNames[id] || id).join(', ')}
                   style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
                   {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
                 </button>
