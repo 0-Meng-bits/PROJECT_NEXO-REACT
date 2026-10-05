@@ -4019,20 +4019,18 @@ export default function UserPortal() {
   // Keep sectionRef in sync so the popstate handler always has the latest section
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Push a sentinel entry whenever the user lands on home so we can intercept
-  // back-button presses from home and show the logout modal instead.
+  // Push ONE sentinel entry on mount so the very first back press is interceptable.
+  // We do NOT re-push on every section change — that stacks extra entries.
   useEffect(() => {
-    if (section === 'home') {
-      window.history.pushState({ portalHome: true }, '');
-    }
-  }, [section]);
+    window.history.pushState({ portalHome: true }, '');
+  }, []);
 
   // Back-button / swipe-back handler.
-  // - If any modal/panel is open → close it (let the URL sync useEffect handle state).
-  // - If on a non-home section → go to home feed first.
-  // - If already on home (sentinel popped) → show logout modal.
+  // - If any modal/panel is open → close it, re-push sentinel to stay interceptable.
+  // - If on a non-home section → go to home feed, re-push sentinel.
+  // - If already on home → show logout modal.
   useEffect(() => {
-    const onPopState = (e) => {
+    const onPopState = () => {
       // Close any open overlays first
       if (showProfile) { setShowProfile(false); window.history.pushState({ portalHome: true }, ''); return; }
       if (viewingProfile) { setViewingProfile(null); window.history.pushState({ portalHome: true }, ''); return; }
@@ -4046,10 +4044,13 @@ export default function UserPortal() {
       if (showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalHome: true }, ''); return; }
       if (viewingApplication) { setViewingApplication(null); window.history.pushState({ portalHome: true }, ''); return; }
 
-      // If not on home, navigate to home feed
+      // If not on home, go to home feed (update state only, no URL push)
       if (sectionRef.current !== 'home') {
-        navTo('home', 'global');
-        // Re-push sentinel so a subsequent back from home shows the logout modal
+        setSection('home');
+        setActiveCommId('global');
+        setActiveChannelId(null);
+        sectionRef.current = 'home';
+        // Re-push sentinel so next back press from home shows logout
         window.history.pushState({ portalHome: true }, '');
         return;
       }
@@ -4063,7 +4064,7 @@ export default function UserPortal() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [showProfile, viewingProfile, showManage, showMembersPanel, showNotifications,
       showShop, showThemePicker, showEventsModal, showCreate, showApplicationForm,
-      viewingApplication, navTo]);
+      viewingApplication]);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
