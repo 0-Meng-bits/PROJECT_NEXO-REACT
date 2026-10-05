@@ -945,11 +945,24 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
             {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
-                <button key={type} onClick={() => toggleReaction(type)}
-                  title={reactions[type].map(id => reactorNames[id] || id).join(', ')}
-                  style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
-                  {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
-                </button>
+                <div key={type} style={{ position: 'relative' }}>
+                  <button onClick={() => toggleReaction(type)}
+                    style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
+                    {emoji} <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
+                  </button>
+                  {/* Reactor names — show on hover via CSS */}
+                  <div style={{
+                    position: 'absolute', bottom: 'calc(100% + 6px)',
+                    [isOwnerMsg ? 'right' : 'left']: 0,
+                    background: 'rgba(20,20,35,0.97)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8, padding: '5px 10px', fontSize: 11, color: 'rgba(255,255,255,0.85)',
+                    whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 200,
+                    opacity: 0, transition: 'opacity 0.15s',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  }} className="reaction-names-tooltip">
+                    {reactions[type].map(id => reactorNames[id] || '...').join(', ')}
+                  </div>
+                </div>
               ) : null
             )}
           </div>

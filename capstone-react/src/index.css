@@ -1748,7 +1748,9 @@ body {
 .reaction-chip:hover { background: rgba(255,255,255,0.1); }
 .reaction-chip.mine { background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.35); color: var(--cyber-cyan); }
 
-/* REQUEST BADGE on manage tab */
+/* Reaction names tooltip — shows on hover */
+.reaction-names-tooltip { opacity: 0; pointer-events: none; }
+div:hover > .reaction-names-tooltip { opacity: 1; }
 .req-badge {
   background: var(--red);
   color: white;
