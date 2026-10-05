@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
@@ -3310,13 +3310,12 @@ function AppealModal({ warning, onClose, userId }) {
 // -- MAIN PORTAL ---------------------------------------------------------------
 export default function UserPortal() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('currentUser')));
   const user = currentUser;
   const [communities, setCommunities] = useState([GLOBAL_COMM]);
   const [myMemberships, setMyMemberships] = useState([]); // { community_id, role, status }
-  const [activeCommId, setActiveCommId] = useState(() => searchParams.get('commId') || 'global');
-  const [section, setSection] = useState(() => searchParams.get('section') || 'home');
+  const [activeCommId, setActiveCommId] = useState(() => new URLSearchParams(window.location.search).get('commId') || 'global');
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'home');
   const [messages, setMessages] = useState([]);
   const [userCustomizations, setUserCustomizations] = useState({}); // studentId -> customizations
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
