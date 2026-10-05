@@ -3730,6 +3730,9 @@ export default function UserPortal() {
       }
       setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
       loadAnnouncements();
+    } else {
+      console.error('Post announcement error:', error);
+      showToast('Failed to post: ' + (error.message || 'Unknown error'));
     }
   };
 
