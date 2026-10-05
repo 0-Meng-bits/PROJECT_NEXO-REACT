@@ -891,7 +891,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               </button>
               {showEmojiPicker && (
                 <div style={{ position: 'absolute', bottom: '100%', left: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) => (
+                  {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
@@ -931,7 +931,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-            {[['heart','??'],['laugh','??'],['sad','??']].map(([type, emoji]) =>
+            {[['heart','❤️'],['laugh','😂'],['sad','😢'],['fire','🔥'],['wow','😮']].map(([type, emoji]) =>
               reactions[type]?.length > 0 ? (
                 <button key={type} onClick={() => toggleReaction(type)}
                   style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
@@ -5206,14 +5206,14 @@ export default function UserPortal() {
                     const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
                     
-                    // Group consecutive messages from same user within 1 minute
+                    // Group consecutive messages from same user within 3 minutes
                     const isGrouped = prev && 
                       prev.student_id === m.student_id && 
-                      (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                      (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                     
                     const isLastInGroup = !next || 
                       next.student_id !== m.student_id || 
-                      (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                      (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
                     
                     return (
                       <React.Fragment key={m.id}>
@@ -5764,14 +5764,14 @@ export default function UserPortal() {
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
                       
-                      // Group consecutive messages from same user within 1 minute
+                      // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
                         prev.student_id === m.student_id && 
-                        (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                        (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
                         next.student_id !== m.student_id || 
-                        (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                        (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
                       
                       return (
                         <React.Fragment key={m.id}>
@@ -5883,14 +5883,14 @@ export default function UserPortal() {
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
                       
-                      // Group consecutive messages from same user within 1 minute
+                      // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
                         prev.student_id === m.student_id && 
-                        (new Date(m.created_at) - new Date(prev.created_at)) < 60 * 1000;
+                        (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
                         next.student_id !== m.student_id || 
-                        (new Date(next.created_at) - new Date(m.created_at)) >= 60 * 1000;
+                        (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
                       
                       return (
                         <React.Fragment key={m.id}>

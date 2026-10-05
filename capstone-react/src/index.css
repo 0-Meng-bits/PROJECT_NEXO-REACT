@@ -1495,22 +1495,22 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 .chat-row.grouped {
-  margin-top: 0px;
-  margin-bottom: 1px;
+  margin-top: 2px;
+  margin-bottom: 0;
 }
 .chat-row:not(.grouped) {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .chat-row.grouped .chat-bubble.other {
   border-radius: 16px 16px 16px 4px;
-  margin-top: 1px;
+  margin-top: 0;
 }
 .chat-row.grouped .chat-bubble.own {
   border-radius: 16px 16px 4px 16px;
-  margin-top: 1px;
+  margin-top: 0;
 }
 /* First message in group keeps full radius on top */
 .chat-row:not(.grouped) + .chat-row.grouped .chat-bubble.other {
@@ -1542,7 +1542,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 3px;
+  margin-bottom: 1px;
   font-size: 10px;
   color: var(--text-muted);
 }
@@ -1820,6 +1820,8 @@ body {
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  gap: 0 !important;
+  padding: 8px 12px !important;
 }
 
 .composer-chat {
