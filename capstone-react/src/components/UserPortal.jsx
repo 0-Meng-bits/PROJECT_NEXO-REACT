@@ -754,7 +754,7 @@ function ChatTimeSeparator({ date }) {
 }
 
 // -- MESSAGE ITEM --------------------------------------------------------------
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readCount, isLastOwn, isGrouped, isLastInGroup, userCustomizations }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readers, isLastOwn, isGrouped, isLastInGroup, userCustomizations }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -1022,12 +1022,33 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           <div className="chat-meta own">
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             {isLastInGroup && <span className="chat-time">{time}</span>}
-            {(isLastOwn || hovered) && (
-              <span style={{ marginLeft: 3, color: readCount > 0 ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 10 }} title={readCount > 0 ? `Seen by ${readCount}` : 'Sent'}>
-                {readCount > 0
-                  ? <i className="fa-solid fa-check-double" />
-                  : <i className="fa-solid fa-check" />
-                }
+            {isLastInGroup && readers?.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', marginLeft: 4 }} title={readers.map(r => r.full_name).join(', ')}>
+                {readers.slice(0, 10).map((r, i) => (
+                  <div key={r.reader_id} style={{
+                    width: 14, height: 14, borderRadius: '50%',
+                    border: '1px solid var(--card-bg)',
+                    background: r.avatar_url ? 'transparent' : 'rgba(0,240,255,0.2)',
+                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 7, fontWeight: 700, color: 'var(--cyber-cyan)',
+                    marginLeft: i === 0 ? 0 : -4, position: 'relative', zIndex: 10 - i, flexShrink: 0,
+                  }}>
+                    {r.avatar_url
+                      ? <img src={r.avatar_url} alt={r.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : (r.full_name?.[0] || '?').toUpperCase()
+                    }
+                  </div>
+                ))}
+                {readers.length > 10 && (
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--card-bg)', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: 'var(--text-muted)', marginLeft: -4, flexShrink: 0 }}>
+                    +{readers.length - 10}
+                  </div>
+                )}
+              </div>
+            )}
+            {isLastInGroup && (!readers || readers.length === 0) && (isLastOwn || hovered) && (
+              <span style={{ marginLeft: 3, color: 'var(--text-muted)', fontSize: 10 }} title="Sent">
+                <i className="fa-solid fa-check" />
               </span>
             )}
           </div>
@@ -3465,7 +3486,7 @@ export default function UserPortal() {
   const [showFlagUser, setShowFlagUser] = useState(null); // { targetUser }
   const [showShop, setShowShop] = useState(false); // Profile Shop modal
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [messageReads, setMessageReads] = useState({}); // message_id -> read count
+  const [messageReads, setMessageReads] = useState({}); // message_id -> [{ reader_id, full_name, avatar_url }]
   const [showEventsModal, setShowEventsModal] = useState(false);
   const [campusEvents, setCampusEvents] = useState([]);
   const [circleEvents, setCircleEvents] = useState([]);
@@ -3530,14 +3551,24 @@ export default function UserPortal() {
     }
   };
 
-  // Fetch read counts for a batch of messages
+  // Fetch read receipts (reader profiles) for a batch of messages
   const fetchReadCounts = useCallback(async (msgIds) => {
     if (!msgIds?.length) return;
-    const { data } = await supabase.from('message_reads').select('message_id').in('message_id', msgIds);
+    const { data } = await supabase
+      .from('message_reads')
+      .select('message_id, reader_id, accounts:reader_id(full_name, account_details(avatar_url))')
+      .in('message_id', msgIds);
     if (data) {
-      const counts = {};
-      data.forEach(r => { counts[r.message_id] = (counts[r.message_id] || 0) + 1; });
-      setMessageReads(prev => ({ ...prev, ...counts }));
+      const grouped = {};
+      data.forEach(r => {
+        if (!grouped[r.message_id]) grouped[r.message_id] = [];
+        grouped[r.message_id].push({
+          reader_id: r.reader_id,
+          full_name: r.accounts?.full_name || '',
+          avatar_url: r.accounts?.account_details?.avatar_url || null,
+        });
+      });
+      setMessageReads(prev => ({ ...prev, ...grouped }));
     }
   }, []);
 
@@ -5331,7 +5362,7 @@ export default function UserPortal() {
                           avatarUrl={avatarCache[m.student_id] || null}
                           onViewProfile={viewUserProfile}
                           online={isOnline(profileIdCache[m.student_id])}
-                          readCount={messageReads[m.id] || 0}
+                          readers={messageReads[m.id] || []}
                           isLastOwn={isLastOwn}
                           isGrouped={isGrouped}
                           isLastInGroup={isLastInGroup}
@@ -5890,7 +5921,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readCount={messageReads[m.id] || 0}
+                            readers={messageReads[m.id] || []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
@@ -6015,7 +6046,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readCount={messageReads[m.id] || 0}
+                            readers={messageReads[m.id] || []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
