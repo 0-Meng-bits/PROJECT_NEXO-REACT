@@ -4030,14 +4030,17 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
+      if (myIds.length) fetchReadCounts(myIds);
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
+      if (myIds.length) fetchReadCounts(myIds);
     } else if (commId) {
-      // Only messages that belong to no specific channel (the default "general" flow)
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
         .is('channel_id', null)
@@ -4045,6 +4048,8 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
+      if (myIds.length) fetchReadCounts(myIds);
     } else {
       setMessages([]);
     }
