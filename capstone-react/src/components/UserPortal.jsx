@@ -4019,49 +4019,51 @@ export default function UserPortal() {
   // Keep sectionRef in sync so the popstate handler always has the latest section
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Push a sentinel entry whenever the user lands on home.
-  // This gives one extra back-step buffer at the home screen.
+  // Push a sentinel entry whenever the user lands on home so we can intercept
+  // back-button presses from home and show the logout modal instead.
   useEffect(() => {
     if (section === 'home') {
-      window.history.pushState({ portalSentinel: true }, '');
+      window.history.pushState({ portalHome: true }, '');
     }
   }, [section]);
 
-  // Guard: when the sentinel is popped (user backed past home), show logout modal
+  // Back-button / swipe-back handler.
+  // - If any modal/panel is open → close it (let the URL sync useEffect handle state).
+  // - If on a non-home section → go to home feed first.
+  // - If already on home (sentinel popped) → show logout modal.
   useEffect(() => {
     const onPopState = (e) => {
-      if (e.state?.portalSentinel) {
-        // Re-push to stay on home, then show the modal
-        window.history.pushState({ portalSentinel: true }, '');
-        setShowLogoutConfirm(true);
+      // Close any open overlays first
+      if (showProfile) { setShowProfile(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (viewingProfile) { setViewingProfile(null); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showManage) { setShowManage(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showMembersPanel) { setShowMembersPanel(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showNotifications) { setShowNotifications(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showShop) { setShowShop(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showThemePicker) { setShowThemePicker(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showEventsModal) { setShowEventsModal(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showCreate) { setShowCreate(false); window.history.pushState({ portalHome: true }, ''); return; }
+      if (showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalHome: true }, ''); return; }
+      if (viewingApplication) { setViewingApplication(null); window.history.pushState({ portalHome: true }, ''); return; }
+
+      // If not on home, navigate to home feed
+      if (sectionRef.current !== 'home') {
+        navTo('home', 'global');
+        // Re-push sentinel so a subsequent back from home shows the logout modal
+        window.history.pushState({ portalHome: true }, '');
+        return;
       }
+
+      // Already on home — show logout confirmation
+      window.history.pushState({ portalHome: true }, ''); // keep user on the page
+      setShowLogoutConfirm(true);
     };
+
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  // When arriving at home, push an extra history entry as a buffer.
-  // That way the first back from home just returns to this buffer entry (same page),
-  // and we can intercept the second back to show the logout modal.
-  useEffect(() => {
-    if (section === 'home') {
-      window.history.pushState({ nexoBuffer: true }, '');
-    }
-  }, [section]);
-
-  // Guard: intercept back from the home buffer entry
-  useEffect(() => {
-    const handlePopState = (e) => {
-      if (e.state && e.state.nexoBuffer) {
-        // Re-push so cancel keeps user on home
-        window.history.pushState({ nexoBuffer: true }, '');
-        setShowLogoutConfirm(true);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [showProfile, viewingProfile, showManage, showMembersPanel, showNotifications,
+      showShop, showThemePicker, showEventsModal, showCreate, showApplicationForm,
+      viewingApplication, navTo]);
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
