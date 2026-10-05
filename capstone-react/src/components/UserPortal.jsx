@@ -1578,7 +1578,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
             </div>
             <div className="input-group">
               <label>DESCRIPTION</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe this node's purpose..." />
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe this channel's purpose..." />
             </div>
             <div className="modal-actions">
               <button className="cyber-btn" onClick={saveSettings} disabled={saving} style={{ flex: 1 }}>
@@ -5576,7 +5576,7 @@ export default function UserPortal() {
                 {!isMember(activeCommId) ? (
                   <div className="post" style={{ textAlign: 'center', padding: 40 }}>
                     <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 16, display: 'block' }}></i>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>This node requires membership to access transmissions.</p>
+                    <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>This circle requires membership to access.</p>
                     {isPending(activeCommId) ? (
                       <span style={{ color: 'var(--cyber-yellow)', fontSize: 12 }}>
                         <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Join request pending approval...
