@@ -4007,8 +4007,13 @@ export default function UserPortal() {
       });
   }, [communities]);
 
+  // Flag so the searchParams sync doesn't override our back-handler navigation
+  const backHandlerActive = useRef(false);
+
   // Sync state back from URL when user presses back/forward
+  // (skip if our own back handler already handled the navigation)
   useEffect(() => {
+    if (backHandlerActive.current) { backHandlerActive.current = false; return; }
     const sec = searchParams.get('section') || 'home';
     const comm = searchParams.get('commId') || 'global';
     setSection(sec);
@@ -4019,15 +4024,14 @@ export default function UserPortal() {
   // Keep sectionRef in sync so the popstate handler always has the latest section
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Push ONE sentinel entry on mount so the very first back press is interceptable.
-  // We do NOT re-push on every section change — that stacks extra entries.
+  // Push ONE sentinel entry on mount so the first back press is interceptable.
   useEffect(() => {
     window.history.pushState({ portalHome: true }, '');
   }, []);
 
   // Back-button / swipe-back handler.
-  // - If any modal/panel is open → close it, re-push sentinel to stay interceptable.
-  // - If on a non-home section → go to home feed, re-push sentinel.
+  // - If any modal/panel is open → close it, re-push sentinel.
+  // - If on a non-home section → go to home feed, replace URL, re-push sentinel.
   // - If already on home → show logout modal.
   useEffect(() => {
     const onPopState = () => {
@@ -4044,19 +4048,22 @@ export default function UserPortal() {
       if (showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalHome: true }, ''); return; }
       if (viewingApplication) { setViewingApplication(null); window.history.pushState({ portalHome: true }, ''); return; }
 
-      // If not on home, go to home feed (update state only, no URL push)
+      // If not on home, go to home feed
       if (sectionRef.current !== 'home') {
+        backHandlerActive.current = true; // prevent searchParams sync from overriding
         setSection('home');
         setActiveCommId('global');
         setActiveChannelId(null);
         sectionRef.current = 'home';
-        // Re-push sentinel so next back press from home shows logout
+        // Replace the current URL entry to home so searchParams stays correct
+        window.history.replaceState(null, '', window.location.pathname + '?section=home');
+        // Push sentinel so next back from home shows logout
         window.history.pushState({ portalHome: true }, '');
         return;
       }
 
       // Already on home — show logout confirmation
-      window.history.pushState({ portalHome: true }, ''); // keep user on the page
+      window.history.pushState({ portalHome: true }, ''); // stay on page
       setShowLogoutConfirm(true);
     };
 
