@@ -4010,48 +4010,66 @@ export default function UserPortal() {
   // Keep sectionRef in sync
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // Back-button / swipe-back handler.
-  // navTo always uses replace:true so internal navigation never pushes browser history.
-  // The sentinel is the only extra entry — back always pops it, we intercept here.
-  // Priority: close open modal → go home if not there → show logout modal.
+  // Ref that always holds the latest state values needed by the back handler.
+  // This avoids stale closures — the popstate listener is registered once but
+  // always reads current values through this ref.
+  const backStateRef = useRef({});
   useEffect(() => {
-    // Push sentinel once on mount
-    window.history.pushState({ portalSentinel: true }, '');
+    backStateRef.current = {
+      section,
+      showProfile, viewingProfile, showManage, showMembersPanel,
+      showNotifications, showShop, showThemePicker, showEventsModal,
+      showCreate, showApplicationForm, viewingApplication,
+    };
+  });
+
+  // Back-button / swipe-back handler — registered ONCE on mount.
+  // Pattern:
+  //   1. On mount → push one "trap" entry onto the history stack.
+  //   2. User navigates inside portal via navTo (replace:true) → stack stays at 2 entries.
+  //   3. Back pressed → trap entry pops → popstate fires → we re-push trap immediately
+  //      so the browser never actually navigates away, then decide what to do:
+  //        a. Modal open? Close it.
+  //        b. Not on home? Go home.
+  //        c. On home? Show logout modal.
+  useEffect(() => {
+    window.history.pushState({ portalTrap: true }, '');
 
     const onPopState = () => {
-      // Always re-push the sentinel so we keep intercepting future back presses
-      window.history.pushState({ portalSentinel: true }, '');
+      // Re-arm the trap immediately so back never escapes the portal
+      window.history.pushState({ portalTrap: true }, '');
 
-      // 1. Close any open overlay first
-      if (showProfile) { setShowProfile(false); return; }
-      if (viewingProfile) { setViewingProfile(null); return; }
-      if (showManage) { setShowManage(false); return; }
-      if (showMembersPanel) { setShowMembersPanel(false); return; }
-      if (showNotifications) { setShowNotifications(false); return; }
-      if (showShop) { setShowShop(false); return; }
-      if (showThemePicker) { setShowThemePicker(false); return; }
-      if (showEventsModal) { setShowEventsModal(false); return; }
-      if (showCreate) { setShowCreate(false); return; }
-      if (showApplicationForm) { setShowApplicationForm(null); return; }
-      if (viewingApplication) { setViewingApplication(null); return; }
+      const s = backStateRef.current;
 
-      // 2. If not on home, go to home
-      const urlSection = new URLSearchParams(window.location.search).get('section') || 'home';
-      if (urlSection !== 'home') {
-        navTo('home', 'global');
+      // a. Close open overlays (priority order)
+      if (s.showProfile)        { setShowProfile(false);        return; }
+      if (s.viewingProfile)     { setViewingProfile(null);      return; }
+      if (s.showManage)         { setShowManage(false);         return; }
+      if (s.showMembersPanel)   { setShowMembersPanel(false);   return; }
+      if (s.showNotifications)  { setShowNotifications(false);  return; }
+      if (s.showShop)           { setShowShop(false);           return; }
+      if (s.showThemePicker)    { setShowThemePicker(false);    return; }
+      if (s.showEventsModal)    { setShowEventsModal(false);    return; }
+      if (s.showCreate)         { setShowCreate(false);         return; }
+      if (s.showApplicationForm){ setShowApplicationForm(null); return; }
+      if (s.viewingApplication) { setViewingApplication(null); return; }
+
+      // b. Not on home → go home
+      if (s.section !== 'home') {
+        setSection('home');
+        setActiveCommId('global');
+        setActiveChannelId(null);
+        setSearchParams({ section: 'home' }, { replace: true });
         return;
       }
 
-      // 3. Already on home — show logout confirmation
+      // c. On home → show logout modal
       setShowLogoutConfirm(true);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showProfile, viewingProfile, showManage, showMembersPanel, showNotifications,
-      showShop, showThemePicker, showEventsModal, showCreate, showApplicationForm,
-      viewingApplication, navTo]);
+  }, []); // empty deps — registered once, reads fresh values via backStateRef
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
