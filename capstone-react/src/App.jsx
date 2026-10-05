@@ -51,10 +51,19 @@ function ProtectedRoute({ children, allowedType }) {
 
     fetch(getApiUrl('/api/me'), { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
-        if (!res.ok) throw new Error('Invalid session');
+        // 401/403 = token is genuinely invalid → force logout
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          setStatus('fail');
+          return null;
+        }
+        if (!res.ok) throw new Error('network');
         return res.json();
       })
       .then(data => {
+        if (!data) return; // already handled above
         // Only preserve locally-stored avatar if it belongs to the same account
         const existing = JSON.parse(localStorage.getItem('currentUser') || '{}');
         const isSameUser = existing.student_id === data.user.student_id;
@@ -70,10 +79,22 @@ function ProtectedRoute({ children, allowedType }) {
         }
       })
       .catch(() => {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        setStatus('fail');
+        // Network error / server down — don't log user out, trust localStorage
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          try {
+            const user = JSON.parse(stored);
+            if (allowedType && user.user_type !== allowedType) {
+              setStatus('fail');
+            } else {
+              setStatus('ok');
+            }
+          } catch {
+            setStatus('fail');
+          }
+        } else {
+          setStatus('fail');
+        }
       });
   }, [allowedType]);
 
