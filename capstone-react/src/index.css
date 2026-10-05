@@ -1495,11 +1495,14 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .chat-row.grouped {
   margin-top: 0px;
-  margin-bottom: 0px;
+  margin-bottom: 1px;
+}
+.chat-row:not(.grouped) {
+  margin-top: 8px;
 }
 .chat-row.grouped .chat-bubble.other {
   border-radius: 16px 16px 16px 4px;

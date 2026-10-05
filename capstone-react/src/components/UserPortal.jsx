@@ -942,7 +942,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {isOwnerMsg && !editing && (
+        {isOwnerMsg && !editing && (isLastInGroup || m.edited || isLastOwn || hovered) && (
           <div className="chat-meta own">
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             {isLastInGroup && <span className="chat-time">{time}</span>}
