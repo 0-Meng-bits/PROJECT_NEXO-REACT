@@ -4721,17 +4721,7 @@ export default function UserPortal() {
           }}>
             <i className="fa-solid fa-bars"></i>
           </button>
-          <div 
-            className="nav-clock" 
-            onClick={() => {
-              setShowEventsModal(true);
-              loadEvents();
-            }}
-            style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
-            onMouseLeave={e => e.currentTarget.style.opacity = 1}
-            title="Click to view Campus Events"
-          >
+          <div className="nav-clock">
           <span className="nav-clock-time">
             {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
@@ -4943,6 +4933,10 @@ export default function UserPortal() {
                 <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
+                </div>
+                <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
+                  <i className="nav-icon fa-solid fa-calendar-days"></i>
+                  <span className="node-name">Campus Events</span>
                 </div>
               </div>
               <div className="sidebar-label" style={{ marginTop: 12 }}>CATEGORIES</div>
