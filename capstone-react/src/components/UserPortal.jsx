@@ -4101,6 +4101,7 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      markMessagesRead(data || []);
       const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
       if (myIds.length) fetchReadCounts(myIds);
     } else if (channelId) {
@@ -4110,6 +4111,7 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      markMessagesRead(data || []);
       const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
       if (myIds.length) fetchReadCounts(myIds);
     } else if (commId) {
@@ -4121,12 +4123,13 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
+      markMessagesRead(data || []);
       const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
       if (myIds.length) fetchReadCounts(myIds);
     } else {
       setMessages([]);
     }
-  }, [fetchAvatarsForMessages, loadCustomizationsForMessages]);
+  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
