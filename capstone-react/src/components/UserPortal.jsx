@@ -2582,7 +2582,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
               const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
               if (readOnly && visiblePhotos.every(p => !p)) return null;
-
               return (
                 <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
@@ -2595,7 +2594,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                           {photo?.photo_url ? (
                             <>
                               <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              {!readOnly && (
+                              {!readOnly && editing && (
                                 <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
                                   <button onClick={() => togglePrivacy(i)} title={photo.is_public ? 'Public — click to make private' : 'Private — click to make public'}
                                     style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
@@ -2613,7 +2612,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                               )}
                             </>
                           ) : (
-                            !readOnly && (
+                            !readOnly && editing && (
                               <div onClick={() => photoRefs[i].current?.click()}
                                 style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)' }}>
                                 {isUploading
@@ -2626,7 +2625,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                               </div>
                             )
                           )}
-                          {!readOnly && (
+                          {!readOnly && editing && (
                             <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
                               onChange={e => handleUpload(i, e.target.files[0])} />
                           )}
@@ -2720,8 +2719,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             {communities.length > 0 && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {communities.slice(0, 6).map(c => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
+                  {communities.map(c => (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--cyber-cyan)', overflow: 'hidden' }}>
                         {c.logo_url
@@ -2732,7 +2731,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                       <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
                     </div>
                   ))}
-                  {communities.length > 6 && <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 4 }}>+{communities.length - 6} more</div>}
                 </div>
               </div>
             )}
