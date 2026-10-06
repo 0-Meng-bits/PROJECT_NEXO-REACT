@@ -754,7 +754,7 @@ function ChatTimeSeparator({ date }) {
 }
 
 // -- MESSAGE ITEM --------------------------------------------------------------
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readers, isLastOwn, isGrouped, isLastInGroup, userCustomizations }) {
+function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readers, isLastOwn, isGrouped, isLastInGroup, userCustomizations, onReply }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(m.content);
   const [hovered, setHovered] = useState(false);
@@ -891,6 +891,15 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 <i className="fa-solid fa-triangle-exclamation"></i> Flagged content
               </div>
             )}
+            {/* Reply quote block */}
+            {m.reply_to_id && (
+              <div style={{ background: 'rgba(0,0,0,0.25)', borderLeft: '3px solid rgba(0,240,255,0.5)', borderRadius: '6px 6px 0 0', padding: '5px 8px', marginBottom: 6, fontSize: 11 }}>
+                <div style={{ color: 'var(--cyber-cyan)', fontWeight: 700, marginBottom: 2 }}>{m.reply_to_author || 'Unknown'}</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
+                  {m.reply_to_preview || '...'}
+                </div>
+              </div>
+            )}
             <MediaMessage message={m} />
           </div>
         )}
@@ -898,6 +907,10 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         {/* Inline action bar "? appears below bubble on hover */}
         {showActions && (
           <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
+            {/* Reply button */}
+            <button className="chat-action-btn" onClick={() => onReply && onReply(m)} title="Reply">
+              <i className="fa-solid fa-reply"></i>
+            </button>
             {/* Emoji reaction button */}
             <div style={{ position: 'relative' }}>
               <button className="chat-action-btn" onClick={() => setShowEmojiPicker(p => !p)} title="React">
@@ -3617,7 +3630,7 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
-  const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
+  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } — message being replied to  const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
   });
@@ -4434,6 +4447,7 @@ export default function UserPortal() {
         community_id: activeCommId === 'global' ? null : activeCommId,
         channel_id: activeCommId === 'global' ? null : activeChannelId,
         role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+        ...(replyTo ? { reply_to_id: replyTo.id, reply_to_preview: replyTo.content?.slice(0, 100), reply_to_author: replyTo.full_name } : {}),
       };
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
@@ -4441,6 +4455,7 @@ export default function UserPortal() {
         setMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
         if (msgInputRef.current) msgInputRef.current.value = '';
         setPendingMedia(null);
+        setReplyTo(null);
       } else {
         throw new Error(error?.message || 'Failed to send');
       }
@@ -4492,6 +4507,7 @@ export default function UserPortal() {
         community_id: activeCommId,
         channel_id: null,
         role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+        ...(replyTo ? { reply_to_id: replyTo.id, reply_to_preview: replyTo.content?.slice(0, 100), reply_to_author: replyTo.full_name } : {}),
       };
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
@@ -4499,6 +4515,7 @@ export default function UserPortal() {
         setCircleChatMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
         if (circleChatInputRef.current) circleChatInputRef.current.value = '';
         setCirclePendingMedia(null);
+        setReplyTo(null);
       } else {
         throw new Error(error?.message || 'Failed to send');
       }
@@ -5398,6 +5415,7 @@ export default function UserPortal() {
                           isGrouped={isGrouped}
                           isLastInGroup={isLastInGroup}
                           userCustomizations={userCustomizations}
+                          onReply={(msg) => setReplyTo(msg)}
                         />
                       </React.Fragment>
                     );
@@ -5408,6 +5426,19 @@ export default function UserPortal() {
 
               {user?.is_verified && (
                 <div className="composer composer-chat">
+                  {/* Reply preview bar */}
+                  {replyTo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(0,240,255,0.06)', borderTop: '1px solid rgba(0,240,255,0.15)', fontSize: 12 }}>
+                      <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 11 }}></i>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>{replyTo.full_name} </span>
+                        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content?.slice(0, 80)}</span>
+                      </div>
+                      <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  )}
                   {pendingMedia && (
                     <MediaPreview 
                       file={pendingMedia.file} 
@@ -5957,6 +5988,7 @@ export default function UserPortal() {
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
                             userCustomizations={userCustomizations}
+                            onReply={(msg) => setReplyTo(msg)}
                           />
                         </React.Fragment>
                       );
@@ -5968,6 +6000,19 @@ export default function UserPortal() {
 
               {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && channels.find(c => c.id === activeChannelId)?.channel_type !== 'tasks' && (
                 <div className="composer composer-chat">
+                  {/* Reply preview bar */}
+                  {replyTo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(0,240,255,0.06)', borderTop: '1px solid rgba(0,240,255,0.15)', fontSize: 12 }}>
+                      <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 11 }}></i>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>{replyTo.full_name} </span>
+                        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content?.slice(0, 80)}</span>
+                      </div>
+                      <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  )}
                   {pendingMedia && (
                     <MediaPreview 
                       file={pendingMedia.file} 
@@ -6082,6 +6127,7 @@ export default function UserPortal() {
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
                             userCustomizations={userCustomizations}
+                            onReply={(msg) => setReplyTo(msg)}
                           />
                         </React.Fragment>
                       );
@@ -6093,6 +6139,19 @@ export default function UserPortal() {
 
               {isMember(activeCommId) && user?.is_verified && (
                 <div className="composer composer-chat">
+                  {/* Reply preview bar */}
+                  {replyTo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(0,240,255,0.06)', borderTop: '1px solid rgba(0,240,255,0.15)', fontSize: 12 }}>
+                      <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 11 }}></i>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>{replyTo.full_name} </span>
+                        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content?.slice(0, 80)}</span>
+                      </div>
+                      <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  )}
                   {circlePendingMedia && (
                     <MediaPreview 
                       file={circlePendingMedia.file} 
