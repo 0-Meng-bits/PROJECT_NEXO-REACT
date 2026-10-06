@@ -877,11 +877,6 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
             {m.role && <span className="chat-role">{m.role}</span>}
           </div>
         )}
-        {!isOwnerMsg && isLastInGroup && (
-          <div className="chat-meta">
-            <span className="chat-time">{time}</span>
-          </div>
-        )}
         {editing ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <input className="msg-edit-input" value={editVal}
@@ -1077,6 +1072,12 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 <i className="fa-solid fa-check" />
               </span>
             )}
+          </div>
+        )}
+        {/* Time for other users' messages — shown below the last bubble in a group */}
+        {!isOwnerMsg && !editing && isLastInGroup && (
+          <div className="chat-meta" style={{ marginTop: 2 }}>
+            <span className="chat-time">{time}</span>
           </div>
         )}
       </div>
@@ -3621,6 +3622,16 @@ export default function UserPortal() {
           avatar_url: r.accounts?.account_details?.avatar_url || null,
         });
       }
+    });
+
+    // Final dedup pass — ensure no duplicate reader_ids per message
+    Object.keys(grouped).forEach(msgId => {
+      const seen = new Set();
+      grouped[msgId] = grouped[msgId].filter(r => {
+        if (seen.has(r.reader_id)) return false;
+        seen.add(r.reader_id);
+        return true;
+      });
     });
 
     setMessageReads(prev => ({ ...prev, ...grouped }));
