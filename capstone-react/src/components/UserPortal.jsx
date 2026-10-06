@@ -753,6 +753,19 @@ function ChatTimeSeparator({ date }) {
   );
 }
 
+// -- UNREAD DIVIDER -----------------------------------------------------------
+function UnreadDivider() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '10px 0 6px' }}>
+      <div style={{ flex: 1, height: 1, background: 'rgba(247,95,95,0.4)' }} />
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', letterSpacing: 1, whiteSpace: 'nowrap' }}>
+        NEW MESSAGES
+      </span>
+      <div style={{ flex: 1, height: 1, background: 'rgba(247,95,95,0.4)' }} />
+    </div>
+  );
+}
+
 // -- MESSAGE ITEM --------------------------------------------------------------
 function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readers, isLastOwn, isGrouped, isLastInGroup, userCustomizations, onReply }) {
   const [editing, setEditing] = useState(false);
@@ -3486,6 +3499,8 @@ export default function UserPortal() {
   const notifRef = useRef(null);
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
+  const firstUnreadRef = useRef(null); // ref to scroll to on load
+  const firstUnreadMsgId = useRef(null); // message id of the first unread message
   const sectionRef = useRef(section); // track current section for popstate handler
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -4064,9 +4079,25 @@ export default function UserPortal() {
   }, []);
 
   const loadMessages = useCallback(async (commId, channelId) => {
+    // Reset first unread on each load
+    firstUnreadMsgId.current = null;
+
+    const calcFirstUnread = async (msgs) => {
+      if (!user?.id || !msgs?.length) return;
+      const otherMsgs = msgs.filter(m => m.student_id !== user.student_id);
+      if (!otherMsgs.length) return;
+      const { data: reads } = await supabase.from('message_reads')
+        .select('message_id').eq('reader_id', user.id)
+        .in('message_id', otherMsgs.map(m => m.id));
+      const readIds = new Set((reads || []).map(r => r.message_id));
+      const first = otherMsgs.find(m => !readIds.has(m.id));
+      if (first) firstUnreadMsgId.current = first.id;
+    };
+
     if (commId === 'global') {
       const { data } = await supabase.from('messages').select('*')
         .is('community_id', null).order('created_at', { ascending: true });
+      await calcFirstUnread(data || []);
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
@@ -4075,6 +4106,7 @@ export default function UserPortal() {
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
+      await calcFirstUnread(data || []);
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
@@ -4085,6 +4117,7 @@ export default function UserPortal() {
         .eq('community_id', commId)
         .is('channel_id', null)
         .order('created_at', { ascending: true });
+      await calcFirstUnread(data || []);
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
@@ -4097,17 +4130,30 @@ export default function UserPortal() {
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
+    firstUnreadMsgId.current = null;
     const { data } = await supabase.from('messages').select('*')
       .eq('community_id', commId)
       .is('channel_id', null)
       .order('created_at', { ascending: true });
+    // Find first unread before marking as read
+    if (user?.id && data?.length) {
+      const otherMsgs = data.filter(m => m.student_id !== user.student_id);
+      if (otherMsgs.length) {
+        const { data: reads } = await supabase.from('message_reads')
+          .select('message_id').eq('reader_id', user.id)
+          .in('message_id', otherMsgs.map(m => m.id));
+        const readIds = new Set((reads || []).map(r => r.message_id));
+        const first = otherMsgs.find(m => !readIds.has(m.id));
+        if (first) firstUnreadMsgId.current = first.id;
+      }
+    }
     setCircleChatMessages(data || []);
     fetchAvatarsForMessages(data || []);
     loadCustomizationsForMessages(data || []);
     markMessagesRead(data || []);
     const myMsgIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
     if (myMsgIds.length) fetchReadCounts(myMsgIds);
-  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id]);
+  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   // Initial load + realtime subscription ? re-runs when channel/community changes
   useEffect(() => {
@@ -4357,9 +4403,13 @@ export default function UserPortal() {
     return () => supabase.removeChannel(sub);
   }, [activeCommId, section, loadCircleChatMessages]);
 
-  // Auto-scroll to bottom when messages update
+  // Auto-scroll: go to first unread if exists, otherwise scroll to bottom
   useEffect(() => {
-    feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (firstUnreadRef.current) {
+      firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const initials = user?.full_name
@@ -5400,6 +5450,9 @@ export default function UserPortal() {
                     return (
                       <React.Fragment key={m.id}>
                         {showSep && <ChatTimeSeparator date={m.created_at} />}
+                        {m.id === firstUnreadMsgId.current && (
+                          <div ref={firstUnreadRef}><UnreadDivider /></div>
+                        )}
                         <MessageItem m={m}
                           tagColor="var(--cyber-cyan)"
                           isOwnerMsg={isOwnerMsg}
@@ -6105,6 +6158,9 @@ export default function UserPortal() {
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
+                          {m.id === firstUnreadMsgId.current && (
+                            <div ref={firstUnreadRef}><UnreadDivider /></div>
+                          )}
                           <MessageItem
                             m={m}
                             tagColor={tagColor}
