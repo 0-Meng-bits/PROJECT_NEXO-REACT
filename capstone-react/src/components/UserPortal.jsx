@@ -1989,6 +1989,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [customizations, setCustomizations] = useState(null);
   const [ownedItems, setOwnedItems] = useState([]);
   const [custSettings, setCustSettings] = useState(null);
+  const [profilePhotos, setProfilePhotos] = useState({ 1: null, 2: null }); // slot -> { id, photo_url, is_public }
+  const [photoUploading, setPhotoUploading] = useState(null); // slot being uploaded
+  const photo1Ref = useRef(null);
+  const photo2Ref = useRef(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2002,6 +2006,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
         if (data.cover_url) setCoverUrl(data.cover_url);
         if (data.id_photo_url) setIdUploaded(true);
+      }
+      // Load profile photos
+      if (user?.id) {
+        const { data: photos } = await supabase.from('profile_photos')
+          .select('*').eq('user_id', user.id);
+        if (photos) {
+          const map = { 1: null, 2: null };
+          photos.forEach(p => { map[p.slot] = p; });
+          setProfilePhotos(map);
+        }
       }
     };
     load();
@@ -2062,6 +2076,43 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
     } catch (err) { console.error(err); }
     finally { setSaving(false); }
+  };
+
+  const handlePhotoUpload = async (slot, file) => {
+    if (!file || !user?.id) return;
+    setPhotoUploading(slot);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `profile-photos/${user.id}/slot${slot}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const photoUrl = urlData.publicUrl;
+      const existing = profilePhotos[slot];
+      if (existing) {
+        await supabase.from('profile_photos').update({ photo_url: photoUrl }).eq('id', existing.id);
+        setProfilePhotos(prev => ({ ...prev, [slot]: { ...existing, photo_url: photoUrl } }));
+      } else {
+        const { data } = await supabase.from('profile_photos').insert([{ user_id: user.id, photo_url: photoUrl, slot, is_public: true }]).select().single();
+        setProfilePhotos(prev => ({ ...prev, [slot]: data }));
+      }
+    } catch (err) { console.error('Photo upload error:', err); }
+    setPhotoUploading(null);
+  };
+
+  const handlePhotoDelete = async (slot) => {
+    const photo = profilePhotos[slot];
+    if (!photo) return;
+    await supabase.from('profile_photos').delete().eq('id', photo.id);
+    setProfilePhotos(prev => ({ ...prev, [slot]: null }));
+  };
+
+  const togglePhotoPrivacy = async (slot) => {
+    const photo = profilePhotos[slot];
+    if (!photo) return;
+    const newVal = !photo.is_public;
+    await supabase.from('profile_photos').update({ is_public: newVal }).eq('id', photo.id);
+    setProfilePhotos(prev => ({ ...prev, [slot]: { ...photo, is_public: newVal } }));
   };
 
   const applyCustomization = async (type, itemId) => {
@@ -2483,6 +2534,109 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 </div>
               </div>
             )}
+
+            {/* PROFILE PHOTOS */}
+            {(() => {
+              const [photos, setPhotos] = React.useState([null, null]); // [slot1, slot2]
+              const [photoUploading, setPhotoUploading] = React.useState([false, false]);
+              const photoRefs = [React.useRef(null), React.useRef(null)];
+
+              React.useEffect(() => {
+                if (!user?.id) return;
+                supabase.from('profile_photos').select('*').eq('user_id', user.id).then(({ data }) => {
+                  if (data) {
+                    const arr = [null, null];
+                    data.forEach(p => { arr[p.slot - 1] = p; });
+                    setPhotos(arr);
+                  }
+                });
+              }, [user?.id]);
+
+              const handleUpload = async (slotIdx, file) => {
+                if (!file) return;
+                setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = true; return n; });
+                const ext = file.name.split('.').pop();
+                const path = `profile-photos/${user.id}/slot${slotIdx + 1}-${Date.now()}.${ext}`;
+                const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+                if (!upErr) {
+                  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+                  const slot = slotIdx + 1;
+                  await supabase.from('profile_photos').upsert({ user_id: user.id, slot, photo_url: publicUrl, is_public: photos[slotIdx]?.is_public ?? true }, { onConflict: 'user_id,slot' });
+                  setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...(n[slotIdx] || {}), photo_url: publicUrl, slot, is_public: n[slotIdx]?.is_public ?? true }; return n; });
+                }
+                setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = false; return n; });
+              };
+
+              const handleDelete = async (slotIdx) => {
+                await supabase.from('profile_photos').delete().eq('user_id', user.id).eq('slot', slotIdx + 1);
+                setPhotos(prev => { const n = [...prev]; n[slotIdx] = null; return n; });
+              };
+
+              const togglePrivacy = async (slotIdx) => {
+                const current = photos[slotIdx];
+                if (!current) return;
+                const newVal = !current.is_public;
+                await supabase.from('profile_photos').update({ is_public: newVal }).eq('user_id', user.id).eq('slot', slotIdx + 1);
+                setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...n[slotIdx], is_public: newVal }; return n; });
+              };
+
+              const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
+              if (readOnly && visiblePhotos.every(p => !p)) return null;
+
+              return (
+                <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[0, 1].map(i => {
+                      const photo = photos[i];
+                      const isUploading = photoUploading[i];
+                      return (
+                        <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          {photo?.photo_url ? (
+                            <>
+                              <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {!readOnly && (
+                                <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
+                                  <button onClick={() => togglePrivacy(i)} title={photo.is_public ? 'Public — click to make private' : 'Private — click to make public'}
+                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                                    <i className={`fa-solid ${photo.is_public ? 'fa-globe' : 'fa-lock'}`}></i>
+                                  </button>
+                                  <button onClick={() => photoRefs[i].current?.click()} title="Replace photo"
+                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'white' }}>
+                                    <i className="fa-solid fa-camera"></i>
+                                  </button>
+                                  <button onClick={() => handleDelete(i)} title="Delete photo"
+                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'var(--red)' }}>
+                                    <i className="fa-solid fa-trash"></i>
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            !readOnly && (
+                              <div onClick={() => photoRefs[i].current?.click()}
+                                style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)' }}>
+                                {isUploading
+                                  ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22 }}></i>
+                                  : <>
+                                      <i className="fa-solid fa-plus" style={{ fontSize: 22 }}></i>
+                                      <span style={{ fontSize: 11 }}>Add Photo</span>
+                                    </>
+                                }
+                              </div>
+                            )
+                          )}
+                          {!readOnly && (
+                            <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
+                              onChange={e => handleUpload(i, e.target.files[0])} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* CUSTOMIZE panel — shown in edit mode */}
             {!readOnly && editing && (
