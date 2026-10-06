@@ -156,8 +156,11 @@ export default function HelpModal({ user, onClose }) {
               </div>
               {/* Step content */}
               <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 10px' }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: 'var(--cyber-cyan)' }}>
-                  <i className={GUIDE_STEPS[step].icon}></i>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: 'var(--cyber-cyan)', overflow: 'hidden' }}>
+                  {step === 0
+                    ? <img src="/logoo.png" alt="NEXO" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : <i className={GUIDE_STEPS[step].icon}></i>
+                  }
                 </div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, color: 'white', margin: 0 }}>{GUIDE_STEPS[step].title}</h3>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 400, margin: 0 }}>{GUIDE_STEPS[step].desc}</p>
