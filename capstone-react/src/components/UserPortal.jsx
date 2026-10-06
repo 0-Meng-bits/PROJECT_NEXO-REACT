@@ -2582,6 +2582,36 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
               const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
               if (readOnly && visiblePhotos.every(p => !p)) return null;
+
+              // Heart reactions state
+              const [reactions, setReactions] = React.useState({}); // photoId -> { count, myReact }
+
+              React.useEffect(() => {
+                const photoIds = photos.filter(p => p?.id).map(p => p.id);
+                if (!photoIds.length) return;
+                supabase.from('profile_photo_reactions').select('photo_id, user_id').in('photo_id', photoIds)
+                  .then(({ data }) => {
+                    if (!data) return;
+                    const map = {};
+                    data.forEach(r => {
+                      if (!map[r.photo_id]) map[r.photo_id] = { count: 0, myReact: false };
+                      map[r.photo_id].count++;
+                      if (r.user_id === user.id) map[r.photo_id].myReact = true;
+                    });
+                    setReactions(map);
+                  });
+              }, [photos.map(p => p?.id).join(',')]);
+
+              const toggleReact = async (photoId) => {
+                const curr = reactions[photoId];
+                if (curr?.myReact) {
+                  await supabase.from('profile_photo_reactions').delete().eq('photo_id', photoId).eq('user_id', user.id);
+                  setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 1) - 1, myReact: false } }));
+                } else {
+                  await supabase.from('profile_photo_reactions').insert([{ photo_id: photoId, user_id: user.id }]);
+                  setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 0) + 1, myReact: true } }));
+                }
+              };
               return (
                 <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
@@ -2609,6 +2639,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                                     <i className="fa-solid fa-trash"></i>
                                   </button>
                                 </div>
+                              )}
+                              {/* Heart react — only shown to other users viewing the profile */}
+                              {readOnly && photo.id && (
+                                <button onClick={() => toggleReact(photo.id)}
+                                  style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                                  <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
+                                  {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
+                                </button>
                               )}
                             </>
                           ) : (
