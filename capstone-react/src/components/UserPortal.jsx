@@ -4796,6 +4796,9 @@ export default function UserPortal() {
           <button className="notif-bell desktop-only-btn" onClick={() => setShowThemePicker(true)} title="Change Theme">
             <i className="fa-solid fa-palette"></i>
           </button>
+          <button className="notif-bell desktop-only-btn" onClick={() => setShowHelp(true)} title="Help Center">
+            <i className="fa-solid fa-circle-question"></i>
+          </button>
 
           {/* Mobile-only: ⋯ more menu */}
           <div className="notif-wrap mobile-more-wrap" ref={moreMenuRef}>
