@@ -1963,6 +1963,13 @@ export default function AdminDashboard() {
           };
 
           const statusColor = { open: 'var(--orange)', resolved: 'var(--green)', closed: 'var(--text-muted)' };
+          const categoryColor = {
+            'Bug Report':       { color: 'var(--red)',          bg: 'rgba(247,95,95,0.08)',     border: 'rgba(247,95,95,0.3)' },
+            'Account Issue':    { color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.08)',    border: 'rgba(252,238,10,0.3)' },
+            'General Question': { color: 'var(--cyber-cyan)',   bg: 'rgba(0,240,255,0.08)',     border: 'rgba(0,240,255,0.2)' },
+            'Circle Problem':   { color: '#a855f7',             bg: 'rgba(168,85,247,0.08)',    border: 'rgba(168,85,247,0.3)' },
+            'Other':            { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
+          };
 
           return (
             <div className="adm-card">
@@ -1985,7 +1992,7 @@ export default function AdminDashboard() {
                             <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{t.accounts?.full_name || '—'}</div>
                             <div style={{ color: 'var(--text-muted)' }}>{t.accounts?.ctu_id}</div>
                           </td>
-                          <td><span className="adm-tag">{t.category}</span></td>
+                          <td><span className="adm-tag" style={{ color: categoryColor[t.category]?.color, background: categoryColor[t.category]?.bg, borderColor: categoryColor[t.category]?.border }}>{t.category}</span></td>
                           <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div>
                           </td>

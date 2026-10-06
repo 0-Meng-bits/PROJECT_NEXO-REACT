@@ -3064,10 +3064,12 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 .desktop-only-btn { display: flex; }
 .mobile-only-btn  { display: none; }
+.mobile-more-wrap { display: none; }
 
 @media (max-width: 655px) {
   .desktop-only-btn  { display: none !important; }
   .mobile-only-btn   { display: flex; }
+  .mobile-more-wrap  { display: flex; }
 }
 
 @media (max-width: 640px) {
