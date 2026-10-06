@@ -3134,7 +3134,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   /* Top nav */
   .top-nav-bar { padding: 0 12px; gap: 8px; }
   .hud-chip { display: none; }
-  .nav-clock { display: flex; flex-direction: column; gap: 0; cursor: pointer; }
+  .nav-clock { display: none; }
   .nav-search-wrap { max-width: none; flex: 1; }
 
   /* Auth */
