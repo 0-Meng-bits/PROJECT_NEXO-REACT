@@ -7,6 +7,7 @@ const SECTIONS = [
   { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
   { key: 'circle_requests', label: 'Circle Requests',     icon: 'fa-solid fa-paper-plane' },
   { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-triangle-exclamation' },
+  { key: 'support',       label: 'Support Tickets',       icon: 'fa-solid fa-headset' },
   { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
   { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
   { key: 'analytics',     label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
@@ -1943,10 +1944,85 @@ export default function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* ── SUPPORT TICKETS ── */}
+        {section === 'support' && (() => {
+          const [tickets, setTickets] = React.useState([]);
+          const [loadingTickets, setLoadingTickets] = React.useState(true);
+
+          React.useEffect(() => {
+            supabase.from('support_tickets')
+              .select('*, accounts:user_id(full_name, ctu_id)')
+              .order('created_at', { ascending: false })
+              .then(({ data }) => { setTickets(data || []); setLoadingTickets(false); });
+          }, []);
+
+          const updateStatus = async (id, status) => {
+            await supabase.from('support_tickets').update({ status }).eq('id', id);
+            setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+          };
+
+          const statusColor = { open: 'var(--orange)', resolved: 'var(--green)', closed: 'var(--text-muted)' };
+
+          return (
+            <div className="adm-card">
+              <div className="adm-card-head">
+                <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
+                <span className="adm-badge">{tickets.filter(t => t.status === 'open').length} open</span>
+              </div>
+              {loadingTickets ? <div className="adm-empty">Loading...</div>
+              : tickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
+              : (
+                <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
+                  <table className="adm-table">
+                    <thead>
+                      <tr><th>USER</th><th>CATEGORY</th><th>MESSAGE</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr>
+                    </thead>
+                    <tbody>
+                      {tickets.map(t => (
+                        <tr key={t.id}>
+                          <td style={{ fontSize: 11 }}>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{t.accounts?.full_name || '—'}</div>
+                            <div style={{ color: 'var(--text-muted)' }}>{t.accounts?.ctu_id}</div>
+                          </td>
+                          <td><span className="adm-tag">{t.category}</span></td>
+                          <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: statusColor[t.status] || 'var(--text-muted)', border: `1px solid ${statusColor[t.status] || '#333'}` }}>
+                              {t.status?.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {t.status === 'open' && (
+                                <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 10 }}
+                                  onClick={() => updateStatus(t.id, 'resolved')}>
+                                  <i className="fa-solid fa-check"></i> Resolve
+                                </button>
+                              )}
+                              {t.status !== 'closed' && (
+                                <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }}
+                                  onClick={() => updateStatus(t.id, 'closed')}>
+                                  Close
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
     </div>
   );
 }
-

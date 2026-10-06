@@ -16,6 +16,7 @@ import GeneratedEventLink from './GeneratedEventLink';
 import EventCard from './EventCard';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
+import HelpModal from './HelpModal';
 
 const SHOP_API = window.location.hostname === 'localhost'
   ? '/api/shop'
@@ -3514,6 +3515,7 @@ export default function UserPortal() {
   const [showGivePoints, setShowGivePoints] = useState(null); // { targetUser }
   const [showFlagUser, setShowFlagUser] = useState(null); // { targetUser }
   const [showShop, setShowShop] = useState(false); // Profile Shop modal
+  const [showHelp, setShowHelp] = useState(false); // Help Center modal
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [messageReads, setMessageReads] = useState({}); // message_id -> [{ reader_id, full_name, avatar_url }]
   const [showEventsModal, setShowEventsModal] = useState(false);
@@ -4236,7 +4238,7 @@ export default function UserPortal() {
     backStateRef.current = {
       section,
       showProfile, viewingProfile, showManage, showMembersPanel,
-      showNotifications, showShop, showThemePicker, showEventsModal,
+      showNotifications, showShop, showHelp, showThemePicker, showEventsModal,
       showCreate, showApplicationForm, viewingApplication,
     };
   });
@@ -4261,7 +4263,7 @@ export default function UserPortal() {
       if (s.showMembersPanel)    { setShowMembersPanel(false);   return; }
       if (s.showNotifications)   { setShowNotifications(false);  return; }
       if (s.showShop)            { setShowShop(false);           return; }
-      if (s.showThemePicker)     { setShowThemePicker(false);    return; }
+      if (s.showHelp)            { setShowHelp(false);           return; }      if (s.showThemePicker)     { setShowThemePicker(false);    return; }
       if (s.showEventsModal)     { setShowEventsModal(false);    return; }
       if (s.showCreate)          { setShowCreate(false);         return; }
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
@@ -4807,6 +4809,9 @@ export default function UserPortal() {
                 </button>
                 <button onClick={() => { setShowThemePicker(true); setShowMoreMenu(false); }}>
                   <i className="fa-solid fa-palette"></i> Appearance
+                </button>
+                <button onClick={() => { setShowHelp(true); setShowMoreMenu(false); }}>
+                  <i className="fa-solid fa-circle-question"></i> Help Center
                 </button>
               </div>
             )}
@@ -6378,6 +6383,10 @@ export default function UserPortal() {
       {/* Profile Shop Modal */}
       {showShop && (
         <ProfileShop user={user} onClose={() => setShowShop(false)} />
+      )}
+      {/* Help Center Modal */}
+      {showHelp && (
+        <HelpModal user={user} onClose={() => setShowHelp(false)} />
       )}
 
       {/* Theme Picker Modal */}
