@@ -3630,7 +3630,8 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
-  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } — message being replied to  const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
+  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } — message being replied to
+  const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
   });
