@@ -5171,7 +5171,7 @@ export default function UserPortal() {
         {/* CIRCLE DOCK ? always visible on desktop, toggle overlay on mobile */}
         <div className={`circle-dock${(showDock || mobileSidebarOpen) ? " dock-mobile-open" : ""}`}>
           <div className="dock-branding">
-            <img src="/logoo.png" className="brand-logo-small" alt="NEXO" />
+            <img src="/logoo.png" className="brand-logo-small" alt="NEXO" style={{ borderRadius: 10 }} />
           </div>
           {myCircles.map(c => (
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? "active" : ""}`}
