@@ -101,7 +101,7 @@ function ProtectedRoute({ children, allowedType }) {
   if (status === 'checking') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0d12', color: 'var(--cyber-cyan)', fontFamily: 'monospace', letterSpacing: 2 }}>
-        VERIFYING SESSION...
+        Loading, please wait...
       </div>
     );
   }
