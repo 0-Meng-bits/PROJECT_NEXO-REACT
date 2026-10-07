@@ -3711,6 +3711,8 @@ export default function UserPortal() {
   const [myApplications, setMyApplications] = useState([]);
   const [viewingApplication, setViewingApplication] = useState(null); // { response, community, questions }
   const [search, setSearch] = useState('');
+  const [searchUsers, setSearchUsers] = useState([]);
+  const searchTimeout = useRef(null);
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
   const [activeChannelId, setActiveChannelId] = useState(null);
@@ -4991,10 +4993,23 @@ export default function UserPortal() {
             className="nav-search-input"
             placeholder="Search communities or users..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => {
+              const val = e.target.value;
+              setSearch(val);
+              clearTimeout(searchTimeout.current);
+              if (val.trim().length < 2) { setSearchUsers([]); return; }
+              searchTimeout.current = setTimeout(async () => {
+                const { data } = await supabase.from('accounts')
+                  .select('id, full_name, ctu_id, account_details(avatar_url)')
+                  .or(`full_name.ilike.%${val.trim()}%,ctu_id.ilike.%${val.trim()}%`)
+                  .neq('ctu_id', user?.student_id)
+                  .limit(5);
+                setSearchUsers(data || []);
+              }, 300);
+            }}
           />
           {search && (
-            <button className="nav-search-clear" onClick={() => setSearch('')}>
+            <button className="nav-search-clear" onClick={() => { setSearch(''); setSearchUsers([]); }}>
               <i className="fa-solid fa-xmark"></i>
             </button>
           )}
@@ -5022,11 +5037,32 @@ export default function UserPortal() {
                   }
                 </>
               )}
-              {/* No results */}
-              {communities.filter(c => c.id !== 'global' && c.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
-                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>No results found.</div>
+              {/* Users */}
+              {searchUsers.length > 0 && (
+                <>
+                  <div className="search-result-label">USERS</div>
+                  {searchUsers.map(u => (
+                    <div key={u.id} className="search-result-item" onClick={() => {
+                      viewUserProfile(u.ctu_id); setSearch(''); setSearchUsers([]);
+                    }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                        {u.account_details?.avatar_url
+                          ? <img src={u.account_details.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : (u.full_name?.[0] || '?').toUpperCase()
+                        }
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{u.full_name}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{u.ctu_id}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
-            </div>
+              {/* No results */}
+              {communities.filter(c => c.id !== 'global' && c.name.toLowerCase().includes(search.toLowerCase())).length === 0 && searchUsers.length === 0 && (
+                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>No results found.</div>
+              )}            </div>
           )}
         </div>
 
