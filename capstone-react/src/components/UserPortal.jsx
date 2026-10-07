@@ -6018,7 +6018,8 @@ export default function UserPortal() {
                           </div>
                         )}
                         {(() => {
-                          const circleOnline = onlineProfiles.filter(p => circleMateIds.has(p.id) || p.id === user?.id);
+                          const currentCircleMemberIds = new Set(circleChatMembers.map(m => m.id));
+                          const circleOnline = onlineProfiles.filter(p => currentCircleMemberIds.has(p.id));
                           return circleOnline.length > 0
                             ? <OnlineStack onlineProfiles={circleOnline} circleMateIds={circleMateIds} avatarCache={avatarCache} maxShow={5} onClick={() => setShowOnlineModal(true)} />
                             : null;
