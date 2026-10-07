@@ -294,7 +294,7 @@ export default function Auth() {
             <i className="fa-solid fa-arrow-left" /> Back
           </button>
           <h1 className="logo-text" style={{ marginBottom: 4 }}>NEXO<span>CONNECT</span></h1>
-          <p className="auth-subtitle">VERIFYING_IDENTITY...</p>
+          <p className="auth-subtitle">Loading, please wait...</p>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--cyber-cyan)', fontFamily: 'monospace' }}>
@@ -477,6 +477,14 @@ export default function Auth() {
             <p>Already registered? <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); }}>Login here</a></p>
           </div>
         )}
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <a href="#" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'underline', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+            onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}>
+            Terms &amp; Conditions
+          </a>
+        </div>
       </div>
       </div>
 

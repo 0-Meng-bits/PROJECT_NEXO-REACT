@@ -200,6 +200,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const [postingComment, setPostingComment] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null); // { id, author_name }
   const [replyInput, setReplyInput] = useState('');
+  const [commentHearts, setCommentHearts] = useState({}); // commentId -> { count, likedByMe }
 
   // Load comment count on mount
   useEffect(() => {
@@ -217,6 +218,35 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       .order('created_at', { ascending: true });
     setComments(data || []);
     setLoadingComments(false);
+    // Load heart counts for these comments
+    if (data?.length && user?.id) {
+      const ids = data.map(c => c.id);
+      const { data: hearts } = await supabase
+        .from('comment_hearts')
+        .select('comment_id, user_id')
+        .in('comment_id', ids);
+      if (hearts) {
+        const map = {};
+        hearts.forEach(h => {
+          if (!map[h.comment_id]) map[h.comment_id] = { count: 0, likedByMe: false };
+          map[h.comment_id].count++;
+          if (h.user_id === user.id) map[h.comment_id].likedByMe = true;
+        });
+        setCommentHearts(map);
+      }
+    }
+  };
+
+  const toggleCommentHeart = async (commentId) => {
+    if (!user?.id) return;
+    const current = commentHearts[commentId] || { count: 0, likedByMe: false };
+    if (current.likedByMe) {
+      await supabase.from('comment_hearts').delete().eq('comment_id', commentId).eq('user_id', user.id);
+      setCommentHearts(prev => ({ ...prev, [commentId]: { count: Math.max(0, (prev[commentId]?.count || 1) - 1), likedByMe: false } }));
+    } else {
+      await supabase.from('comment_hearts').insert([{ comment_id: commentId, user_id: user.id }]);
+      setCommentHearts(prev => ({ ...prev, [commentId]: { count: (prev[commentId]?.count || 0) + 1, likedByMe: true } }));
+    }
   };
 
   const markSolution = async (commentId) => {
@@ -603,6 +633,16 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                         </button>
                       )}
                     </div>
+                    {/* Heart react */}
+                    {user?.is_verified && (
+                      <button onClick={() => toggleCommentHeart(c.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)', padding: '2px 0 0 38px', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
+                        onMouseLeave={e => e.currentTarget.style.color = commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)'}>
+                        <i className={commentHearts[c.id]?.likedByMe ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
+                        {commentHearts[c.id]?.count > 0 && <span>{commentHearts[c.id].count}</span>}
+                      </button>
+                    )}
                     {/* Reply button */}
                     {user?.is_verified && (
                       <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
@@ -875,7 +915,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 customizations={userCustomizations[m.student_id]}
               />
             </span>
-            {m.role && <span className="chat-role">{m.role}</span>}
+            {m.role && m.role !== 'MEMBER' && <span className="chat-role">{m.role}</span>}
           </div>
         )}
         {editing ? (
@@ -5720,7 +5760,7 @@ export default function UserPortal() {
                     />
                     <input ref={msgInputRef} onChange={() => setSendError('')}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
-                      placeholder="Say something to the campus..."
+                      placeholder="Say something to the Global Feed..."
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
                     <button className="chat-send-btn" onClick={sendPost} disabled={uploading} title="Send">
@@ -6315,7 +6355,7 @@ export default function UserPortal() {
                     />
                     <input ref={msgInputRef} onChange={() => setSendError('')}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
-                      placeholder="Write a message..."
+                      placeholder={`Say something to ${activeComm?.name || 'Circle Chat'}...`}
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
                     <button className="chat-send-btn" onClick={sendPost} disabled={uploading} title="Send">

@@ -584,6 +584,15 @@ CREATE TABLE IF NOT EXISTS profile_photo_reactions (
   UNIQUE(photo_id, user_id)
 );
 
+-- Comment hearts
+CREATE TABLE IF NOT EXISTS comment_hearts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  comment_id uuid REFERENCES post_comments(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES accounts(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(comment_id, user_id)
+);
+
 -- ============================================================
 -- ROW LEVEL SECURITY - Enable on all tables
 -- ============================================================
@@ -619,6 +628,7 @@ ALTER TABLE task_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE showcase_feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profile_photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profile_photo_reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comment_hearts ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- RLS POLICIES
