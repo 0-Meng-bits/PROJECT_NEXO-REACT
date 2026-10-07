@@ -10,10 +10,17 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Supabase puts the session in the URL hash after clicking the reset link
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true);
+    // Check if a recovery session is already active (hash already parsed on load)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true);
     });
+
+    // Also listen for the event in case it fires after mount
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') setReady(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleReset = async (e) => {

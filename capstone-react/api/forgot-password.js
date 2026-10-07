@@ -12,11 +12,7 @@ export default async function handler(req, res) {
 
   if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
 
-  const siteUrl = process.env.SITE_URL;
-  if (!siteUrl) {
-    console.error('[FORGOT PASSWORD] SITE_URL env var not set');
-    return res.status(500).json({ message: 'Server configuration error.' });
-  }
+  const siteUrl = process.env.SITE_URL || 'https://project-nexo-react.vercel.app';
 
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'recovery',
@@ -27,6 +23,11 @@ export default async function handler(req, res) {
   if (linkError) {
     console.error('[FORGOT PASSWORD] Link error:', linkError.message);
     return res.status(400).json({ message: linkError.message });
+  }
+
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.error('[FORGOT PASSWORD] GMAIL_USER or GMAIL_APP_PASSWORD env vars not set');
+    return res.status(500).json({ message: 'Email service not configured.' });
   }
 
   const transporter = nodemailer.createTransport({
@@ -55,8 +56,8 @@ export default async function handler(req, res) {
       `,
     });
   } catch (emailErr) {
-    console.error('[FORGOT PASSWORD] Email error:', emailErr.message);
-    return res.status(400).json({ message: 'Failed to send reset email.' });
+    console.error('[FORGOT PASSWORD] Email error:', emailErr.message, emailErr.code, emailErr.responseCode);
+    return res.status(400).json({ message: emailErr.message || 'Failed to send reset email.' });
   }
 
   res.status(200).json({ message: 'Password reset email sent.' });
