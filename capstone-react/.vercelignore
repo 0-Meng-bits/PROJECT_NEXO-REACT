@@ -1,1 +1,15 @@
 server-local.js
+api/admin-data.js
+api/circle-requests.js
+api/close-poll.js
+api/communities.js
+api/delete.js
+api/login.js
+api/me.js
+api/messages.js
+api/moderation.js
+api/shop.js
+api/signup.js
+api/update-profile.js
+api/upload.js
+api/verify-student.js
