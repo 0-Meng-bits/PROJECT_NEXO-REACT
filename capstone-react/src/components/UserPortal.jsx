@@ -5150,24 +5150,6 @@ export default function UserPortal() {
                   <span className="node-name">Campus Events</span>
                 </div>
               </div>
-              <div className="sidebar-label" style={{ marginTop: 12 }}>CATEGORIES</div>
-              <div className="nav-links">
-                {[
-                  { key: 'academic', label: 'Academic',  icon: 'fa-solid fa-graduation-cap' },
-                  { key: 'project',  label: 'Projects',  icon: 'fa-solid fa-flask' },
-                  { key: 'hobby',    label: 'Hobbies',   icon: 'fa-solid fa-gamepad' },
-                  { key: 'social',   label: 'Social',    icon: 'fa-solid fa-user-group' },
-                ].map(cat => (
-                  <div key={cat.key}
-                    className={`ls-item ${section === 'activity' && activeCategory === cat.key ? 'active' : ''}`}
-                    onClick={() => { navTo('activity', 'global'); setActiveCategory(cat.key); }}
-                  >
-                    <i className={`nav-icon ${cat.icon}`} style={{ fontStyle: 'normal' }}></i>
-                    <span className="node-name">{cat.label}</span>
-                  </div>
-                ))}
-              </div>
-
               </div>
             </>
           ) : (
@@ -5757,11 +5739,32 @@ export default function UserPortal() {
               <div className="post" style={{ borderLeft: '4px solid var(--cyber-cyan)', marginBottom: 4 }}>
                 <h2 style={{ fontSize: 16, letterSpacing: 2, color: 'var(--cyber-cyan)' }}>
                   <i className="fa-solid fa-compass" style={{ marginRight: 10 }}></i>
-                  {activeCategory === 'all' ? 'EXPLORE ALL CIRCLES' : activeCategory.toUpperCase()}
+                  EXPLORE CIRCLES
                 </h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8 }}>
-                  Discover circles and request to join. Click a category in the sidebar to filter.
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 8, marginBottom: 12 }}>
+                  Discover circles and request to join.
                 </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'all',      label: 'All',      icon: 'fa-solid fa-border-all' },
+                    { key: 'academic', label: 'Academic', icon: 'fa-solid fa-graduation-cap' },
+                    { key: 'project',  label: 'Projects', icon: 'fa-solid fa-flask' },
+                    { key: 'hobby',    label: 'Hobbies',  icon: 'fa-solid fa-gamepad' },
+                    { key: 'social',   label: 'Social',   icon: 'fa-solid fa-user-group' },
+                  ].map(cat => (
+                    <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        background: activeCategory === cat.key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${activeCategory === cat.key ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
+                        color: activeCategory === cat.key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                        transition: 'all 0.2s',
+                      }}>
+                      <i className={cat.icon} style={{ fontSize: 11 }} />{cat.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {(() => {
