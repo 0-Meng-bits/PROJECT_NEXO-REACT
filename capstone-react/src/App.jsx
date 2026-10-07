@@ -101,8 +101,14 @@ function ProtectedRoute({ children, allowedType }) {
   if (status === 'checking') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0d12', gap: 16 }}>
-        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 28, color: 'var(--cyber-cyan)' }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading, please wait...</span>
+        <img src="/logoo.png" alt="NEXO" style={{ width: 80, height: 80, objectFit: 'contain', filter: 'drop-shadow(0 0 18px rgba(0,240,255,0.4))' }} />
+        <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 4, color: '#fcee0a' }}>
+            NEXO<span style={{ color: '#00f0ff' }}> CONNECT</span>
+          </div>
+        </div>
+        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22, color: 'var(--cyber-cyan)', marginTop: 8 }} />
+        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading, please wait...</span>
       </div>
     );
   }
