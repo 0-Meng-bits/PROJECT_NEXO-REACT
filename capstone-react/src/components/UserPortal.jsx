@@ -3976,7 +3976,7 @@ export default function UserPortal() {
     });
   }, [user?.id]);
 
-  // Heartbeat: update last_seen every 30s
+  // Heartbeat: update last_seen every 60s
   useEffect(() => {
     if (!user?.id) return;
     const ping = () => fetch(getApiUrl('/api/update-profile?userId=' + user.id), {
@@ -3985,17 +3985,17 @@ export default function UserPortal() {
       body: JSON.stringify({ last_seen: new Date().toISOString() }),
     }).catch(() => {});
     ping();
-    const t = setInterval(ping, 30000);
+    const t = setInterval(ping, 60000);
     return () => clearInterval(t);
   }, [user?.id]);
 
-  // Poll online users every 30s (online = last_seen within 2 minutes)
+  // Poll online users every 90s (online = last_seen within 3 minutes)
   const [onlineProfiles, setOnlineProfiles] = useState([]); // full profile objects of online users
   const [circleMateIds, setCircleMateIds] = useState(new Set()); // UUIDs of users sharing a circle
 
   useEffect(() => {
     const fetchOnline = async () => {
-      const since = new Date(Date.now() - 2 * 60 * 1000).toISOString(); // 2 min window (truly online)
+      const since = new Date(Date.now() - 3 * 60 * 1000).toISOString(); // 3 min window
       const { data } = await supabase.from('accounts')
         .select('id, full_name, ctu_id, account_details!inner(avatar_url, last_seen)')
         .gte('account_details.last_seen', since)
@@ -4004,11 +4004,10 @@ export default function UserPortal() {
         ...a, student_id: a.ctu_id, avatar_url: a.account_details?.avatar_url,
       }));
       setOnlineUsers(new Set(profiles.map(p => p.id)));
-      // Keep self in the list for display ? just mark them differently if needed
       setOnlineProfiles(profiles);
     };
     fetchOnline();
-    const t = setInterval(fetchOnline, 30000);
+    const t = setInterval(fetchOnline, 90000);
     return () => clearInterval(t);
   }, [user?.id]);
 
