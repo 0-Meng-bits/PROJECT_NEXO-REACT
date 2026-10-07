@@ -2542,13 +2542,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     className="profile-modal-companion"
                     style={{
                       position: 'absolute',
-                      bottom: -18,
-                      right: -28,
-                      width: '72px',
+                      top: -28,
+                      left: -24,
+                      width: '80px',
                       height: 'auto',
                       pointerEvents: 'none',
-                      filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.7))',
-                      zIndex: 2,
+                      filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.8))',
+                      zIndex: 3,
+                      transform: 'rotate(-15deg)',
                     }}
                   />
                 );
