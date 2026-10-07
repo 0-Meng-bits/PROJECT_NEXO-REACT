@@ -92,7 +92,12 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(getApiUrl('/api/forgot-password'), {
+      // forgot-password runs on Vercel serverless in production (Render blocks Gmail SMTP)
+      // locally it falls back to the local dev server
+      const forgotUrl = import.meta.env.DEV
+        ? getApiUrl('/api/forgot-password')
+        : '/api/forgot-password';
+      const res = await fetch(forgotUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId: form.ctuId }),
