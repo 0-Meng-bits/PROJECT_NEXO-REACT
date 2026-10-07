@@ -100,8 +100,9 @@ function ProtectedRoute({ children, allowedType }) {
 
   if (status === 'checking') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0d12', color: 'var(--cyber-cyan)', fontFamily: 'monospace', letterSpacing: 2 }}>
-        Loading, please wait...
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0d12', gap: 16 }}>
+        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 28, color: 'var(--cyber-cyan)' }} />
+        <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading, please wait...</span>
       </div>
     );
   }
