@@ -3862,12 +3862,14 @@ export default function UserPortal() {
       }
     });
 
-    // Add reactors as implicit readers
+    // Add reactors as implicit readers — use accounts.id (UUID) for consistent dedup
     (reacts || []).forEach(r => {
+      const uuid = r.accounts?.id;
+      if (!uuid) return;
       if (!grouped[r.message_id]) grouped[r.message_id] = [];
-      if (!grouped[r.message_id].find(x => x.reader_id === r.student_id)) {
+      if (!grouped[r.message_id].find(x => x.reader_id === uuid)) {
         grouped[r.message_id].push({
-          reader_id: r.student_id,
+          reader_id: uuid,
           full_name: r.accounts?.full_name || '',
           avatar_url: r.accounts?.account_details?.avatar_url || null,
         });
