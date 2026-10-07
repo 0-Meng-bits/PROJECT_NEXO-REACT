@@ -3044,7 +3044,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
-  const maxAmount = myRankLevel >= 2 ? 0.5 : 0.3;
+  const maxAmount = myRankLevel >= 2 ? 5 : 3;
   const maxRecipients = myRankLevel >= 2 ? 5 : 3;
 
   const submit = async () => {
@@ -3125,7 +3125,7 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
             <div className="input-group">
               <label>POINTS TO GIVE (Max: {maxAmount})</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                {[0.1, 0.2, 0.3, myRankLevel >= 2 ? 0.4 : null, myRankLevel >= 2 ? 0.5 : null].filter(Boolean).map(val => (
+                {[1, 2, 3, myRankLevel >= 2 ? 4 : null, myRankLevel >= 2 ? 5 : null].filter(Boolean).map(val => (
                   <button
                     key={val}
                     onClick={() => setAmount(val)}
