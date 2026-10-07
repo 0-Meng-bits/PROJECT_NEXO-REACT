@@ -1,0 +1,1 @@
+ALTER TABLE account_details ADD COLUMN IF NOT EXISTS bio TEXT;

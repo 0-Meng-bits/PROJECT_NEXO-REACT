@@ -2115,8 +2115,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
-  const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [] });
+  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
+  const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [showWarningHistory, setShowWarningHistory] = useState(false);
@@ -2133,11 +2133,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     if (!user?.id) return;
     const load = async () => {
       const { data, error } = await supabase.from('account_details')
-        .select('course, year_level, interests, avatar_url, id_photo_url, cover_url')
+        .select('course, year_level, interests, avatar_url, id_photo_url, cover_url, bio')
         .eq('id', user.id).single();
       if (!error && data) {
-        setProfile({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
-        setEditForm({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [] });
+        setProfile({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
+        setEditForm({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
         if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
         if (data.cover_url) setCoverUrl(data.cover_url);
         if (data.id_photo_url) setIdUploaded(true);
@@ -2201,7 +2201,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests }),
+        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio }),
       });
       if (res.ok) {
         setProfile({ ...editForm });
@@ -2565,6 +2565,22 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     {customizations.badge.preview_url}
                   </span>
                 )}
+                <span style={{
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  ...(customizations?.name_color?.css_data
+                    ? (() => {
+                        const d = typeof customizations.name_color.css_data === 'string'
+                          ? JSON.parse(customizations.name_color.css_data)
+                          : customizations.name_color.css_data;
+                        return d.gradient
+                          ? { background: d.gradient, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
+                          : { color: d.color };
+                      })()
+                    : { color: 'var(--cyber-cyan)' })
+                }}>· {user.student_id}</span>
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
@@ -2594,15 +2610,25 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {/* Student ID — always read-only */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>STUDENT ID</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-yellow)', fontFamily: 'monospace' }}>{user.student_id}</div>
-              </div>
-              {/* Circles — always read-only */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>CIRCLES</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{communities.length}</div>
+              {/* Member Since — always read-only */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px', gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>BIO</div>
+                {editing ? (
+                  <>
+                    <textarea
+                      value={editForm.bio}
+                      onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
+                      maxLength={200}
+                      placeholder="Write something about yourself..."
+                      style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.6, resize: 'none', outline: 'none', fontFamily: 'inherit', minHeight: 60, boxSizing: 'border-box' }}
+                    />
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'right' }}>{(editForm.bio || '').length}/200</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: profile.bio ? 'var(--text-primary)' : 'var(--text-muted)', lineHeight: 1.6, fontStyle: profile.bio ? 'normal' : 'italic' }}>
+                    {profile.bio || 'No bio yet.'}
+                  </div>
+                )}
               </div>
               {/* Course — editable inline */}
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
@@ -2746,12 +2772,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
           {/* RIGHT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(252,238,10,0.3)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--cyber-yellow)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>STATS</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--cyber-cyan)', lineHeight: 1 }}>{communities.length}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, marginTop: 4 }}>CIRCLES JOINED</div>
-            </div>
-
             {communities.length > 0 && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
@@ -4888,6 +4908,9 @@ export default function UserPortal() {
     c.id === 'global' || c.creator_id === user?.id || isMember(c.id)
   );
 
+  // Circles for profile display — excludes the global feed
+  const myCirclesForProfile = myCircles.filter(c => c.id !== 'global');
+
   return (
     <div className="portal-layout">
       {/* PENDING BANNER */}
@@ -6515,7 +6538,7 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCircles} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal
           user={viewingProfile}
