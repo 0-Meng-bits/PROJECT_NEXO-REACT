@@ -1967,6 +1967,141 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
   );
 }
 
+// -- PROFILE PHOTOS SECTION ----------------------------------------------------
+function ProfilePhotosSection({ user, readOnly, editing }) {
+  const [photos, setPhotos] = useState([null, null]);
+  const [photoUploading, setPhotoUploading] = useState([false, false]);
+  const [reactions, setReactions] = useState({});
+  const photoRefs = [useRef(null), useRef(null)];
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('profile_photos').select('*').eq('user_id', user.id).then(({ data }) => {
+      if (data) {
+        const arr = [null, null];
+        data.forEach(p => { arr[p.slot - 1] = p; });
+        setPhotos(arr);
+      }
+    });
+  }, [user?.id]);
+
+  useEffect(() => {
+    const photoIds = photos.filter(p => p?.id).map(p => p.id);
+    if (!photoIds.length) return;
+    supabase.from('profile_photo_reactions').select('photo_id, user_id').in('photo_id', photoIds)
+      .then(({ data }) => {
+        if (!data) return;
+        const map = {};
+        data.forEach(r => {
+          if (!map[r.photo_id]) map[r.photo_id] = { count: 0, myReact: false };
+          map[r.photo_id].count++;
+          if (r.user_id === user.id) map[r.photo_id].myReact = true;
+        });
+        setReactions(map);
+      });
+  }, [photos[0]?.id, photos[1]?.id, user?.id]);
+
+  const handleUpload = async (slotIdx, file) => {
+    if (!file) return;
+    setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = true; return n; });
+    const ext = file.name.split('.').pop();
+    const path = `profile-photos/${user.id}/slot${slotIdx + 1}-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    if (!upErr) {
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      const slot = slotIdx + 1;
+      await supabase.from('profile_photos').upsert({ user_id: user.id, slot, photo_url: publicUrl, is_public: photos[slotIdx]?.is_public ?? true }, { onConflict: 'user_id,slot' });
+      setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...(n[slotIdx] || {}), photo_url: publicUrl, slot, is_public: n[slotIdx]?.is_public ?? true }; return n; });
+    }
+    setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = false; return n; });
+  };
+
+  const handleDelete = async (slotIdx) => {
+    await supabase.from('profile_photos').delete().eq('user_id', user.id).eq('slot', slotIdx + 1);
+    setPhotos(prev => { const n = [...prev]; n[slotIdx] = null; return n; });
+  };
+
+  const togglePrivacy = async (slotIdx) => {
+    const current = photos[slotIdx];
+    if (!current) return;
+    const newVal = !current.is_public;
+    await supabase.from('profile_photos').update({ is_public: newVal }).eq('user_id', user.id).eq('slot', slotIdx + 1);
+    setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...n[slotIdx], is_public: newVal }; return n; });
+  };
+
+  const toggleReact = async (photoId) => {
+    const curr = reactions[photoId];
+    if (curr?.myReact) {
+      await supabase.from('profile_photo_reactions').delete().eq('photo_id', photoId).eq('user_id', user.id);
+      setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 1) - 1, myReact: false } }));
+    } else {
+      await supabase.from('profile_photo_reactions').insert([{ photo_id: photoId, user_id: user.id }]);
+      setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 0) + 1, myReact: true } }));
+    }
+  };
+
+  const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
+  if (readOnly && visiblePhotos.every(p => !p)) return null;
+
+  return (
+    <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {[0, 1].map(i => {
+          const photo = photos[i];
+          const isUploading = photoUploading[i];
+          return (
+            <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {photo?.photo_url ? (
+                <>
+                  <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {!readOnly && editing && (
+                    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
+                      <button onClick={() => togglePrivacy(i)} title={photo.is_public ? 'Public' : 'Private'}
+                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                        <i className={`fa-solid ${photo.is_public ? 'fa-globe' : 'fa-lock'}`}></i>
+                      </button>
+                      <button onClick={() => photoRefs[i].current?.click()} title="Replace"
+                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'white' }}>
+                        <i className="fa-solid fa-camera"></i>
+                      </button>
+                      <button onClick={() => handleDelete(i)} title="Delete"
+                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'var(--red)' }}>
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  )}
+                  {readOnly && photo.id && (
+                    <button onClick={() => toggleReact(photo.id)}
+                      style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                      <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
+                      {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
+                    </button>
+                  )}
+                </>
+              ) : (
+                !readOnly && editing && (
+                  <div onClick={() => photoRefs[i].current?.click()}
+                    style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    {isUploading
+                      ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22 }}></i>
+                      : <><i className="fa-solid fa-plus" style={{ fontSize: 22 }}></i><span style={{ fontSize: 11 }}>Add Photo</span></>
+                    }
+                  </div>
+                )
+              )}
+              {!readOnly && editing && (
+                <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
+                  onChange={e => handleUpload(i, e.target.files[0])} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // -- PROFILE MODAL -------------------------------------------------------------
 function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly }) {
   const initials = user.full_name
@@ -2536,144 +2671,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             )}
 
             {/* PROFILE PHOTOS */}
-            {(() => {
-              const [photos, setPhotos] = React.useState([null, null]); // [slot1, slot2]
-              const [photoUploading, setPhotoUploading] = React.useState([false, false]);
-              const photoRefs = [React.useRef(null), React.useRef(null)];
-
-              React.useEffect(() => {
-                if (!user?.id) return;
-                supabase.from('profile_photos').select('*').eq('user_id', user.id).then(({ data }) => {
-                  if (data) {
-                    const arr = [null, null];
-                    data.forEach(p => { arr[p.slot - 1] = p; });
-                    setPhotos(arr);
-                  }
-                });
-              }, [user?.id]);
-
-              const handleUpload = async (slotIdx, file) => {
-                if (!file) return;
-                setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = true; return n; });
-                const ext = file.name.split('.').pop();
-                const path = `profile-photos/${user.id}/slot${slotIdx + 1}-${Date.now()}.${ext}`;
-                const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-                if (!upErr) {
-                  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-                  const slot = slotIdx + 1;
-                  await supabase.from('profile_photos').upsert({ user_id: user.id, slot, photo_url: publicUrl, is_public: photos[slotIdx]?.is_public ?? true }, { onConflict: 'user_id,slot' });
-                  setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...(n[slotIdx] || {}), photo_url: publicUrl, slot, is_public: n[slotIdx]?.is_public ?? true }; return n; });
-                }
-                setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = false; return n; });
-              };
-
-              const handleDelete = async (slotIdx) => {
-                await supabase.from('profile_photos').delete().eq('user_id', user.id).eq('slot', slotIdx + 1);
-                setPhotos(prev => { const n = [...prev]; n[slotIdx] = null; return n; });
-              };
-
-              const togglePrivacy = async (slotIdx) => {
-                const current = photos[slotIdx];
-                if (!current) return;
-                const newVal = !current.is_public;
-                await supabase.from('profile_photos').update({ is_public: newVal }).eq('user_id', user.id).eq('slot', slotIdx + 1);
-                setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...n[slotIdx], is_public: newVal }; return n; });
-              };
-
-              const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
-              if (readOnly && visiblePhotos.every(p => !p)) return null;
-
-              // Heart reactions state
-              const [reactions, setReactions] = React.useState({}); // photoId -> { count, myReact }
-
-              React.useEffect(() => {
-                const photoIds = photos.filter(p => p?.id).map(p => p.id);
-                if (!photoIds.length) return;
-                supabase.from('profile_photo_reactions').select('photo_id, user_id').in('photo_id', photoIds)
-                  .then(({ data }) => {
-                    if (!data) return;
-                    const map = {};
-                    data.forEach(r => {
-                      if (!map[r.photo_id]) map[r.photo_id] = { count: 0, myReact: false };
-                      map[r.photo_id].count++;
-                      if (r.user_id === user.id) map[r.photo_id].myReact = true;
-                    });
-                    setReactions(map);
-                  });
-              }, [photos.map(p => p?.id).join(',')]);
-
-              const toggleReact = async (photoId) => {
-                const curr = reactions[photoId];
-                if (curr?.myReact) {
-                  await supabase.from('profile_photo_reactions').delete().eq('photo_id', photoId).eq('user_id', user.id);
-                  setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 1) - 1, myReact: false } }));
-                } else {
-                  await supabase.from('profile_photo_reactions').insert([{ photo_id: photoId, user_id: user.id }]);
-                  setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 0) + 1, myReact: true } }));
-                }
-              };
-              return (
-                <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {[0, 1].map(i => {
-                      const photo = photos[i];
-                      const isUploading = photoUploading[i];
-                      return (
-                        <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          {photo?.photo_url ? (
-                            <>
-                              <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              {!readOnly && editing && (
-                                <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
-                                  <button onClick={() => togglePrivacy(i)} title={photo.is_public ? 'Public — click to make private' : 'Private — click to make public'}
-                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                                    <i className={`fa-solid ${photo.is_public ? 'fa-globe' : 'fa-lock'}`}></i>
-                                  </button>
-                                  <button onClick={() => photoRefs[i].current?.click()} title="Replace photo"
-                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'white' }}>
-                                    <i className="fa-solid fa-camera"></i>
-                                  </button>
-                                  <button onClick={() => handleDelete(i)} title="Delete photo"
-                                    style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'var(--red)' }}>
-                                    <i className="fa-solid fa-trash"></i>
-                                  </button>
-                                </div>
-                              )}
-                              {/* Heart react — only shown to other users viewing the profile */}
-                              {readOnly && photo.id && (
-                                <button onClick={() => toggleReact(photo.id)}
-                                  style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
-                                  <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
-                                  {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            !readOnly && editing && (
-                              <div onClick={() => photoRefs[i].current?.click()}
-                                style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)' }}>
-                                {isUploading
-                                  ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22 }}></i>
-                                  : <>
-                                      <i className="fa-solid fa-plus" style={{ fontSize: 22 }}></i>
-                                      <span style={{ fontSize: 11 }}>Add Photo</span>
-                                    </>
-                                }
-                              </div>
-                            )
-                          )}
-                          {!readOnly && editing && (
-                            <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
-                              onChange={e => handleUpload(i, e.target.files[0])} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
+            <ProfilePhotosSection user={user} readOnly={readOnly} editing={editing} />
 
             {/* CUSTOMIZE panel — shown in edit mode */}
             {!readOnly && editing && (
