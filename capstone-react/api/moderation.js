@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       }
 
       // Validate amount
-      if (amount <= 0 || amount > 0.5) {
+      if (amount <= 0 || amount > 5) {
         return res.status(400).json({ error: 'Invalid amount' });
       }
 

@@ -97,7 +97,7 @@ function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
       <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
-      <span>{points.toFixed(1)}</span>
+      <span>{Number.isInteger(points) ? points : points.toFixed(1)}</span>
       {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>· {color.label}</span>}
     </div>
   );
