@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -382,8 +382,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
               })()
           }
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'var(--text-primary)' }}>
               {displayName}
             </span>
@@ -402,16 +402,16 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 color: isSolved ? '#22d3ee' : '#fbbf24',
                 border: `1px solid ${isSolved ? 'rgba(34,211,238,0.3)' : 'rgba(251,191,36,0.3)'}`,
               }}>
-                {isSolved ? '? Solved' : '? Unanswered'}
+                {isSolved ? '✓ Solved' : '? Unanswered'}
               </span>
             )}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} ? {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             {user?.user_type === 'Admin' && (
               <button className="chat-action-btn" onClick={() => onPin(a.id, a.pinned)}
                 style={{ color: 'var(--cyber-yellow)' }} title={a.pinned ? 'Unpin' : 'Pin'}>
@@ -474,13 +474,13 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% ? {votes}</span>}
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
                 </div>
               </button>
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` � You voted "${myVote}"` : a.event_metadata?.is_closed ? " � Poll Closed" : " � Click to vote"}
+            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` · You voted "${myVote}"` : a.event_metadata?.is_closed ? " · Poll Closed" : " · Click to vote"}
           </div>
         </div>
       )}
@@ -500,7 +500,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           <i className="fa-solid fa-lock"></i>
           <span>
             Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` � Winning option: ${a.event_metadata.winning_option}`}
+            {a.event_metadata.winning_option && ` · Winning option: ${a.event_metadata.winning_option}`}
           </span>
         </div>
       )}
@@ -5211,6 +5211,7 @@ export default function UserPortal() {
             <>
               <div className="sidebar-brand-area">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src="/logoo.png" alt="Nexo" className="sidebar-logo-icon" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} />
                   <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
                 </div>
               </div>

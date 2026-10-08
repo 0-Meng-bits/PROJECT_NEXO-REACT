@@ -5483,3 +5483,74 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     padding: 16px !important;
   }
 }
+
+
+/* ── MOBILE: Announcement card header + comments ── */
+@media (max-width: 640px) {
+  /* Fix name wrapping in announcement header */
+  .announcement-header {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .announcement-author-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* The flex:1 middle section — clamp it so it doesn't push buttons off */
+  .announcement-header > div[style] {
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Name text — allow wrapping but don't overflow */
+  .announcement-header span[style] {
+    word-break: break-word;
+  }
+
+  /* Action buttons on the right — shrink gracefully */
+  .announcement-header > div:last-child {
+    flex-shrink: 0;
+    display: flex;
+    gap: 4px;
+  }
+
+  .announcement-title {
+    font-size: 14px;
+  }
+
+  .announcement-body {
+    font-size: 12px;
+  }
+
+  /* Comment list — fix name + timestamp row cramping */
+  .announcement-card .comment-meta,
+  .announcement-card [style*="justify-content: space-between"] {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* ── MOBILE: Sidebar logo — show only icon, hide text ── */
+.sidebar-logo-icon { display: none; }
+
+@media (max-width: 640px) {
+  .sidebar-title {
+    display: none;
+  }
+
+  .sidebar-logo-icon {
+    display: block;
+  }
+
+  .sidebar-brand-area {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
