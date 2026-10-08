@@ -27,8 +27,13 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: 'Missing user id' });
 
+      // Delete from accounts table (cascades to account_status, account_details, etc.)
       const { error } = await supabaseAdmin.from('accounts').delete().eq('id', id);
       if (error) return res.status(400).json({ error: error.message });
+
+      // Also delete the auth user so they can re-register with the same email
+      await supabaseAdmin.auth.admin.deleteUser(id);
+
       return res.json({ ok: true });
     }
 

@@ -345,8 +345,12 @@ export default function AdminDashboard() {
 
   const rejectStudent = async (id, name) => {
     if (!confirm(`Reject and remove ${name}?`)) return;
-    const { error } = await supabase.from('accounts').delete().eq('id', id);
-    if (!error) { showToast('Student rejected and removed.'); fetchData(); }
+    const res = await fetch(getApiUrl('/api/delete'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-user', id }),
+    });
+    if (res.ok) { showToast('Student rejected and removed.'); fetchData(); }
     else showToast('Failed to reject.');
   };
 
