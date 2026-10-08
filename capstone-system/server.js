@@ -631,6 +631,31 @@ app.post('/api/verify-student/:id', async (req, res) => {
   res.json({ message: 'Student verified!' });
 });
 
+// ── ADMIN: DELETE USER (POST /api/delete) ────────────────────────────────────
+app.post('/api/delete', async (req, res) => {
+  const { action, id } = req.body;
+
+  if (action === 'delete-user') {
+    if (!id) return res.status(400).json({ error: 'Missing user id' });
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(id);
+    } catch (e) {
+      console.warn('[DELETE USER] Auth delete failed:', e.message);
+    }
+    await supabaseAdmin.from('accounts').delete().eq('id', id);
+    return res.json({ ok: true });
+  }
+
+  if (action === 'delete-community') {
+    if (!id) return res.status(400).json({ error: 'Missing community id' });
+    const { error } = await supabaseAdmin.from('communities').delete().eq('id', id);
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ ok: true });
+  }
+
+  return res.status(400).json({ error: 'Invalid action' });
+});
+
 // ── ADMIN: DELETE USER ────────────────────────────────────────────────────────
 app.delete('/api/delete-user', async (req, res) => {
   const { id } = req.query;
