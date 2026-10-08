@@ -1080,8 +1080,8 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           </div>
         )}
 
-        {isOwnerMsg && !editing && (isLastInGroup || m.edited) && (
-          <div className="chat-meta own">
+        {!editing && (isLastInGroup || m.edited) && (
+          <div className={`chat-meta${isOwnerMsg ? ' own' : ''}`} style={!isOwnerMsg ? { marginTop: 2 } : {}}>
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             {isLastInGroup && <span className="chat-time">{time}</span>}
             {isLastInGroup && readers?.length > 0 && (
@@ -1108,17 +1108,11 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 )}
               </div>
             )}
-            {isLastInGroup && (!readers || readers.length === 0) && (isLastOwn || hovered) && (
+            {isOwnerMsg && isLastInGroup && (!readers || readers.length === 0) && (isLastOwn || hovered) && (
               <span style={{ marginLeft: 3, color: 'var(--text-muted)', fontSize: 10 }} title="Sent">
                 <i className="fa-solid fa-check" />
               </span>
             )}
-          </div>
-        )}
-        {/* Time for other users' messages — shown below the last bubble in a group */}
-        {!isOwnerMsg && !editing && isLastInGroup && (
-          <div className="chat-meta" style={{ marginTop: 2 }}>
-            <span className="chat-time">{time}</span>
           </div>
         )}
       </div>
@@ -4369,8 +4363,10 @@ export default function UserPortal() {
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
       markMessagesRead(data || []);
-      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
-      if (myIds.length) fetchReadCounts(myIds);
+      const msgs = data || [];
+      const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
+      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
@@ -4379,8 +4375,10 @@ export default function UserPortal() {
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
       markMessagesRead(data || []);
-      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
-      if (myIds.length) fetchReadCounts(myIds);
+      const msgs = data || [];
+      const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
+      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else if (commId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('community_id', commId)
@@ -4391,8 +4389,10 @@ export default function UserPortal() {
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
       markMessagesRead(data || []);
-      const myIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
-      if (myIds.length) fetchReadCounts(myIds);
+      const msgs = data || [];
+      const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
+      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else {
       setMessages([]);
     }
@@ -4421,8 +4421,10 @@ export default function UserPortal() {
     fetchAvatarsForMessages(data || []);
     loadCustomizationsForMessages(data || []);
     markMessagesRead(data || []);
-    const myMsgIds = (data || []).filter(m => m.student_id === user?.student_id).map(m => m.id);
-    if (myMsgIds.length) fetchReadCounts(myMsgIds);
+    const msgs = data || [];
+    const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
+    const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+    if (idsToFetch.length) fetchReadCounts(idsToFetch);
   }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   // Initial load + realtime subscription ? re-runs when channel/community changes
@@ -4448,6 +4450,8 @@ export default function UserPortal() {
             setMessages(prev => {
               if (prev.find(m => m.id === msg.id)) return prev;
               fetchAvatarsForMessages([msg]);
+              markMessagesRead([msg]);
+              fetchReadCounts([msg.id]);
               return [...prev, msg];
             });
           }
@@ -4655,7 +4659,7 @@ export default function UserPortal() {
               if (prev.find(m => m.id === msg.id)) return prev;
               fetchAvatarsForMessages([msg]);
               markMessagesRead([msg]);
-              if (msg.student_id === user?.student_id) fetchReadCounts([msg.id]);
+              fetchReadCounts([msg.id]);
               return [...prev, msg];
             });
           }
@@ -5720,20 +5724,19 @@ export default function UserPortal() {
 
                 {(() => {
                   const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
-                  // Build a map: readerId -> lastMessageId they read (among own messages)
-                  const readerLastMsg = {};
-                  messages.forEach((m) => {
-                    if (m.student_id !== user?.student_id) return;
-                    (messageReads[m.id] || []).forEach(r => {
-                      readerLastMsg[r.reader_id] = m.id;
-                    });
-                  });
+                  const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null;
+                  const lastMsgSenderId = messages.length > 0 ? messages[messages.length - 1].student_id : null;
+                  // Readers for last message: exclude current user and the sender
+                  const lastMsgReaders = (messageReads[lastMsgId] || []).filter(
+                    r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
+                  );
                   return messages.map((m, idx) => {
                     const isOwnerMsg = m.student_id === user?.student_id;
                     const prev = messages[idx - 1];
                     const next = messages[idx + 1];
                     const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                    const isLastMsg = m.id === lastMsgId;
                     
                     // Group consecutive messages from same user within 3 minutes
                     const isGrouped = prev && 
@@ -5744,11 +5747,6 @@ export default function UserPortal() {
                       next.student_id !== m.student_id || 
                       (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
-                    // Only show readers whose last-read message is this one
-                    const filteredReaders = isOwnerMsg
-                      ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
-                      : [];
-                    
                     return (
                       <React.Fragment key={m.id}>
                         {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -5766,7 +5764,7 @@ export default function UserPortal() {
                           avatarUrl={avatarCache[m.student_id] || null}
                           onViewProfile={viewUserProfile}
                           online={isOnline(profileIdCache[m.student_id])}
-                          readers={filteredReaders}
+                          readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                           isLastOwn={isLastOwn}
                           isGrouped={isGrouped}
                           isLastInGroup={isLastInGroup}
@@ -6329,14 +6327,11 @@ export default function UserPortal() {
 
                     // Otherwise show regular chat messages
                     const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
-                    // Build a map: readerId -> lastMessageId they read (among own messages)
-                    const readerLastMsg = {};
-                    messages.forEach((m) => {
-                      if (m.student_id !== user?.student_id) return;
-                      (messageReads[m.id] || []).forEach(r => {
-                        readerLastMsg[r.reader_id] = m.id;
-                      });
-                    });
+                    const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null;
+                    const lastMsgSenderId = messages.length > 0 ? messages[messages.length - 1].student_id : null;
+                    const lastMsgReaders = (messageReads[lastMsgId] || []).filter(
+                      r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
+                    );
                     return messages.map((m, idx) => {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
@@ -6344,6 +6339,7 @@ export default function UserPortal() {
                       const next = messages[idx + 1];
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      const isLastMsg = m.id === lastMsgId;
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
@@ -6353,11 +6349,6 @@ export default function UserPortal() {
                       const isLastInGroup = !next || 
                         next.student_id !== m.student_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
-
-                      // Only show readers whose last-read message is this one
-                      const filteredReaders = isOwnerMsg
-                        ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
-                        : [];
                       
                       return (
                         <React.Fragment key={m.id}>
@@ -6374,7 +6365,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readers={filteredReaders}
+                            readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
@@ -6475,14 +6466,11 @@ export default function UserPortal() {
                 ) : (
                   (() => {
                     const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
-                    // Build a map: readerId -> lastMessageId they read (among own messages)
-                    const readerLastMsg = {};
-                    circleChatMessages.forEach((m) => {
-                      if (m.student_id !== user?.student_id) return;
-                      (messageReads[m.id] || []).forEach(r => {
-                        readerLastMsg[r.reader_id] = m.id;
-                      });
-                    });
+                    const lastMsgId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].id : null;
+                    const lastMsgSenderId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].student_id : null;
+                    const lastMsgReaders = (messageReads[lastMsgId] || []).filter(
+                      r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
+                    );
                     return circleChatMessages.map((m, idx) => {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
@@ -6490,6 +6478,7 @@ export default function UserPortal() {
                       const next = circleChatMessages[idx + 1];
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                      const isLastMsg = m.id === lastMsgId;
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
@@ -6500,11 +6489,6 @@ export default function UserPortal() {
                         next.student_id !== m.student_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
-                      // Only show readers whose last-read message is this one
-                      const filteredReaders = isOwnerMsg
-                        ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
-                        : [];
-                      
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -6529,7 +6513,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readers={filteredReaders}
+                            readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
