@@ -241,7 +241,9 @@ export default function AdminDashboard() {
       setCommunities(commRes.ok ? await commRes.json() : []);
       setStudents((adminData.students || []).map(s => {
         const { id: _asId, ...accountStatus } = s.account_status || {};
-        const { id: _adId, ...accountDetails } = s.account_details || {};
+        // account_details may come back as an array (one-to-many join) or object
+        const adRaw = Array.isArray(s.account_details) ? s.account_details[0] : s.account_details;
+        const { id: _adId, ...accountDetails } = adRaw || {};
         return { ...s, ...accountStatus, ...accountDetails };
       }));
       setAnnouncements(adminData.announcements || []);

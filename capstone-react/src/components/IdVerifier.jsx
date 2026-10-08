@@ -63,9 +63,12 @@ function extractIdFromText(text, typedId) {
   const spacedPattern = idClean.split('').join('[\\s\\-\\.]*');
   if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true };
 
-  // 3. Fuzzy match — generate all possible interpretations of OCR text
-  // and check if any match the typed ID exactly
-  // This handles cases where OCR reads "O" instead of "0", "l" instead of "1", etc.
+  // 3. Strip everything except alphanumeric and check again
+  // Handles cases like "1 No.8230582" where noise prefixes the number
+  const ocrAlphaNum = ocrRaw.replace(/[^A-Z0-9]/g, '');
+  if (ocrAlphaNum.includes(idClean)) return { found: true };
+
+  // 4. Fuzzy match — generate all possible interpretations of OCR text
   const ocrVariants = buildOcrVariants(ocrStripped);
   if (ocrVariants.includes(idClean)) return { found: true };
 
@@ -77,24 +80,36 @@ function extractIdFromText(text, typedId) {
     if (wordVariants.includes(idClean)) return { found: true };
   }
 
+  // 5. Check each line's digit-only sequence against the ID
+  // Handles "1 No.8230582" → digits only → "18230582" which contains "8230582"
+  const lines = ocrRaw.split(/\n/);
+  for (const line of lines) {
+    const digitsOnly = line.replace(/[^0-9]/g, '');
+    if (digitsOnly.includes(idClean.replace(/[^0-9]/g, ''))) return { found: true };
+  }
+
   return { found: false };
 }
-
 // Preprocess image on canvas to improve OCR accuracy:
-// - Upscale, increase contrast, convert to grayscale
-async function preprocessImage(imageFile) {
+// - Optionally crop to bottom portion (cropRatio=0.4 means bottom 40%)
+// - Upscale to target size, adaptive threshold binarization
+async function preprocessImage(imageFile, cropRatio = 1) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(imageFile);
     img.onload = () => {
-      const scale = Math.max(1, 2400 / Math.max(img.width, img.height));
+      const srcY = Math.floor(img.height * (1 - cropRatio));
+      const srcH = img.height - srcY;
+      // Use lower target for crop pass (faster), higher for full image pass
+      const targetSize = cropRatio < 1 ? 1600 : 2000;
+      const scale = Math.max(1, targetSize / Math.max(img.width, srcH));
       const canvas = document.createElement('canvas');
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(srcH * scale);
       const ctx = canvas.getContext('2d');
 
-      // Draw scaled image
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Draw only the cropped region, scaled
+      ctx.drawImage(img, 0, srcY, img.width, srcH, 0, 0, canvas.width, canvas.height);
 
       // Step 1: Convert to grayscale
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -167,6 +182,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const capturedFileRef = useRef(null);
+  const scanningRef = useRef(false); // prevent double-trigger on mobile camera return
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -183,9 +199,14 @@ export default function IdVerifier({ ctuId, onVerified }) {
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       });
       streamRef.current = stream;
-      setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      }, 100);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      } else {
+        // video element not mounted yet, wait for next tick
+        setTimeout(() => {
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        }, 50);
+      }
     } catch {
       setCameraError('Camera access denied. Please upload a photo instead.');
       setStage('idle');
@@ -213,26 +234,34 @@ export default function IdVerifier({ ctuId, onVerified }) {
     setProgress(0);
     setResult(null);
     try {
-      // Preprocess image for better OCR accuracy
-      const processedFile = await preprocessImage(imageFile);
-
       const worker = await createWorker('eng', 1, {
         logger: (m) => {
           if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100));
         },
       });
-
-      // Configure Tesseract for ID number detection
       await worker.setParameters({
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
-        tessedit_pageseg_mode: '11', // Sparse text — better for ID cards with scattered fields
+        tessedit_pageseg_mode: '11',
       });
 
-      const { data: { text } } = await worker.recognize(processedFile);
-      await worker.terminate();
+      // Pass 1: crop to bottom 40% where ID number lives on CTU IDs
+      const croppedFile = await preprocessImage(imageFile, 0.4);
+      const { data: { text: croppedText } } = await worker.recognize(croppedFile);
+      console.log('[OCR] Cropped pass:', croppedText);
 
-      console.log('[OCR] Raw text:', text); // helpful for debugging
-      setResult(extractIdFromText(text, ctuId));
+      let result = extractIdFromText(croppedText, ctuId);
+
+      // Pass 2: only if crop pass failed — try full image
+      if (!result.found) {
+        setProgress(0);
+        const fullFile = await preprocessImage(imageFile, 1);
+        const { data: { text: fullText } } = await worker.recognize(fullFile);
+        console.log('[OCR] Full image pass:', fullText);
+        result = extractIdFromText(fullText, ctuId);
+      }
+
+      await worker.terminate();
+      setResult(result);
       setStage('done');
     } catch (err) {
       console.error('OCR error:', err);
@@ -242,7 +271,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
   const handleFile = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || scanningRef.current) return;
+    scanningRef.current = true;
     capturedFileRef.current = file;
     setPreview(URL.createObjectURL(file));
     runOCR(file);
@@ -254,6 +284,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
   const reset = () => {
     stopCamera();
+    scanningRef.current = false;
     setStage('idle');
     setPreview(null);
     setResult(null);
@@ -334,19 +365,10 @@ export default function IdVerifier({ ctuId, onVerified }) {
               <input id="id-file-upload" ref={fileRef} type="file"
                 accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
             </label>
-            {isMobile ? (
-              <label className="id-upload-btn camera" htmlFor="id-camera-mobile">
-                <i className="fa-solid fa-camera" style={{ marginRight: 6 }} />
-                Take Photo
-                <input id="id-camera-mobile" type="file" accept="image/*"
-                  capture="environment" onChange={handleFile} style={{ display: 'none' }} />
-              </label>
-            ) : (
-              <button className="id-upload-btn camera" onClick={openCamera} type="button">
-                <i className="fa-solid fa-camera" style={{ marginRight: 6 }} />
-                Take Photo
-              </button>
-            )}
+            <button className="id-upload-btn camera" onClick={openCamera} type="button">
+              <i className="fa-solid fa-camera" style={{ marginRight: 6 }} />
+              Take Photo
+            </button>
           </div>
         </div>
       )}
@@ -356,26 +378,6 @@ export default function IdVerifier({ ctuId, onVerified }) {
         <div className="id-camera-wrap">
           <div className="id-camera-frame">
             <video ref={videoRef} autoPlay playsInline muted className="id-camera-video" />
-            <div className="id-camera-overlay">
-              <div className="id-camera-guide">
-                <span>Align ID flat and horizontal within the frame</span>
-              </div>
-              {/* Bottom crop indicator */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                height: '55%', border: '2px solid rgba(0,240,255,0.6)',
-                borderTop: '2px dashed var(--cyber-cyan)',
-                pointerEvents: 'none',
-              }}>
-                <span style={{
-                  position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%)',
-                  fontSize: 10, color: 'var(--cyber-cyan)', background: 'rgba(0,0,0,0.7)',
-                  padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap',
-                }}>
-                  Name & ID area — keep this zone clear
-                </span>
-              </div>
-            </div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
             <button className="cyber-btn" onClick={capturePhoto} type="button" style={{ flex: 1 }}>
