@@ -210,7 +210,7 @@ app.post('/api/signup', async (req, res) => {
       id: userId, ctu_id: studentId, full_name: fullName, email, user_type,
     }]);
     await supabaseAdmin.from('account_status').insert([{ id: userId, is_verified: false }]);
-    await supabaseAdmin.from('account_details').insert([{
+    await supabaseAdmin.from('account_details').upsert([{
       id: userId,
       id_photo_url: idPhotoUrl,
       id_verified: id_verified || false,
