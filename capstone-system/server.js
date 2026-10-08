@@ -156,16 +156,14 @@ app.post('/api/login', async (req, res) => {
 
 // ── SIGNUP ────────────────────────────────────────────────────────────────────
 app.post('/api/signup', async (req, res) => {
-  const { email, password, fullName, studentId, user_type } = req.body;
+  const { email, password, fullName, studentId, user_type, id_photo_base64, id_photo_ext, id_verified } = req.body;
 
   // Clean up any orphaned DB rows from a previous failed signup attempt
   const { data: existingAccount } = await supabaseAdmin
     .from('accounts').select('id').eq('ctu_id', studentId).single();
   if (existingAccount) {
-    // Check if auth user exists for this account
     const { data: authCheck } = await supabaseAdmin.auth.admin.getUserById(existingAccount.id);
     if (!authCheck?.user) {
-      // Orphaned DB row — clean it up so signup can proceed
       await supabaseAdmin.from('account_details').delete().eq('id', existingAccount.id);
       await supabaseAdmin.from('account_status').delete().eq('id', existingAccount.id);
       await supabaseAdmin.from('accounts').delete().eq('id', existingAccount.id);
@@ -186,25 +184,44 @@ app.post('/api/signup', async (req, res) => {
 
   const userId = authData.user.id;
 
+  // 2. Upload ID photo if provided
+  let idPhotoUrl = null;
+  if (id_photo_base64) {
+    try {
+      const ext = id_photo_ext || 'jpg';
+      const path = `id-photos/${studentId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${ext}`;
+      const buffer = Buffer.from(id_photo_base64, 'base64');
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('id-photos')
+        .upload(path, buffer, { contentType: `image/${ext}`, upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabaseAdmin.storage.from('id-photos').getPublicUrl(path);
+        idPhotoUrl = urlData.publicUrl;
+      } else {
+        console.warn('[SIGNUP] Photo upload error:', uploadError.message);
+      }
+    } catch (e) {
+      console.warn('[SIGNUP] Photo upload exception:', e.message);
+    }
+  }
+
   try {
-    // 2a. Insert into accounts
     await supabaseAdmin.from('accounts').insert([{
       id: userId, ctu_id: studentId, full_name: fullName, email, user_type,
     }]);
-
-    // 2b. Insert into account_status
     await supabaseAdmin.from('account_status').insert([{ id: userId, is_verified: false }]);
-
-    // 2c. Insert into account_details
-    await supabaseAdmin.from('account_details').insert([{ id: userId }]);
-
+    await supabaseAdmin.from('account_details').insert([{
+      id: userId,
+      id_photo_url: idPhotoUrl,
+      id_verified: id_verified || false,
+    }]);
   } catch (err) {
     await supabaseAdmin.auth.admin.deleteUser(userId);
     return res.status(400).json({ message: err.message });
   }
 
   const { data: sessionData } = await supabase.auth.signInWithPassword({ email, password });
-  const user = { id: userId, student_id: studentId, full_name: fullName, email, user_type, is_verified: false };
+  const user = { id: userId, student_id: studentId, full_name: fullName, email, user_type, is_verified: false, id_photo_url: idPhotoUrl };
 
   res.status(200).json({ message: 'Awaiting approval', user, session: sessionData?.session || null });
 });
