@@ -47,6 +47,7 @@ export default async function handler(req, res) {
 
   // Insert profile linked to auth user (backwards compat)
   const { data, error } = await supabaseAdmin
+    .from('profiles')
     .insert([{
       id: authData.user.id,
       student_id: studentId,
