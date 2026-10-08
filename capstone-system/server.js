@@ -197,12 +197,15 @@ app.post('/api/signup', async (req, res) => {
       if (!uploadError) {
         const { data: urlData } = supabaseAdmin.storage.from('id-photos').getPublicUrl(path);
         idPhotoUrl = urlData.publicUrl;
+        console.log('[SIGNUP] Photo uploaded, URL:', idPhotoUrl);
       } else {
         console.warn('[SIGNUP] Photo upload error:', uploadError.message);
       }
     } catch (e) {
       console.warn('[SIGNUP] Photo upload exception:', e.message);
     }
+  } else {
+    console.log('[SIGNUP] No id_photo_base64 received');
   }
 
   try {
@@ -215,6 +218,7 @@ app.post('/api/signup', async (req, res) => {
       id_photo_url: idPhotoUrl,
       id_verified: id_verified || false,
     }]);
+    console.log('[SIGNUP] account_details upserted with id_photo_url:', idPhotoUrl);
   } catch (err) {
     await supabaseAdmin.auth.admin.deleteUser(userId);
     return res.status(400).json({ message: err.message });
