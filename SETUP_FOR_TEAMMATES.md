@@ -1,161 +1,87 @@
-# 🚀 Database Setup Guide for Team Members
+# Database Setup Guide for Team Members
+
+Last updated: 2026-10-04
 
 ## Quick Start (5 minutes)
 
-Your teammate has updated the database schema. Follow these steps to sync your local/dev environment:
+### Step 1 — Pull the latest code
+
+```bash
+git pull origin main
+```
+
+### Step 2 — Set up your Supabase project
+
+Go to [supabase.com](https://supabase.com), create a new project (or use an existing one).
+
+### Step 3 — Run the schema
+
+1. Go to your project → SQL Editor
+2. Open `COMPLETE_SCHEMA.sql` from the repo root
+3. Copy the entire file and paste it into the SQL Editor
+4. Click Run
+
+That's it. All 29 tables, indexes, RLS policies, storage buckets, and default shop items are set up in one shot.
+
+### Step 4 — Configure your .env
+
+Copy the `.env` file template and fill in your Supabase credentials:
+
+```bash
+cd capstone-react
+cp .env.example .env   # if it exists, otherwise ask a teammate for the .env values
+```
+
+You need:
+- `VITE_SUPABASE_URL` — your project URL (Project Settings → API)
+- `VITE_SUPABASE_ANON_KEY` — your anon/public key
+- `SUPABASE_SERVICE_ROLE_KEY` — your service role key (for the API)
+
+### Step 5 — Run the dev server
+
+```bash
+cd capstone-react
+npm install
+npm run dev
+```
 
 ---
 
-## Option 1: Fresh Database Setup (RECOMMENDED - Easiest) ✨
+## Important Notes
 
-**Use this if you want to start fresh with the new schema.**
+### Do NOT run the old migrations folder
 
-### Steps:
+The `supabase/migrations/` folder has 59 files spanning months of incremental changes. Some of them reference old table names like `profiles` and `auditions` that no longer exist. Running them on a fresh database will break.
 
-1. **Pull the latest code from GitHub:**
-   ```bash
-   git pull origin main
-   ```````
+Use `COMPLETE_SCHEMA.sql` instead — it is the single source of truth and reflects the full current schema.
 
-2. **Go to your Supabase Project:**
-   - Log in to [supabase.com](https://supabase.com)
-   - Open your project
+### What's in the schema
 
-3. **Run the complete schema:**
-   - Go to **SQL Editor** in the left sidebar
-   - Open the file `COMPLETE_SCHEMA.sql` from the repo
-   - Copy all the content
-   - Paste it into the SQL Editor
-   - Click **Run** or press `Ctrl+Enter`
+- Core user tables: `accounts`, `account_status`, `account_details`
+- Community tables: `communities`, `memberships`, `channels`, `circle_requests`
+- Messaging: `messages`, `message_reads`, `message_reactions`
+- Content: `announcements`, `post_comments`, `showcase_feedback`
+- Applications: `applications`, `application_questions`, `application_submissions`
+- Events: `campus_events`, `notifications`
+- Moderation: `reports`, `user_warnings`, `user_flags`, `warning_appeals`, `abuse_patterns`
+- Trust points: `point_transactions`, `appreciation_cooldowns`
+- Shop: `shop_items`, `user_purchases`, `user_profile_settings`
+- Tasks: `task_items`
+- Storage buckets: `avatars`, `chat-media`
 
-4. **Done!** ✅
-   - Your database now has all the new tables
-   - All foreign keys are set up
-   - Storage buckets are configured
+### Troubleshooting
 
----
+**"Table already exists" error** — Your database already has some tables. Either drop the schema first or just skip those errors; the schema uses `CREATE TABLE IF NOT EXISTS` so existing tables won't be overwritten.
 
-## Option 2: Run Migrations (For Advanced Users)
+To start fully fresh (deletes all data):
+```sql
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+```
+Then re-run `COMPLETE_SCHEMA.sql`.
 
-**Use this if you want to keep existing data and migrate step-by-step.**
+**"Permission denied" error** — Make sure your backend is using the `service_role` key, not the `anon` key.
 
-### Prerequisites:
-- Supabase CLI installed
-- Connection to your Supabase project
-
-### Steps:
-
-1. **Pull the latest code:**
-   ```bash
-   git pull origin main
-   ```
-
-2. **Link to your Supabase project:**
-   ```bash
-   cd supabase
-   npx supabase link --project-ref YOUR_PROJECT_REF
-   ```
-
-3. **Push migrations:**
-   ```bash
-   npx supabase db push
-   ```
-
-4. **Verify:**
-   ```sql
-   -- Run this in SQL Editor to check tables
-   SELECT table_name 
-   FROM information_schema.tables 
-   WHERE table_schema = 'public' 
-   AND table_name IN ('accounts', 'account_status', 'account_details',
-                      'applications', 'application_questions', 'application_submissions')
-   ORDER BY table_name;
-   ```
-
----
-
-## What Changed?
-
-### Major Schema Updates:
-
-1. **profiles → accounts** (Normalized)
-   - Old: Single `profiles` table
-   - New: Split into 3 tables:
-     - `accounts` - Core identity
-     - `account_status` - Verification/moderation
-     - `account_details` - Profile info
-
-2. **auditions → applications** (Terminology)
-   - `auditions` → `applications`
-   - `audition_questions` → `application_questions`
-   - `audition_responses` → `application_submissions`
-
-3. **New columns:**
-   - `communities.application_enabled`
-   - `communities.internal_application`
-   - `account_details.last_seen`
-   - `account_details.cover_url`
-
-### All Code Updated:
-✅ Backend API (server.js)
-✅ Frontend components
-✅ All foreign keys migrated
-✅ Storage buckets configured
-
----
-
-## Testing Your Setup
-
-After running the setup, test these:
-
-1. **Check tables exist:**
-   ```sql
-   SELECT count(*) FROM accounts;
-   SELECT count(*) FROM communities;
-   SELECT count(*) FROM applications;
-   ```
-
-2. **Run the dev server:**
-   ```bash
-   cd capstone-react
-   npm install  # If there are new dependencies
-   npm run dev
-   ```
-
-3. **Try logging in/signing up** to verify everything works
-
----
-
-## Troubleshooting
-
-### "Table already exists" error
-- You already have some tables. Use **Option 2** (migrations) instead, or:
-- Drop your existing database tables first (⚠️ This deletes all data):
-  ```sql
-  DROP SCHEMA public CASCADE;
-  CREATE SCHEMA public;
-  ```
-  Then re-run `COMPLETE_SCHEMA.sql`
-
-### "Permission denied" error
-- Make sure you're using **service_role** key in your backend
-- Check that RLS policies are set up (they're in the schema file)
-
-### FK constraint errors
-- Run the complete schema file from scratch
-- Or check if any old `profiles` references still exist
-
----
-
-## Need Help?
-
-Ask your teammate who made these changes! They have the full context. 😊
-
-**Files to reference:**
-- `COMPLETE_SCHEMA.sql` - Full database schema
-- `MIGRATION_COMPLETE.md` - Documentation of what changed
-- `DATABASE_SCHEMA.md` - Schema reference
-
----
-
-**Estimated Time:** 5-10 minutes for Option 1 (fresh setup)
+**Login/signup not working** — Make sure Supabase Auth is enabled in your project (Authentication → Settings). Email confirmations can be turned off for local dev.

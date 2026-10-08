@@ -3895,6 +3895,8 @@ export default function UserPortal() {
   // Mark visible messages as read
   const markMessagesRead = useCallback(async (msgs) => {
     if (!user?.id || !msgs?.length) return;
+    // Don't mark as read if the tab is hidden (user isn't actually looking at it)
+    if (document.visibilityState !== 'visible') return;
     // Only attempt if user has a real Supabase auth session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -5718,6 +5720,14 @@ export default function UserPortal() {
 
                 {(() => {
                   const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                  // Build a map: readerId -> lastMessageId they read (among own messages)
+                  const readerLastMsg = {};
+                  messages.forEach((m) => {
+                    if (m.student_id !== user?.student_id) return;
+                    (messageReads[m.id] || []).forEach(r => {
+                      readerLastMsg[r.reader_id] = m.id;
+                    });
+                  });
                   return messages.map((m, idx) => {
                     const isOwnerMsg = m.student_id === user?.student_id;
                     const prev = messages[idx - 1];
@@ -5733,6 +5743,11 @@ export default function UserPortal() {
                     const isLastInGroup = !next || 
                       next.student_id !== m.student_id || 
                       (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
+
+                    // Only show readers whose last-read message is this one
+                    const filteredReaders = isOwnerMsg
+                      ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
+                      : [];
                     
                     return (
                       <React.Fragment key={m.id}>
@@ -5751,7 +5766,7 @@ export default function UserPortal() {
                           avatarUrl={avatarCache[m.student_id] || null}
                           onViewProfile={viewUserProfile}
                           online={isOnline(profileIdCache[m.student_id])}
-                          readers={messageReads[m.id] || []}
+                          readers={filteredReaders}
                           isLastOwn={isLastOwn}
                           isGrouped={isGrouped}
                           isLastInGroup={isLastInGroup}
@@ -6314,6 +6329,14 @@ export default function UserPortal() {
 
                     // Otherwise show regular chat messages
                     const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                    // Build a map: readerId -> lastMessageId they read (among own messages)
+                    const readerLastMsg = {};
+                    messages.forEach((m) => {
+                      if (m.student_id !== user?.student_id) return;
+                      (messageReads[m.id] || []).forEach(r => {
+                        readerLastMsg[r.reader_id] = m.id;
+                      });
+                    });
                     return messages.map((m, idx) => {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
@@ -6330,6 +6353,11 @@ export default function UserPortal() {
                       const isLastInGroup = !next || 
                         next.student_id !== m.student_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
+
+                      // Only show readers whose last-read message is this one
+                      const filteredReaders = isOwnerMsg
+                        ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
+                        : [];
                       
                       return (
                         <React.Fragment key={m.id}>
@@ -6346,7 +6374,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readers={messageReads[m.id] || []}
+                            readers={filteredReaders}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
@@ -6447,6 +6475,14 @@ export default function UserPortal() {
                 ) : (
                   (() => {
                     const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                    // Build a map: readerId -> lastMessageId they read (among own messages)
+                    const readerLastMsg = {};
+                    circleChatMessages.forEach((m) => {
+                      if (m.student_id !== user?.student_id) return;
+                      (messageReads[m.id] || []).forEach(r => {
+                        readerLastMsg[r.reader_id] = m.id;
+                      });
+                    });
                     return circleChatMessages.map((m, idx) => {
                       const isOwnerMsg = m.student_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
@@ -6463,6 +6499,11 @@ export default function UserPortal() {
                       const isLastInGroup = !next || 
                         next.student_id !== m.student_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
+
+                      // Only show readers whose last-read message is this one
+                      const filteredReaders = isOwnerMsg
+                        ? (messageReads[m.id] || []).filter(r => readerLastMsg[r.reader_id] === m.id)
+                        : [];
                       
                       return (
                         <React.Fragment key={m.id}>
@@ -6488,7 +6529,7 @@ export default function UserPortal() {
                             avatarUrl={avatarCache[m.student_id] || null}
                             onViewProfile={viewUserProfile}
                             online={isOnline(profileIdCache[m.student_id])}
-                            readers={messageReads[m.id] || []}
+                            readers={filteredReaders}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
                             isLastInGroup={isLastInGroup}
