@@ -87,7 +87,7 @@ async function preprocessImage(imageFile) {
     const img = new Image();
     const url = URL.createObjectURL(imageFile);
     img.onload = () => {
-      const scale = Math.max(1, 1600 / Math.max(img.width, img.height));
+      const scale = Math.max(1, 2400 / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
@@ -96,17 +96,52 @@ async function preprocessImage(imageFile) {
       // Draw scaled image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Apply grayscale + contrast boost via pixel manipulation
+      // Step 1: Convert to grayscale
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        // Grayscale
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        // Contrast stretch: push darks darker, lights lighter
-        const contrast = 1.5;
-        const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-        const adjusted = Math.min(255, Math.max(0, factor * (gray - 128) + 128));
-        data[i] = data[i + 1] = data[i + 2] = adjusted;
+      const w = canvas.width;
+      const h = canvas.height;
+      const gray = new Uint8ClampedArray(w * h);
+      for (let i = 0; i < w * h; i++) {
+        gray[i] = Math.round(0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]);
+      }
+
+      // Step 2: Adaptive threshold (integral image method)
+      // Each pixel is compared to the mean of its surrounding block minus a constant C
+      // This handles uneven lighting and gradient backgrounds (like yellow-to-green IDs)
+      const blockSize = Math.round(Math.min(w, h) * 0.05) | 1; // ~5% of smaller dimension, must be odd
+      const C = 10; // subtract from local mean — tune this to make text pop
+
+      // Build integral image for fast block sums
+      const integral = new Float64Array((w + 1) * (h + 1));
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          integral[(y + 1) * (w + 1) + (x + 1)] =
+            gray[y * w + x]
+            + integral[y * (w + 1) + (x + 1)]
+            + integral[(y + 1) * (w + 1) + x]
+            - integral[y * (w + 1) + x];
+        }
+      }
+
+      const half = Math.floor(blockSize / 2);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const x1 = Math.max(0, x - half);
+          const y1 = Math.max(0, y - half);
+          const x2 = Math.min(w - 1, x + half);
+          const y2 = Math.min(h - 1, y + half);
+          const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+          const sum = integral[(y2 + 1) * (w + 1) + (x2 + 1)]
+            - integral[y1 * (w + 1) + (x2 + 1)]
+            - integral[(y2 + 1) * (w + 1) + x1]
+            + integral[y1 * (w + 1) + x1];
+          const localMean = sum / count;
+          const binary = gray[y * w + x] < localMean - C ? 0 : 255;
+          const idx = (y * w + x) * 4;
+          data[idx] = data[idx + 1] = data[idx + 2] = binary;
+          data[idx + 3] = 255;
+        }
       }
       ctx.putImageData(imageData, 0, 0);
 
@@ -190,7 +225,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
       // Configure Tesseract for ID number detection
       await worker.setParameters({
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-',
-        tessedit_pageseg_mode: '6', // Assume uniform block of text
+        tessedit_pageseg_mode: '11', // Sparse text — better for ID cards with scattered fields
       });
 
       const { data: { text } } = await worker.recognize(processedFile);
