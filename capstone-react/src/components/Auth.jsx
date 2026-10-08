@@ -39,16 +39,32 @@ export default function Auth() {
   const doSignup = async (verified, idPhotoFile) => {
     setLoading(true);
     try {
-      // Convert photo file to base64 to upload server-side (avoids storage auth issues)
+      // Convert photo file to base64 — resize to max 1200px and compress to reduce payload size
       let id_photo_base64 = null;
-      let id_photo_ext = null;
+      let id_photo_ext = 'jpg';
       if (idPhotoFile instanceof File) {
-        const buf = await idPhotoFile.arrayBuffer();
+        const compressed = await new Promise((resolve) => {
+          const img = new Image();
+          const url = URL.createObjectURL(idPhotoFile);
+          img.onload = () => {
+            const maxSize = 1200;
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(idPhotoFile); };
+          img.src = url;
+        });
+        const buf = await compressed.arrayBuffer();
         const bytes = new Uint8Array(buf);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
         id_photo_base64 = btoa(binary);
-        id_photo_ext = idPhotoFile.name?.split('.').pop() || 'jpg';
+        id_photo_ext = 'jpg';
       }
 
       const res = await fetch(getApiUrl('/api/signup'), {
