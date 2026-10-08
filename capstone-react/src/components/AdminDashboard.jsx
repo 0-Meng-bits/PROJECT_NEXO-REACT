@@ -244,7 +244,8 @@ export default function AdminDashboard() {
         // account_details may come back as an array (one-to-many join) or object
         const adRaw = Array.isArray(s.account_details) ? s.account_details[0] : s.account_details;
         const { id: _adId, ...accountDetails } = adRaw || {};
-        return { ...s, ...accountStatus, ...accountDetails };
+        // accounts table uses ctu_id, map it to student_id for display consistency
+        return { ...s, ...accountStatus, ...accountDetails, student_id: s.student_id || s.ctu_id };
       }));
       setAnnouncements(adminData.announcements || []);
       setAuditions(adminData.auditions || []);
