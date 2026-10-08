@@ -2545,6 +2545,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   border-radius: 12px;
   padding: 20px;
   transition: border-color 0.2s;
+  overflow: hidden;
 }
 .announcement-card:hover { border-color: rgba(0,240,255,0.15); }
 .announcement-card.pinned {
@@ -5487,7 +5488,6 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* ── MOBILE: Announcement card header + comments ── */
 @media (max-width: 640px) {
-  /* Fix name wrapping in announcement header */
   .announcement-header {
     flex-wrap: nowrap;
     align-items: flex-start;
@@ -5501,22 +5501,13 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     flex-shrink: 0;
   }
 
-  /* The flex:1 middle section — clamp it so it doesn't push buttons off */
-  .announcement-header > div[style] {
-    min-width: 0;
-    flex: 1;
+  /* Hide badge label text — keep only the icon */
+  .post-type-label {
+    display: none;
   }
 
-  /* Name text — allow wrapping but don't overflow */
-  .announcement-header span[style] {
-    word-break: break-word;
-  }
-
-  /* Action buttons on the right — shrink gracefully */
-  .announcement-header > div:last-child {
-    flex-shrink: 0;
-    display: flex;
-    gap: 4px;
+  .post-type-badge {
+    padding: 3px 6px !important;
   }
 
   .announcement-title {
@@ -5525,13 +5516,6 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
   .announcement-body {
     font-size: 12px;
-  }
-
-  /* Comment list — fix name + timestamp row cramping */
-  .announcement-card .comment-meta,
-  .announcement-card [style*="justify-content: space-between"] {
-    flex-wrap: wrap;
-    gap: 4px;
   }
 }
 

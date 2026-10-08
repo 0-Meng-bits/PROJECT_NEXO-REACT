@@ -392,8 +392,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 anonymous
               </span>
             )}
-            <span style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10 }}>
-              <i className={type.icon} style={{ marginRight: 4 }}></i>{type.label}
+            <span className="post-type-badge" style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <i className={type.icon}></i><span className="post-type-label">{type.label}</span>
             </span>
             {isQuestion && (
               <span style={{
@@ -632,44 +632,43 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           {isSolutionComment ? '? Unmark Solution' : '? Mark as Solution'}
                         </button>
                       )}
+                      {/* Heart + Reply — inside bubble so they don't overflow on mobile */}
+                      {user?.is_verified && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                          <button onClick={() => toggleCommentHeart(c.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
+                            onMouseLeave={e => e.currentTarget.style.color = commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)'}>
+                            <i className={commentHearts[c.id]?.likedByMe ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
+                            {commentHearts[c.id]?.count > 0 && <span>{commentHearts[c.id].count}</span>}
+                          </button>
+                          <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
+                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
+                            <i className="fa-solid fa-reply"></i>Reply
+                          </button>
+                        </div>
+                      )}
+                      {/* Inline reply input */}
+                      {replyingTo?.id === c.id && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                          <input value={replyInput} onChange={e => setReplyInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
+                            placeholder={`Reply to ${c.author_name}...`}
+                            autoFocus
+                            style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none' }} />
+                          <button onClick={submitReply} disabled={!replyInput.trim()}
+                            style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: replyInput.trim() ? 1 : 0.4 }}>
+                            <i className="fa-solid fa-paper-plane"></i>
+                          </button>
+                          <button onClick={() => setReplyingTo(null)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>
+                            <i className="fa-solid fa-xmark"></i>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {/* Heart react */}
-                    {user?.is_verified && (
-                      <button onClick={() => toggleCommentHeart(c.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)', padding: '2px 0 0 38px', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4 }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
-                        onMouseLeave={e => e.currentTarget.style.color = commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)'}>
-                        <i className={commentHearts[c.id]?.likedByMe ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
-                        {commentHearts[c.id]?.count > 0 && <span>{commentHearts[c.id].count}</span>}
-                      </button>
-                    )}
-                    {/* Reply button */}
-                    {user?.is_verified && (
-                      <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', padding: '2px 0 0 38px', fontFamily: 'inherit', transition: 'color 0.2s' }}
-                        onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                        <i className="fa-solid fa-reply" style={{ marginRight: 4 }}></i>Reply
-                      </button>
-                    )}
-                    {/* Inline reply input */}
-                    {replyingTo?.id === c.id && (
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingLeft: 38, marginTop: 6 }}>
-                        <input value={replyInput} onChange={e => setReplyInput(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
-                          placeholder={`Reply to ${c.author_name}...`}
-                          autoFocus
-                          style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none' }} />
-                        <button onClick={submitReply} disabled={!replyInput.trim()}
-                          style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: replyInput.trim() ? 1 : 0.4 }}>
-                          <i className="fa-solid fa-paper-plane"></i>
-                        </button>
-                        <button onClick={() => setReplyingTo(null)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
-                          <i className="fa-solid fa-xmark"></i>
-                        </button>
-                      </div>
-                    )}
                   </div>
                   );
                 })}
@@ -678,7 +677,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
 
             {/* Comment input */}
             {user?.is_verified && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
                 <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
                   {(user.full_name || 'U')[0].toUpperCase()}
                 </div>
@@ -687,7 +686,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                   onChange={e => setCommentInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()}
                   placeholder="Write a comment..."
-                  style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '7px 14px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', transition: 'border-color 0.2s' }}
+                  style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '7px 14px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', transition: 'border-color 0.2s' }}
                   onFocus={e => e.target.style.borderColor = 'rgba(0,240,255,0.3)'}
                   onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                 />
