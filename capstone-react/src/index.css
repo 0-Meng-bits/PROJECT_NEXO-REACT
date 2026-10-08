@@ -4117,7 +4117,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   border: 1px solid rgba(0,240,255,0.3);
   background: #000;
 }
-.id-camera-video { width: 100%; display: block; max-height: 240px; object-fit: cover; }
+.id-camera-video { width: 100%; display: block; max-height: 380px; object-fit: cover; }
 .id-camera-overlay {
   position: absolute;
   inset: 0;
