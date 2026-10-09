@@ -5210,10 +5210,12 @@ export default function UserPortal() {
             <span className="hud-value">{user?.student_id}</span>
           </div>
           <div className="hud-avatar" onClick={() => setShowProfile(true)} style={{ position: 'relative' }}>
-            {navAvatarUrl
-              ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : initials
-            }
+            <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {navAvatarUrl
+                ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : initials
+              }
+            </div>
             {navCompanion && (
               <img src={navCompanion} alt="" style={{
                 position: 'absolute', top: -8, left: -8,
