@@ -896,8 +896,8 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 if (!d?.url) return null;
                 return (
                   <img src={d.url} alt="" style={{
-                    position: 'absolute', top: -8, left: -8,
-                    width: 20, height: 'auto',
+                    position: 'absolute', top: '-15%', left: '-15%',
+                    width: '55%', height: 'auto',
                     pointerEvents: 'none', zIndex: 2,
                     filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))',
                     transform: 'rotate(-15deg)',
@@ -5218,8 +5218,8 @@ export default function UserPortal() {
             </div>
             {navCompanion && (
               <img src={navCompanion} alt="" style={{
-                position: 'absolute', top: -8, left: -8,
-                width: 20, height: 'auto',
+                position: 'absolute', top: '-15%', left: '-15%',
+                width: '55%', height: 'auto',
                 pointerEvents: 'none', zIndex: 2,
                 filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))',
                 transform: 'rotate(-15deg)',
