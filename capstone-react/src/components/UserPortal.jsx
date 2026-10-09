@@ -5582,11 +5582,11 @@ export default function UserPortal() {
                       <div key={c.id} className="popular-row"
                         onClick={() => { navTo('circles', c.id); }}>
                         <div className="popular-row-icon" style={{
-                          background: c.cover_url ? undefined : categoryGradient(c.category),
-                          backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
+                          background: c.logo_url ? undefined : c.cover_url ? undefined : categoryGradient(c.category),
+                          backgroundImage: c.logo_url ? `url(${c.logo_url})` : c.cover_url ? `url(${c.cover_url})` : undefined,
                           backgroundSize: 'cover', backgroundPosition: 'center',
                         }}>
-                          {!c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
+                          {!c.logo_url && !c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
