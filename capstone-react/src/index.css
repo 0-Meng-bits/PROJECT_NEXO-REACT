@@ -5452,8 +5452,8 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
   .profile-modal-companion {
     width: 56px !important;
-    top: -8px !important;
-    left: -8px !important;
+    top: -14px !important;
+    left: -16px !important;
   }
 
   /* Edit/Cancel/Save buttons — push to new row on mobile */
