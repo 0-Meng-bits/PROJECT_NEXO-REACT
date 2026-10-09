@@ -2017,9 +2017,8 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
 }
 
 // -- PROFILE PHOTOS SECTION ----------------------------------------------------
-function ProfilePhotosSection({ user, readOnly, editing }) {
-  const [photos, setPhotos] = useState([null, null]);
-  const [photoUploading, setPhotoUploading] = useState([false, false]);
+function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUploading, onUpload, onDelete, onTogglePrivacy }) {
+  const [savedPhotos, setSavedPhotos] = useState([null, null]);
   const [reactions, setReactions] = useState({});
   const photoRefs = [useRef(null), useRef(null)];
 
@@ -2029,10 +2028,15 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
       if (data) {
         const arr = [null, null];
         data.forEach(p => { arr[p.slot - 1] = p; });
-        setPhotos(arr);
+        setSavedPhotos(arr);
       }
     });
   }, [user?.id]);
+
+  // In edit mode show pending, in read-only show saved
+  const photos = editing && pendingPhotos
+    ? [pendingPhotos[1], pendingPhotos[2]]
+    : savedPhotos;
 
   useEffect(() => {
     const photoIds = photos.filter(p => p?.id).map(p => p.id);
@@ -2049,34 +2053,6 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
         setReactions(map);
       });
   }, [photos[0]?.id, photos[1]?.id, user?.id]);
-
-  const handleUpload = async (slotIdx, file) => {
-    if (!file) return;
-    setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = true; return n; });
-    const ext = file.name.split('.').pop();
-    const path = `profile-photos/${user.id}/slot${slotIdx + 1}-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-    if (!upErr) {
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-      const slot = slotIdx + 1;
-      await supabase.from('profile_photos').upsert({ user_id: user.id, slot, photo_url: publicUrl, is_public: photos[slotIdx]?.is_public ?? true }, { onConflict: 'user_id,slot' });
-      setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...(n[slotIdx] || {}), photo_url: publicUrl, slot, is_public: n[slotIdx]?.is_public ?? true }; return n; });
-    }
-    setPhotoUploading(prev => { const n = [...prev]; n[slotIdx] = false; return n; });
-  };
-
-  const handleDelete = async (slotIdx) => {
-    await supabase.from('profile_photos').delete().eq('user_id', user.id).eq('slot', slotIdx + 1);
-    setPhotos(prev => { const n = [...prev]; n[slotIdx] = null; return n; });
-  };
-
-  const togglePrivacy = async (slotIdx) => {
-    const current = photos[slotIdx];
-    if (!current) return;
-    const newVal = !current.is_public;
-    await supabase.from('profile_photos').update({ is_public: newVal }).eq('user_id', user.id).eq('slot', slotIdx + 1);
-    setPhotos(prev => { const n = [...prev]; n[slotIdx] = { ...n[slotIdx], is_public: newVal }; return n; });
-  };
 
   const toggleReact = async (photoId) => {
     const curr = reactions[photoId];
@@ -2097,8 +2073,9 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
       <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {[0, 1].map(i => {
+          const slot = i + 1;
           const photo = photos[i];
-          const isUploading = photoUploading[i];
+          const isUploading = photoUploading === slot;
           return (
             <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
               {photo?.photo_url ? (
@@ -2106,7 +2083,7 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
                   <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   {!readOnly && editing && (
                     <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
-                      <button onClick={() => togglePrivacy(i)} title={photo.is_public ? 'Public' : 'Private'}
+                      <button onClick={() => onTogglePrivacy(slot)} title={photo.is_public ? 'Public' : 'Private'}
                         style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
                         <i className={`fa-solid ${photo.is_public ? 'fa-globe' : 'fa-lock'}`}></i>
                       </button>
@@ -2114,7 +2091,7 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
                         style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'white' }}>
                         <i className="fa-solid fa-camera"></i>
                       </button>
-                      <button onClick={() => handleDelete(i)} title="Delete"
+                      <button onClick={() => onDelete(slot)} title="Delete"
                         style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'var(--red)' }}>
                         <i className="fa-solid fa-trash"></i>
                       </button>
@@ -2141,7 +2118,7 @@ function ProfilePhotosSection({ user, readOnly, editing }) {
               )}
               {!readOnly && editing && (
                 <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => handleUpload(i, e.target.files[0])} />
+                  onChange={e => onUpload(slot, e.target.files[0])} />
               )}
             </div>
           );
@@ -2157,6 +2134,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
+  const [pendingAvatarUrl, setPendingAvatarUrl] = useState(null); // staged, committed on Save
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
   const idPhotoRef = useRef(null);
@@ -2167,13 +2145,17 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
+  const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
   const [coverUploading, setCoverUploading] = useState(false);
   const [showWarningHistory, setShowWarningHistory] = useState(false);
   const [appealingWarning, setAppealingWarning] = useState(null);
   const [customizations, setCustomizations] = useState(null);
   const [ownedItems, setOwnedItems] = useState([]);
   const [custSettings, setCustSettings] = useState(null);
+  // Pending (staged) customization selections — only committed on Save
+  const [pendingCustSettings, setPendingCustSettings] = useState(null);
   const [profilePhotos, setProfilePhotos] = useState({ 1: null, 2: null }); // slot -> { id, photo_url, is_public }
+  const [pendingPhotos, setPendingPhotos] = useState({ 1: null, 2: null }); // staged changes
   const [photoUploading, setPhotoUploading] = useState(null); // slot being uploaded
   const photo1Ref = useRef(null);
   const photo2Ref = useRef(null);
@@ -2199,6 +2181,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           const map = { 1: null, 2: null };
           photos.forEach(p => { map[p.slot] = p; });
           setProfilePhotos(map);
+          setPendingPhotos({ ...map });
         }
       }
     };
@@ -2216,6 +2199,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .maybeSingle();
 
       setCustSettings(settings || {});
+      setPendingCustSettings(settings || {});
 
       if (settings) {
         const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
@@ -2247,17 +2231,94 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const saveProfile = async () => {
     setSaving(true);
     try {
+      // Save profile fields
       const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio }),
       });
-      if (res.ok) {
-        setProfile({ ...editForm });
-        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...editForm }));
-        setEditing(false);
+      if (!res.ok) { setSaving(false); return; }
+      setProfile({ ...editForm });
+      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const updates = { ...editForm };
+
+      // Commit pending cover
+      if (pendingCoverUrl) {
+        const token = localStorage.getItem('accessToken');
+        await fetch(getApiUrl('/api/update-profile'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ userId: user.id, cover_url: pendingCoverUrl }),
+        });
+        setCoverUrl(pendingCoverUrl);
+        setPendingCoverUrl(null);
+        updates.cover_url = pendingCoverUrl;
       }
+
+      // Commit pending avatar
+      if (pendingAvatarUrl) {
+        const res2 = await fetch(getApiUrl('/api/upload-avatar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('accessToken') ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {}) },
+          body: JSON.stringify({ userId: user.id, avatar: pendingAvatarUrl }),
+        });
+        if (res2.ok) {
+          const { url } = await res2.json();
+          onAvatarUpdate(url || pendingAvatarUrl);
+          updates.avatar_url = url || pendingAvatarUrl;
+        } else {
+          onAvatarUpdate(pendingAvatarUrl);
+          updates.avatar_url = pendingAvatarUrl;
+        }
+        setPendingAvatarUrl(null);
+      }
+
+      localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...updates }));
+
+      // Commit pending customizations to DB
+      if (pendingCustSettings) {
+        const token = localStorage.getItem('accessToken');
+        const types = ['badge', 'name_color', 'avatar_border', 'background', 'companion', 'theme'];
+        for (const type of types) {
+          const pendingVal = pendingCustSettings[`active_${type}`];
+          const savedVal = custSettings?.[`active_${type}`];
+          if (pendingVal !== savedVal) {
+            await fetch(SHOP_API, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              body: JSON.stringify({ action: 'apply-customization', userId: user.id, type, itemId: pendingVal || null }),
+            });
+          }
+        }
+        clearCustomizationCache(user.id);
+        setCustSettings({ ...pendingCustSettings });
+      }
+
+      // Commit pending photos to DB
+      for (const slot of [1, 2]) {
+        const pending = pendingPhotos[slot];
+        const saved = profilePhotos[slot];
+        if (pending === null && saved) {
+          // deleted
+          await supabase.from('profile_photos').delete().eq('id', saved.id);
+          setProfilePhotos(prev => ({ ...prev, [slot]: null }));
+        } else if (pending && pending !== saved) {
+          // new or replaced
+          if (saved) {
+            await supabase.from('profile_photos').update({ photo_url: pending.photo_url, is_public: pending.is_public }).eq('id', saved.id);
+            setProfilePhotos(prev => ({ ...prev, [slot]: { ...saved, photo_url: pending.photo_url, is_public: pending.is_public } }));
+          } else {
+            const { data } = await supabase.from('profile_photos').insert([{ user_id: user.id, photo_url: pending.photo_url, slot, is_public: pending.is_public ?? true }]).select().single();
+            if (data) setProfilePhotos(prev => ({ ...prev, [slot]: data }));
+          }
+        } else if (pending && pending.is_public !== saved?.is_public) {
+          await supabase.from('profile_photos').update({ is_public: pending.is_public }).eq('id', saved.id);
+          setProfilePhotos(prev => ({ ...prev, [slot]: { ...saved, is_public: pending.is_public } }));
+        }
+      }
+      setPendingPhotos({ 1: profilePhotos[1], 2: profilePhotos[2] });
+
+      setEditing(false);
     } catch (err) { console.error(err); }
     finally { setSaving(false); }
   };
@@ -2272,53 +2333,30 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
       const photoUrl = urlData.publicUrl;
-      const existing = profilePhotos[slot];
-      if (existing) {
-        await supabase.from('profile_photos').update({ photo_url: photoUrl }).eq('id', existing.id);
-        setProfilePhotos(prev => ({ ...prev, [slot]: { ...existing, photo_url: photoUrl } }));
-      } else {
-        const { data } = await supabase.from('profile_photos').insert([{ user_id: user.id, photo_url: photoUrl, slot, is_public: true }]).select().single();
-        setProfilePhotos(prev => ({ ...prev, [slot]: data }));
-      }
+      // Stage in pending — DB write happens on Save
+      setPendingPhotos(prev => ({ ...prev, [slot]: { ...(prev[slot] || {}), photo_url: photoUrl, slot, is_public: prev[slot]?.is_public ?? true } }));
     } catch (err) { console.error('Photo upload error:', err); }
     setPhotoUploading(null);
   };
 
   const handlePhotoDelete = async (slot) => {
-    const photo = profilePhotos[slot];
-    if (!photo) return;
-    await supabase.from('profile_photos').delete().eq('id', photo.id);
-    setProfilePhotos(prev => ({ ...prev, [slot]: null }));
+    // Stage deletion — DB write happens on Save
+    setPendingPhotos(prev => ({ ...prev, [slot]: null }));
   };
 
   const togglePhotoPrivacy = async (slot) => {
-    const photo = profilePhotos[slot];
-    if (!photo) return;
-    const newVal = !photo.is_public;
-    await supabase.from('profile_photos').update({ is_public: newVal }).eq('id', photo.id);
-    setProfilePhotos(prev => ({ ...prev, [slot]: { ...photo, is_public: newVal } }));
+    setPendingPhotos(prev => ({ ...prev, [slot]: prev[slot] ? { ...prev[slot], is_public: !prev[slot].is_public } : null }));
   };
 
   const applyCustomization = async (type, itemId) => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(SHOP_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'apply-customization', userId: user.id, type, itemId }),
-      });
-      if (!res.ok) return;
-      clearCustomizationCache(user.id);
-      // Update local settings state
-      setCustSettings(prev => ({ ...prev, [`active_${type}`]: itemId }));
-      // Reload customizations display
-      if (itemId) {
-        const { data: item } = await supabase.from('shop_items').select('*').eq('id', itemId).single();
-        if (item) setCustomizations(prev => ({ ...prev, [type]: item }));
-      } else {
-        setCustomizations(prev => ({ ...prev, [type]: null }));
-      }
-    } catch (err) { console.error(err); }
+    // Only stage the change locally — committed to DB on Save
+    setPendingCustSettings(prev => ({ ...prev, [`active_${type}`]: itemId }));
+    if (itemId) {
+      const { data: item } = await supabase.from('shop_items').select('*').eq('id', itemId).single();
+      if (item) setCustomizations(prev => ({ ...prev, [type]: item }));
+    } else {
+      setCustomizations(prev => ({ ...prev, [type]: null }));
+    }
   };
 
   const handleIdPhotoUpload = async (e) => {
@@ -2364,36 +2402,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.onerror = reject;
         img.src = objectUrl;
       });
-      
-      // Update UI immediately
-      setCoverUrl(compressed);
-      
-      // Save via backend API (has service role permissions)
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/update-profile'), {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ 
-          userId: user.id, 
-          cover_url: compressed 
-        }),
-      });
-      
-      if (res.ok) {
-        // Also update localStorage
-        const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        localStorage.setItem('currentUser', JSON.stringify({ ...stored, cover_url: compressed }));
-      } else {
-        console.error('Failed to save cover photo');
-        setCoverUrl(user.cover_url || null); // Revert on failure
-      }
-    } catch (err) { 
-      console.error(err); 
-      setCoverUrl(user.cover_url || null); // Revert on error
-    }
+      // Stage only — saved to DB on Save
+      setPendingCoverUrl(compressed);
+    } catch (err) { console.error(err); }
     finally { setCoverUploading(false); }
   };
 
@@ -2418,23 +2429,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.onerror = reject;
         img.src = objectUrl;
       });
-      setAvatarUrl(compressed);
-      onAvatarUpdate(compressed);
-      const res = await fetch(getApiUrl(`/api/upload-avatar`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('accessToken') ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {}),
-        },
-        body: JSON.stringify({ userId: user.id, avatar: compressed }),
-      });
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      if (res.ok) {
-        const { url } = await res.json();
-        localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: url }));
-      } else {
-        localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: compressed }));
-      }
+      // Stage only — saved to DB on Save
+      setPendingAvatarUrl(compressed);
+      setAvatarUrl(compressed); // preview immediately
     } catch (err) { console.error(err); }
     finally { setUploading(false); }
   };
@@ -2447,7 +2444,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     'linear-gradient(135deg,#1a0a0f 0%,#f43f5e 100%)',
   ];
   const gradIdx = (user.student_id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % coverGradients.length;
-  const coverBg = coverUrl ? `url(${coverUrl}) center/cover no-repeat` : coverGradients[gradIdx];
+  const displayCoverUrl = editing ? (pendingCoverUrl ?? coverUrl) : coverUrl;
+  const coverBg = displayCoverUrl ? `url(${displayCoverUrl}) center/cover no-repeat` : coverGradients[gradIdx];
 
   const getBackgroundStyle = () => {
     if (customizations?.background?.css_data) {
@@ -2648,7 +2646,34 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               {!readOnly && (!editing
                 ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
                 : <>
-                    <button className="cyber-btn secondary" onClick={() => setEditing(false)} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>CANCEL</button>
+                    <button className="cyber-btn secondary" onClick={() => { 
+                      setEditForm({ ...profile }); 
+                      setPendingCustSettings({ ...custSettings });
+                      setPendingPhotos({ ...profilePhotos });
+                      // revert cover and avatar previews
+                      setPendingCoverUrl(null);
+                      setPendingAvatarUrl(null);
+                      setAvatarUrl(currentAvatarUrl || user.avatar_url || null);
+                      // revert customizations display back to saved
+                      if (custSettings) {
+                        const itemIds = Object.values(custSettings).filter(Boolean);
+                        if (itemIds.length > 0) {
+                          supabase.from('shop_items').select('*').in('id', itemIds).then(({ data: items }) => {
+                            if (items) setCustomizations({
+                              badge: items.find(i => i.id === custSettings.active_badge),
+                              name_color: items.find(i => i.id === custSettings.active_name_color),
+                              background: items.find(i => i.id === custSettings.active_background),
+                              theme: items.find(i => i.id === custSettings.active_theme),
+                              avatar_border: items.find(i => i.id === custSettings.active_avatar_border),
+                              companion: items.find(i => i.id === custSettings.active_companion),
+                            });
+                          });
+                        } else {
+                          setCustomizations(null);
+                        }
+                      }
+                      setEditing(false); 
+                    }} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>CANCEL</button>
                     <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
                       {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />SAVING</> : 'SAVE'}
                     </button>
@@ -2751,7 +2776,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             )}
 
             {/* PROFILE PHOTOS */}
-            <ProfilePhotosSection user={user} readOnly={readOnly} editing={editing} />
+            <ProfilePhotosSection 
+              user={user} readOnly={readOnly} editing={editing}
+              pendingPhotos={pendingPhotos}
+              photoUploading={photoUploading}
+              onUpload={handlePhotoUpload}
+              onDelete={handlePhotoDelete}
+              onTogglePrivacy={togglePhotoPrivacy}
+            />
 
             {/* CUSTOMIZE panel — shown in edit mode */}
             {!readOnly && editing && (
@@ -2766,7 +2798,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     {['badge', 'name_color', 'avatar_border', 'background', 'companion', 'theme'].map(type => {
                       const typeItems = ownedItems.filter(p => p.shop_items?.type === type);
                       if (typeItems.length === 0) return null;
-                      const activeId = custSettings?.[`active_${type}`];
+                      const activeId = pendingCustSettings?.[`active_${type}`];
                       return (
                         <div key={type}>
                           <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 7, textTransform: 'uppercase' }}>
