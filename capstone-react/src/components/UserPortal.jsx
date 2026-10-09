@@ -1464,13 +1464,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // Use service-role API to bypass RLS
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl(`/api/upload-cover`), {
+      const res = await fetch(getApiUrl(`/api/upload`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ...updates, communityId: comm.id }),
+        body: JSON.stringify({ action: 'upload-cover', ...updates, communityId: comm.id }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2404,9 +2404,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       });
       setAvatarUrl(compressed);
       onAvatarUpdate(compressed);
-      const res = await fetch(getApiUrl(`/api/upload-avatar`), {
+      const res = await fetch(getApiUrl(`/api/upload`), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, avatar: compressed }),
+        body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: compressed }),
       });
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (res.ok) {
@@ -6021,13 +6021,13 @@ export default function UserPortal() {
                           let saved = false;
                           try {
                             const token = localStorage.getItem('accessToken');
-                            const serverRes = await fetch(getApiUrl(`/api/upload-cover`), {
+                            const serverRes = await fetch(getApiUrl(`/api/upload`), {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
                                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
                               },
-                              body: JSON.stringify({ cover_url: compressed, communityId: activeComm.id }),
+                              body: JSON.stringify({ action: 'upload-cover', cover_url: compressed, communityId: activeComm.id }),
                             });
                             if (serverRes.ok) {
                               saved = true;
