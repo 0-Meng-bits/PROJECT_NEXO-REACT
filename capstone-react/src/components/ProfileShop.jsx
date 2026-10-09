@@ -27,7 +27,9 @@ function ItemPreviewCard({ item, user }) {
     : { border: '3px solid var(--card-bg)' };
 
   const cardBg = item.type === 'background'
-    ? { background: css.pattern || css.gradient || css.image || 'rgba(0,0,0,0.8)', backgroundSize: css.size || 'cover' }
+    ? css.backgroundImage
+      ? { backgroundImage: css.backgroundImage, backgroundSize: css.backgroundSize || 'cover', backgroundPosition: css.backgroundPosition || 'center', backgroundRepeat: css.backgroundRepeat || 'no-repeat' }
+      : { background: css.pattern || css.gradient || css.image || 'rgba(0,0,0,0.8)', backgroundSize: css.size || 'cover' }
     : item.type === 'theme' && css.gradient
     ? { background: css.gradient }
     : {};
@@ -257,7 +259,11 @@ export default function ProfileShop({ user, onClose }) {
                             <div style={{ height: 50, borderRadius: 6, background: css.gradient || css.primary || 'rgba(0,240,255,0.2)' }} />
                           )}
                           {item.type === 'background' && (
-                            <div style={{ height: 50, borderRadius: 6, background: css.pattern || css.gradient || css.image || 'rgba(0,240,255,0.1)', backgroundSize: css.size || 'cover' }} />
+                            <div style={{ height: 50, borderRadius: 6,
+                              ...(css.backgroundImage
+                                ? { backgroundImage: css.backgroundImage, backgroundSize: css.backgroundSize || 'cover', backgroundPosition: css.backgroundPosition || 'center' }
+                                : { background: css.pattern || css.gradient || css.image || 'rgba(0,240,255,0.1)', backgroundSize: css.size || 'cover' })
+                            }} />
                           )}
                           {item.type === 'avatar_border' && (
                             <div style={{ width: 44, height: 44, borderRadius: '50%', margin: '0 auto', background: 'rgba(0,240,255,0.1)', border: css.border || '3px solid var(--cyber-cyan)', boxShadow: css.boxShadow }} />
