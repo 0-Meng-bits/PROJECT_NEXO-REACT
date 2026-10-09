@@ -218,7 +218,35 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       .select('*')
       .eq('announcement_id', a.id)
       .order('created_at', { ascending: true });
-    setComments(data || []);
+
+    // Re-order: replies (starting with @name) should appear right after the comment they reply to
+    const reordered = [];
+    if (data?.length) {
+      const nameToLastIdx = {}; // author_name -> last index of their comment in reordered
+      for (const c of data) {
+        const replyMatch = c.content.match(/^@(.+?) /);
+        if (replyMatch) {
+          const targetName = replyMatch[1];
+          // Find the last comment by that author already placed
+          let insertIdx = -1;
+          for (let i = reordered.length - 1; i >= 0; i--) {
+            if (reordered[i].author_name === targetName) { insertIdx = i; break; }
+          }
+          if (insertIdx !== -1) {
+            // Insert right after the target comment (and any consecutive replies after it)
+            let afterIdx = insertIdx + 1;
+            while (afterIdx < reordered.length && reordered[afterIdx].content.startsWith(`@${targetName} `)) afterIdx++;
+            reordered.splice(afterIdx, 0, c);
+          } else {
+            reordered.push(c);
+          }
+        } else {
+          reordered.push(c);
+        }
+      }
+    }
+
+    setComments(reordered);
     setLoadingComments(false);
     // Load heart counts for these comments
     if (data?.length && user?.id) {
