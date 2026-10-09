@@ -39,19 +39,27 @@ function ItemPreviewCard({ item, user }) {
       display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px',
       position: 'relative',
     }}>
-      {/* Avatar */}
-      <div style={{
-        width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-        background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontSize: 20, fontWeight: 800, color: 'var(--cyber-cyan)',
-        overflow: 'hidden', position: 'relative', ...avatarBorderStyle,
-      }}>
-        {user.avatar_url
-          ? <img src={user.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : (user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??')}
-        {/* companion preview */}
+      {/* Avatar wrapper — companion sits outside overflow:hidden circle */}
+      <div style={{ position: 'relative', flexShrink: 0, width: 56, height: 56 }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 20, fontWeight: 800, color: 'var(--cyber-cyan)',
+          overflow: 'hidden', ...avatarBorderStyle,
+        }}>
+          {user.avatar_url
+            ? <img src={user.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : (user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??')}
+        </div>
+        {/* companion preview — outside the clipped circle */}
         {item.type === 'companion' && css.url && (
-          <img src={css.url} alt="companion" style={{ position: 'absolute', bottom: -8, right: -14, width: 36, pointerEvents: 'none', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.7))', zIndex: 2 }} />
+          <img src={css.url} alt="companion" style={{
+            position: 'absolute', top: '-15%', left: '-15%',
+            width: '55%', height: 'auto',
+            pointerEvents: 'none', zIndex: 2,
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
+            transform: 'rotate(-15deg)',
+          }} />
         )}
       </div>
       <div>
