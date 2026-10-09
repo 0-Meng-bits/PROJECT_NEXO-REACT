@@ -201,6 +201,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const [replyingTo, setReplyingTo] = useState(null); // { id, author_name }
   const [replyInput, setReplyInput] = useState('');
   const [commentHearts, setCommentHearts] = useState({}); // commentId -> { count, likedByMe }
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentVal, setEditingCommentVal] = useState('');
 
   // Load comment count on mount
   useEffect(() => {
@@ -328,6 +330,18 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
     setCommentCount(prev => Math.max(0, prev - 1));
   };
 
+  const updateComment = async (commentId, newContent) => {
+    if (!newContent.trim()) return;
+    const { error } = await supabase.from('post_comments')
+      .update({ content: newContent.trim() })
+      .eq('id', commentId);
+    if (!error) {
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent.trim() } : c));
+      setEditingCommentId(null);
+      setEditingCommentVal('');
+    }
+  };
+
   const submitReply = async () => {
     if (!replyInput.trim() || !user || !replyingTo) return;
     const content = `@${replyingTo.author_name} ${replyInput.trim()}`;
@@ -339,7 +353,14 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       content,
     }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at').single();
     if (!error && data) {
-      setComments(prev => [...prev, data]);
+      // Insert reply right after the parent comment, not at the bottom
+      setComments(prev => {
+        const idx = prev.findIndex(c => c.id === replyingTo.id);
+        if (idx === -1) return [...prev, data];
+        const next = [...prev];
+        next.splice(idx + 1, 0, data);
+        return next;
+      });
       setCommentCount(prev => prev + 1);
       setReplyInput('');
       setReplyingTo(null);
@@ -571,8 +592,10 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                   return (
                   <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     {/* Avatar */}
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                      {(c.author_name || 'U')[0].toUpperCase()}
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
+                      {avatarCache?.[c.author_id]
+                        ? <img src={avatarCache[c.author_id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (c.author_name || 'U')[0].toUpperCase()}
                     </div>
                     <div style={{ flex: 1, background: isSolutionComment ? 'rgba(34,211,238,0.04)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isSolutionComment ? 'rgba(34,211,238,0.4)' : containsBadWord(c.content) ? 'rgba(247,95,95,0.3)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 12px' }}>
                       {/* Solution badge */}
@@ -590,7 +613,15 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                             {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {/* Delete own comment or admin */}
+                          {/* Edit + Delete own comment or admin delete */}
+                          {c.author_id === user?.id && (
+                            <button onClick={() => { setEditingCommentId(c.id); setEditingCommentVal(c.content); }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '0 2px' }}
+                              onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
+                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
+                              <i className="fa-solid fa-pen"></i>
+                            </button>
+                          )}
                           {(c.author_id === user?.id || user?.user_type === 'Admin') && (
                             <button onClick={() => deleteComment(c.id)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '0 2px' }}
@@ -616,7 +647,26 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           <i className="fa-solid fa-triangle-exclamation"></i> Flagged
                         </div>
                       )}
-                      <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>{c.content}</p>
+                      {editingCommentId === c.id ? (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
+                          <input
+                            value={editingCommentVal}
+                            onChange={e => setEditingCommentVal(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') updateComment(c.id, editingCommentVal); if (e.key === 'Escape') { setEditingCommentId(null); setEditingCommentVal(''); } }}
+                            autoFocus
+                            style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.35)', borderRadius: 8, padding: '5px 10px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                          <button onClick={() => updateComment(c.id, editingCommentVal)} disabled={!editingCommentVal.trim()}
+                            style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#000', fontSize: 11 }}>
+                            <i className="fa-solid fa-check" />
+                          </button>
+                          <button onClick={() => { setEditingCommentId(null); setEditingCommentVal(''); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
+                            <i className="fa-solid fa-xmark" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>{c.content}</p>
+                      )}
                       {/* Mark / Unmark Solution button */}
                       {isQuestion && isAuthorizedSolver && (
                         <button
@@ -658,7 +708,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                             placeholder={`Reply to ${c.author_name}...`}
                             autoFocus
                             style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none' }} />
-                          <button onClick={submitReply} disabled={!replyInput.trim()}
+                          <button onClick={() => submitReply()} disabled={!replyInput.trim()}
                             style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: replyInput.trim() ? 1 : 0.4 }}>
                             <i className="fa-solid fa-paper-plane"></i>
                           </button>
@@ -1653,7 +1703,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       await supabase.from('notifications').insert([{
         user_id: inviteResult.id,
         type: 'circle_invite',
-        message: `You've been invited to join "${comm.name}"! Visit Explore to accept or decline.`,
+        message: `You've been invited to join "${comm.name}"! Click this notification to view the circle.`,
         link_comm_id: comm.id,
       }]);
       setInviteSearch('');
@@ -5213,8 +5263,8 @@ export default function UserPortal() {
                       onClick={() => {
                         markRead(n.id);
                         if (n.type === 'circle_invite' && n.link_comm_id) {
-                          navTo('activity', 'global');
                           setActiveCategory('all');
+                          navTo('activity', 'global');
                         } else if (n.link_comm_id) {
                           setActiveChannelId(null);
                           navTo('circles', n.link_comm_id);
@@ -5950,7 +6000,12 @@ export default function UserPortal() {
               {(() => {
                 const filtered = communities.filter(c =>
                   c.id !== 'global' && (activeCategory === 'all' || c.category === activeCategory)
-                );
+                ).sort((a, b) => {
+                  // Invited circles always float to the top
+                  const aInvited = isInvited(a.id) ? 1 : 0;
+                  const bInvited = isInvited(b.id) ? 1 : 0;
+                  return bInvited - aInvited;
+                });
                 return filtered.length === 0 ? (
                   <div className="post"><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles found in this category.</p></div>
                 ) : (
