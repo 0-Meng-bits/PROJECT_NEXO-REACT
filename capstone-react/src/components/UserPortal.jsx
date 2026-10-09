@@ -222,20 +222,37 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
     // Re-order: replies (starting with @name) should appear right after the comment they reply to
     const reordered = [];
     if (data?.length) {
-      const nameToLastIdx = {}; // author_name -> last index of their comment in reordered
+      // Build a set of all known author names (longest first to avoid partial matches)
+      const authorNames = [...new Set(data.map(c => c.author_name).filter(Boolean))]
+        .sort((a, b) => b.length - a.length);
+
       for (const c of data) {
-        const replyMatch = c.content.match(/^@(.+?) /);
-        if (replyMatch) {
-          const targetName = replyMatch[1];
-          // Find the last comment by that author already placed
+        // Check if this comment is a reply by matching @authorName at the start
+        let targetName = null;
+        if (c.content.startsWith('@')) {
+          for (const name of authorNames) {
+            if (c.content.startsWith(`@${name} `) || c.content === `@${name}`) {
+              targetName = name;
+              break;
+            }
+          }
+        }
+
+        if (targetName) {
+          // Find the last index of target author's comment in reordered
           let insertIdx = -1;
           for (let i = reordered.length - 1; i >= 0; i--) {
             if (reordered[i].author_name === targetName) { insertIdx = i; break; }
           }
           if (insertIdx !== -1) {
-            // Insert right after the target comment (and any consecutive replies after it)
+            // Insert right after that comment (skip over any existing replies that follow it)
             let afterIdx = insertIdx + 1;
-            while (afterIdx < reordered.length && reordered[afterIdx].content.startsWith(`@${targetName} `)) afterIdx++;
+            while (afterIdx < reordered.length) {
+              const next = reordered[afterIdx];
+              const isReply = authorNames.some(n => next.content.startsWith(`@${n} `) || next.content === `@${n}`);
+              if (isReply) afterIdx++;
+              else break;
+            }
             reordered.splice(afterIdx, 0, c);
           } else {
             reordered.push(c);
