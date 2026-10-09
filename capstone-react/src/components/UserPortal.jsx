@@ -888,6 +888,22 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                 style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
                 {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
               </div>
+              {/* Companion sticker on chat avatar */}
+              {(() => {
+                const companion = userCustomizations?.[m.student_id]?.companion;
+                if (!companion?.css_data) return null;
+                const d = typeof companion.css_data === 'string' ? JSON.parse(companion.css_data) : companion.css_data;
+                if (!d?.url) return null;
+                return (
+                  <img src={d.url} alt="" style={{
+                    position: 'absolute', top: -8, left: -8,
+                    width: 20, height: 'auto',
+                    pointerEvents: 'none', zIndex: 2,
+                    filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))',
+                    transform: 'rotate(-15deg)',
+                  }} />
+                );
+              })()}
               {online && (
                 <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
               )}
@@ -3915,6 +3931,7 @@ export default function UserPortal() {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
   });
+  const [navCompanion, setNavCompanion] = useState(null);
 
   // Load campus events
   const loadEvents = useCallback(async () => {
@@ -4304,7 +4321,8 @@ export default function UserPortal() {
           active_theme,
           active_badge,
           active_name_color,
-          active_background
+          active_background,
+          active_companion
         `)
         .in('user_id', accountIds);
 
@@ -4312,7 +4330,7 @@ export default function UserPortal() {
 
       // Get shop items for the active customizations
       const itemIds = settings.flatMap(s => 
-        [s.active_theme, s.active_badge, s.active_name_color, s.active_background].filter(Boolean)
+        [s.active_theme, s.active_badge, s.active_name_color, s.active_background, s.active_companion].filter(Boolean)
       );
 
       const { data: items } = await supabase
@@ -4331,7 +4349,8 @@ export default function UserPortal() {
             badge: items.find(i => i.id === setting.active_badge),
             name_color: items.find(i => i.id === setting.active_name_color),
             background: items.find(i => i.id === setting.active_background),
-            theme: items.find(i => i.id === setting.active_theme)
+            theme: items.find(i => i.id === setting.active_theme),
+            companion: items.find(i => i.id === setting.active_companion),
           };
         }
       });
@@ -4472,6 +4491,29 @@ export default function UserPortal() {
   }, [activeCommId, activeChannelId]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
+
+  // Load current user's companion for nav avatar
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadNavCompanion = async () => {
+      const { data: settings } = await supabase
+        .from('user_profile_settings')
+        .select('active_companion')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!settings?.active_companion) return;
+      const { data: item } = await supabase
+        .from('shop_items')
+        .select('css_data')
+        .eq('id', settings.active_companion)
+        .single();
+      if (item?.css_data) {
+        const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data;
+        setNavCompanion(d?.url || null);
+      }
+    };
+    loadNavCompanion();
+  }, [user?.id]);
 
   // Load member counts for all communities
   useEffect(() => {
@@ -5167,11 +5209,20 @@ export default function UserPortal() {
             <span className="hud-label">SCHOOL_ID:</span>
             <span className="hud-value">{user?.student_id}</span>
           </div>
-          <div className="hud-avatar" onClick={() => setShowProfile(true)}>
+          <div className="hud-avatar" onClick={() => setShowProfile(true)} style={{ position: 'relative' }}>
             {navAvatarUrl
               ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : initials
             }
+            {navCompanion && (
+              <img src={navCompanion} alt="" style={{
+                position: 'absolute', top: -8, left: -8,
+                width: 20, height: 'auto',
+                pointerEvents: 'none', zIndex: 2,
+                filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))',
+                transform: 'rotate(-15deg)',
+              }} />
+            )}
           </div>
         </div>
       </nav>
@@ -6649,7 +6700,7 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onClose={() => setShowProfile(false)} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal
           user={viewingProfile}
