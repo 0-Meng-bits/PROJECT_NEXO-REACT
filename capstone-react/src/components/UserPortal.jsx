@@ -146,7 +146,7 @@ const FEEDBACK_TAGS = [
   { id: 'impact',    label: 'Impact',    emoji: '??', color: '#ef4444' },
 ];
 
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents, onViewProfile }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
@@ -437,7 +437,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         </div>
       )}
       <div className="announcement-header">
-        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`} style={{ overflow: 'hidden', padding: 0 }}>
+        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`}
+          style={{ overflow: 'hidden', padding: 0, cursor: !isAnon && onViewProfile ? 'pointer' : 'default' }}
+          onClick={() => !isAnon && onViewProfile && onViewProfile(a.author_student_id)}>
           {isAnon
             ? <i className="fa-solid fa-user-secret"></i>
             : (() => {
@@ -450,7 +452,11 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+            <span
+              style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'var(--text-primary)', cursor: !isAnon && onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
+              onClick={() => !isAnon && onViewProfile && onViewProfile(a.author_student_id)}
+              onMouseEnter={e => { if (!isAnon && onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
+              onMouseLeave={e => { e.target.style.color = isAnon ? 'var(--text-muted)' : 'var(--text-primary)'; }}>
               {displayName}
             </span>
             {isAnon && (
@@ -5830,6 +5836,7 @@ export default function UserPortal() {
                         onDelete={deleteAnnouncement}
                         onVote={handleVote}
                         onReport={(data) => setShowReport(data)}
+                        onViewProfile={viewUserProfile}
                         onApply={(ann) => {
                           const match = ann.title?.match(/\(([^)]+)\)$/);
                           const commName = match?.[1];
@@ -6487,6 +6494,7 @@ export default function UserPortal() {
                             onDelete={(id) => { deleteAnnouncement(id); loadCircleAnnouncements(activeCommId); }}
                             onVote={handleCircleVote}
                             onReport={(data) => setShowReport(data)}
+                            onViewProfile={viewUserProfile}
                             onApply={() => setShowApplicationForm({ comm: activeComm })}
                             communityCreatorId={activeComm?.creator_id}
                             onReload={() => loadCircleAnnouncements(activeCommId)}
