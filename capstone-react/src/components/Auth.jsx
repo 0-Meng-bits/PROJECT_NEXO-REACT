@@ -19,7 +19,7 @@ export default function Auth() {
   const [pendingRoute, setPendingRoute] = useState('/portal');
   const [suspendedUntil, setSuspendedUntil] = useState(null);
   const [form, setForm] = useState({
-    ctuId: '', password: '', fullName: '', email: '', userType: 'Student'
+    ctuId: '', password: '', fullName: '', email: '', userType: 'Student', gender: ''
   });
   const navigate = useNavigate();
 
@@ -76,6 +76,7 @@ export default function Auth() {
           fullName: form.fullName,
           email: form.email,
           user_type: form.userType,
+          gender: form.gender,
           id_verified: verified,
           id_photo_base64,
           id_photo_ext,
@@ -162,6 +163,10 @@ export default function Auth() {
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token
           });
+        }
+        // Store streak info to show toast in portal
+        if (data.points_awarded > 0) {
+          sessionStorage.setItem('streakToast', JSON.stringify({ streak: data.streak, points: data.points_awarded }));
         }
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {
@@ -399,6 +404,15 @@ export default function Auth() {
                   <select name="userType" value={form.userType} onChange={update} disabled={loading}>
                     <option value="Student">STUDENT</option>
                     <option value="Faculty">FACULTY</option>
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label>GENDER</label>
+                  <select name="gender" value={form.gender} onChange={update} disabled={loading} required>
+                    <option value="" disabled>Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
                   </select>
                 </div>
               </div>

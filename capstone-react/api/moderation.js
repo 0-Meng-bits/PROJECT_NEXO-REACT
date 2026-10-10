@@ -66,6 +66,17 @@ export default async function handler(req, res) {
 
       if (txError) return res.status(400).json({ error: txError.message });
 
+      // Directly update account_status.trust_points (don't rely on DB trigger)
+      const { data: receiverStatus } = await supabaseAdmin
+        .from('account_status')
+        .select('trust_points')
+        .eq('id', receiverId)
+        .single();
+      await supabaseAdmin
+        .from('account_status')
+        .update({ trust_points: (receiverStatus?.trust_points ?? 10) + amount })
+        .eq('id', receiverId);
+
       // Record cooldown
       await supabaseAdmin.from('appreciation_cooldowns').insert([{
         giver_id: giverId,

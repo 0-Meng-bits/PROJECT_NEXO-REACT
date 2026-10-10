@@ -4,7 +4,13 @@ import nodemailer from 'nodemailer';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, password, fullName, studentId, user_type, id_verified, id_photo_base64, id_photo_ext } = req.body;
+  const { email, password, fullName, studentId, user_type, gender, id_verified, id_photo_base64, id_photo_ext } = req.body;
+
+  // Validate gender
+  const VALID_GENDERS = ['Male', 'Female', 'Prefer not to say'];
+  if (!VALID_GENDERS.includes(gender)) {
+    return res.status(400).json({ message: 'Invalid gender value.' });
+  }
 
   // Create user with email_confirm: false (requires verification)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -40,7 +46,7 @@ export default async function handler(req, res) {
       id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type,
     }]);
     await supabaseAdmin.from('account_status').insert([{ id: authData.user.id, is_verified: false }]);
-    await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl }]);
+    await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl, gender }]);
   } catch (e) {
     console.warn('[SIGNUP] New table insert warning:', e.message);
   }

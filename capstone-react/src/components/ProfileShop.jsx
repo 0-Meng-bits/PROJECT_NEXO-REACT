@@ -143,8 +143,13 @@ export default function ProfileShop({ user, onClose }) {
       const token = localStorage.getItem('accessToken');
       const headers = { ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 
-      const { data: statusData } = await supabase.from('account_status').select('trust_points').eq('id', user.id).single();
-      setTrustPoints(statusData?.trust_points || 0);
+      // Read trust points directly from account_status (authoritative cached column)
+      const { data: statusData } = await supabase
+        .from('account_status')
+        .select('trust_points')
+        .eq('id', user.id)
+        .single();
+      setTrustPoints(statusData?.trust_points ?? 10);
 
       const itemsRes = await fetch(SHOP_API, { headers });
       if (!itemsRes.ok) throw new Error(`Shop GET failed: ${itemsRes.status}`);

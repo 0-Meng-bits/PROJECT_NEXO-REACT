@@ -7,7 +7,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    lock: false, // prevent NavigatorLockAcquireTimeoutError across tabs
+    // removed lock:false — it causes concurrent refresh races that produce
+    // "Already Used" token errors; the default navigator lock is safer
   },
   global: {
     headers: {

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
+import VideoEmbed from './VideoEmbed';
 
 // -- GUIDE STEPS ---------------------------------------------------------------
 const GUIDE_STEPS = [
@@ -133,7 +135,7 @@ export default function HelpModal({ user, onClose }) {
           </div>
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4 }}>
-            {[['guide','fa-solid fa-book-open','Guide'],['faq','fa-solid fa-circle-question','FAQ'],['contact','fa-solid fa-headset','Support']].map(([id, icon, label]) => (
+            {[['guide','fa-solid fa-book-open','Guide'],['video','fa-solid fa-circle-play','Video'],['faq','fa-solid fa-circle-question','FAQ'],['contact','fa-solid fa-headset','Support']].map(([id, icon, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ flex: 1, padding: '8px 0', background: tab === id ? 'rgba(0,240,255,0.1)' : 'none', border: 'none', borderBottom: `2px solid ${tab === id ? 'var(--cyber-cyan)' : 'transparent'}`, color: tab === id ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: '0.15s' }}>
                 <i className={icon}></i> {label}
@@ -183,6 +185,18 @@ export default function HelpModal({ user, onClose }) {
                     <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>Done
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* VIDEO TAB */}
+          {tab === 'video' && (
+            <div>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+                Watch this short tutorial to get familiar with all the features of NEXO Connect.
+              </p>
+              <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,240,255,0.2)' }}>
+                <VideoEmbed />
               </div>
             </div>
           )}

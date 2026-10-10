@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
+import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
+import VideoEmbed from './VideoEmbed';
 
 const COURSES = [
   'BEED',
@@ -251,6 +253,14 @@ export default function Onboarding() {
                 {avatarPreview ? 'NEXT →' : 'SKIP FOR NOW →'}
               </button>
             </div>
+
+            {/* Tutorial video */}
+            <div style={{ marginTop: 24, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,240,255,0.15)' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(0,240,255,0.06)', fontSize: 11, color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1 }}>
+                <i className="fa-solid fa-circle-play" style={{ marginRight: 6 }}></i>WATCH: HOW NEXO WORKS
+              </div>
+              <VideoEmbed />
+            </div>
           </div>
         )}
 
@@ -350,7 +360,8 @@ export default function Onboarding() {
 
             <div className="ob-actions">
               <button className="cyber-btn secondary" onClick={() => setStep(2)}>← BACK</button>
-              <button className="cyber-btn" onClick={handleFinish} disabled={saving}>
+              <button className="cyber-btn" onClick={handleFinish} disabled={saving || selectedInterests.length === 0}
+                title={selectedInterests.length === 0 ? 'Please select at least one interest to continue' : ''}>
                 {saving ? 'SAVING...' : 'ENTER NEXO →'}
               </button>
             </div>
