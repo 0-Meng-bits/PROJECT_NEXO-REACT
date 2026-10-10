@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const userId = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
-  const { course, year_level, interests, last_seen, bio, cover_url } = req.body;
+  const { course, year_level, interests, last_seen, bio, cover_url, discoverable } = req.body;
   const updates = {};
   if (course !== undefined) updates.course = course;
   if (year_level !== undefined) updates.year_level = year_level;
@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   if (last_seen !== undefined) updates.last_seen = last_seen;
   if (bio !== undefined) updates.bio = bio;
   if (cover_url !== undefined) updates.cover_url = cover_url;
+  if (discoverable !== undefined) updates.discoverable = discoverable;
 
   if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
 

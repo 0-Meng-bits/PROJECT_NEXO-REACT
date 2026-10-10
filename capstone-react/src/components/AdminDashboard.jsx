@@ -387,7 +387,7 @@ export default function AdminDashboard() {
 
     if (profile?.is_banned) { showToast(`${userName} is already banned.`); return; }
 
-    const currentPoints = profile?.trust_points ?? 3;
+    const currentPoints = profile?.trust_points ?? 10;
     const newPoints = Math.max(0, currentPoints - 1);
     const newWarnings = (profile?.warning_count || 0) + 1;
     const willSuspend = newPoints === 0;
@@ -397,14 +397,22 @@ export default function AdminDashboard() {
       user_id: userId, admin_id: admin?.id, type: 'warning', reason,
     }]);
 
-    // Compute suspension end date (7 days from now)
+    // Deduct point via point_transactions — DB trigger syncs account_status.trust_points
+    await supabase.from('point_transactions').insert([{
+      user_id: userId,
+      amount: -1,
+      transaction_type: 'warning',
+      from_user_id: admin?.id,
+      reason,
+    }]);
+
+    // Update warning count and suspension separately (not trust_points — that's handled by trigger)
     const suspendedUntil = willSuspend
       ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
     await supabase.from('account_status').update({
       warning_count: newWarnings,
-      trust_points: willSuspend ? 1 : newPoints,
       ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
     }).eq('id', userId);
 
@@ -620,6 +628,9 @@ export default function AdminDashboard() {
             )}
             {s.key === 'reports' && reports.filter(r => r.status === 'pending').length > 0 && (
               <span className="adm-badge">{reports.filter(r => r.status === 'pending').length}</span>
+            )}
+            {s.key === 'communities' && communities.filter(c => c.status === 'pending').length > 0 && (
+              <span className="adm-badge">{communities.filter(c => c.status === 'pending').length}</span>
             )}
           </div>
         ))}
@@ -969,8 +980,8 @@ export default function AdminDashboard() {
                         }
                       </td>
                       <td>
-                        <span style={{ fontWeight: 700, color: (s.trust_points ?? 3) <= 1 ? 'var(--red)' : (s.trust_points ?? 3) <= 2 ? 'var(--orange)' : 'var(--green)' }}>
-                          {s.trust_points ?? 3}/3
+                        <span style={{ fontWeight: 700, color: (s.trust_points ?? 10) <= 3 ? 'var(--red)' : (s.trust_points ?? 10) <= 6 ? 'var(--orange)' : 'var(--green)' }}>
+                          {s.trust_points ?? 10}/20
                         </span>
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
@@ -1019,7 +1030,7 @@ export default function AdminDashboard() {
                     { label: 'STATUS',     value: selectedUser.is_banned ? 'Banned' : selectedUser.is_verified ? 'Verified' : 'Pending' },
                     { label: 'ID VERIFIED', value: selectedUser.id_verified ? 'Yes' : 'No' },
                     { label: 'JOINED',     value: new Date(selectedUser.created_at).toLocaleString() },
-                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 3}/3` },
+                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 10}/20` },
                     { label: 'WARNINGS',   value: selectedUser.warning_count || 0 },
                   ].map(({ label, value, mono }) => (
                     <div key={label} style={{ display: 'flex', gap: 16, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>

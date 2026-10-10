@@ -17,6 +17,7 @@ import EventCard from './EventCard';
 import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 import HelpModal from './HelpModal';
+import DiscoverPeople from './DiscoverPeople';
 
 const SHOP_API = window.location.hostname === 'localhost'
   ? '/api/shop'
@@ -1266,13 +1267,45 @@ const CATEGORY_ICONS = {
 
 // -- CREATE MODAL --------------------------------------------------------------
 function CreateModal({ onClose, onCreated, userId }) {
-  const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap' });
+  const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap', interest_tag: '', is_open: false });
   const [loading, setLoading] = useState(false);
+  const [connections, setConnections] = useState([]);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
+  const [invitees, setInvitees] = useState([]); // user ids to invite
+
+  // Load viewer's accepted connections to check the gate and populate invite list
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    // Check localStorage for a cached connection count first for instant render
+    const cached = localStorage.getItem('nexo_connection_count');
+    if (cached !== null) {
+      const count = parseInt(cached, 10);
+      setConnections(Array(count).fill({})); // placeholder to get count right
+      setConnectionsLoaded(true);
+    }
+    fetch(getApiUrl('/api/connections'), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then(data => {
+        const accepted = (data || []).filter(c => c.status === 'accepted');
+        localStorage.setItem('nexo_connection_count', accepted.length);
+        setConnections(accepted);
+        setConnectionsLoaded(true);
+      })
+      .catch(() => setConnectionsLoaded(true));
+  }, []);
+
+  const acceptedCount = connections.length;
+  const canCreate = acceptedCount >= 2;
 
   const handleCategoryChange = (cat) => {
-    // Auto-select first icon of new category
     const firstIcon = CATEGORY_ICONS[cat]?.[0]?.icon || 'fa-solid fa-graduation-cap';
-    setForm(f => ({ ...f, category: cat, icon: firstIcon }));
+    setForm(f => ({ ...f, category: cat, icon: firstIcon, interest_tag: '' }));
+  };
+
+  const toggleInvitee = (id) => {
+    setInvitees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const submit = async () => {
@@ -1287,38 +1320,72 @@ function CreateModal({ onClose, onCreated, userId }) {
       const res = await fetch(getApiUrl('/api/communities'), {
         method: 'POST',
         headers,
-        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim(), category: form.category, icon: form.icon }),
+        body: JSON.stringify({
+          name: form.name.trim(),
+          description: form.description.trim(),
+          category: form.category,
+          icon: form.icon,
+          interest_tag: form.interest_tag || null,
+          is_open: form.is_open,
+          invitees,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.message || 'Failed to submit request.'); setLoading(false); return; }
-      // Request submitted for approval
       alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
       onClose();
     } catch {
-      alert('Network error ? could not submit request.');
+      alert('Network error — could not submit request.');
     }
     setLoading(false);
   };
 
   const icons = CATEGORY_ICONS[form.category] || [];
 
+  // Build filtered interest list for selected category
+  const INTEREST_LABELS_MAP = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'E-Sports', dancing:'Dancing', bl_gl:'Watching BL/GL', sports:'Sports', travel:'Travel' };
+  const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
+  const interestOptions = CAT_INTERESTS[form.category] || [];
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <h3>Create New Circle</h3>
+
+        {/* Connection gate */}
+        {connectionsLoaded && !canCreate && (
+          <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12, color: 'var(--cyber-yellow)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <i className="fa-solid fa-triangle-exclamation"></i>
+            <span>You need <strong>2 connections</strong> to create a circle. You currently have {acceptedCount}. Go to <strong>Discover People</strong> to connect with people first.</span>
+          </div>
+        )}
+
         <div className="input-group">
           <label>CIRCLE NAME</label>
-          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" />
+          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" disabled={!canCreate} />
         </div>
         <div className="input-group">
           <label>CLASSIFICATION</label>
-          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
+          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)} disabled={!canCreate}>
             <option value="academic">Academic / Study Group</option>
             <option value="project">Special Project / Capstone</option>
             <option value="hobby">Hobby / Interest</option>
             <option value="social">Social / Hangout</option>
           </select>
         </div>
+
+        {/* Interest tag — filtered by category */}
+        {interestOptions.length > 0 && (
+          <div className="input-group">
+            <label>CIRCLE INTEREST TAG</label>
+            <select value={form.interest_tag} onChange={e => setForm(f => ({ ...f, interest_tag: e.target.value }))} disabled={!canCreate}>
+              <option value="">Select interest (optional)</option>
+              {interestOptions.map(i => (
+                <option key={i} value={i}>{INTEREST_LABELS_MAP[i] || i}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Icon picker */}
         <div className="input-group">
@@ -1331,6 +1398,7 @@ function CreateModal({ onClose, onCreated, userId }) {
                 className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
                 onClick={() => setForm(f => ({ ...f, icon: opt.icon }))}
                 title={opt.label}
+                disabled={!canCreate}
               >
                 <i className={opt.icon}></i>
                 <span>{opt.label}</span>
@@ -1341,10 +1409,43 @@ function CreateModal({ onClose, onCreated, userId }) {
 
         <div className="input-group">
           <label>DESCRIPTION</label>
-          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
+          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." disabled={!canCreate} />
         </div>
+
+        {/* Open for Applications toggle */}
+        <div className="input-group">
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+            <span>OPEN FOR APPLICATIONS</span>
+            <input type="checkbox" checked={form.is_open} onChange={e => setForm(f => ({ ...f, is_open: e.target.checked }))}
+              style={{ accentColor: 'var(--cyber-cyan)', width: 16, height: 16, cursor: 'pointer' }} disabled={!canCreate} />
+          </label>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            When on, this circle will appear on the Discover page so anyone can apply to join.
+          </div>
+        </div>
+
+        {/* Invite connections */}
+        {canCreate && connections.length > 0 && (
+          <div className="input-group">
+            <label>INVITE YOUR CONNECTIONS (optional)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 160, overflowY: 'auto' }}>
+              {connections.map(c => {
+                const other = c.user_id === userId ? c.recipient : c.requester;
+                const otherId = c.user_id === userId ? c.connected_user_id : c.user_id;
+                const name = other?.full_name || otherId;
+                return (
+                  <label key={otherId} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, padding: '6px 10px', borderRadius: 8, border: `1px solid ${invitees.includes(otherId) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: invitees.includes(otherId) ? 'rgba(0,240,255,0.06)' : 'transparent', transition: '0.15s' }}>
+                    <input type="checkbox" checked={invitees.includes(otherId)} onChange={() => toggleInvitee(otherId)} style={{ accentColor: 'var(--cyber-cyan)' }} />
+                    <span>{name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="modal-actions">
-          <button className="cyber-btn" onClick={submit} disabled={loading} style={{ flex: 1 }}>
+          <button className="cyber-btn" onClick={submit} disabled={loading || !canCreate || !form.name.trim()} style={{ flex: 1 }}>
             {loading ? 'SUBMITTING...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />SUBMIT FOR APPROVAL</>}
           </button>
           <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
@@ -2243,7 +2344,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
+  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
   const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
@@ -2260,6 +2361,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [photoUploading, setPhotoUploading] = useState(null); // slot being uploaded
   const photo1Ref = useRef(null);
   const photo2Ref = useRef(null);
+  const [profileConnections, setProfileConnections] = useState([]);
+  const [connectionsCount, setConnectionsCount] = useState(0);
+  const [expandedAvatar, setExpandedAvatar] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2289,11 +2393,26 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     load();
   }, [user?.id]);
 
+  // Load connections for this profile
+  useEffect(() => {
+    if (!user?.id) return;
+    const token = localStorage.getItem('accessToken');
+    fetch(getApiUrl('/api/connections'), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then(data => {
+        const accepted = (data || []).filter(c => c.status === 'accepted');
+        setConnectionsCount(accepted.length);
+        if (!readOnly) setProfileConnections(accepted);
+      })
+      .catch(() => {});
+  }, [user?.id, readOnly]);
+
   // Load active customizations + owned items
   useEffect(() => {
     if (!user?.id) return;
-    const loadCustomizations = async () => {
-      const { data: settings } = await supabase
+    const loadCustomizations = async () => {      const { data: settings } = await supabase
         .from('user_profile_settings')
         .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border, active_companion')
         .eq('user_id', user.id)
@@ -2336,7 +2455,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio }),
+        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
       });
       if (!res.ok) { setSaving(false); return; }
       setProfile({ ...editForm });
@@ -2640,7 +2759,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 color: 'var(--cyber-cyan)', 
                 boxShadow: customizations?.avatar_border?.css_data?.boxShadow || '0 0 20px rgba(0,240,255,0.25)'
               }}>
-                {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                {avatarUrl ? <img src={avatarUrl} alt="avatar" onClick={() => setExpandedAvatar(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} /> : initials}
               </div>
               {/* Companion sticker */}
               {customizations?.companion?.css_data && (() => {
@@ -2737,7 +2856,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
-                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'}<i className="fa-solid fa-certificate" style={{ marginLeft: 6, color: 'var(--cyber-cyan)' }} /></span>
+                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'}</span>
                   : <span className="verified-badge" style={{ fontSize: 11, borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending Verification</span>
                 }
               </div>
@@ -2844,6 +2963,22 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
             {/* Trust Points Badge */}
             <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
+
+            {/* Appear in Discover toggle — only for own profile in edit mode */}
+            {!readOnly && editing && (
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 2 }}>APPEAR IN DISCOVER</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Allow others to find you on the Discover page</div>
+                  </div>
+                  <input type="checkbox"
+                    checked={editForm.discoverable !== false}
+                    onChange={e => setEditForm(f => ({ ...f, discoverable: e.target.checked }))}
+                    style={{ accentColor: 'var(--cyber-cyan)', width: 18, height: 18, cursor: 'pointer' }} />
+                </div>
+              </div>
+            )}
 
             {/* Interests — view or edit inline */}
             {(!editing && profile.interests?.length > 0) && (
@@ -2964,7 +3099,12 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
                   {communities.map(c => (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div key={c.id}
+                      onClick={() => { if (onClose) onClose(); if (c.id && c.id !== 'global') { setTimeout(() => { window.dispatchEvent(new CustomEvent('nexo-navigate-circle', { detail: { circleId: c.id } })); }, 100); } }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 8, padding: '4px 6px', transition: 'background 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.07)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
                       <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--cyber-cyan)', overflow: 'hidden' }}>
                         {c.logo_url
                           ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
@@ -2978,8 +3118,44 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-              {!readOnly && (
+            {/* Connections count + list (own profile only) */}
+            {!readOnly && (
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>CONNECTIONS</span>
+                  <span style={{ fontSize: 13, color: 'var(--cyber-cyan)', fontWeight: 800 }}>{connectionsCount}</span>
+                </div>
+                {profileConnections.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No connections yet. Visit Discover to connect with peers.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+                    {profileConnections.map(c => {
+                      const currentUserId = user.id;
+                      const other = c.user_id === currentUserId ? c.recipient : c.requester;
+                      const name = other?.full_name || 'Unknown';
+                      const initials = (name[0] || 'U').toUpperCase();
+                      return (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
+                            {initials}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Connection count on read-only (viewing another profile) */}
+            {readOnly && connectionsCount > 0 && (
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <i className="fa-solid fa-link" style={{ color: 'var(--cyber-cyan)', fontSize: 13 }}></i>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}><strong style={{ color: 'var(--cyber-cyan)' }}>{connectionsCount}</strong> Connection{connectionsCount !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>              {!readOnly && (
                 <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11, background: 'rgba(180,30,30,0.85)', borderColor: 'var(--red)', color: '#fff', fontWeight: 700, backdropFilter: 'blur(8px)' }}>
                   <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
                 </button>
@@ -2990,6 +3166,42 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         </div>
       </div>
       
+      {/* Expanded Avatar Overlay */}
+      {expandedAvatar && avatarUrl && (
+        <div
+          onClick={() => setExpandedAvatar(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={avatarUrl}
+            alt="Profile"
+            style={{
+              maxWidth: '90vw', maxHeight: '90vh',
+              borderRadius: 16,
+              boxShadow: '0 0 60px rgba(0,240,255,0.3)',
+              objectFit: 'contain',
+            }}
+          />
+          <button
+            onClick={() => setExpandedAvatar(false)}
+            style={{
+              position: 'absolute', top: 20, right: 20,
+              background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '50%', width: 40, height: 40,
+              color: 'white', fontSize: 18, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      )}
+
       {/* Warning History Modal */}
       {showWarningHistory && (
         <WarningHistoryModal
@@ -3919,6 +4131,8 @@ export default function UserPortal() {
   const [campusEvents, setCampusEvents] = useState([]);
   const [circleEvents, setCircleEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [mutedCategories, setMutedCategories] = useState([]); // notification category mutes
+  const [streakCount, setStreakCount] = useState(0); // login streak for flame icon
 
   // Block navigation away from /portal when on home feed — show logout modal instead
   const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
@@ -3941,6 +4155,62 @@ export default function UserPortal() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     navigate('/auth');
+  };
+
+  // Listen for circle navigation events from ProfileModal
+  useEffect(() => {
+    const handler = (e) => {
+      const { circleId } = e.detail || {};
+      if (circleId) {
+        setShowProfile(false);
+        setViewingProfile(null);
+        navTo('circles', circleId);
+        setActiveChannelId(null);
+      }
+    };
+    window.addEventListener('nexo-navigate-circle', handler);
+    return () => window.removeEventListener('nexo-navigate-circle', handler);
+  }, [navTo]);
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('notification_mutes')
+      .select('category')
+      .eq('user_id', user.id)
+      .then(({ data }) => setMutedCategories((data || []).map(r => r.category)));
+  }, [user?.id]);
+
+  // Show streak toast and load streak count on portal mount
+  useEffect(() => {
+    // Show streak toast if login just happened
+    const streakData = sessionStorage.getItem('streakToast');
+    if (streakData) {
+      try {
+        const { streak, points } = JSON.parse(streakData);
+        sessionStorage.removeItem('streakToast');
+        setTimeout(() => {
+          showToast(`🔥 Day ${streak} Streak! +${points} Trust Points`);
+        }, 1500);
+      } catch { /* ignore */ }
+    }
+    // Load current streak count
+    if (user?.id) {
+      supabase.from('login_streaks')
+        .select('streak_count')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => setStreakCount(data?.streak_count || 0));
+    }
+  }, [user?.id]);
+
+  const toggleMuteCategory = async (cat) => {
+    const isMuted = mutedCategories.includes(cat);
+    if (isMuted) {
+      await supabase.from('notification_mutes').delete().eq('user_id', user.id).eq('category', cat);
+      setMutedCategories(prev => prev.filter(c => c !== cat));
+    } else {
+      await supabase.from('notification_mutes').insert([{ user_id: user.id, category: cat }]);
+      setMutedCategories(prev => [...prev, cat]);
+    }
   };
 
   const viewUserProfile = async (studentId) => {
@@ -5326,7 +5596,7 @@ export default function UserPortal() {
                         <i className={notifIcon(n.type)}></i>
                       </div>
                       <div className="notif-content">
-                        <p className="notif-msg">{n.message}</p>
+                        <p className="notif-msg">{n.group_count > 1 ? n.message : n.message}</p>
                         <span className="notif-time">{timeAgo(n.created_at)}</span>
                       </div>
                       {!n.is_read && <div className="notif-unread-dot"></div>}
@@ -5334,6 +5604,20 @@ export default function UserPortal() {
                   ))}
                   </div>
                 )}
+                {/* Notification mute controls */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '10px 14px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>MUTE CATEGORIES</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {['Connections', 'Circles', 'Campus'].map(cat => (
+                      <label key={cat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)' }}>
+                        <span>{cat}</span>
+                        <input type="checkbox" checked={mutedCategories.includes(cat)}
+                          onChange={() => toggleMuteCategory(cat)}
+                          style={{ accentColor: 'var(--cyber-cyan)', cursor: 'pointer' }} />
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -5342,6 +5626,14 @@ export default function UserPortal() {
             <span className="hud-label">SCHOOL_ID:</span>
             <span className="hud-value">{user?.student_id}</span>
           </div>
+          {streakCount > 0 && (
+            <div className="hud-chip" title={`${streakCount}-day login streak — log in daily to earn trust points!`}
+              onClick={() => showToast(`🔥 ${streakCount}-day streak! Log in daily to earn up to +5 Trust Points per day.`)}
+              style={{ cursor: 'pointer' }}>
+              <span style={{ fontSize: 13 }}>🔥</span>
+              <span className="hud-value" style={{ color: '#f97316', fontWeight: 800 }}>{streakCount}</span>
+            </div>
+          )}
           <div className="hud-avatar" onClick={() => setShowProfile(true)} style={{ position: 'relative' }}>
             <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {navAvatarUrl
@@ -5366,7 +5658,9 @@ export default function UserPortal() {
         {/* CIRCLE DOCK ? always visible on desktop, toggle overlay on mobile */}
         <div className={`circle-dock${(showDock || mobileSidebarOpen) ? " dock-mobile-open" : ""}`}>
           <div className="dock-branding">
-            <img src="/logoo.png" className="brand-logo-small" alt="NEXO" style={{ borderRadius: 10 }} />
+            <img src="/logoo.png" className="brand-logo-small" alt="NEXO" style={{ borderRadius: 10, cursor: 'pointer' }}
+              onClick={() => { navTo('home', 'global'); setActiveCommId('global'); setShowDock(false); setMobileSidebarOpen(false); }}
+              title="Go to Home Feed" />
           </div>
           {myCircles.map(c => (
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? "active" : ""}`}
@@ -5399,7 +5693,8 @@ export default function UserPortal() {
             /* -- GLOBAL / HOME sidebar -- */
             <>
               <div className="sidebar-brand-area">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                  onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <img src="/logoo.png" alt="Nexo" className="sidebar-logo-icon" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} />
                   <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
                 </div>
@@ -5422,6 +5717,10 @@ export default function UserPortal() {
                 <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-calendar-days"></i>
                   <span className="node-name">Campus Events</span>
+                </div>
+                <div className={`ls-item ${section === 'discover' ? 'active' : ''}`} onClick={() => { navTo('discover', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                  <i className="nav-icon fa-solid fa-people-group"></i>
+                  <span className="node-name">Discover People</span>
                 </div>
               </div>
               </div>
@@ -5592,6 +5891,29 @@ export default function UserPortal() {
                     onClick={() => leaveCircle(activeCommId)}>
                     <i className="nav-icon fa-solid fa-right-from-bracket"></i>
                     <span className="node-name">Leave Circle</span>
+                  </div>
+                )}
+                {isOwner && activeComm?.status === 'pending' && (
+                  <div className="ls-item" style={{ color: 'var(--red)' }}
+                    onClick={async () => {
+                      if (!confirm(`Cancel the circle "${activeComm.name}"? All pending invites will be cancelled and invitees will be notified.`)) return;
+                      const token = localStorage.getItem('accessToken');
+                      const res = await fetch(getApiUrl('/api/memberships'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                        body: JSON.stringify({ action: 'cancel_circle', community_id: activeCommId }),
+                      });
+                      if (res.ok) {
+                        showToast('Circle cancelled.');
+                        await loadCommunities();
+                        navTo('home', 'global');
+                      } else {
+                        const d = await res.json().catch(() => ({}));
+                        showToast(d.message || 'Failed to cancel circle.');
+                      }
+                    }}>
+                    <i className="nav-icon fa-solid fa-circle-xmark"></i>
+                    <span className="node-name">Cancel Circle</span>
                   </div>
                 )}
               </div>
@@ -6013,6 +6335,18 @@ export default function UserPortal() {
                 </div>
               )}
             </>
+          )}
+
+          {/* -- DISCOVER PEOPLE -- */}
+          {section === 'discover' && (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px', width: '100%', boxSizing: 'border-box' }}>
+              <DiscoverPeople
+                user={user}
+                onShowToast={showToast}
+                onViewProfile={viewUserProfile}
+                onNavigateToCircle={(circleId) => navTo('circles', circleId)}
+              />
+            </div>
           )}
 
           {/* -- ACTIVITY HUB "? discover & join circles -- */}

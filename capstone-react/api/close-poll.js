@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 // ── HELPER FUNCTIONS ────────────────────────────────────────────────────────
 
@@ -124,7 +124,7 @@ export default async function handler(req, res) {
     }
     
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !user) {
       return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Invalid auth token' });

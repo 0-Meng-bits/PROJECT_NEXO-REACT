@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { loadTheme } from '../lib/theme';
+import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
+import VideoEmbed from './VideoEmbed';
 
 function useReveal() {
   const ref = useRef(null);
@@ -297,6 +299,21 @@ export default function Landing({ onEnter }) {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* TUTORIAL VIDEO */}
+      <section className="lnd-section" id="video" style={{ background: 'rgba(0,240,255,0.03)' }}>
+        <div className="lnd-container">
+          <Reveal><p className="lnd-eyebrow">WATCH THE TUTORIAL</p></Reveal>
+          <Reveal delay={120}>
+            <h2 className="lnd-section-title">See how it <span className="lnd-cyan">works in action.</span></h2>
+          </Reveal>
+          <Reveal delay={240}>
+            <div style={{ marginTop: 32, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,240,255,0.2)', boxShadow: '0 0 40px rgba(0,240,255,0.08)' }}>
+              <VideoEmbed />
+            </div>
+          </Reveal>
         </div>
       </section>
 
