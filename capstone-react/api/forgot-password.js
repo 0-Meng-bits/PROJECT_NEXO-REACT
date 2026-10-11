@@ -10,13 +10,21 @@ export default async function handler(req, res) {
   const { data: profile, error } = await supabaseAdmin
     .from('accounts').select('email').eq('ctu_id', studentId).single();
 
-  if (error || !profile) return res.status(404).json({ message: 'CTU ID not found.' });
+  // Fallback: if accounts table doesn't exist or user not found, check profiles
+  let email = profile?.email;
+  if (!email) {
+    const { data: profileData } = await supabaseAdmin
+      .from('profiles').select('email').eq('student_id', studentId).single();
+    email = profileData?.email;
+  }
+
+  if (!email) return res.status(404).json({ message: 'CTU ID not found.' });
 
   const siteUrl = process.env.SITE_URL || 'https://project-nexo-react.vercel.app';
 
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: 'recovery',
-    email: profile.email,
+    email: email,
     options: { redirectTo: `${siteUrl}/reset-password` },
   });
 
@@ -35,7 +43,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         from: 'NEXO Connect <onboarding@resend.dev>',
-        to: profile.email,
+        to: email,
         subject: 'Reset your NEXO Connect password',
         html: buildEmailHtml(linkData.properties.action_link),
       }),
@@ -69,7 +77,7 @@ export default async function handler(req, res) {
   try {
     await transporter.sendMail({
       from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-      to: profile.email,
+      to: email,
       subject: 'Reset your NEXO Connect password',
       html: buildEmailHtml(linkData.properties.action_link),
     });
