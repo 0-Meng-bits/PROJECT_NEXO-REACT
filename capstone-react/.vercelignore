@@ -1,11 +1,17 @@
 server-local.js
+api/_notifications.js
+api/_supabase.js
 api/admin-data.js
 api/circle-requests.js
 api/close-poll.js
 api/communities.js
+api/connections.js
 api/delete.js
+api/discover.js
+api/forgot-password.js
 api/login.js
 api/me.js
+api/memberships.js
 api/messages.js
 api/moderation.js
 api/shop.js
