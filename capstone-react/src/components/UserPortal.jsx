@@ -3139,7 +3139,50 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                           <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
                             {initials}
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{name}</div>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Disconnect from ${name}?`)) return;
+                              const token = localStorage.getItem('accessToken');
+                              const res = await fetch(getApiUrl('/api/connections'), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                body: JSON.stringify({ action: 'remove', connection_id: c.id }),
+                              });
+                              if (res.ok) {
+                                setProfileConnections(prev => prev.filter(x => x.id !== c.id));
+                                setConnectionsCount(prev => Math.max(0, prev - 1));
+                              }
+                            }}
+                            title="Disconnect"
+                            style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', opacity: 0.6, flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                          >
+                            <i className="fa-solid fa-user-xmark"></i>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const otherId = c.user_id === user.id ? c.connected_user_id : c.user_id;
+                              if (!confirm(`Block ${name}? They won't be able to see you on Discover or send you connection requests.`)) return;
+                              const token = localStorage.getItem('accessToken');
+                              const res = await fetch(getApiUrl('/api/connections'), {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                body: JSON.stringify({ action: 'block', target_id: otherId }),
+                              });
+                              if (res.ok) {
+                                setProfileConnections(prev => prev.filter(x => x.id !== c.id));
+                                setConnectionsCount(prev => Math.max(0, prev - 1));
+                              }
+                            }}
+                            title="Block user"
+                            style={{ background: 'none', border: 'none', color: '#f97316', cursor: 'pointer', fontSize: 12, padding: '2px 4px', opacity: 0.6, flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
+                          >
+                            <i className="fa-solid fa-ban"></i>
+                          </button>
                         </div>
                       );
                     })}

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './_supabase.js';
+import { supabase, supabaseAdmin } from './_supabase.js';
 
 // ── HELPER FUNCTIONS ────────────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ async function notifyVoters(pollVotes, pollTitle, eventTitle, eventId, community
   }));
   
   if (notifications.length > 0) {
-    await supabase.from('notifications').insert(notifications);
+    await supabaseAdmin.from('notifications').insert(notifications);
   }
 }
 
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
         
       } catch (validationError) {
         // If event generation fails, still close poll but notify creator
-        await supabase.from('notifications').insert({
+        await supabaseAdmin.from('notifications').insert({
           user_id: poll.author_id,
           type: 'event_generation_failed',
           message: `Your poll "${poll.title}" was closed but the event could not be created: ${validationError.message}`,

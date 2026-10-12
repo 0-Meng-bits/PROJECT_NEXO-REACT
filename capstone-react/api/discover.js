@@ -42,7 +42,8 @@ export default async function handler(req, res) {
   const connectionMap = {};
   (connections || []).forEach(c => {
     const otherId = c.user_id === userId ? c.connected_user_id : c.user_id;
-    connectionMap[otherId] = { connection_id: c.id, status: c.status };
+    const isSender = c.user_id === userId; // true = viewer sent the request
+    connectionMap[otherId] = { connection_id: c.id, status: c.status, is_sender: isSender };
   });
 
   const acceptedConnectionIds = new Set(
@@ -116,6 +117,7 @@ export default async function handler(req, res) {
         shared_interest_count: sharedInterests.length,
         connection_status: connInfo?.status || null,
         connection_id: connInfo?.connection_id || null,
+        is_sender: connInfo?.is_sender ?? null,
       };
     });
 

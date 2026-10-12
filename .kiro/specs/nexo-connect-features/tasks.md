@@ -338,3 +338,16 @@ Incremental implementation of ten features across the NEXO Connect platform: gen
 - The `insertNotification()` helper (Task 11.3) must be in place before Tasks 14.8 and 15.6 to ensure grouping and muting work across all notification call sites
 - The `CATEGORY_INTEREST_MAP` constant (Task 2.1) is shared between the Circle Creation form and the test suite — import from `src/lib/constants.js` in both places
 - All new API routes follow the existing pattern: read `Authorization: Bearer <token>` header, use `supabaseAdmin` for writes, return JSON
+
+## Backlog
+
+- [ ] B1. Database normalization cleanup
+  - Remove `full_name` and `role` from `messages` table (transitive dependency — derive from `accounts` and `memberships` via JOIN)
+  - Remove `author_name` and `author_type` from `announcements` table (same issue)
+  - Remove `poster_name` and `poster_type` from `campus_events` table
+  - Remove `author_student_id` from `announcements` (redundant FK — `author_id` already points to the same user)
+  - Change `messages.student_id` to reference `accounts(id)` instead of `accounts(ctu_id)` for consistency
+  - Extract `account_details.interests text[]` into a separate `account_interests` table (1NF violation)
+  - Extract `circle_requests.invitees uuid[]` into a separate junction table (1NF violation)
+  - Consider replacing `announcements.poll_options jsonb` and `poll_votes jsonb` with proper relational tables
+  - Note: some denormalizations (e.g. cached names in messages) may be intentional for performance — evaluate before removing

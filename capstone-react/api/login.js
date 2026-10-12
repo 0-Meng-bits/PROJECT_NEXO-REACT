@@ -8,55 +8,71 @@ import { supabase, supabaseAdmin } from './_supabase.js';
 async function processLoginStreak(userId, currentTrustPoints) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: record } = await supabaseAdmin
+  const { data: record, error: fetchError } = await supabaseAdmin
     .from('login_streaks')
     .select('streak_count, last_login_date, longest_streak')
     .eq('user_id', userId)
     .maybeSingle();
 
-  // First ever login
-  if (!record) {
-    await supabaseAdmin.from('login_streaks').insert([{
-      user_id: userId, streak_count: 1, last_login_date: today, longest_streak: 1,
-    }]);
-    await supabaseAdmin.from('point_transactions').insert([{
-      user_id: userId, amount: 1, transaction_type: 'daily_recovery', reason: 'Day 1 login streak',
-    }]);
-    await supabaseAdmin.from('account_status')
-      .update({ trust_points: (currentTrustPoints ?? 10) + 1 })
-      .eq('id', userId);
-    return { streak: 1, points_awarded: 1 };
+  if (fetchError) {
+    console.error('[STREAK] fetch error:', fetchError.message);
+    return { streak: 0, points_awarded: 0 };
   }
 
   // Same day — no double award
-  if (record.last_login_date === today) {
+  if (record?.last_login_date === today) {
     return { streak: record.streak_count, points_awarded: 0 };
   }
 
-  const daysDiff = Math.round(
-    (new Date(today) - new Date(record.last_login_date)) / (1000 * 60 * 60 * 24)
-  );
+  let newStreak = 1;
+  let pointsAwarded = 1;
 
-  let newStreak;
-  if (daysDiff === 1)      newStreak = record.streak_count + 1;
-  else if (daysDiff <= 3)  newStreak = record.streak_count; // grace period
-  else                     newStreak = 1; // reset
+  if (!record) {
+    // First ever login — insert streak record
+    const { error: insertError } = await supabaseAdmin.from('login_streaks').insert([{
+      user_id: userId, streak_count: 1, last_login_date: today, longest_streak: 1,
+    }]);
+    if (insertError) {
+      console.error('[STREAK] insert error:', insertError.message);
+      return { streak: 0, points_awarded: 0 };
+    }
+  } else {
+    // Existing record — calculate streak progression
+    const daysDiff = Math.round(
+      (new Date(today) - new Date(record.last_login_date)) / (1000 * 60 * 60 * 24)
+    );
 
-  const pointsAwarded = Math.min(newStreak, 5);
-  const newLongest = Math.max(newStreak, record.longest_streak || 0);
+    if (daysDiff === 1)       newStreak = record.streak_count + 1;
+    else if (daysDiff <= 3)   newStreak = record.streak_count; // 2-day grace period
+    else                      newStreak = 1; // reset
 
-  await supabaseAdmin.from('login_streaks').update({
-    streak_count: newStreak, last_login_date: today, longest_streak: newLongest,
-  }).eq('user_id', userId);
+    pointsAwarded = Math.min(newStreak, 5);
+    const newLongest = Math.max(newStreak, record.longest_streak || 0);
 
-  await supabaseAdmin.from('point_transactions').insert([{
-    user_id: userId, amount: pointsAwarded, transaction_type: 'daily_recovery',
-    reason: `Day ${newStreak} login streak`,
-  }]);
+    const { error: updateError } = await supabaseAdmin.from('login_streaks').update({
+      streak_count: newStreak, last_login_date: today, longest_streak: newLongest,
+    }).eq('user_id', userId);
 
-  // Directly update account_status — don't rely on DB trigger
+    if (updateError) {
+      console.error('[STREAK] update error:', updateError.message);
+      return { streak: record.streak_count, points_awarded: 0 };
+    }
+  }
+
+  // Award trust points — non-fatal if point_transactions table doesn't exist
+  const newTp = Math.min((currentTrustPoints ?? 10) + pointsAwarded, 10); // cap at 10
+  try {
+    await supabaseAdmin.from('point_transactions').insert([{
+      user_id: userId, amount: pointsAwarded, transaction_type: 'daily_recovery',
+      reason: `Day ${newStreak} login streak`,
+    }]);
+  } catch {
+    // point_transactions is optional — streak still counts without it
+  }
+
+  // Always update trust_points directly on account_status
   await supabaseAdmin.from('account_status')
-    .update({ trust_points: (currentTrustPoints ?? 10) + pointsAwarded })
+    .update({ trust_points: newTp })
     .eq('id', userId);
 
   return { streak: newStreak, points_awarded: pointsAwarded };
