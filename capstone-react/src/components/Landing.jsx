@@ -82,6 +82,9 @@ export default function Landing({ onEnter }) {
     { icon: 'fa-solid fa-microphone',      title: 'Application System',  desc: 'Organizations can open applications with custom questions. Students apply directly — no need for separate forms.' },
     { icon: 'fa-solid fa-id-card',         title: 'Verified Identity',   desc: 'Every account is verified using your CTU school ID. This keeps the platform safe and school-members only.' },
     { icon: 'fa-solid fa-shield',          title: 'Trust & Moderation',  desc: 'A built-in reputation system keeps the community respectful. Admins can flag, review, and manage any content.' },
+    { icon: 'fa-solid fa-people-group',    title: 'Discover People',     desc: 'Find students who share your interests. Browse peers by interest and build your network before joining circles.' },
+    { icon: 'fa-solid fa-link',            title: 'Connection System',   desc: 'Send and accept connection requests to build a trusted network. Connections are the foundation of every new circle.' },
+    { icon: 'fa-solid fa-fire',            title: 'Daily Login Streak',  desc: 'Log in daily to earn trust points. Maintain your streak and recover points — the longer you stay active, the more you earn.' },
   ];
 
   const steps = [

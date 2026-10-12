@@ -23,7 +23,7 @@ function ConnectionStatusBadge({ status }) {
   return null;
 }
 
-function UserCard({ user, onConnect, onCancelRequest, onViewProfile, connecting }) {
+function UserCard({ user, onConnect, onCancelRequest, onAcceptRequest, onViewProfile, connecting }) {
   const canConnect = !user.connection_status;
   const isPending = user.connection_status === 'pending';
   const initials = (user.full_name || 'U')[0].toUpperCase();
@@ -96,7 +96,7 @@ function UserCard({ user, onConnect, onCancelRequest, onViewProfile, connecting 
         </div>
       )}
 
-      {/* Connect / Cancel button */}
+      {/* Connect / Cancel / Accept+Decline buttons */}
       {canConnect && (
         <button
           onClick={() => onConnect(user.id)}
@@ -117,7 +117,8 @@ function UserCard({ user, onConnect, onCancelRequest, onViewProfile, connecting 
           }
         </button>
       )}
-      {isPending && (
+      {/* Viewer sent the request — show Cancel */}
+      {isPending && user.is_sender === true && (
         <button
           onClick={() => onCancelRequest(user.id, user.connection_id)}
           disabled={connecting === user.id}
@@ -126,13 +127,41 @@ function UserCard({ user, onConnect, onCancelRequest, onViewProfile, connecting 
             background: 'rgba(247,95,95,0.08)', border: '1px solid var(--red)',
             borderRadius: 8, color: 'var(--red)', cursor: 'pointer',
             fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-            transition: 'background 0.2s',
           }}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(247,95,95,0.18)'}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(247,95,95,0.08)'}
         >
           <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>Cancel Request
         </button>
+      )}
+      {/* Viewer received the request — show Accept + Decline */}
+      {isPending && user.is_sender === false && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+          <button
+            onClick={() => onAcceptRequest(user.id, user.connection_id)}
+            disabled={connecting === user.id}
+            style={{
+              flex: 1, padding: '7px 0',
+              background: 'rgba(62,207,142,0.1)', border: '1px solid #3ecf8e',
+              borderRadius: 8, color: '#3ecf8e', cursor: 'pointer',
+              fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            <i className="fa-solid fa-check" style={{ marginRight: 5 }}></i>Accept
+          </button>
+          <button
+            onClick={() => onCancelRequest(user.id, user.connection_id)}
+            disabled={connecting === user.id}
+            style={{
+              flex: 1, padding: '7px 0',
+              background: 'rgba(247,95,95,0.08)', border: '1px solid var(--red)',
+              borderRadius: 8, color: 'var(--red)', cursor: 'pointer',
+              fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            <i className="fa-solid fa-xmark" style={{ marginRight: 5 }}></i>Decline
+          </button>
+        </div>
       )}
     </div>
   );
@@ -245,6 +274,28 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
   }, []);
 
   useEffect(() => { fetchDiscover(); }, [fetchDiscover]);
+
+  const handleAcceptRequest = async (targetId, connectionId) => {
+    if (!connectionId) return;
+    setConnecting(targetId);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/connections'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'accept', connection_id: connectionId }),
+      });
+      if (res.ok) {
+        onShowToast?.('Connection accepted!');
+        setUsers(prev => prev.map(u => u.id === targetId ? { ...u, connection_status: 'accepted' } : u));
+      } else {
+        onShowToast?.('Failed to accept request.');
+      }
+    } catch {
+      onShowToast?.('Failed to accept request.');
+    }
+    setConnecting(null);
+  };
 
   const handleCancelRequest = async (targetId, connectionId) => {
     if (!connectionId) return;
@@ -427,7 +478,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                     {groupUsers.map(u => (
-                      <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onViewProfile={onViewProfile} connecting={connecting} />
+                      <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onAcceptRequest={handleAcceptRequest} onViewProfile={onViewProfile} connecting={connecting} />
                     ))}
                   </div>
                 </div>
@@ -440,7 +491,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                 {displayedUsers.map(u => (
-                  <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onViewProfile={onViewProfile} connecting={connecting} />
+                  <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onAcceptRequest={handleAcceptRequest} onViewProfile={onViewProfile} connecting={connecting} />
                 ))}
               </div>
             )
