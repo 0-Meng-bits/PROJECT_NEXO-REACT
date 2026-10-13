@@ -104,38 +104,56 @@ export default async function handler(req, res) {
     // Continue anyway - user can request password reset to verify email later
   }
 
-  // Send verification email via Gmail SMTP
+  // Send verification email — try Resend first, fall back to Gmail
   if (linkData?.properties?.action_link) {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
+    const emailHtml = `
+      <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+        <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+        <p>Welcome, <strong>${fullName}</strong>!</p>
+        <p>Click the link below to verify your email and activate your account:</p>
+        <a href="${linkData.properties.action_link}"
+           style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
+          VERIFY EMAIL
+        </a>
+        <p style="color:#666;font-size:12px;">This link expires in 24 hours. After verification, your account will be reviewed by an admin.</p>
+      </div>
+    `;
 
-    try {
-      await transporter.sendMail({
-        from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-        to: email,
-        subject: 'Verify your NEXO Connect account',
-        html: `
-          <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
-            <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
-            <p>Welcome, <strong>${fullName}</strong>!</p>
-            <p>Click the link below to verify your email and activate your account:</p>
-            <a href="${linkData.properties.action_link}"
-               style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
-              VERIFY EMAIL
-            </a>
-            <p style="color:#666;font-size:12px;">This link expires in 24 hours. After verification, your account will be reviewed by an admin.</p>
-          </div>
-        `,
-      });
-      console.log('[SIGNUP] Verification email sent to', email);
-    } catch (emailErr) {
-      console.error('[SIGNUP] Email send error:', emailErr.message);
-      // Non-fatal - user can request password reset to verify later
+    let emailSent = false;
+
+    // Try Resend first (reliable on cloud)
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: 'NEXO Connect <onboarding@resend.dev>', to: email, subject: 'Verify your NEXO Connect account', html: emailHtml }),
+        });
+        if (resendRes.ok) emailSent = true;
+      } catch { /* non-fatal */ }
+    }
+
+    // Fall back to Gmail with 10s timeout
+    if (!emailSent && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+        });
+        await transporter.sendMail({
+          from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+          to: email,
+          subject: 'Verify your NEXO Connect account',
+          html: emailHtml,
+        });
+        console.log('[SIGNUP] Verification email sent to', email);
+      } catch (emailErr) {
+        console.error('[SIGNUP] Email send error:', emailErr.message);
+        // Non-fatal
+      }
     }
   }
 
