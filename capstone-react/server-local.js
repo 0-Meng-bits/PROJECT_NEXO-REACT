@@ -58,6 +58,10 @@ app.all('/api/shop', shop);
 app.all('/api/signup', signup);
 app.all('/api/update-profile', updateProfile);
 app.all('/api/upload', upload);
+app.all('/api/verify-student/:id', (req, res) => {
+  req.query = { ...req.query, id: req.params.id };
+  verifyStudent(req, res);
+});
 app.all('/api/verify-student', verifyStudent);
 
 // Serve built frontend static files
