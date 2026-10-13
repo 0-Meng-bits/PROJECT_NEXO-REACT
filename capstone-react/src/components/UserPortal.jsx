@@ -205,6 +205,34 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentVal, setEditingCommentVal] = useState('');
 
+  // Post like state
+  const [postLiked, setPostLiked] = useState(false);
+  const [postLikeCount, setPostLikeCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('post_likes')
+      .select('user_id', { count: 'exact' })
+      .eq('announcement_id', a.id)
+      .then(({ data, count }) => {
+        setPostLikeCount(count || 0);
+        setPostLiked((data || []).some(r => r.user_id === user.id));
+      });
+  }, [a.id, user?.id]);
+
+  const togglePostLike = async () => {
+    if (!user?.id) return;
+    if (postLiked) {
+      await supabase.from('post_likes').delete().eq('announcement_id', a.id).eq('user_id', user.id);
+      setPostLiked(false);
+      setPostLikeCount(p => Math.max(0, p - 1));
+    } else {
+      await supabase.from('post_likes').insert([{ announcement_id: a.id, user_id: user.id }]);
+      setPostLiked(true);
+      setPostLikeCount(p => p + 1);
+    }
+  };
+
   // Load comment count on mount
   useEffect(() => {
     supabase.from('post_comments')
@@ -620,15 +648,26 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
 
       {/* -- COMMENT SECTION -- */}
       <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-        {/* Toggle comments button */}
-        <button onClick={toggleComments}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', transition: 'color 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-          <i className="fa-regular fa-comment"></i>
-          {showComments ? 'Hide comments' : `Comments${commentCount > 0 ? ` (${commentCount})` : ''}`}
-          <i className={`fa-solid fa-chevron-${showComments ? 'up' : 'down'}`} style={{ fontSize: 9 }}></i>
-        </button>
+        {/* Action bar: like + comments toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Like button */}
+          <button onClick={togglePostLike}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: postLiked ? '#f43f5e' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5, padding: '2px 0', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
+            onMouseLeave={e => e.currentTarget.style.color = postLiked ? '#f43f5e' : 'var(--text-muted)'}>
+            <i className={postLiked ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
+            {postLikeCount > 0 && <span>{postLikeCount}</span>}
+          </button>
+          {/* Toggle comments button */}
+          <button onClick={toggleComments}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
+            <i className="fa-regular fa-comment"></i>
+            {showComments ? 'Hide comments' : `Comments${commentCount > 0 ? ` (${commentCount})` : ''}`}
+            <i className={`fa-solid fa-chevron-${showComments ? 'up' : 'down'}`} style={{ fontSize: 9 }}></i>
+          </button>
+        </div>{/* end action bar */}
 
         {showComments && (
           <div style={{ marginTop: 12 }}>
