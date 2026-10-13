@@ -310,7 +310,8 @@ CREATE TABLE IF NOT EXISTS point_transactions (
   amount decimal(4,1) NOT NULL,
   transaction_type text NOT NULL CHECK (transaction_type IN (
     'warning', 'appreciation', 'daily_recovery',
-    'appeal_approved', 'admin_bonus', 'harassment_penalty'
+    'appeal_approved', 'admin_bonus', 'harassment_penalty',
+    'welcome_bonus'
   )),
   from_user_id uuid REFERENCES accounts(id),
   community_id uuid REFERENCES communities(id),
