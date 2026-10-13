@@ -1271,18 +1271,13 @@ function CreateModal({ onClose, onCreated, userId }) {
   const [loading, setLoading] = useState(false);
   const [connections, setConnections] = useState([]);
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
-  const [invitees, setInvitees] = useState([]); // user ids to invite
+  const [invitees, setInvitees] = useState([]);
 
-  // Load viewer's accepted connections to check the gate and populate invite list
+  const INTEREST_LABELS_MAP = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'E-Sports', dancing:'Dancing', bl_gl:'Watching BL/GL', sports:'Sports', travel:'Travel' };
+  const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    // Check localStorage for a cached connection count first for instant render
-    const cached = localStorage.getItem('nexo_connection_count');
-    if (cached !== null) {
-      const count = parseInt(cached, 10);
-      setConnections(Array(count).fill({})); // placeholder to get count right
-      setConnectionsLoaded(true);
-    }
     fetch(getApiUrl('/api/connections'), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
@@ -1297,7 +1292,16 @@ function CreateModal({ onClose, onCreated, userId }) {
   }, []);
 
   const acceptedCount = connections.length;
-  const canCreate = acceptedCount >= 2;
+  // is_open must be forced on if invitees < 2
+  const forcedOpen = invitees.length < 2;
+  const effectiveIsOpen = forcedOpen ? true : form.is_open;
+
+  // Sync is_open state when forced
+  useEffect(() => {
+    if (forcedOpen && !form.is_open) {
+      setForm(f => ({ ...f, is_open: true }));
+    }
+  }, [forcedOpen]);
 
   const handleCategoryChange = (cat) => {
     const firstIcon = CATEGORY_ICONS[cat]?.[0]?.icon || 'fa-solid fa-graduation-cap';
@@ -1308,14 +1312,25 @@ function CreateModal({ onClose, onCreated, userId }) {
     setInvitees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  const interestOptions = CAT_INTERESTS[form.category] || [];
+  const icons = CATEGORY_ICONS[form.category] || [];
+
+  // Validation: name + interest_tag required
+  const canSubmit = form.name.trim() && form.interest_tag;
+
+  const openHint = invitees.length === 0
+    ? 'Required — you have no invited connections. Circle will recruit members publicly.'
+    : invitees.length === 1
+    ? 'Required — you need 1 more member. Circle will also recruit publicly.'
+    : 'Optional — you have 2 invites. Circle can activate privately or stay open.';
+
   const submit = async () => {
-    if (!form.name.trim()) return;
+    if (!canSubmit) return;
     setLoading(true);
     const token = localStorage.getItem('accessToken');
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     else if (userId) headers['x-user-id'] = userId;
-
     try {
       const res = await fetch(getApiUrl('/api/communities'), {
         method: 'POST',
@@ -1325,8 +1340,8 @@ function CreateModal({ onClose, onCreated, userId }) {
           description: form.description.trim(),
           category: form.category,
           icon: form.icon,
-          interest_tag: form.interest_tag || null,
-          is_open: form.is_open,
+          interest_tag: form.interest_tag,
+          is_open: effectiveIsOpen,
           invitees,
         }),
       });
@@ -1340,33 +1355,19 @@ function CreateModal({ onClose, onCreated, userId }) {
     setLoading(false);
   };
 
-  const icons = CATEGORY_ICONS[form.category] || [];
-
-  // Build filtered interest list for selected category
-  const INTEREST_LABELS_MAP = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'E-Sports', dancing:'Dancing', bl_gl:'Watching BL/GL', sports:'Sports', travel:'Travel' };
-  const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
-  const interestOptions = CAT_INTERESTS[form.category] || [];
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-        <h3>Create New Circle</h3>
-
-        {/* Connection gate */}
-        {connectionsLoaded && !canCreate && (
-          <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.3)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12, color: 'var(--cyber-yellow)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <i className="fa-solid fa-triangle-exclamation"></i>
-            <span>You need <strong>2 connections</strong> to create a circle. You currently have {acceptedCount}. Go to <strong>Discover People</strong> to connect with people first.</span>
-          </div>
-        )}
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto', width: '100%', maxWidth: 480 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--cyber-cyan)', marginBottom: 20 }}>CREATE NEW CIRCLE</h3>
 
         <div className="input-group">
           <label>CIRCLE NAME</label>
-          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" disabled={!canCreate} />
+          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" />
         </div>
+
         <div className="input-group">
           <label>CLASSIFICATION</label>
-          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)} disabled={!canCreate}>
+          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
             <option value="academic">Academic / Study Group</option>
             <option value="project">Special Project / Capstone</option>
             <option value="hobby">Hobby / Interest</option>
@@ -1374,32 +1375,31 @@ function CreateModal({ onClose, onCreated, userId }) {
           </select>
         </div>
 
-        {/* Interest tag — filtered by category */}
+        {/* Interest tag — REQUIRED, single select, filtered by category */}
         {interestOptions.length > 0 && (
           <div className="input-group">
-            <label>CIRCLE INTEREST TAG</label>
-            <select value={form.interest_tag} onChange={e => setForm(f => ({ ...f, interest_tag: e.target.value }))} disabled={!canCreate}>
-              <option value="">Select interest (optional)</option>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              CIRCLE INTEREST TAG
+              <span style={{ color: 'var(--red)', fontSize: 12 }}>*</span>
+            </label>
+            <select value={form.interest_tag} onChange={e => setForm(f => ({ ...f, interest_tag: e.target.value }))}>
+              <option value="">Select an interest...</option>
               {interestOptions.map(i => (
                 <option key={i} value={i}>{INTEREST_LABELS_MAP[i] || i}</option>
               ))}
             </select>
+            {!form.interest_tag && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Required — pick what this circle is about.</div>}
           </div>
         )}
 
         {/* Icon picker */}
         <div className="input-group">
           <label>CIRCLE ICON</label>
-          <div className="icon-picker">
+          <div className="icon-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {icons.map(opt => (
-              <button
-                key={opt.icon}
-                type="button"
+              <button key={opt.icon} type="button"
                 className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, icon: opt.icon }))}
-                title={opt.label}
-                disabled={!canCreate}
-              >
+                onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
                 <i className={opt.icon}></i>
                 <span>{opt.label}</span>
               </button>
@@ -1409,43 +1409,67 @@ function CreateModal({ onClose, onCreated, userId }) {
 
         <div className="input-group">
           <label>DESCRIPTION</label>
-          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." disabled={!canCreate} />
+          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
         </div>
 
-        {/* Open for Applications toggle */}
+        {/* Open for Applications — auto-locked when invitees < 2 */}
         <div className="input-group">
-          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-            <span>OPEN FOR APPLICATIONS</span>
-            <input type="checkbox" checked={form.is_open} onChange={e => setForm(f => ({ ...f, is_open: e.target.checked }))}
-              style={{ accentColor: 'var(--cyber-cyan)', width: 16, height: 16, cursor: 'pointer' }} disabled={!canCreate} />
-          </label>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            When on, this circle will appear on the Discover page so anyone can apply to join.
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <label style={{ margin: 0 }}>OPEN FOR APPLICATIONS</label>
+            <input type="checkbox" checked={effectiveIsOpen}
+              onChange={e => !forcedOpen && setForm(f => ({ ...f, is_open: e.target.checked }))}
+              style={{ accentColor: 'var(--cyber-cyan)', width: 16, height: 16, cursor: forcedOpen ? 'not-allowed' : 'pointer', opacity: forcedOpen ? 0.6 : 1 }} />
+          </div>
+          <div style={{ fontSize: 11, color: forcedOpen ? 'var(--cyber-yellow)' : 'var(--text-muted)', marginTop: 6 }}>
+            {forcedOpen && <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>}
+            {openHint}
           </div>
         </div>
 
-        {/* Invite connections */}
-        {canCreate && connections.length > 0 && (
+        {/* Invite connections — clean card style */}
+        {connectionsLoaded && connections.length > 0 && (
           <div className="input-group">
-            <label>INVITE YOUR CONNECTIONS (optional)</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 160, overflowY: 'auto' }}>
+            <label>INVITE YOUR CONNECTIONS</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
               {connections.map(c => {
                 const other = c.user_id === userId ? c.recipient : c.requester;
                 const otherId = c.user_id === userId ? c.connected_user_id : c.user_id;
-                const name = other?.full_name || otherId;
+                const name = other?.full_name || 'Connection';
+                const initials = name[0]?.toUpperCase() || '?';
+                const checked = invitees.includes(otherId);
                 return (
-                  <label key={otherId} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, padding: '6px 10px', borderRadius: 8, border: `1px solid ${invitees.includes(otherId) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: invitees.includes(otherId) ? 'rgba(0,240,255,0.06)' : 'transparent', transition: '0.15s' }}>
-                    <input type="checkbox" checked={invitees.includes(otherId)} onChange={() => toggleInvitee(otherId)} style={{ accentColor: 'var(--cyber-cyan)' }} />
-                    <span>{name}</span>
-                  </label>
+                  <div key={otherId} onClick={() => toggleInvitee(otherId)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: `1px solid ${checked ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: checked ? 'rgba(0,240,255,0.06)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: '0.15s' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '2px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                      {initials}
+                    </div>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{name}</span>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.3)'}`, background: checked ? 'var(--cyber-cyan)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {checked && <i className="fa-solid fa-check" style={{ fontSize: 10, color: '#0d0d12' }}></i>}
+                    </div>
+                  </div>
                 );
               })}
             </div>
+            {invitees.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', marginTop: 6 }}>
+                <i className="fa-solid fa-users" style={{ marginRight: 5 }}></i>
+                {invitees.length} connection{invitees.length !== 1 ? 's' : ''} selected
+                {invitees.length < 2 && ' — select 1 more to make Open optional'}
+              </div>
+            )}
           </div>
         )}
 
-        <div className="modal-actions">
-          <button className="cyber-btn" onClick={submit} disabled={loading || !canCreate || !form.name.trim()} style={{ flex: 1 }}>
+        {connectionsLoaded && connections.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 8 }}>
+            <i className="fa-solid fa-info-circle" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }}></i>
+            No connections yet. Go to <strong style={{ color: 'var(--cyber-cyan)' }}>Discover People</strong> to connect with others.
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button className="cyber-btn" onClick={submit} disabled={loading || !canSubmit} style={{ flex: 1 }}>
             {loading ? 'SUBMITTING...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />SUBMIT FOR APPROVAL</>}
           </button>
           <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
