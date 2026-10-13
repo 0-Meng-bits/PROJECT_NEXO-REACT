@@ -12,6 +12,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'Invalid gender value.' });
   }
 
+  // Check for duplicate CTU ID before creating auth user
+  const { data: existingAccount } = await supabaseAdmin
+    .from('accounts')
+    .select('id')
+    .eq('ctu_id', studentId)
+    .maybeSingle();
+  if (existingAccount) {
+    return res.status(400).json({ message: 'This CTU ID is already registered.' });
+  }
+
+  // Also check profiles table (legacy)
+  const { data: existingProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('student_id', studentId)
+    .maybeSingle();
+  if (existingProfile) {
+    return res.status(400).json({ message: 'This CTU ID is already registered.' });
+  }
+
   // Create user with email_confirm: false (requires verification)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
