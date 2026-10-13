@@ -477,13 +477,31 @@ export default function Auth() {
                 <i className="fa-solid fa-id-card" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }} />
                 You will verify your ID in the next step
               </div>
+
+              {/* Terms agreement checkbox */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  id="terms-agree"
+                  checked={form.agreedToTerms || false}
+                  onChange={e => setForm(f => ({ ...f, agreedToTerms: e.target.checked }))}
+                  style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 14, height: 14, flexShrink: 0, cursor: 'pointer' }}
+                />
+                <label htmlFor="terms-agree" style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', lineHeight: 1.5 }}>
+                  I have read and agree to the{' '}
+                  <a href="#" onClick={e => { e.preventDefault(); setShowTermsModal(true); }}
+                    style={{ color: 'var(--cyber-cyan)', textDecoration: 'underline' }}>
+                    Terms &amp; Conditions
+                  </a>
+                </label>
+              </div>
             </>
           )}
 
           <button
             type="submit"
             className="cyber-btn ripple-btn"
-            disabled={loading}
+            disabled={loading || (!isLogin && !form.agreedToTerms)}
             onClick={(e) => {
               const btn = e.currentTarget;
               const circle = document.createElement('span');
