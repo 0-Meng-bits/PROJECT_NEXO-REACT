@@ -178,6 +178,7 @@ export default function Onboarding() {
 
     const profileUpdates = { ...detailsUpdates, onboarding_complete: true };
     const { data: updatedProfile } = await supabase
+      .from('profiles')
       .update(profileUpdates)
       .eq('id', user.id)
       .select()
