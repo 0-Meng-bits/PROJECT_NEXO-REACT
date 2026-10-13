@@ -173,8 +173,8 @@ export default function Onboarding() {
     };
     await supabase.from('account_details').update(detailsUpdates).eq('id', user.id);
 
-    // Mark onboarding complete in account_status
-    await supabase.from('account_status').update({ onboarding_complete: true }).eq('id', user.id);
+    // Mark onboarding complete in account_details
+    await supabase.from('account_details').update({ onboarding_complete: true }).eq('id', user.id);
 
     const profileUpdates = { ...detailsUpdates, onboarding_complete: true };
     const { data: updatedProfile } = await supabase
@@ -189,11 +189,16 @@ export default function Onboarding() {
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({
         ...updatedProfile,
+        onboarding_complete: true,
         avatar_url: updatedProfile.avatar_url || avatarUrl || stored.avatar_url || null,
       }));
-    } else if (avatarUrl) {
+    } else {
       const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      localStorage.setItem('currentUser', JSON.stringify({ ...stored, avatar_url: avatarUrl }));
+      localStorage.setItem('currentUser', JSON.stringify({
+        ...stored,
+        onboarding_complete: true,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      }));
     }
 
     setSaving(false);
