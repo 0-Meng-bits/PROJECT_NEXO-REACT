@@ -110,13 +110,30 @@ export default async function handler(req, res) {
 
   const isPending = !status.is_verified;
 
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  let authData;
+  const { data: firstAuthData, error: authError } = await supabase.auth.signInWithPassword({
     email: account.email,
     password,
   });
 
   if (authError) {
-    return res.status(401).json({ message: 'Invalid credentials.' });
+    // Auto-confirm email if not confirmed — happens with new signups before email verification
+    if (authError.message?.includes('Email not confirmed') || authError.message?.includes('email_not_confirmed')) {
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(account.id, { email_confirm: true });
+        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+          email: account.email, password,
+        });
+        if (retryError) return res.status(401).json({ message: 'Invalid credentials.' });
+        authData = retryData;
+      } catch {
+        return res.status(401).json({ message: 'Invalid credentials.' });
+      }
+    } else {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+  } else {
+    authData = firstAuthData;
   }
 
   // Process login streak (non-blocking — don't fail login if this errors)
