@@ -2397,16 +2397,28 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   useEffect(() => {
     if (!user?.id) return;
     const token = localStorage.getItem('accessToken');
-    fetch(getApiUrl('/api/connections'), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(r => r.json())
-      .then(data => {
-        const accepted = (data || []).filter(c => c.status === 'accepted');
-        setConnectionsCount(accepted.length);
-        if (!readOnly) setProfileConnections(accepted);
+
+    if (readOnly) {
+      // Viewing someone else's profile — count their connections via Supabase directly
+      supabase
+        .from('connections')
+        .select('id', { count: 'exact', head: true })
+        .or(`user_id.eq.${user.id},connected_user_id.eq.${user.id}`)
+        .eq('status', 'accepted')
+        .then(({ count }) => setConnectionsCount(count || 0));
+    } else {
+      // Own profile — load full connections list
+      fetch(getApiUrl('/api/connections'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-      .catch(() => {});
+        .then(r => r.json())
+        .then(data => {
+          const accepted = (data || []).filter(c => c.status === 'accepted');
+          setConnectionsCount(accepted.length);
+          setProfileConnections(accepted);
+        })
+        .catch(() => {});
+    }
   }, [user?.id, readOnly]);
 
   // Load active customizations + owned items
