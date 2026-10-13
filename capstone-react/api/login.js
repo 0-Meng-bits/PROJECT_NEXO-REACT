@@ -60,7 +60,7 @@ async function processLoginStreak(userId, currentTrustPoints) {
   }
 
   // Award trust points — non-fatal if point_transactions table doesn't exist
-  const newTp = Math.min((currentTrustPoints ?? 10) + pointsAwarded, 10); // cap at 10
+  const newTp = (currentTrustPoints ?? 0) + pointsAwarded; // no arbitrary cap — welcome bonus can push above 10
   try {
     await supabaseAdmin.from('point_transactions').insert([{
       user_id: userId, amount: pointsAwarded, transaction_type: 'daily_recovery',
@@ -136,12 +136,14 @@ export default async function handler(req, res) {
     authData = firstAuthData;
   }
 
-  // Process login streak (non-blocking — don't fail login if this errors)
+  // Process login streak — only for verified users
   let streakInfo = { streak: 0, points_awarded: 0 };
-  try {
-    streakInfo = await processLoginStreak(account.id, status.trust_points ?? 10);
-  } catch (err) {
-    console.error('[LOGIN] Streak processing error:', err.message);
+  if (!isPending) {
+    try {
+      streakInfo = await processLoginStreak(account.id, status.trust_points ?? 0);
+    } catch (err) {
+      console.error('[LOGIN] Streak processing error:', err.message);
+    }
   }
 
   // Re-fetch trust_points after streak processing so the value is accurate
