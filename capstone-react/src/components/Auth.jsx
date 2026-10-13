@@ -168,12 +168,16 @@ export default function Auth() {
         if (data.points_awarded > 0) {
           sessionStorage.setItem('streakToast', JSON.stringify({ streak: data.streak, points: data.points_awarded }));
         }
+        // Redirect to onboarding if not completed yet
+        const targetRoute = data.user.user_type === 'Admin'
+          ? '/admin'
+          : (!data.user.onboarding_complete ? '/onboarding' : '/portal');
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {
-          setPendingRoute(data.user.user_type === 'Admin' ? '/admin' : '/portal');
+          setPendingRoute(targetRoute);
           setShowTermsModal(true);
         } else {
-          navigate(data.user.user_type === 'Admin' ? '/admin' : '/portal');
+          navigate(targetRoute);
         }
       } else {
         if (data.banned) {
