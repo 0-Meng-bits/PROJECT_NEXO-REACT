@@ -8,7 +8,6 @@ api/communities.js
 api/connections.js
 api/delete.js
 api/discover.js
-api/forgot-password.js
 api/login.js
 api/me.js
 api/memberships.js
