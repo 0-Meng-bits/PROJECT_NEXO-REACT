@@ -364,12 +364,16 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
     );
   }
 
-  // Group by interest for "All" view
+  // Group by interest for "All" view — each user appears only once (under their first matching interest)
   const grouped = {};
   if (view === 'all' && !activeFilter && !search.trim()) {
+    const placed = new Set();
     allInterests.forEach(interest => {
-      const group = displayedUsers.filter(u => u.interests?.includes(interest));
-      if (group.length > 0) grouped[interest] = group;
+      const group = displayedUsers.filter(u => !placed.has(u.id) && u.interests?.includes(interest));
+      if (group.length > 0) {
+        grouped[interest] = group;
+        group.forEach(u => placed.add(u.id));
+      }
     });
   }
 
@@ -454,36 +458,15 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
       ) : (
         <>
 
-          {/* People section */}
-          {view === 'all' && !activeFilter && !search.trim() ? (
-            // Grouped by interest
-            Object.keys(grouped).length === 0 ? (
-              <EmptyState view={view} />
-            ) : (
-              Object.entries(grouped).map(([interest, groupUsers]) => (
-                <div key={interest} style={{ marginBottom: 28 }}>
-                  <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
-                    {INTEREST_LABELS[interest] || interest} · {groupUsers.length}
-                  </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-                    {groupUsers.map(u => (
-                      <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onAcceptRequest={handleAcceptRequest} onViewProfile={onViewProfile} connecting={connecting} />
-                    ))}
-                  </div>
-                </div>
-              ))
-            )
+          {/* People section — always flat grid */}
+          {displayedUsers.length === 0 ? (
+            <EmptyState view={view} filter={activeFilter} search={search} />
           ) : (
-            // Flat list (suggested or filtered)
-            displayedUsers.length === 0 ? (
-              <EmptyState view={view} filter={activeFilter} search={search} />
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-                {displayedUsers.map(u => (
-                  <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onAcceptRequest={handleAcceptRequest} onViewProfile={onViewProfile} connecting={connecting} />
-                ))}
-              </div>
-            )
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+              {displayedUsers.map(u => (
+                <UserCard key={u.id} user={u} onConnect={handleConnect} onCancelRequest={handleCancelRequest} onAcceptRequest={handleAcceptRequest} onViewProfile={onViewProfile} connecting={connecting} />
+              ))}
+            </div>
           )}
         </>
       )}
