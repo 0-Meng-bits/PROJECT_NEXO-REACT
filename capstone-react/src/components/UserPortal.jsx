@@ -7121,6 +7121,12 @@ export default function UserPortal() {
                     <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 16, display: 'block' }}></i>
                     <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
                   </div>
+                ) : activeComm?.status === 'pending' ? (
+                  <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                    <i className="fa-solid fa-hourglass-half" style={{ fontSize: 32, color: 'var(--orange)', marginBottom: 16, display: 'block' }}></i>
+                    <p style={{ color: 'var(--orange)', fontWeight: 700, marginBottom: 8 }}>Circle is still forming</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chat unlocks once 3 members have joined. Share the circle in Explore so others can apply!</p>
+                  </div>
                 ) : (
                   (() => {
                     const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
@@ -7186,7 +7192,7 @@ export default function UserPortal() {
                 <div ref={feedBottomRef} />
               </div>
 
-              {isMember(activeCommId) && user?.is_verified && (
+              {isMember(activeCommId) && user?.is_verified && activeComm?.status !== 'pending' && (
                 <div className="composer composer-chat">
                   {/* Reply preview bar */}
                   {replyTo && (
