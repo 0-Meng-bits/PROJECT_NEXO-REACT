@@ -6481,14 +6481,15 @@ export default function UserPortal() {
                     { key: 'project',  label: 'Projects', icon: 'fa-solid fa-flask' },
                     { key: 'hobby',    label: 'Hobbies',  icon: 'fa-solid fa-gamepad' },
                     { key: 'social',   label: 'Social',   icon: 'fa-solid fa-user-group' },
+                    { key: 'forming',  label: 'Forming',  icon: 'fa-solid fa-hourglass-half' },
                   ].map(cat => (
                     <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6,
                         padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        background: activeCategory === cat.key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${activeCategory === cat.key ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                        color: activeCategory === cat.key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                        background: activeCategory === cat.key ? (cat.key === 'forming' ? 'rgba(247,169,79,0.15)' : 'rgba(0,240,255,0.15)') : 'rgba(255,255,255,0.05)',
+                        border: `1px solid ${activeCategory === cat.key ? (cat.key === 'forming' ? 'var(--orange)' : 'var(--cyber-cyan)') : 'rgba(255,255,255,0.1)'}`,
+                        color: activeCategory === cat.key ? (cat.key === 'forming' ? 'var(--orange)' : 'var(--cyber-cyan)') : 'var(--text-muted)',
                         transition: 'all 0.2s',
                       }}>
                       <i className={cat.icon} style={{ fontSize: 11 }} />{cat.label}
@@ -6499,7 +6500,11 @@ export default function UserPortal() {
 
               {(() => {
                 const filtered = communities.filter(c =>
-                  c.id !== 'global' && (activeCategory === 'all' || c.category === activeCategory)
+                  c.id !== 'global' && (
+                    activeCategory === 'all' ? true :
+                    activeCategory === 'forming' ? c.status === 'pending' :
+                    c.category === activeCategory
+                  )
                 ).sort((a, b) => {
                   // Invited circles always float to the top
                   const aInvited = isInvited(a.id) ? 1 : 0;
