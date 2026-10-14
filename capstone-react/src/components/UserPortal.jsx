@@ -5426,25 +5426,21 @@ export default function UserPortal() {
 
   const deleteCircle = async (id) => {
     if (!confirm('Delete this circle? This cannot be undone.')) return;
-    console.log('[DELETE CIRCLE]', { id });
     const token = localStorage.getItem('accessToken');
     try {
-      const res = await fetch(getApiUrl(`/api/delete-community?id=${id}`), {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+      const res = await fetch(getApiUrl('/api/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'delete-community', id }),
       });
       const data = await res.json();
-      console.log('[DELETE CIRCLE] Response:', { status: res.status, data });
       if (!res.ok) { showToast(data.message || data.error || 'Failed to delete circle.'); return; }
       showToast('Circle deleted.');
       await loadCommunities();
       navTo('home', 'global');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error ? could not delete circle.');
+      showToast('Network error — could not delete circle.');
     }
   };
 
