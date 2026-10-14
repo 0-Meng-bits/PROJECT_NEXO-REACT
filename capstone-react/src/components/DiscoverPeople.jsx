@@ -450,20 +450,6 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
         </div>
       ) : (
         <>
-          {/* Open Circles section */}
-          {circles.length > 0 && (
-            <div style={{ marginBottom: 32 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
-                <i className="fa-solid fa-network-wired" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>
-                Open Circles
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-                {circles.map(circle => (
-                  <CircleCard key={circle.id} circle={circle} onJoin={onNavigateToCircle} />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* People section */}
           {view === 'all' && !activeFilter && !search.trim() ? (

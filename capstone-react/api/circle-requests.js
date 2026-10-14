@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   }
 
   if (action === 'approve') {
-    // 1. Create the community
+    // 1. Create the community as pending (needs 3 members to activate)
     const { data: newCommunity, error: createError } = await supabaseAdmin
       .from('communities')
       .insert([{
@@ -53,6 +53,9 @@ export default async function handler(req, res) {
         category: request.category,
         icon: request.icon,
         creator_id: request.creator_id,
+        interest_tag: request.interest_tag || null,
+        is_open: request.is_open || false,
+        status: 'pending',
         created_at: new Date().toISOString()
       }])
       .select()
@@ -63,19 +66,18 @@ export default async function handler(req, res) {
       return res.status(500).json({ message: 'Failed to create circle.' });
     }
 
-    // 2. Add creator as a member with leader rank
+    // 2. Add creator as a member with Leader rank (rank_level 3)
     const { error: memberError } = await supabaseAdmin
       .from('memberships')
       .insert([{
         user_id: request.creator_id,
         community_id: newCommunity.id,
-        rank_level: 2, // Leader rank
+        rank_level: 3,
         status: 'active'
       }]);
 
     if (memberError) {
       console.error('[ADD LEADER AS MEMBER]', memberError);
-      // Don't fail the whole operation, just log it
     }
 
     // 3. Create default channels

@@ -704,8 +704,8 @@ export default function AdminDashboard() {
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0' }}>{req.description || 'No description'}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        By <strong style={{ color: 'var(--text-primary)' }}>{req.accounts?.full_name || 'Unknown'}</strong>
-                        {req.accounts?.ctu_id && ` (${req.accounts.ctu_id})`}
+                        By <strong style={{ color: 'var(--text-primary)' }}>{req.accounts?.full_name || req.creator?.full_name || 'Unknown'}</strong>
+                        {(req.accounts?.ctu_id || req.creator?.ctu_id) && ` (${req.accounts?.ctu_id || req.creator?.ctu_id})`}
                         {' � '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                       {req.status === 'rejected' && req.admin_note && (

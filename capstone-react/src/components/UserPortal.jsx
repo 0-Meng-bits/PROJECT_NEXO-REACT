@@ -1434,7 +1434,7 @@ function CreateModal({ onClose, onCreated, userId }) {
         {/* Icon picker */}
         <div className="input-group">
           <label>CIRCLE ICON</label>
-          <div className="icon-picker" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div className="icon-picker">
             {icons.map(opt => (
               <button key={opt.icon} type="button"
                 className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
@@ -6528,8 +6528,16 @@ export default function UserPortal() {
                               <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
                             <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
                             {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
+                            {c.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+                            {c.is_open && c.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
                             {c.application_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
                           </div>
+                          {c.status === 'pending' && (
+                            <div style={{ fontSize: 11, color: 'var(--orange)', background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.2)', borderRadius: 6, padding: '5px 10px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <i className="fa-solid fa-circle-info"></i>
+                              This circle is forming — needs members to activate. Apply to join!
+                            </div>
+                          )}
                           <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.description || 'No description provided.'}</p>
                         </div>
                         <div style={{ flexShrink: 0, marginLeft: 20 }}>
