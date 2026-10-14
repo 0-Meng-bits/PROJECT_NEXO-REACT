@@ -2552,10 +2552,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
       // Commit pending avatar
       if (pendingAvatarUrl) {
-        const res2 = await fetch(getApiUrl('/api/upload-avatar'), {
+        const res2 = await fetch(getApiUrl('/api/upload'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('accessToken') ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {}) },
-          body: JSON.stringify({ userId: user.id, avatar: pendingAvatarUrl }),
+          body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: pendingAvatarUrl }),
         });
         if (res2.ok) {
           const { url } = await res2.json();
