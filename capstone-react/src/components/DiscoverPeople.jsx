@@ -51,10 +51,13 @@ function UserCard({ user, onConnect, onCancelRequest, onAcceptRequest, onViewPro
             background: 'rgba(0,240,255,0.15)', border: '2px solid rgba(0,240,255,0.3)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, fontWeight: 800, color: 'var(--cyber-cyan)',
-            cursor: 'pointer', flexShrink: 0,
+            cursor: 'pointer', flexShrink: 0, overflow: 'hidden',
           }}
         >
-          {initials}
+          {user.avatar_url
+            ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : initials
+          }
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
