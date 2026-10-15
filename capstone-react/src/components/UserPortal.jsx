@@ -4972,6 +4972,7 @@ export default function UserPortal() {
 
   // Initial load + realtime subscription ? re-runs when channel/community changes
   useEffect(() => {
+    setMessages([]); // clear stale messages immediately so old context doesn't flash
     loadMessages(activeCommId, activeChannelId);
   }, [activeCommId, activeChannelId]); // eslint-disable-line
 
@@ -5112,6 +5113,7 @@ export default function UserPortal() {
 
   // Reload channels and circle announcements whenever the active community changes
   useEffect(() => {
+    setCircleAnnouncements([]); // clear stale announcements immediately when switching circles
     loadChannels(activeCommId);
     loadCircleAnnouncements(activeCommId);
     setQaFilter('all'); // reset Q&A filter when switching communities
