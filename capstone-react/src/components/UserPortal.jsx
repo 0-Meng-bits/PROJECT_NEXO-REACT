@@ -4167,6 +4167,7 @@ export default function UserPortal() {
   const [activeCommId, setActiveCommId] = useState(() => new URLSearchParams(window.location.search).get('commId') || 'global');
   const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') || 'home');
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [userCustomizations, setUserCustomizations] = useState({}); // studentId -> customizations
   const [avatarCache, setAvatarCache] = useState({}); // student_id -> avatar_url
   const [profileIdCache, setProfileIdCache] = useState({}); // student_id -> UUID
@@ -4885,6 +4886,7 @@ export default function UserPortal() {
   const loadMessages = useCallback(async (commId, channelId) => {
     // Reset first unread on each load
     firstUnreadMsgId.current = null;
+    setMessagesLoading(true);
 
     const calcFirstUnread = async (msgs) => {
       if (!user?.id || !msgs?.length) return;
@@ -4939,6 +4941,7 @@ export default function UserPortal() {
     } else {
       setMessages([]);
     }
+    setMessagesLoading(false);
   }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
@@ -6351,7 +6354,12 @@ export default function UserPortal() {
               </div>
               <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
 
-                {(() => {
+                {messagesLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-muted)' }}>
+                    <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22, color: 'var(--cyber-cyan)', opacity: 0.7 }}></i>
+                    <span style={{ fontSize: 12, letterSpacing: 1 }}>Loading messages...</span>
+                  </div>
+                ) : (() => {
                   const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
                   const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null;
                   const lastMsgSenderId = messages.length > 0 ? messages[messages.length - 1].student_id : null;
@@ -6992,6 +7000,12 @@ export default function UserPortal() {
                     }
 
                     // Otherwise show regular chat messages
+                    if (messagesLoading) return (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-muted)' }}>
+                        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22, color: 'var(--cyber-cyan)', opacity: 0.7 }}></i>
+                        <span style={{ fontSize: 12, letterSpacing: 1 }}>Loading messages...</span>
+                      </div>
+                    );
                     const lastOwnIdx = messages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
                     const lastMsgId = messages.length > 0 ? messages[messages.length - 1].id : null;
                     const lastMsgSenderId = messages.length > 0 ? messages[messages.length - 1].student_id : null;
