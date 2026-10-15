@@ -706,7 +706,7 @@ export default function AdminDashboard() {
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         By <strong style={{ color: 'var(--text-primary)' }}>{req.accounts?.full_name || req.creator?.full_name || 'Unknown'}</strong>
                         {(req.accounts?.ctu_id || req.creator?.ctu_id) && ` (${req.accounts?.ctu_id || req.creator?.ctu_id})`}
-                        {' � '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {'  —  '}{new Date(req.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                       {req.status === 'rejected' && req.admin_note && (
                         <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Reason: {req.admin_note}</div>
@@ -981,7 +981,7 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         <span style={{ fontWeight: 700, color: (s.trust_points ?? 10) <= 3 ? 'var(--red)' : (s.trust_points ?? 10) <= 6 ? 'var(--orange)' : 'var(--green)' }}>
-                          {s.trust_points ?? 10}/20
+                          {s.trust_points ?? 10} TP
                         </span>
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
@@ -1030,7 +1030,7 @@ export default function AdminDashboard() {
                     { label: 'STATUS',     value: selectedUser.is_banned ? 'Banned' : selectedUser.is_verified ? 'Verified' : 'Pending' },
                     { label: 'ID VERIFIED', value: selectedUser.id_verified ? 'Yes' : 'No' },
                     { label: 'JOINED',     value: new Date(selectedUser.created_at).toLocaleString() },
-                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 10}/20` },
+                    { label: 'TRUST POINTS', value: `${selectedUser.trust_points ?? 10} TP` },
                     { label: 'WARNINGS',   value: selectedUser.warning_count || 0 },
                   ].map(({ label, value, mono }) => (
                     <div key={label} style={{ display: 'flex', gap: 16, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1960,7 +1960,7 @@ export default function AdminDashboard() {
                 })()}
               </div>
             </div>
-          );
+          );  
         })()}
 
         {/* ── SUPPORT TICKETS ── */}
