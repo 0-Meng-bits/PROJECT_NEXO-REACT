@@ -6829,6 +6829,12 @@ export default function UserPortal() {
                       )
                     )}
                   </div>
+                ) : activeComm?.status === 'pending' ? (
+                  <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                    <i className="fa-solid fa-hourglass-half" style={{ fontSize: 32, color: 'var(--orange)', marginBottom: 16, display: 'block' }}></i>
+                    <p style={{ color: 'var(--orange)', fontWeight: 700, marginBottom: 8 }}>Circle is still forming</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chat unlocks once 3 members have joined. Share the circle in Explore so others can apply!</p>
+                  </div>
                 ) : showCircleAnnouncements ? (
                   /* -- CIRCLE ANNOUNCEMENTS VIEW -- */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -7038,7 +7044,7 @@ export default function UserPortal() {
                 <div ref={feedBottomRef} />
               </div>
 
-              {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && channels.find(c => c.id === activeChannelId)?.channel_type !== 'tasks' && (
+              {isMember(activeCommId) && !showCircleAnnouncements && user?.is_verified && channels.find(c => c.id === activeChannelId)?.channel_type !== 'tasks' && activeComm?.status !== 'pending' && (
                 <div className="composer composer-chat">
                   {/* Reply preview bar */}
                   {replyTo && (
