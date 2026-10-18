@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../lib/api';
 import { INTEREST_LABELS } from '../lib/constants';
 
@@ -68,7 +68,7 @@ function UserCard({ user, onConnect, onCancelRequest, onAcceptRequest, onViewPro
           >
             {user.full_name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.course || user.user_type}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.program || user.user_type}</div>
         </div>
         <ConnectionStatusBadge status={user.connection_status} />
       </div>
@@ -359,7 +359,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
     const q = search.toLowerCase();
     displayedUsers = displayedUsers.filter(u =>
       u.full_name?.toLowerCase().includes(q) ||
-      u.course?.toLowerCase().includes(q) ||
+      u.program?.toLowerCase().includes(q) ||
       u.interests?.some(i => (INTEREST_LABELS[i] || i).toLowerCase().includes(q))
     );
   }
@@ -396,7 +396,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name, course, or interest..."
+          placeholder="Search by name, program, or interest..."
           style={{
             width: '100%', padding: '10px 14px 10px 36px',
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',

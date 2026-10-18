@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './_supabase.js';
+﻿import { supabaseAdmin } from './_supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -6,9 +6,9 @@ export default async function handler(req, res) {
   const userId = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
-  const { course, year_level, interests, last_seen, bio, cover_url, discoverable } = req.body;
+  const { program, year_level, interests, last_seen, bio, cover_url, discoverable } = req.body;
   const updates = {};
-  if (course !== undefined) updates.course = course;
+  if (program !== undefined) updates.program = program;
   if (year_level !== undefined) updates.year_level = year_level;
   if (interests !== undefined) updates.interests = interests;
   if (last_seen !== undefined) updates.last_seen = last_seen;

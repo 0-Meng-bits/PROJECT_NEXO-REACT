@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
 import VideoEmbed from './VideoEmbed';
 
-const COURSES = [
+const PROGRAMS = [
   'BEED',
   'BIT AUTO TECH',
   'BIT COM TECH',
@@ -52,7 +52,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(1); // 1=avatar, 2=course/year, 3=interests
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [course, setCourse] = useState('');
+  const [program, setProgram] = useState('');
   const [yearLevel, setYearLevel] = useState('');
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [auraMatch, setAuraMatch] = useState(null);
@@ -166,7 +166,7 @@ export default function Onboarding() {
 
     // Update account_details with onboarding data
     const detailsUpdates = {
-      course,
+      program,
       year_level: yearLevel,
       interests: selectedInterests,
       ...(avatarUrl && { avatar_url: avatarUrl }),
@@ -277,10 +277,10 @@ export default function Onboarding() {
             <p className="ob-subtitle">Help us connect you with the right people</p>
 
             <div className="input-group">
-              <label>COURSE / PROGRAM</label>
-              <select value={course} onChange={e => setCourse(e.target.value)}>
-                <option value="">Select your course...</option>
-                {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+              <label>PROGRAM</label>
+              <select value={program} onChange={e => setProgram(e.target.value)}>
+                <option value="">Select your program...</option>
+                {PROGRAMS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -303,7 +303,7 @@ export default function Onboarding() {
             <div className="ob-actions">
               <button className="cyber-btn secondary" onClick={() => setStep(1)}>← BACK</button>
               <button className="cyber-btn" onClick={() => setStep(3)}
-                disabled={!course || !yearLevel}>
+                disabled={!program || !yearLevel}>
                 NEXT →
               </button>
             </div>

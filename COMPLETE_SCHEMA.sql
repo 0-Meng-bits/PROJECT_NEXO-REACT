@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- NEXO CONNECT - Complete Database Schema
 -- Last Updated: 2026-10-04
 -- Purpose: Fresh database setup for team members
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS account_status (
 CREATE TABLE IF NOT EXISTS account_details (
   id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
   department text,
-  course text,
+  program text,
   year_level text,
   interests text[],
   avatar_url text,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS circle_requests (
 -- 8. MESSAGES
 CREATE TABLE IF NOT EXISTS messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id text REFERENCES accounts(ctu_id) ON DELETE CASCADE,
+  sender_id text REFERENCES accounts(ctu_id) ON DELETE CASCADE,
   community_id uuid REFERENCES communities(id) ON DELETE CASCADE,
   channel_id uuid REFERENCES channels(id) ON DELETE CASCADE,
   full_name text,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS message_reads (
 CREATE TABLE IF NOT EXISTS message_reactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id uuid REFERENCES messages(id) ON DELETE CASCADE,
-  student_id text REFERENCES accounts(ctu_id) ON DELETE CASCADE,
+  sender_id text REFERENCES accounts(ctu_id) ON DELETE CASCADE,
   reaction text NOT NULL CHECK (reaction IN ('heart', 'laugh', 'sad')),
   created_at timestamptz DEFAULT now(),
   UNIQUE(message_id, student_id, reaction)

@@ -966,11 +966,11 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         const grouped = {};
         data.forEach(r => {
           if (!grouped[r.reaction]) grouped[r.reaction] = [];
-          grouped[r.reaction].push(r.student_id);
+          grouped[r.reaction].push(r.sender_id);
         });
         setReactions(grouped);
         // Fetch names for all reactors
-        const ids = [...new Set(data.map(r => r.student_id).filter(Boolean))];
+        const ids = [...new Set(data.map(r => r.sender_id).filter(Boolean))];
         if (ids.length) {
           const { data: accounts } = await supabase
             .from('accounts').select('ctu_id, full_name').in('ctu_id', ids);
@@ -1025,13 +1025,13 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
         <div style={{ position: 'relative', flexShrink: 0 }}>
           {!isGrouped ? (
             <>
-              <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+              <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.sender_id)}
                 style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
                 {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
               </div>
               {/* Companion sticker on chat avatar */}
               {(() => {
-                const companion = userCustomizations?.[m.student_id]?.companion;
+                const companion = userCustomizations?.[m.sender_id]?.companion;
                 if (!companion?.css_data) return null;
                 const d = typeof companion.css_data === 'string' ? JSON.parse(companion.css_data) : companion.css_data;
                 if (!d?.url) return null;
@@ -1061,14 +1061,14 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
       >
         {!isOwnerMsg && !isGrouped && (
           <div className="chat-meta">
-            <span className="chat-name" onClick={() => onViewProfile && onViewProfile(m.student_id)}
+            <span className="chat-name" onClick={() => onViewProfile && onViewProfile(m.sender_id)}
               style={{ cursor: onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
               onMouseEnter={e => { if (onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
               onMouseLeave={e => { e.target.style.color = ''; }}>
               <CustomizedUsername 
-                studentId={m.student_id} 
+                studentId={m.sender_id} 
                 username={m.full_name}
-                customizations={userCustomizations[m.student_id]}
+                customizations={userCustomizations[m.sender_id]}
               />
             </span>
             {m.role && m.role !== 'MEMBER' && <span className="chat-role">{m.role}</span>}
@@ -1153,7 +1153,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
             )}
             {onReport && !isOwnerMsg && (
               <button className="chat-action-btn" title="Report this message"
-                onClick={() => onReport({ type: 'message', id: m.id, preview: m.content, reportedUserId: m.student_id })}
+                onClick={() => onReport({ type: 'message', id: m.id, preview: m.content, reportedUserId: m.sender_id })}
                 style={{ color: 'var(--text-muted)' }}>
                 <i className="fa-solid fa-flag"></i>
               </button>
@@ -2214,7 +2214,7 @@ const INTEREST_LABELS = {
   bxgl: 'Watching BL/GL',
 };
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
-const COURSES = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
+const PROGRAMS = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
 
 // -- PROFILE TRUST POINTS SECTION ---------------------------------------------
 function ProfileTrustPointsSection({ userId, onViewHistory }) {
@@ -2407,8 +2407,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
-  const [profile, setProfile] = useState({ course: user.course || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
+  const [editForm, setEditForm] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
+  const [profile, setProfile] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
   const [coverUploading, setCoverUploading] = useState(false);
@@ -2432,11 +2432,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     if (!user?.id) return;
     const load = async () => {
       const { data, error } = await supabase.from('account_details')
-        .select('course, year_level, interests, avatar_url, id_photo_url, cover_url, bio')
+        .select('program, year_level, interests, avatar_url, id_photo_url, cover_url, bio')
         .eq('id', user.id).single();
       if (!error && data) {
-        setProfile({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
-        setEditForm({ course: data.course || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
+        setProfile({ program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
+        setEditForm({ program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
         if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
         if (data.cover_url) setCoverUrl(data.cover_url);
         if (data.id_photo_url) setIdUploaded(true);
@@ -2530,7 +2530,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course: editForm.course, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
+        body: JSON.stringify({ program: editForm.program, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
       });
       if (!res.ok) { setSaving(false); return; }
       setProfile({ ...editForm });
@@ -3004,18 +3004,18 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   </div>
                 )}
               </div>
-              {/* Course — editable inline */}
+              {/* Program — editable inline */}
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>COURSE</div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>PROGRAM</div>
                 {editing ? (
-                  <select value={editForm.course} onChange={e => setEditForm(f => ({ ...f, course: e.target.value }))}
+                  <select value={editForm.program} onChange={e => setEditForm(f => ({ ...f, program: e.target.value }))}
                     className="dark-select"
                     style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700, padding: 0, outline: 'none', cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select course</option>
-                    {COURSES.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
+                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select program</option>
+                    {PROGRAMS.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
                   </select>
                 ) : (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.course || '—'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '—'}</div>
                 )}
               </div>
               {/* Year — editable inline, students only */}
@@ -4336,7 +4336,7 @@ export default function UserPortal() {
     if (!studentId) return;
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(course, year_level, interests, avatar_url, cover_url)')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url)')
       .eq('ctu_id', String(studentId)).single();
     if (!error && data) {
       const flat = {
@@ -4382,7 +4382,7 @@ export default function UserPortal() {
     // Fetch reactors (implicit reads)
     const { data: reacts } = await supabase
       .from('message_reactions')
-      .select('message_id, student_id, accounts:student_id(id, full_name, account_details(avatar_url))')
+      .select('message_id, sender_id, accounts:student_id(id, full_name, account_details(avatar_url))')
       .in('message_id', msgIds);
 
     const grouped = {};
@@ -4435,12 +4435,12 @@ export default function UserPortal() {
     // Only attempt if user has a real Supabase auth session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const others = msgs.filter(m => m.student_id !== user.student_id);
+    const others = msgs.filter(m => m.sender_id !== user.student_id);
     if (!others.length) return;
     const inserts = others.map(m => ({ message_id: m.id, reader_id: user.id }));
     try {
       await supabase.from('message_reads').upsert(inserts, { onConflict: 'message_id,reader_id', ignoreDuplicates: true });
-      const myMsgs = msgs.filter(m => m.student_id === user.student_id).map(m => m.id);
+      const myMsgs = msgs.filter(m => m.sender_id === user.student_id).map(m => m.id);
       if (myMsgs.length) fetchReadCounts(myMsgs);
     } catch (_) {}
   }, [user?.id, user?.student_id, fetchReadCounts]);
@@ -4803,7 +4803,7 @@ export default function UserPortal() {
   };
 
   const fetchAvatarsForMessages = useCallback(async (msgs) => {
-    const uncached = [...new Set((msgs || []).map(m => m.student_id).filter(id => id))];
+    const uncached = [...new Set((msgs || []).map(m => m.sender_id).filter(id => id))];
     if (uncached.length === 0) return;
     const { data } = await supabase.from('accounts').select('id, ctu_id, account_details(avatar_url)').in('ctu_id', uncached);
     if (data) {
@@ -4821,7 +4821,7 @@ export default function UserPortal() {
   const loadCustomizationsForMessages = useCallback(async (msgs) => {
     if (!msgs || msgs.length === 0) return;
     
-    const studentIds = [...new Set(msgs.map(m => m.student_id).filter(Boolean))];
+    const studentIds = [...new Set(msgs.map(m => m.sender_id).filter(Boolean))];
     if (studentIds.length === 0) return;
 
     try {
@@ -4890,7 +4890,7 @@ export default function UserPortal() {
 
     const calcFirstUnread = async (msgs) => {
       if (!user?.id || !msgs?.length) return;
-      const otherMsgs = msgs.filter(m => m.student_id !== user.student_id);
+      const otherMsgs = msgs.filter(m => m.sender_id !== user.student_id);
       if (!otherMsgs.length) return;
       const { data: reads } = await supabase.from('message_reads')
         .select('message_id').eq('reader_id', user.id)
@@ -4910,7 +4910,7 @@ export default function UserPortal() {
       markMessagesRead(data || []);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
-      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
@@ -4922,7 +4922,7 @@ export default function UserPortal() {
       markMessagesRead(data || []);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
-      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else if (commId) {
       const { data } = await supabase.from('messages').select('*')
@@ -4936,7 +4936,7 @@ export default function UserPortal() {
       markMessagesRead(data || []);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
-      const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+      const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else {
       setMessages([]);
@@ -4953,7 +4953,7 @@ export default function UserPortal() {
       .order('created_at', { ascending: true });
     // Find first unread before marking as read
     if (user?.id && data?.length) {
-      const otherMsgs = data.filter(m => m.student_id !== user.student_id);
+      const otherMsgs = data.filter(m => m.sender_id !== user.student_id);
       if (otherMsgs.length) {
         const { data: reads } = await supabase.from('message_reads')
           .select('message_id').eq('reader_id', user.id)
@@ -4969,7 +4969,7 @@ export default function UserPortal() {
     markMessagesRead(data || []);
     const msgs = data || [];
     const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
-    const idsToFetch = [...new Set([...msgs.filter(m => m.student_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
+    const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
     if (idsToFetch.length) fetchReadCounts(idsToFetch);
   }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
@@ -5333,7 +5333,7 @@ export default function UserPortal() {
       }
 
       const payload = {
-        student_id: user.student_id,
+        sender_id: user.student_id,
         full_name: user.full_name,
         content: msgInput.trim() || '',
         message_type: messageType,
@@ -5393,7 +5393,7 @@ export default function UserPortal() {
       }
 
       const payload = {
-        student_id: user.student_id,
+        sender_id: user.student_id,
         full_name: user.full_name,
         content: circleChatInput.trim() || '',
         message_type: messageType,
@@ -6368,7 +6368,7 @@ export default function UserPortal() {
                     r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
                   );
                   return messages.map((m, idx) => {
-                    const isOwnerMsg = m.student_id === user?.student_id;
+                    const isOwnerMsg = m.sender_id === user?.student_id;
                     const prev = messages[idx - 1];
                     const next = messages[idx + 1];
                     const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
@@ -6377,11 +6377,11 @@ export default function UserPortal() {
                     
                     // Group consecutive messages from same user within 3 minutes
                     const isGrouped = prev && 
-                      prev.student_id === m.student_id && 
+                      prev.student_id === m.sender_id && 
                       (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                     
                     const isLastInGroup = !next || 
-                      next.student_id !== m.student_id || 
+                      next.student_id !== m.sender_id || 
                       (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
                     return (
@@ -6398,9 +6398,9 @@ export default function UserPortal() {
                           onEdit={editMessage}
                           onReport={(data) => setShowReport(data)}
                           currentStudentId={user?.student_id}
-                          avatarUrl={avatarCache[m.student_id] || null}
+                          avatarUrl={avatarCache[m.sender_id] || null}
                           onViewProfile={viewUserProfile}
-                          online={isOnline(profileIdCache[m.student_id])}
+                          online={isOnline(profileIdCache[m.sender_id])}
                           readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                           isLastOwn={isLastOwn}
                           isGrouped={isGrouped}
@@ -6775,16 +6775,16 @@ export default function UserPortal() {
                               {label} ? {group.length}
                             </div>
                             {group.map(m => {
-                              const url = avatarCache[m.student_id] || m.avatar_url;
+                              const url = avatarCache[m.sender_id] || m.avatar_url;
                               const initials = (m.full_name || '?')[0].toUpperCase();
                               return (
                                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}
                                   onClick={() => { 
                                   setShowOnlineModal(false); 
-                                  if (m.student_id === user?.student_id || m.student_id === user?.ctu_id) {
+                                  if (m.sender_id === user?.student_id || m.sender_id === user?.ctu_id) {
                                     setShowProfile(true);
                                   } else {
-                                    viewUserProfile(m.student_id); 
+                                    viewUserProfile(m.sender_id); 
                                   }
                                 }}>
 
@@ -6798,7 +6798,7 @@ export default function UserPortal() {
                                   </div>
                                   <div>
                                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{m.full_name}</div>
-                                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m.student_id}</div>
+                                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{m.sender_id}</div>
                                   </div>
                                 </div>
                               );
@@ -7013,7 +7013,7 @@ export default function UserPortal() {
                       r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
                     );
                     return messages.map((m, idx) => {
-                      const isOwnerMsg = m.student_id === user?.student_id;
+                      const isOwnerMsg = m.sender_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
                       const prev = messages[idx - 1];
                       const next = messages[idx + 1];
@@ -7023,11 +7023,11 @@ export default function UserPortal() {
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
-                        prev.student_id === m.student_id && 
+                        prev.student_id === m.sender_id && 
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
-                        next.student_id !== m.student_id || 
+                        next.student_id !== m.sender_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
                       
                       return (
@@ -7042,9 +7042,9 @@ export default function UserPortal() {
                             onEdit={editMessage}
                             onReport={(data) => setShowReport(data)}
                             currentStudentId={user?.student_id}
-                            avatarUrl={avatarCache[m.student_id] || null}
+                            avatarUrl={avatarCache[m.sender_id] || null}
                             onViewProfile={viewUserProfile}
-                            online={isOnline(profileIdCache[m.student_id])}
+                            online={isOnline(profileIdCache[m.sender_id])}
                             readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
@@ -7158,7 +7158,7 @@ export default function UserPortal() {
                       r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
                     );
                     return circleChatMessages.map((m, idx) => {
-                      const isOwnerMsg = m.student_id === user?.student_id;
+                      const isOwnerMsg = m.sender_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
                       const prev = circleChatMessages[idx - 1];
                       const next = circleChatMessages[idx + 1];
@@ -7168,11 +7168,11 @@ export default function UserPortal() {
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
-                        prev.student_id === m.student_id && 
+                        prev.student_id === m.sender_id && 
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
-                        next.student_id !== m.student_id || 
+                        next.student_id !== m.sender_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
                       return (
@@ -7196,9 +7196,9 @@ export default function UserPortal() {
                               setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
                             }}
                             currentStudentId={user?.student_id}
-                            avatarUrl={avatarCache[m.student_id] || null}
+                            avatarUrl={avatarCache[m.sender_id] || null}
                             onViewProfile={viewUserProfile}
-                            online={isOnline(profileIdCache[m.student_id])}
+                            online={isOnline(profileIdCache[m.sender_id])}
                             readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
                             isLastOwn={isLastOwn}
                             isGrouped={isGrouped}
@@ -7271,11 +7271,11 @@ export default function UserPortal() {
                           {label} ? {group.length}
                         </div>
                         {group.map(m => {
-                          const url = avatarCache[m.student_id] || m.avatar_url;
+                          const url = avatarCache[m.sender_id] || m.avatar_url;
                           const initials = (m.full_name || '?')[0].toUpperCase();
                           const rankLabels = ['', 'MOD', 'CO-LEAD', 'LEADER'];
                           return (
-                            <div key={m.id} onClick={() => viewUserProfile(m.student_id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
+                            <div key={m.id} onClick={() => viewUserProfile(m.sender_id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
                               <div style={{ position: 'relative', flexShrink: 0 }}>
                                 <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
                                   {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}

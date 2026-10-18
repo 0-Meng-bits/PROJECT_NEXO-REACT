@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './_supabase.js';
+﻿import { supabaseAdmin } from './_supabase.js';
 
 // Helper: resolve user ID from Authorization header
 async function getAuthUserId(req) {
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   // 4. Fetch discoverable users with interests — query account_details, accounts, and account_status separately
   const { data: details, error: detailsError } = await supabaseAdmin
     .from('account_details')
-    .select('id, interests, course, avatar_url')
+    .select('id, interests, program, avatar_url')
     .not('interests', 'is', null)
     .eq('discoverable', true);
 
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
         full_name: acc.full_name || '',
         ctu_id: acc.ctu_id || '',
         user_type: acc.user_type || 'Student',
-        course: d.course || '',
+        program: d.program || '',
         avatar_url: d.avatar_url || null,
         interests: d.interests || [],
         shared_interest_count: sharedInterests.length,
