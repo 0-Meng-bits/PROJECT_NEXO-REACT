@@ -177,7 +177,9 @@ export default function AdminDashboard() {
           category: newEvent.category,
           start_date: newEvent.start_date,
           end_date: newEvent.end_date || newEvent.start_date,
-          created_by: admin?.id,
+          poster_id: admin?.id,
+          poster_name: admin?.full_name || 'Admin',
+          poster_type: 'Admin',
         }),
       });
       if (res.ok) {
