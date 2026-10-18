@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { loadTheme } from '../lib/theme';
 import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
@@ -76,7 +76,7 @@ export default function Landing({ onEnter }) {
   };
 
   const features = [
-    { icon: 'fa-solid fa-users',          title: 'Campus Circles',      desc: 'Join or create your own group — whether it\'s for your course, a hobby, a project, or just hanging out with classmates.' },
+    { icon: 'fa-solid fa-users',          title: 'Campus Circles',      desc: 'Join or create your own group — whether it\'s for your program, a hobby, a project, or just hanging out with classmates.' },
     { icon: 'fa-solid fa-bullhorn',        title: 'Live Announcements',  desc: 'Stay updated with real-time posts from faculty, organizations, and fellow students. Never miss an important update.' },
     { icon: 'fa-solid fa-comments',        title: 'Group Messaging',     desc: 'Chat inside your circle in real time. Each group has its own channels so conversations stay organized.' },
     { icon: 'fa-solid fa-microphone',      title: 'Application System',  desc: 'Organizations can open applications with custom questions. Students apply directly — no need for separate forms.' },
@@ -89,7 +89,7 @@ export default function Landing({ onEnter }) {
 
   const steps = [
     { num: '01', icon: 'fa-solid fa-user-plus',   title: 'Create Your Account',    desc: 'Sign up using your CTU student ID and upload your school ID photo to verify who you are.' },
-    { num: '02', icon: 'fa-solid fa-sliders',      title: 'Set Up Your Profile',    desc: 'Pick your interests, add your course and year level, and get matched with groups that fit you.' },
+    { num: '02', icon: 'fa-solid fa-sliders',      title: 'Set Up Your Profile',    desc: 'Pick your interests, add your program and year level, and get matched with groups that fit you.' },
     { num: '03', icon: 'fa-solid fa-earth-asia',   title: 'Explore & Connect',      desc: 'Browse circles, join conversations, attend events, and become part of the CTU campus community.' },
   ];
 
@@ -195,7 +195,7 @@ export default function Landing({ onEnter }) {
                 {[
                   { icon: 'fa-solid fa-lock', label: 'School-only access', desc: 'Only real CTU users with a verified ID can join.' },
                   { icon: 'fa-solid fa-bell', label: 'Never miss anything', desc: 'Get announcements, events, and updates in one feed.' },
-                  { icon: 'fa-solid fa-users', label: 'Find your people', desc: 'Join circles that match your course, hobby, or org.' },
+                  { icon: 'fa-solid fa-users', label: 'Find your people', desc: 'Join circles that match your program, hobby, or org.' },
                 ].map((p, i) => (
                   <div key={i} className="lnd-explainer-point">
                     <div className="lnd-explainer-point-icon"><i className={p.icon} /></div>

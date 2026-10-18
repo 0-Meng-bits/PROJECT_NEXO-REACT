@@ -49,7 +49,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
-  const [step, setStep] = useState(1); // 1=avatar, 2=course/year, 3=interests
+  const [step, setStep] = useState(1); // 1=avatar, 2=program/year, 3=interests
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [program, setProgram] = useState('');
@@ -270,7 +270,7 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* ── STEP 2: Course + Year ── */}
+        {/* ── STEP 2: Program + Year ── */}
         {step === 2 && (
           <div className="ob-step-content fade-in">
             <h2 className="ob-title">Your Academic Identity</h2>
