@@ -7415,7 +7415,7 @@ export default function UserPortal() {
             </div>
             
             {/* Content */}
-            <div className="events-modal-content">
+            <div className="events-modal-content"> 
               {eventsLoading ? (
                 <div className="events-loading">
                   <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
