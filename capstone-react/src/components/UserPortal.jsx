@@ -961,7 +961,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase.from('message_reactions')
-        .select('reaction, student_id').eq('message_id', m.id);
+        .select('reaction, sender_id').eq('message_id', m.id);
       if (data) {
         const grouped = {};
         data.forEach(r => {
@@ -990,14 +990,14 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
     if (mine) {
       // Remove the reaction if clicking the same emoji
       await supabase.from('message_reactions')
-        .delete().eq('message_id', m.id).eq('student_id', currentStudentId);
+        .delete().eq('message_id', m.id).eq('sender_id', currentStudentId);
       setReactions(prev => ({ ...prev, [type]: (prev[type] || []).filter(s => s !== currentStudentId) }));
     } else {
       // Delete any existing reaction first, then add the new one
       await supabase.from('message_reactions')
-        .delete().eq('message_id', m.id).eq('student_id', currentStudentId);
+        .delete().eq('message_id', m.id).eq('sender_id', currentStudentId);
       await supabase.from('message_reactions')
-        .insert([{ message_id: m.id, student_id: currentStudentId, reaction: type }]);
+        .insert([{ message_id: m.id, sender_id: currentStudentId, reaction: type }]);
       
       // Update state: remove user from all reactions, then add to the new one
       const updated = {};
@@ -4382,7 +4382,7 @@ export default function UserPortal() {
     // Fetch reactors (implicit reads)
     const { data: reacts } = await supabase
       .from('message_reactions')
-      .select('message_id, sender_id, accounts:student_id(id, full_name, account_details(avatar_url))')
+      .select('message_id, sender_id')
       .in('message_id', msgIds);
 
     const grouped = {};
