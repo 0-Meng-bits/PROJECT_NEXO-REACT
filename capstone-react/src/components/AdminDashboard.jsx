@@ -101,6 +101,198 @@ function containsBadWord(text) {
   return BAD_WORDS.some(w => lower.includes(w));
 }
 
+// ── USER FLAGS SECTION (extracted to avoid hooks-in-IIFE) ────────────────────
+function UserFlagsSection({ admin }) {
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedFlag, setSelectedFlag] = useState(null);
+  const [issuing, setIssuing] = useState(false);
+
+  useEffect(() => {
+    const loadFlags = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_flags')
+        .select(`*, flagged_user:accounts!flagged_user_id(full_name, ctu_id, avatar_url), flagger:accounts!flagger_id(full_name, ctu_id), community:communities(name)`)
+        .order('created_at', { ascending: false });
+      if (!error && data) setFlags(data);
+      setLoading(false);
+    };
+    loadFlags();
+  }, []);
+
+  const severityColors = { minor: 'var(--orange)', moderate: 'var(--cyber-yellow)', severe: 'var(--red)', critical: '#ff0000' };
+
+  const issueWarning = async (flagId, severity, pointsToDeduct) => {
+    if (!selectedFlag) return;
+    setIssuing(true);
+    try {
+      const { data: warning, error: warnError } = await supabase.from('user_warnings').insert([{
+        user_id: selectedFlag.flagged_user_id, admin_id: admin?.id, type: 'warning',
+        severity, points_deducted: pointsToDeduct, community_id: selectedFlag.community_id, reason: selectedFlag.reason
+      }]).select().single();
+      if (warnError) throw warnError;
+      await supabase.from('point_transactions').insert([{
+        user_id: selectedFlag.flagged_user_id, amount: -pointsToDeduct,
+        transaction_type: 'warning', reason: `Warning: ${selectedFlag.reason}`, reference_id: warning.id
+      }]);
+      await supabase.from('user_flags').update({ status: 'warning_issued', reviewed_by: admin?.id, reviewed_at: new Date().toISOString() }).eq('id', flagId);
+      setFlags(prev => prev.map(f => f.id === flagId ? { ...f, status: 'warning_issued' } : f));
+      setSelectedFlag(null);
+      alert('Warning issued successfully!');
+    } catch (err) { console.error(err); alert('Failed to issue warning'); }
+    setIssuing(false);
+  };
+
+  const dismissFlag = async (flagId) => {
+    await supabase.from('user_flags').update({ status: 'dismissed', reviewed_by: admin?.id, reviewed_at: new Date().toISOString() }).eq('id', flagId);
+    setFlags(prev => prev.map(f => f.id === flagId ? { ...f, status: 'dismissed' } : f));
+    setSelectedFlag(null);
+  };
+
+  const pendingFlags = flags.filter(f => f.status === 'pending');
+  const reviewedFlags = flags.filter(f => f.status !== 'pending');
+
+  return (
+    <div className="adm-card">
+      <div className="adm-card-head">
+        <span>User Flags</span>
+        <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{pendingFlags.length} pending</span>
+      </div>
+      {loading ? <div className="adm-empty"><i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i><div style={{ marginTop: 10 }}>Loading flags...</div></div>
+      : flags.length === 0 ? <div className="adm-empty"><i className="fa-solid fa-circle-check" style={{ fontSize: 32, marginBottom: 10 }}></i><div>No flags yet</div></div>
+      : (
+        <>
+          {pendingFlags.length > 0 && (
+            <>
+              <div style={{ padding: '12px 20px', background: 'rgba(252,238,10,0.05)', borderBottom: '1px solid rgba(252,238,10,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>PENDING REVIEW — {pendingFlags.length}</div>
+              {pendingFlags.map(flag => (
+                <div key={flag.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', gap: 14, marginBottom: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(252,238,10,0.1)', border: '2px solid var(--cyber-yellow)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, overflow: 'hidden' }}>
+                      {flag.flagged_user?.avatar_url ? <img src={flag.flagged_user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : flag.flagged_user?.full_name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{flag.flagged_user?.full_name || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>ID: {flag.flagged_user?.ctu_id} · Circle: {flag.community?.name || 'N/A'}</div>
+                      <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: `${severityColors[flag.severity]}15`, border: `1px solid ${severityColors[flag.severity]}`, borderRadius: 6, fontSize: 10, fontWeight: 700, color: severityColors[flag.severity], textTransform: 'uppercase', letterSpacing: 1 }}>{flag.severity}</div>
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 13, color: 'var(--text-muted)' }}><strong style={{ color: 'white' }}>Reason:</strong> {flag.reason}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>Flagged by: {flag.flagger?.full_name} ({flag.flagger?.ctu_id}) · {new Date(flag.created_at).toLocaleString()}</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="cyber-btn" onClick={() => setSelectedFlag(flag)} style={{ flex: 1, background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)' }}><i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>Issue Warning</button>
+                    <button className="cyber-btn secondary" onClick={() => dismissFlag(flag.id)} style={{ flex: 1 }}>Dismiss</button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {reviewedFlags.length > 0 && (
+            <>
+              <div style={{ padding: '12px 20px', background: 'rgba(0,240,255,0.05)', borderBottom: '1px solid rgba(0,240,255,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-cyan)', marginTop: 16 }}>REVIEWED — {reviewedFlags.length}</div>
+              {reviewedFlags.slice(0, 10).map(flag => (
+                <div key={flag.id} style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: 0.6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span>{flag.flagged_user?.full_name} · {flag.community?.name}</span>
+                    <span style={{ color: flag.status === 'warning_issued' ? 'var(--cyber-yellow)' : 'var(--text-muted)' }}>{flag.status === 'warning_issued' ? 'Warning Issued' : 'Dismissed'}</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+      {selectedFlag && (
+        <div className="modal-overlay" onClick={() => setSelectedFlag(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <h3 style={{ marginBottom: 16, color: 'var(--cyber-yellow)' }}><i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>Issue Official Warning</h3>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{selectedFlag.flagged_user?.full_name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>ID: {selectedFlag.flagged_user?.ctu_id}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}><strong style={{ color: 'white' }}>Reason:</strong> {selectedFlag.reason}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[{ severity: 'minor', points: 1, label: 'Minor (-1 point)', desc: 'Small violation' }, { severity: 'moderate', points: 3, label: 'Moderate (-3 points)', desc: 'Concerning behavior' }, { severity: 'severe', points: 5, label: 'Severe (-5 points)', desc: 'Serious violation' }, { severity: 'critical', points: 10, label: 'Critical (-10 points)', desc: 'Extreme violation' }].map(opt => (
+                <button key={opt.severity} className="cyber-btn" onClick={() => issueWarning(selectedFlag.id, opt.severity, opt.points)} disabled={issuing} style={{ background: `${severityColors[opt.severity]}15`, color: severityColors[opt.severity], border: `1px solid ${severityColors[opt.severity]}`, justifyContent: 'space-between', textAlign: 'left' }}>
+                  <div><div style={{ fontWeight: 700 }}>{opt.label}</div><div style={{ fontSize: 10, opacity: 0.7 }}>{opt.desc}</div></div>
+                  <i className="fa-solid fa-gavel"></i>
+                </button>
+              ))}
+            </div>
+            <button className="cyber-btn secondary" onClick={() => setSelectedFlag(null)} style={{ width: '100%', marginTop: 16 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SUPPORT TICKETS SECTION (extracted to avoid hooks-in-IIFE) ───────────────
+function SupportTicketsSection() {
+  const [tickets, setTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+
+  useEffect(() => {
+    supabase.from('support_tickets')
+      .select('*, accounts:user_id(full_name, ctu_id)')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setTickets(data || []); setLoadingTickets(false); });
+  }, []);
+
+  const updateStatus = async (id, status) => {
+    await supabase.from('support_tickets').update({ status }).eq('id', id);
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  };
+
+  const statusColor = { open: 'var(--orange)', resolved: 'var(--green)', closed: 'var(--text-muted)' };
+  const categoryColor = {
+    'Bug Report':       { color: 'var(--red)',          bg: 'rgba(247,95,95,0.08)',     border: 'rgba(247,95,95,0.3)' },
+    'Account Issue':    { color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.08)',    border: 'rgba(252,238,10,0.3)' },
+    'General Question': { color: 'var(--cyber-cyan)',   bg: 'rgba(0,240,255,0.08)',     border: 'rgba(0,240,255,0.2)' },
+    'Circle Problem':   { color: '#a855f7',             bg: 'rgba(168,85,247,0.08)',    border: 'rgba(168,85,247,0.3)' },
+    'Other':            { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
+  };
+
+  return (
+    <div className="adm-card">
+      <div className="adm-card-head">
+        <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
+        <span className="adm-badge">{tickets.filter(t => t.status === 'open').length} open</span>
+      </div>
+      {loadingTickets ? <div className="adm-empty">Loading...</div>
+      : tickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
+      : (
+        <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
+          <table className="adm-table">
+            <thead><tr><th>USER</th><th>CATEGORY</th><th>MESSAGE</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr></thead>
+            <tbody>
+              {tickets.map(t => (
+                <tr key={t.id}>
+                  <td style={{ fontSize: 11 }}>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{t.accounts?.full_name || '—'}</div>
+                    <div style={{ color: 'var(--text-muted)' }}>{t.accounts?.ctu_id}</div>
+                  </td>
+                  <td><span className="adm-tag" style={{ color: categoryColor[t.category]?.color, background: categoryColor[t.category]?.bg, borderColor: categoryColor[t.category]?.border }}>{t.category}</span></td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div></td>
+                  <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: statusColor[t.status] || 'var(--text-muted)', border: `1px solid ${statusColor[t.status] || '#333'}` }}>{t.status?.toUpperCase()}</span></td>
+                  <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {t.status === 'open' && <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 10 }} onClick={() => updateStatus(t.id, 'resolved')}><i className="fa-solid fa-check"></i> Resolve</button>}
+                      {t.status !== 'closed' && <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }} onClick={() => updateStatus(t.id, 'closed')}>Close</button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const admin = JSON.parse(localStorage.getItem('currentUser'));
@@ -1442,272 +1634,8 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── USER FLAGS ── */}
-        {section === 'user_flags' && (() => {
-          const [flags, setFlags] = useState([]);
-          const [loading, setLoading] = useState(true);
-          const [selectedFlag, setSelectedFlag] = useState(null);
-          const [issuing, setIssuing] = useState(false);
-
-          useEffect(() => {
-            const loadFlags = async () => {
-              setLoading(true);
-              const { data, error } = await supabase
-                .from('user_flags')
-                .select(`
-                  *,
-                  flagged_user:accounts!flagged_user_id(full_name, ctu_id, avatar_url),
-                  flagger:accounts!flagger_id(full_name, ctu_id),
-                  community:communities(name)
-                `)
-                .order('created_at', { ascending: false });
-              
-              if (!error && data) setFlags(data);
-              setLoading(false);
-            };
-            loadFlags();
-          }, []);
-
-          const issueWarning = async (flagId, severity, pointsToDeduct) => {
-            if (!selectedFlag) return;
-            setIssuing(true);
-
-            try {
-              // Create warning
-              const { data: warning, error: warnError } = await supabase
-                .from('user_warnings')
-                .insert([{
-                  user_id: selectedFlag.flagged_user_id,
-                  admin_id: user.id,
-                  type: 'warning',
-                  severity: severity,
-                  points_deducted: pointsToDeduct,
-                  community_id: selectedFlag.community_id,
-                  reason: selectedFlag.reason
-                }])
-                .select()
-                .single();
-
-              if (warnError) throw warnError;
-
-              // Create point transaction
-              await supabase.from('point_transactions').insert([{
-                user_id: selectedFlag.flagged_user_id,
-                amount: -pointsToDeduct,
-                transaction_type: 'warning',
-                reason: `Warning: ${selectedFlag.reason}`,
-                reference_id: warning.id
-              }]);
-
-              // Update flag status
-              await supabase
-                .from('user_flags')
-                .update({ 
-                  status: 'warning_issued',
-                  reviewed_by: user.id,
-                  reviewed_at: new Date().toISOString()
-                })
-                .eq('id', flagId);
-
-              // Refresh flags
-              setFlags(prev => prev.map(f => 
-                f.id === flagId 
-                  ? { ...f, status: 'warning_issued', reviewed_by: user.id } 
-                  : f
-              ));
-              setSelectedFlag(null);
-              alert('Warning issued successfully!');
-            } catch (err) {
-              console.error(err);
-              alert('Failed to issue warning');
-            }
-            setIssuing(false);
-          };
-
-          const dismissFlag = async (flagId) => {
-            await supabase
-              .from('user_flags')
-              .update({ 
-                status: 'dismissed',
-                reviewed_by: user.id,
-                reviewed_at: new Date().toISOString()
-              })
-              .eq('id', flagId);
-
-            setFlags(prev => prev.map(f => 
-              f.id === flagId 
-                ? { ...f, status: 'dismissed', reviewed_by: user.id } 
-                : f
-            ));
-            setSelectedFlag(null);
-          };
-
-          const pendingFlags = flags.filter(f => f.status === 'pending');
-          const reviewedFlags = flags.filter(f => f.status !== 'pending');
-
-          const severityColors = {
-            minor: 'var(--orange)',
-            moderate: 'var(--cyber-yellow)',
-            severe: 'var(--red)',
-            critical: '#ff0000'
-          };
-
-          return (
-            <div className="adm-card">
-              <div className="adm-card-head">
-                <span>User Flags</span>
-                <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>
-                  {pendingFlags.length} pending
-                </span>
-              </div>
-
-              {loading ? (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i>
-                  <div style={{ marginTop: 10 }}>Loading flags...</div>
-                </div>
-              ) : flags.length === 0 ? (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <i className="fa-solid fa-circle-check" style={{ fontSize: 32, marginBottom: 10 }}></i>
-                  <div>No flags yet</div>
-                </div>
-              ) : (
-                <>
-                  {/* Pending Flags */}
-                  {pendingFlags.length > 0 && (
-                    <>
-                      <div style={{ padding: '12px 20px', background: 'rgba(252,238,10,0.05)', borderBottom: '1px solid rgba(252,238,10,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-yellow)' }}>
-                        PENDING REVIEW — {pendingFlags.length}
-                      </div>
-                      {pendingFlags.map(flag => (
-                        <div key={flag.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ display: 'flex', gap: 14, marginBottom: 12 }}>
-                            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(252,238,10,0.1)', border: '2px solid var(--cyber-yellow)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, overflow: 'hidden' }}>
-                              {flag.flagged_user?.avatar_url ? (
-                                <img src={flag.flagged_user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                flag.flagged_user?.full_name?.[0]?.toUpperCase() || '?'
-                              )}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 700, fontSize: 14 }}>{flag.flagged_user?.full_name || 'Unknown'}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                ID: {flag.flagged_user?.ctu_id} · Circle: {flag.community?.name || 'N/A'}
-                              </div>
-                              <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: `${severityColors[flag.severity]}15`, border: `1px solid ${severityColors[flag.severity]}`, borderRadius: 6, fontSize: 10, fontWeight: 700, color: severityColors[flag.severity], textTransform: 'uppercase', letterSpacing: 1 }}>
-                                {flag.severity}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 13, color: 'var(--text-muted)' }}>
-                            <strong style={{ color: 'white' }}>Reason:</strong> {flag.reason}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-                            Flagged by: {flag.flagger?.full_name} ({flag.flagger?.ctu_id}) · {new Date(flag.created_at).toLocaleString()}
-                          </div>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              className="cyber-btn"
-                              onClick={() => setSelectedFlag(flag)}
-                              style={{ flex: 1, background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)' }}
-                            >
-                              <i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>Issue Warning
-                            </button>
-                            <button
-                              className="cyber-btn secondary"
-                              onClick={() => dismissFlag(flag.id)}
-                              style={{ flex: 1 }}
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-
-                  {/* Reviewed Flags */}
-                  {reviewedFlags.length > 0 && (
-                    <>
-                      <div style={{ padding: '12px 20px', background: 'rgba(0,240,255,0.05)', borderBottom: '1px solid rgba(0,240,255,0.2)', fontSize: 11, fontWeight: 700, letterSpacing: 2, color: 'var(--cyber-cyan)', marginTop: 16 }}>
-                        REVIEWED — {reviewedFlags.length}
-                      </div>
-                      {reviewedFlags.slice(0, 10).map(flag => (
-                        <div key={flag.id} style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', opacity: 0.6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                            <span>{flag.flagged_user?.full_name} · {flag.community?.name}</span>
-                            <span style={{ color: flag.status === 'warning_issued' ? 'var(--cyber-yellow)' : 'var(--text-muted)' }}>
-                              {flag.status === 'warning_issued' ? 'Warning Issued' : 'Dismissed'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </>
-              )}
-
-              {/* Issue Warning Modal */}
-              {selectedFlag && (
-                <div className="modal-overlay" onClick={() => setSelectedFlag(null)}>
-                  <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
-                    <h3 style={{ marginBottom: 16, color: 'var(--cyber-yellow)' }}>
-                      <i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>
-                      Issue Official Warning
-                    </h3>
-
-                    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>{selectedFlag.flagged_user?.full_name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-                        ID: {selectedFlag.flagged_user?.ctu_id}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                        <strong style={{ color: 'white' }}>Reason:</strong> {selectedFlag.reason}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {[
-                        { severity: 'minor', points: 1, label: 'Minor (-1 point)', desc: 'Small violation' },
-                        { severity: 'moderate', points: 3, label: 'Moderate (-3 points)', desc: 'Concerning behavior' },
-                        { severity: 'severe', points: 5, label: 'Severe (-5 points)', desc: 'Serious violation' },
-                        { severity: 'critical', points: 10, label: 'Critical (-10 points)', desc: 'Extreme violation' },
-                      ].map(opt => (
-                        <button
-                          key={opt.severity}
-                          className="cyber-btn"
-                          onClick={() => issueWarning(selectedFlag.id, opt.severity, opt.points)}
-                          disabled={issuing}
-                          style={{
-                            background: `${severityColors[opt.severity]}15`,
-                            color: severityColors[opt.severity],
-                            border: `1px solid ${severityColors[opt.severity]}`,
-                            justifyContent: 'space-between',
-                            textAlign: 'left'
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 700 }}>{opt.label}</div>
-                            <div style={{ fontSize: 10, opacity: 0.7 }}>{opt.desc}</div>
-                          </div>
-                          <i className="fa-solid fa-gavel"></i>
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      className="cyber-btn secondary"
-                      onClick={() => setSelectedFlag(null)}
-                      style={{ width: '100%', marginTop: 16 }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {/* u2500u2500 USER FLAGS u2500u2500 */}
+        {section === 'user_flags' && <UserFlagsSection admin={admin} />}
 
 {/* ── REPORTS ── */}
         {section === 'reports' && (
@@ -1722,321 +1650,96 @@ export default function AdminDashboard() {
             : reports.length === 0 ? (
               <div className="adm-empty">No reports yet.</div>
             ) : (
-              <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
-              <table className="adm-table">
-                <thead>
-                  <tr><th>REPORTED BY</th><th>REPORTED USER</th><th>TYPE</th><th>REASON</th><th>CONTENT</th><th>STATUS</th><th>ACTIONS</th></tr>
-                </thead>
-                <tbody>
-                  {reports.map(r => (
-                    <tr key={r.id}>
-                      <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
-                        <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
-                      </td>
-                      <td style={{ fontSize: 11 }}>
-                        <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
-                        <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
-                      </td>
-                      <td><span className="adm-tag">{r.content_type}</span></td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 12, maxWidth: 160 }}>{r.reason}</td>
-                      <td style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: 180 }}>
-                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {r.content_preview || '—'}
-                        </div>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                          color: r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : 'var(--text-muted)',
-                          border: `1px solid ${r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : '#333'}` }}>
-                          {r.status.toUpperCase()}
-                        </span>
-                      </td>
-                      <td>
-                        {r.status === 'pending' && (
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {r.reported_user_id && (
-                              <>
-                                <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
-                                  onClick={() => {
-                                    const reason = prompt('Warning reason:');
-                                    if (reason) issueWarning(r.reported_user_id, r.reported?.full_name, reason);
-                                    resolveReport(r.id, 'reviewed', 'Warning issued');
-                                  }}>
-                                  <i className="fa-solid fa-triangle-exclamation"></i> Warn
-                                </button>
-                                <button className="adm-btn reject" style={{ fontSize: 10 }}
-                                  onClick={() => {
-                                    banUser(r.reported_user_id, r.reported?.full_name);
-                                    resolveReport(r.id, 'reviewed', 'User banned');
-                                  }}>
-                                  <i className="fa-solid fa-ban"></i> Ban
-                                </button>
-                              </>
-                            )}
-                            {r.content_id && (
-                              <button className="adm-btn reject" style={{ fontSize: 10 }}
-                                onClick={() => {
-                                  deleteContent(r.content_type, r.content_id);
-                                  resolveReport(r.id, 'reviewed', 'Content deleted');
-                                }}>
-                                <i className="fa-solid fa-trash"></i> Delete
+              <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+                <table className="adm-table">
+                  <thead><tr><th>REPORTER</th><th>REPORTED</th><th>TYPE</th><th>REASON</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr></thead>
+                  <tbody>
+                    {reports.map(r => (
+                      <tr key={r.id}>
+                        <td style={{ fontSize: 11 }}>
+                          <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
+                          <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
+                          <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
+                        </td>
+                        <td><span className="adm-tag">{r.content_type}</span></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 200 }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reason}</div>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                            color: r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : 'var(--text-muted)',
+                            border: `1px solid ${r.status === 'pending' ? 'var(--orange)' : r.status === 'reviewed' ? 'var(--green)' : '#333'}`
+                          }}>{r.status?.toUpperCase()}</span>
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {r.status === 'pending' && (
+                              <button className="adm-btn approve" style={{ fontSize: 10 }} onClick={() => resolveReport(r.id, 'reviewed', 'Reviewed by admin')}>
+                                <i className="fa-solid fa-check"></i>
                               </button>
                             )}
-                            <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }}
-                              onClick={() => resolveReport(r.id, 'dismissed', 'Dismissed by admin')}>
-                              Dismiss
+                            <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id)}>
+                              <i className="fa-solid fa-trash"></i>
                             </button>
                           </div>
-                        )}
-                        {r.status !== 'pending' && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.admin_note || '—'}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         )}
+
         {/* ── CONTENT MONITOR ── */}
         {section === 'moderation' && (() => {
           const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
           const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
           const flaggedGlobal = globalMessages.filter(m => containsBadWord(m.content));
           const allFlagged = [
-            ...flaggedMessages.map(m => ({ ...m, _type: 'circle_message', _circle: m.communities?.name })),
-            ...flaggedAnnouncements.map(a => ({ ...a, _type: 'announcement', _circle: a.communities?.name })),
+            ...flaggedMessages.map(m => ({ ...m, _type: 'circle_message' })),
+            ...flaggedAnnouncements.map(a => ({ ...a, _type: 'announcement' })),
             ...flaggedGlobal.map(m => ({ ...m, _type: 'global_message', _circle: 'Global Feed' })),
           ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Warning stats */}
-              <div className="adm-stats-row">
-                <div className="adm-stat-card">
-                  <div className="adm-stat-icon" style={{ background: 'rgba(247,169,79,0.15)', color: 'var(--orange)' }}>
-                    <i className="fa-solid fa-triangle-exclamation"></i>
-                  </div>
-                  <div>
-                    <div className="adm-stat-val" style={{ color: 'var(--orange)' }}>{allFlagged.length}</div>
-                    <div className="adm-stat-lbl">Flagged Content</div>
-                  </div>
-                </div>
-                <div className="adm-stat-card">
-                  <div className="adm-stat-icon" style={{ background: 'rgba(247,95,95,0.15)', color: 'var(--red)' }}>
-                    <i className="fa-solid fa-ban"></i>
-                  </div>
-                  <div>
-                    <div className="adm-stat-val" style={{ color: 'var(--red)' }}>
-                      {students.filter(s => s.is_banned).length}
-                    </div>
-                    <div className="adm-stat-lbl">Banned Users</div>
-                  </div>
-                </div>
-                <div className="adm-stat-card">
-                  <div className="adm-stat-icon" style={{ background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)' }}>
-                    <i className="fa-solid fa-flag"></i>
-                  </div>
-                  <div>
-                    <div className="adm-stat-val" style={{ color: 'var(--cyber-yellow)' }}>
-                      {reports.filter(r => r.status === 'pending').length}
-                    </div>
-                    <div className="adm-stat-lbl">Pending Reports</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Flagged content */}
-              <div className="adm-card">
-                <div className="adm-card-head">
-                  <span><i className="fa-solid fa-robot" style={{ marginRight: 8, color: 'var(--orange)' }}></i>Auto-Detected Inappropriate Content</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{allFlagged.length} flagged</span>
-                </div>
-                {allFlagged.length === 0 ? (
-                  <div className="adm-empty">
-                    <i className="fa-solid fa-shield-halved" style={{ fontSize: 28, color: 'var(--green)', marginBottom: 10, display: 'block' }}></i>
-                    No inappropriate content detected.
-                  </div>
-                ) : (
-                  <table className="adm-table">
-                    <thead><tr><th>TYPE</th><th>CIRCLE</th><th>CONTENT</th><th>AUTHOR</th><th>DATE</th><th>ACTION</th></tr></thead>
-                    <tbody>
-                      {allFlagged.map((item, i) => {
-                        const content = item.content || item.title || '';
-                        const highlighted = content.replace(
-                          new RegExp(BAD_WORDS.join('|'), 'gi'),
-                          match => `[${match}]`
-                        );
-                        return (
-                          <tr key={i}>
-                            <td><span className="adm-tag" style={{ color: 'var(--orange)', borderColor: 'var(--orange)' }}>
-                              {item._type === 'global_message' ? 'Global' : item._type === 'announcement' ? 'Post' : 'Message'}
-                            </span></td>
-                            <td style={{ fontSize: 11, color: 'var(--cyber-cyan)' }}>{item._circle || '—'}</td>
-                            <td style={{ fontSize: 12, color: 'var(--text-primary)', maxWidth: 280 }}>
-                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {highlighted}
-                              </div>
-                            </td>
-                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                              {item.full_name || item.author_name || '—'}
-                            </td>
-                            <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                              {new Date(item.created_at).toLocaleDateString()}
-                            </td>
-                            <td>
-                              <button className="adm-btn reject" style={{ fontSize: 10 }}
-                                onClick={() => deleteContent(
-                                  item._type === 'announcement' ? 'announcement' : 'message',
-                                  item.id
-                                )}>
-                                <i className="fa-solid fa-trash"></i> Delete
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* User warnings history */}
-              <div className="adm-card">
-                <div className="adm-card-head">
-                  <span>Users with Warnings / Bans</span>
-                </div>
-                {(() => {
-                  const warnedUsers = students.filter(s => s.warning_count > 0 || s.is_banned);
-                  return warnedUsers.length === 0 ? (
-                    <div className="adm-empty">No warnings or bans issued yet.</div>
-                  ) : (
-                    <table className="adm-table">
-                      <thead><tr><th>CTU ID</th><th>NAME</th><th>WARNINGS</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                      <tbody>
-                        {warnedUsers.map(s => (
-                          <tr key={s.id}>
-                            <td><span className="adm-mono">{s.student_id}</span></td>
-                            <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
-                            <td>
-                              <span style={{ color: s.warning_count >= 3 ? 'var(--red)' : 'var(--orange)', fontWeight: 700 }}>
-                                {s.warning_count || 0} warning{s.warning_count !== 1 ? 's' : ''}
-                              </span>
-                            </td>
-                            <td>
-                              {s.is_banned
-                                ? <span className="adm-status" style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid var(--red)' }}>BANNED</span>
-                                : <span className="adm-status verified">ACTIVE</span>
-                              }
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                {!s.is_banned && (
-                                  <>
-                                    <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)', fontSize: 10 }}
-                                      onClick={() => { const r = prompt('Warning reason:'); if (r) issueWarning(s.id, s.full_name, r); }}>
-                                      <i className="fa-solid fa-triangle-exclamation"></i> Warn
-                                    </button>
-                                    <button className="adm-btn reject" style={{ fontSize: 10 }}
-                                      onClick={() => banUser(s.id, s.full_name)}>
-                                      <i className="fa-solid fa-ban"></i> Ban
-                                    </button>
-                                  </>
-                                )}
-                                {s.is_banned && (
-                                  <button className="adm-btn approve" style={{ fontSize: 10 }}
-                                    onClick={() => unbanUser(s.id, s.full_name)}>
-                                    <i className="fa-solid fa-unlock"></i> Unban
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()}
-              </div>
-            </div>
-          );  
-        })()}
-
-        {/* ── SUPPORT TICKETS ── */}
-        {section === 'support' && (() => {
-          const [tickets, setTickets] = React.useState([]);
-          const [loadingTickets, setLoadingTickets] = React.useState(true);
-
-          React.useEffect(() => {
-            supabase.from('support_tickets')
-              .select('*, accounts:user_id(full_name, ctu_id)')
-              .order('created_at', { ascending: false })
-              .then(({ data }) => { setTickets(data || []); setLoadingTickets(false); });
-          }, []);
-
-          const updateStatus = async (id, status) => {
-            await supabase.from('support_tickets').update({ status }).eq('id', id);
-            setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-          };
-
-          const statusColor = { open: 'var(--orange)', resolved: 'var(--green)', closed: 'var(--text-muted)' };
-          const categoryColor = {
-            'Bug Report':       { color: 'var(--red)',          bg: 'rgba(247,95,95,0.08)',     border: 'rgba(247,95,95,0.3)' },
-            'Account Issue':    { color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.08)',    border: 'rgba(252,238,10,0.3)' },
-            'General Question': { color: 'var(--cyber-cyan)',   bg: 'rgba(0,240,255,0.08)',     border: 'rgba(0,240,255,0.2)' },
-            'Circle Problem':   { color: '#a855f7',             bg: 'rgba(168,85,247,0.08)',    border: 'rgba(168,85,247,0.3)' },
-            'Other':            { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
-          };
-
-          return (
             <div className="adm-card">
               <div className="adm-card-head">
-                <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
-                <span className="adm-badge">{tickets.filter(t => t.status === 'open').length} open</span>
+                <span>Content Monitor</span>
+                <span style={{ fontSize: 12, color: allFlagged.length > 0 ? 'var(--red)' : 'var(--green)' }}>
+                  {allFlagged.length} flagged
+                </span>
               </div>
-              {loadingTickets ? <div className="adm-empty">Loading...</div>
-              : tickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
-              : (
-                <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
+              {allFlagged.length === 0 ? (
+                <div className="adm-empty">
+                  <i className="fa-solid fa-shield-check" style={{ fontSize: 32, color: 'var(--green)', marginBottom: 12, display: 'block' }}></i>
+                  No flagged content detected.
+                </div>
+              ) : (
+                <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
                   <table className="adm-table">
-                    <thead>
-                      <tr><th>USER</th><th>CATEGORY</th><th>MESSAGE</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr>
-                    </thead>
+                    <thead><tr><th>TYPE</th><th>AUTHOR</th><th>CONTENT</th><th>DATE</th><th>ACTIONS</th></tr></thead>
                     <tbody>
-                      {tickets.map(t => (
-                        <tr key={t.id}>
-                          <td style={{ fontSize: 11 }}>
-                            <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{t.accounts?.full_name || '—'}</div>
-                            <div style={{ color: 'var(--text-muted)' }}>{t.accounts?.ctu_id}</div>
-                          </td>
-                          <td><span className="adm-tag" style={{ color: categoryColor[t.category]?.color, background: categoryColor[t.category]?.bg, borderColor: categoryColor[t.category]?.border }}>{t.category}</span></td>
-                          <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div>
-                          </td>
-                          <td>
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: statusColor[t.status] || 'var(--text-muted)', border: `1px solid ${statusColor[t.status] || '#333'}` }}>
-                              {t.status?.toUpperCase()}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              {t.status === 'open' && (
-                                <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 10 }}
-                                  onClick={() => updateStatus(t.id, 'resolved')}>
-                                  <i className="fa-solid fa-check"></i> Resolve
-                                </button>
-                              )}
-                              {t.status !== 'closed' && (
-                                <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }}
-                                  onClick={() => updateStatus(t.id, 'closed')}>
-                                  Close
-                                </button>
-                              )}
+                      {allFlagged.map(item => (
+                        <tr key={item.id}>
+                          <td><span className="adm-tag">{item._type?.replace('_', ' ')}</span></td>
+                          <td style={{ fontSize: 12, color: 'var(--text-primary)' }}>{item.full_name || item.author_name || '—'}</td>
+                          <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 300 }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.content || `${item.title}: ${item.content}`}
                             </div>
+                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <button className="adm-btn reject" style={{ fontSize: 10 }}
+                              onClick={() => deleteContent(item._type === 'announcement' ? 'announcement' : 'message', item.id)}>
+                              <i className="fa-solid fa-trash"></i> Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2047,6 +1750,10 @@ export default function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* ── SUPPORT TICKETS ── */}
+        {section === 'support' && <SupportTicketsSection />}
+
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
