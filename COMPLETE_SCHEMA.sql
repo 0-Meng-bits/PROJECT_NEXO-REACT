@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS account_status (
 -- 3. ACCOUNT_DETAILS (Profile Information)
 CREATE TABLE IF NOT EXISTS account_details (
   id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-  department text,
   program text,
   year_level text,
   interests text[],
@@ -42,7 +41,9 @@ CREATE TABLE IF NOT EXISTS account_details (
   id_verified boolean DEFAULT false,
   last_seen timestamptz,
   onboarding_complete boolean DEFAULT false,
-  bio text
+  bio text,
+  gender text CHECK (gender IN ('Male', 'Female', 'Prefer not to say')),
+  discoverable boolean NOT NULL DEFAULT true
 );
 
 -- ============================================================
@@ -62,6 +63,9 @@ CREATE TABLE IF NOT EXISTS communities (
   is_official boolean DEFAULT false,
   application_enabled boolean DEFAULT false,
   internal_application boolean DEFAULT false,
+  interest_tag text,
+  is_open boolean NOT NULL DEFAULT false,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('pending', 'active')),
   created_at timestamptz DEFAULT now()
 );
 
@@ -98,6 +102,9 @@ CREATE TABLE IF NOT EXISTS circle_requests (
   icon text DEFAULT 'fa-solid fa-graduation-cap',
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   admin_note text DEFAULT '',
+  interest_tag text,
+  is_open boolean NOT NULL DEFAULT false,
+  invitees uuid[] NOT NULL DEFAULT '{}',
   created_at timestamptz DEFAULT now(),
   reviewed_at timestamptz
 );
@@ -118,7 +125,7 @@ CREATE TABLE IF NOT EXISTS messages (
   edited boolean DEFAULT false,
   message_type text DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'video', 'voice')),
   media_url text,
-  media_size bigint,w
+  media_size bigint,
   media_duration int,
   reply_to_id uuid REFERENCES messages(id) ON DELETE SET NULL,
   reply_to_preview text,
@@ -259,6 +266,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   type text NOT NULL,
   message text NOT NULL,
   is_read boolean DEFAULT false,
+  category text CHECK (category IN ('Connections', 'Circles', 'Campus')),
+  group_key text,
+  group_count int NOT NULL DEFAULT 1,
   created_at timestamptz DEFAULT now()
 );
 
