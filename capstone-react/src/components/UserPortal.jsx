@@ -5250,12 +5250,13 @@ export default function UserPortal() {
 
   // Auto-scroll: go to first unread if exists, otherwise scroll to bottom
   useEffect(() => {
+    if (messagesLoading) return; // wait until messages are rendered
     if (firstUnreadRef.current) {
       firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
       feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, messagesLoading]);
 
   const initials = user?.full_name
     ? user.full_name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2) : 'U';
