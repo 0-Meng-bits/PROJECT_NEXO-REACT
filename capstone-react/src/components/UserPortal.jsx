@@ -4231,6 +4231,7 @@ export default function UserPortal() {
   const feedBottomRef = useRef(null);
   const firstUnreadRef = useRef(null); // ref to scroll to on load
   const firstUnreadMsgId = useRef(null); // message id of the first unread message
+  const [firstUnreadId, setFirstUnreadId] = useState(null); // state version to trigger render
   const sectionRef = useRef(section); // track current section for popstate handler
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -4886,6 +4887,7 @@ export default function UserPortal() {
   const loadMessages = useCallback(async (commId, channelId) => {
     // Reset first unread on each load
     firstUnreadMsgId.current = null;
+    setFirstUnreadId(null);
     setMessagesLoading(true);
 
     const calcFirstUnread = async (msgs) => {
@@ -4897,7 +4899,7 @@ export default function UserPortal() {
         .in('message_id', otherMsgs.map(m => m.id));
       const readIds = new Set((reads || []).map(r => r.message_id));
       const first = otherMsgs.find(m => !readIds.has(m.id));
-      if (first) firstUnreadMsgId.current = first.id;
+      if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(first.id); }
     };
 
     if (commId === 'global') {
@@ -4960,7 +4962,7 @@ export default function UserPortal() {
           .in('message_id', otherMsgs.map(m => m.id));
         const readIds = new Set((reads || []).map(r => r.message_id));
         const first = otherMsgs.find(m => !readIds.has(m.id));
-        if (first) firstUnreadMsgId.current = first.id;
+        if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(first.id); }
       }
     }
     setCircleChatMessages(data || []);
@@ -6388,7 +6390,7 @@ export default function UserPortal() {
                     return (
                       <React.Fragment key={m.id}>
                         {showSep && <ChatTimeSeparator date={m.created_at} />}
-                        {m.id === firstUnreadMsgId.current && (
+                        {m.id === firstUnreadId && (
                           <div ref={firstUnreadRef}><UnreadDivider /></div>
                         )}
                         <MessageItem m={m}
@@ -7179,7 +7181,7 @@ export default function UserPortal() {
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
-                          {m.id === firstUnreadMsgId.current && (
+                          {m.id === firstUnreadId && (
                             <div ref={firstUnreadRef}><UnreadDivider /></div>
                           )}
                           <MessageItem
