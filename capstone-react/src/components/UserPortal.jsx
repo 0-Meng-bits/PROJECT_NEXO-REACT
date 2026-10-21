@@ -6377,11 +6377,11 @@ export default function UserPortal() {
                     
                     // Group consecutive messages from same user within 3 minutes
                     const isGrouped = prev && 
-                      prev.student_id === m.sender_id && 
+                      prev.sender_id === m.sender_id && 
                       (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                     
                     const isLastInGroup = !next || 
-                      next.student_id !== m.sender_id || 
+                      next.sender_id !== m.sender_id || 
                       (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
                     return (
@@ -7023,11 +7023,11 @@ export default function UserPortal() {
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
-                        prev.student_id === m.sender_id && 
+                        prev.sender_id === m.sender_id && 
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
-                        next.student_id !== m.sender_id || 
+                        next.sender_id !== m.sender_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
                       
                       return (
@@ -7168,11 +7168,11 @@ export default function UserPortal() {
                       
                       // Group consecutive messages from same user within 3 minutes
                       const isGrouped = prev && 
-                        prev.student_id === m.sender_id && 
+                        prev.sender_id === m.sender_id && 
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
                       const isLastInGroup = !next || 
-                        next.student_id !== m.sender_id || 
+                        next.sender_id !== m.sender_id || 
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
                       return (
