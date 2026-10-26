@@ -414,7 +414,6 @@ CREATE TABLE IF NOT EXISTS user_purchases (
 CREATE TABLE IF NOT EXISTS user_profile_settings (
   user_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
   active_theme uuid REFERENCES shop_items(id),
-  active_badge uuid REFERENCES shop_items(id),
   active_background uuid REFERENCES shop_items(id),
   active_name_color uuid REFERENCES shop_items(id),
   active_music uuid REFERENCES shop_items(id),

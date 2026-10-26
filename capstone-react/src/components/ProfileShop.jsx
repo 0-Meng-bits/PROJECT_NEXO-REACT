@@ -234,7 +234,7 @@ export default function ProfileShop({ user, onClose }) {
               {tab === 'shop' && (
                 <>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                    {['all', 'theme', 'badge', 'name_color', 'avatar_border', 'background', 'companion'].map(type => (
+                    {['all', 'theme', 'name_color', 'avatar_border', 'background', 'companion'].map(type => (
                       <button key={type} onClick={() => setSelectedType(type)}
                         style={{ padding: '6px 12px', fontSize: 11, borderRadius: 6, cursor: 'pointer', textTransform: 'capitalize',
                           background: selectedType === type ? 'rgba(0,240,255,0.2)' : 'rgba(0,0,0,0.3)',

@@ -2489,7 +2489,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     if (!user?.id) return;
     const loadCustomizations = async () => {      const { data: settings } = await supabase
         .from('user_profile_settings')
-        .select('active_badge, active_name_color, active_background, active_theme, active_avatar_border, active_companion')
+        .select('active_name_color, active_background, active_theme, active_avatar_border, active_companion')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -2497,12 +2497,11 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       setPendingCustSettings(settings || {});
 
       if (settings) {
-        const itemIds = [settings.active_badge, settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
+        const itemIds = [settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
         if (itemIds.length > 0) {
           const { data: items } = await supabase.from('shop_items').select('*').in('id', itemIds);
           if (items) {
             setCustomizations({
-              badge: items.find(i => i.id === settings.active_badge),
               name_color: items.find(i => i.id === settings.active_name_color),
               background: items.find(i => i.id === settings.active_background),
               theme: items.find(i => i.id === settings.active_theme),
@@ -2912,6 +2911,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     {customizations.badge.preview_url}
                   </span>
                 )}
+                {/* Gender icon */}
+                {user?.gender === 'Male' && <i className="fa-solid fa-mars" style={{ fontSize: 13, color: 'var(--cyber-cyan)', marginLeft: 4 }} title="Male" />}
+                {user?.gender === 'Female' && <i className="fa-solid fa-venus" style={{ fontSize: 13, color: '#f472b6', marginLeft: 4 }} title="Female" />}
                 <span style={{
                   fontSize: 13,
                   fontFamily: 'monospace',
@@ -2955,7 +2957,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                         if (itemIds.length > 0) {
                           supabase.from('shop_items').select('*').in('id', itemIds).then(({ data: items }) => {
                             if (items) setCustomizations({
-                              badge: items.find(i => i.id === custSettings.active_badge),
                               name_color: items.find(i => i.id === custSettings.active_name_color),
                               background: items.find(i => i.id === custSettings.active_background),
                               theme: items.find(i => i.id === custSettings.active_theme),
@@ -3106,7 +3107,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>You don't own any items yet. Visit the Profile Shop to get some!</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {['badge', 'name_color', 'avatar_border', 'background', 'companion', 'theme'].map(type => {
+                    {['name_color', 'avatar_border', 'background', 'companion', 'theme'].map(type => {
                       const typeItems = ownedItems.filter(p => p.shop_items?.type === type);
                       if (typeItems.length === 0) return null;
                       const activeId = pendingCustSettings?.[`active_${type}`];
@@ -4842,7 +4843,6 @@ export default function UserPortal() {
         .select(`
           user_id,
           active_theme,
-          active_badge,
           active_name_color,
           active_background,
           active_companion
@@ -4853,7 +4853,7 @@ export default function UserPortal() {
 
       // Get shop items for the active customizations
       const itemIds = settings.flatMap(s => 
-        [s.active_theme, s.active_badge, s.active_name_color, s.active_background, s.active_companion].filter(Boolean)
+        [s.active_theme, s.active_name_color, s.active_background, s.active_companion].filter(Boolean)
       );
 
       const { data: items } = await supabase
@@ -4869,7 +4869,6 @@ export default function UserPortal() {
         const setting = settings.find(s => s.user_id === acc.id);
         if (setting) {
           customsMap[acc.ctu_id] = {
-            badge: items.find(i => i.id === setting.active_badge),
             name_color: items.find(i => i.id === setting.active_name_color),
             background: items.find(i => i.id === setting.active_background),
             theme: items.find(i => i.id === setting.active_theme),
@@ -7494,6 +7493,7 @@ export default function UserPortal() {
     </div>
   );
 }
+
 
 
 
