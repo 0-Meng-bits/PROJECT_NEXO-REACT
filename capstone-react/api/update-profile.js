@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('accounts').update({ full_name: full_name.trim() }).eq('id', userId);
   }
 
-  if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
+  if (!Object.keys(updates).length) return res.json({ message: 'Profile updated.' }); // only full_name changed, still success
 
   const { error } = await supabaseAdmin
     .from('account_details')

@@ -3022,7 +3022,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     value={editForm.full_name}
                     onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
                     maxLength={60}
-                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
+                    autoComplete="off"
+                    style={{ width: '100%', background: 'rgba(0,240,255,0.06)', border: 'none', borderBottom: '1px solid var(--cyber-cyan)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: '2px 4px', borderRadius: 0 }}
                     placeholder="Your display name"
                   />
                 ) : (
