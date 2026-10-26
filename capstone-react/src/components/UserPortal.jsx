@@ -2394,7 +2394,7 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
 }
 
 // -- PROFILE MODAL -------------------------------------------------------------
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
@@ -2569,7 +2569,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...updates }));
       if (editForm.full_name && editForm.full_name !== user.full_name) {
-        setCurrentUser(prev => ({ ...prev, full_name: editForm.full_name }));
+        onUpdateUser && onUpdateUser(prev => ({ ...prev, full_name: editForm.full_name }));
       }
 
       // Commit pending customizations to DB
@@ -7341,7 +7341,7 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
-      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onUpdateUser={setCurrentUser} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal
           user={viewingProfile}
