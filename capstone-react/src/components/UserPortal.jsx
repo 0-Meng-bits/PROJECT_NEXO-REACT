@@ -4891,14 +4891,17 @@ export default function UserPortal() {
     setMessagesLoading(true);
 
     const calcFirstUnread = async (msgs) => {
-      if (!user?.id || !msgs?.length) return;
+      if (!user?.id || !msgs?.length) { console.log('[UNREAD] early exit - no user or msgs'); return; }
       const otherMsgs = msgs.filter(m => m.sender_id !== user.student_id);
-      if (!otherMsgs.length) return;
+      console.log('[UNREAD] total msgs:', msgs.length, 'other msgs:', otherMsgs.length, 'user.student_id:', user.student_id);
+      if (!otherMsgs.length) { console.log('[UNREAD] no other msgs'); return; }
       const { data: reads } = await supabase.from('message_reads')
         .select('message_id').eq('reader_id', user.id)
         .in('message_id', otherMsgs.map(m => m.id));
       const readIds = new Set((reads || []).map(r => r.message_id));
+      console.log('[UNREAD] reads count:', reads?.length, 'unread count:', otherMsgs.filter(m => !readIds.has(m.id)).length);
       const first = otherMsgs.find(m => !readIds.has(m.id));
+      console.log('[UNREAD] first unread:', first?.id);
       if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(first.id); }
     };
 
