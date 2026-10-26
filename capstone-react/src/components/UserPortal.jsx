@@ -4909,7 +4909,7 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
-      markMessagesRead(data || []);
+      setTimeout(() => markMessagesRead(data || []), 1000);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
@@ -4921,7 +4921,7 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
-      markMessagesRead(data || []);
+      setTimeout(() => markMessagesRead(data || []), 1000);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
@@ -4935,7 +4935,7 @@ export default function UserPortal() {
       setMessages(data || []);
       fetchAvatarsForMessages(data || []);
       loadCustomizationsForMessages(data || []);
-      markMessagesRead(data || []);
+      setTimeout(() => markMessagesRead(data || []), 1000);
       const msgs = data || [];
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
@@ -4968,7 +4968,7 @@ export default function UserPortal() {
     setCircleChatMessages(data || []);
     fetchAvatarsForMessages(data || []);
     loadCustomizationsForMessages(data || []);
-    markMessagesRead(data || []);
+      setTimeout(() => markMessagesRead(data || []), 1000);
     const msgs = data || [];
     const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
     const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
