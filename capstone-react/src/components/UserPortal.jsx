@@ -2944,10 +2944,10 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
             <div className="profile-edit-actions" style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0, marginLeft: 'auto' }}>
               {!readOnly && (!editing
-                ? <button className="cyber-btn" onClick={() => setEditing(true)} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
+                ? <button className="cyber-btn" onClick={() => { setEditForm(f => ({ ...f, ...profile, full_name: user.full_name || '' })); setEditing(true); }} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
                 : <>
                     <button className="cyber-btn secondary" onClick={() => { 
-                      setEditForm({ ...profile }); 
+                      setEditForm({ ...profile, full_name: user.full_name || '' }); 
                       setPendingCustSettings({ ...custSettings });
                       setPendingPhotos({ ...profilePhotos });
                       // revert cover and avatar previews
