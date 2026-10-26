@@ -2436,7 +2436,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .eq('id', user.id).single();
       if (!error && data) {
         setProfile({ program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
-        setEditForm({ program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
+        setEditForm(f => ({ ...f, program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' }));
         if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
         if (data.cover_url) setCoverUrl(data.cover_url);
         if (data.id_photo_url) setIdUploaded(true);
