@@ -2879,6 +2879,17 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 alignItems: 'center',
                 gap: 8
               }}>
+                {editing ? (
+                  <input
+                    value={editForm.full_name}
+                    onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
+                    maxLength={60}
+                    autoComplete="off"
+                    className="profile-modal-name"
+                    style={{ fontSize: 24, fontWeight: 800, letterSpacing: 1, lineHeight: 1.2, background: 'transparent', border: 'none', borderBottom: '2px solid var(--cyber-cyan)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', textTransform: 'uppercase', padding: '0 2px', width: 'auto', minWidth: 60, maxWidth: 260 }}
+                    placeholder="YOUR NAME"
+                  />
+                ) : (
                 <span className="profile-modal-name" style={{
                   fontSize: 24, 
                   fontWeight: 800,
@@ -2909,6 +2920,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 }}>
                   {user.full_name?.toUpperCase()}
                 </span>
+                )}
                 {customizations?.badge && (
                   <span style={{ fontSize: 16 }} title={customizations.badge.name}>
                     {customizations.badge.preview_url}
@@ -3013,22 +3025,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>PROGRAM</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '—'}</div>
                 {editing && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>Contact admin to change your program.</div>}
-              </div>
-              {/* Display Name — editable */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>DISPLAY NAME</div>
-                {editing ? (
-                  <input
-                    value={editForm.full_name}
-                    onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
-                    maxLength={60}
-                    autoComplete="off"
-                    style={{ width: '100%', background: 'rgba(0,240,255,0.06)', border: 'none', borderBottom: '1px solid var(--cyber-cyan)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: '2px 4px', borderRadius: 0 }}
-                    placeholder="Your display name"
-                  />
-                ) : (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{user.full_name || '—'}</div>
-                )}
               </div>
               {/* Year — editable inline, students only */}
               {user.user_type !== 'Faculty' && (
