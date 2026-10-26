@@ -4338,7 +4338,7 @@ export default function UserPortal() {
     if (!studentId) return;
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url)')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url, gender)')
       .eq('ctu_id', String(studentId)).single();
     if (!error && data) {
       const flat = {
