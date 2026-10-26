@@ -4887,22 +4887,19 @@ export default function UserPortal() {
   const loadMessages = useCallback(async (commId, channelId) => {
     // Reset first unread on each load
     firstUnreadMsgId.current = null;
-    setFirstUnreadId(null);
+    // firstUnreadId reset handled by useEffect on community switch
     setMessagesLoading(true);
 
     const calcFirstUnread = async (msgs) => {
-      if (!user?.id || !msgs?.length) { console.log('[UNREAD] early exit - no user or msgs'); return; }
+      if (!user?.id || !msgs?.length) return;
       const otherMsgs = msgs.filter(m => m.sender_id !== user.student_id);
-      console.log('[UNREAD] total msgs:', msgs.length, 'other msgs:', otherMsgs.length, 'user.student_id:', user.student_id);
-      if (!otherMsgs.length) { console.log('[UNREAD] no other msgs'); return; }
+      if (!otherMsgs.length) return;
       const { data: reads } = await supabase.from('message_reads')
         .select('message_id').eq('reader_id', user.id)
         .in('message_id', otherMsgs.map(m => m.id));
       const readIds = new Set((reads || []).map(r => r.message_id));
-      console.log('[UNREAD] reads count:', reads?.length, 'unread count:', otherMsgs.filter(m => !readIds.has(m.id)).length);
       const first = otherMsgs.find(m => !readIds.has(m.id));
-      console.log('[UNREAD] first unread:', first?.id);
-      if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(first.id); }
+      if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(prev => prev || first.id); }
     };
 
     if (commId === 'global') {
@@ -4965,7 +4962,7 @@ export default function UserPortal() {
           .in('message_id', otherMsgs.map(m => m.id));
         const readIds = new Set((reads || []).map(r => r.message_id));
         const first = otherMsgs.find(m => !readIds.has(m.id));
-        if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(first.id); }
+        if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(prev => prev || first.id); }
       }
     }
     setCircleChatMessages(data || []);
@@ -4981,6 +4978,7 @@ export default function UserPortal() {
   // Initial load + realtime subscription ? re-runs when channel/community changes
   useEffect(() => {
     setMessages([]); // clear stale messages immediately so old context doesn't flash
+    setFirstUnreadId(null); // reset unread divider on community switch
     loadMessages(activeCommId, activeChannelId);
   }, [activeCommId, activeChannelId]); // eslint-disable-line
 
