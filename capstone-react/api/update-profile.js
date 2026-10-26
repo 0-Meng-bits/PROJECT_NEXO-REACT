@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const userId = req.query.userId || req.headers['x-user-id'] || req.body?.userId;
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
-  const { program, year_level, interests, last_seen, bio, cover_url, discoverable } = req.body;
+  const { program, year_level, interests, last_seen, bio, cover_url, discoverable, full_name } = req.body;
   const updates = {};
   if (program !== undefined) updates.program = program;
   if (year_level !== undefined) updates.year_level = year_level;
@@ -15,6 +15,11 @@ export default async function handler(req, res) {
   if (bio !== undefined) updates.bio = bio;
   if (cover_url !== undefined) updates.cover_url = cover_url;
   if (discoverable !== undefined) updates.discoverable = discoverable;
+
+  // Update full_name in accounts table separately
+  if (full_name !== undefined && full_name.trim()) {
+    await supabaseAdmin.from('accounts').update({ full_name: full_name.trim() }).eq('id', userId);
+  }
 
   if (!Object.keys(updates).length) return res.status(400).json({ message: 'Nothing to update.' });
 

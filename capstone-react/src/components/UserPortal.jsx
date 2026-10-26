@@ -2407,7 +2407,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [idUploading, setIdUploading] = useState(false);
   const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
+  const [editForm, setEditForm] = useState({ full_name: user.full_name || '', program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
   const [profile, setProfile] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
@@ -2529,7 +2529,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ program: editForm.program, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
+        body: JSON.stringify({ full_name: editForm.full_name, program: editForm.program, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
       });
       if (!res.ok) { setSaving(false); return; }
       setProfile({ ...editForm });
@@ -2568,11 +2568,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }
 
       localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...updates }));
+      if (editForm.full_name && editForm.full_name !== user.full_name) {
+        setCurrentUser(prev => ({ ...prev, full_name: editForm.full_name }));
+      }
 
       // Commit pending customizations to DB
       if (pendingCustSettings) {
         const token = localStorage.getItem('accessToken');
-        const types = ['badge', 'name_color', 'avatar_border', 'background', 'companion', 'theme'];
+        const types = ['name_color', 'avatar_border', 'background', 'companion', 'theme'];
         for (const type of types) {
           const pendingVal = pendingCustSettings[`active_${type}`];
           const savedVal = custSettings?.[`active_${type}`];
@@ -3005,18 +3008,25 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   </div>
                 )}
               </div>
-              {/* Program — editable inline */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
+              {/* Program — read-only, contact admin to change */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>PROGRAM</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '—'}</div>
+                {editing && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>Contact admin to change your program.</div>}
+              </div>
+              {/* Display Name — editable */}
+              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>DISPLAY NAME</div>
                 {editing ? (
-                  <select value={editForm.program} onChange={e => setEditForm(f => ({ ...f, program: e.target.value }))}
-                    className="dark-select"
-                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700, padding: 0, outline: 'none', cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select program</option>
-                    {PROGRAMS.map(c => <option key={c} value={c} style={{ background: '#1a1a2e', color: 'white' }}>{c}</option>)}
-                  </select>
+                  <input
+                    value={editForm.full_name}
+                    onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
+                    maxLength={60}
+                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
+                    placeholder="Your display name"
+                  />
                 ) : (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '—'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{user.full_name || '—'}</div>
                 )}
               </div>
               {/* Year — editable inline, students only */}
