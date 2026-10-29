@@ -5,8 +5,11 @@ import { supabase, supabaseAdmin } from './_supabase.js';
  * Returns { streak, points_awarded } to include in login response.
  * Points are written to point_transactions — the DB trigger syncs account_status.trust_points.
  */
-async function processLoginStreak(userId, currentTrustPoints) {
-  const today = new Date().toISOString().slice(0, 10);
+async function processLoginStreak(userId) {
+  // Use Philippine time (UTC+8) so "today" matches the user's actual calendar day
+  const now = new Date();
+  const phTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const today = phTime.toISOString().slice(0, 10);
 
   const { data: record, error: fetchError } = await supabaseAdmin
     .from('login_streaks')
@@ -59,8 +62,7 @@ async function processLoginStreak(userId, currentTrustPoints) {
     }
   }
 
-  // Award trust points — non-fatal if point_transactions table doesn't exist
-  const newTp = (currentTrustPoints ?? 0) + pointsAwarded; // no arbitrary cap — welcome bonus can push above 10
+  // Award trust points — increment directly to avoid overwriting TP earned from other actions
   try {
     await supabaseAdmin.from('point_transactions').insert([{
       user_id: userId, amount: pointsAwarded, transaction_type: 'daily_recovery',
@@ -70,9 +72,10 @@ async function processLoginStreak(userId, currentTrustPoints) {
     // point_transactions is optional — streak still counts without it
   }
 
-  // Always update trust_points directly on account_status
+  // Fetch current TP then increment — avoids overwriting TP earned from other actions
+  const { data: current } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', userId).single();
   await supabaseAdmin.from('account_status')
-    .update({ trust_points: newTp })
+    .update({ trust_points: (current?.trust_points ?? 0) + pointsAwarded })
     .eq('id', userId);
 
   return { streak: newStreak, points_awarded: pointsAwarded };
@@ -140,7 +143,7 @@ export default async function handler(req, res) {
   let streakInfo = { streak: 0, points_awarded: 0 };
   if (!isPending) {
     try {
-      streakInfo = await processLoginStreak(account.id, status.trust_points ?? 0);
+      streakInfo = await processLoginStreak(account.id);
     } catch (err) {
       console.error('[LOGIN] Streak processing error:', err.message);
     }
