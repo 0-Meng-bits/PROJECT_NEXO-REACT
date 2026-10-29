@@ -2815,6 +2815,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCoverChange} />
             </>
           )}
+          {/* Report cover photo — only when viewing another user's profile and cover exists */}
+          {readOnly && user?.cover_url && onReport && (
+            <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Cover photo of ${user.full_name}`, reportedUserId: user.id })}
+              title="Report this cover photo"
+              style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(247,95,95,0.4)', color: 'var(--red)', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, backdropFilter: 'blur(6px)', opacity: 0.8 }}
+              onMouseEnter={e => e.currentTarget.style.opacity = 1}
+              onMouseLeave={e => e.currentTarget.style.opacity = 0.8}>
+              <i className="fa-solid fa-flag" style={{ fontSize: 10 }} /> Report Cover
+            </button>
+          )}
         </div>
 
         {/* AVATAR + NAME ROW */}
@@ -2870,6 +2880,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   </button>
                   <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
                 </>
+              )}
+              {/* Report avatar — only when viewing another user's profile */}
+              {readOnly && avatarUrl && onReport && (
+                <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Avatar photo of ${user.full_name}`, reportedUserId: user.id })}
+                  title="Report this profile photo"
+                  style={{ position: 'absolute', bottom: 2, right: 2, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(247,95,95,0.5)', color: 'var(--red)', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fa-solid fa-flag" />
+                </button>
               )}
             </div>
 
@@ -6660,7 +6678,7 @@ export default function UserPortal() {
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button "? top-right, only for creator */}
+                  {/* Cover photo edit button — top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -6720,6 +6738,16 @@ export default function UserPortal() {
                         }}
                       />
                     </label>
+                  )}
+                  {/* Report circle cover/logo — visible to non-owners when cover exists */}
+                  {!isOwner && activeComm.cover_url && user?.user_type !== 'Admin' && (
+                    <button onClick={() => setShowReport({ type: 'circle_photo', id: activeComm.id, preview: `Cover photo of circle: ${activeComm.name}`, reportedUserId: activeComm.creator_id })}
+                      title="Report this circle cover photo"
+                      style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(247,95,95,0.4)', color: 'var(--red)', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, backdropFilter: 'blur(6px)', opacity: 0.8, zIndex: 5 }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                      onMouseLeave={e => e.currentTarget.style.opacity = 0.8}>
+                      <i className="fa-solid fa-flag" style={{ fontSize: 10 }} /> Report Cover
+                    </button>
                   )}
                   <div className="circle-cover-overlay">
                     <div className="circle-cover-icon">
@@ -7350,6 +7378,7 @@ export default function UserPortal() {
           onLogout={() => {}}
           onAvatarUpdate={() => {}}
           currentAvatarUrl={viewingProfile.avatar_url}
+          onReport={(data) => setShowReport(data)}
           readOnly
         />
       )}
