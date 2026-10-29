@@ -2282,7 +2282,7 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
 }
 
 // -- PROFILE PHOTOS SECTION ----------------------------------------------------
-function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUploading, onUpload, onDelete, onTogglePrivacy }) {
+function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUploading, onUpload, onDelete, onTogglePrivacy, onReport }) {
   const [savedPhotos, setSavedPhotos] = useState([null, null]);
   const [reactions, setReactions] = useState({});
   const photoRefs = [useRef(null), useRef(null)];
@@ -2363,11 +2363,20 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
                     </div>
                   )}
                   {readOnly && photo.id && (
-                    <button onClick={() => toggleReact(photo.id)}
-                      style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
-                      <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
-                      {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
-                    </button>
+                    <>
+                      <button onClick={() => toggleReact(photo.id)}
+                        style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                        <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
+                        {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
+                      </button>
+                      {onReport && (
+                        <button onClick={() => onReport({ type: 'profile_photo', id: photo.id, preview: `Profile photo ${slot} of ${user?.full_name}`, reportedUserId: user?.id })}
+                          title="Report this photo"
+                          style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(247,95,95,0.4)', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 10, color: 'var(--red)' }}>
+                          <i className="fa-solid fa-flag" />
+                        </button>
+                      )}
+                    </>
                   )}
                 </>
               ) : (
@@ -3120,6 +3129,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               onUpload={handlePhotoUpload}
               onDelete={handlePhotoDelete}
               onTogglePrivacy={togglePhotoPrivacy}
+              onReport={onReport}
             />
 
             {/* CUSTOMIZE panel — shown in edit mode */}

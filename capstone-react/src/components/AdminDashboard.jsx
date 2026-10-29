@@ -699,7 +699,15 @@ export default function AdminDashboard() {
     if (!confirm('Delete this content?')) return;
     if (type === 'message') await supabase.from('messages').delete().eq('id', id);
     if (type === 'announcement') await supabase.from('announcements').delete().eq('id', id);
-    showToast('Content deleted.');
+    if (type === 'profile_photo') {
+      // id is the user's account id — clear their avatar and cover
+      await supabase.from('account_details').update({ avatar_url: null, cover_url: null }).eq('id', id);
+    }
+    if (type === 'circle_photo') {
+      // id is the community id — clear the circle cover
+      await supabase.from('communities').update({ cover_url: null }).eq('id', id);
+    }
+    showToast('Content removed.');
     fetchData();
   };
 
