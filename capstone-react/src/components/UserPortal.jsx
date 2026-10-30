@@ -2630,7 +2630,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
 }
 
 // -- PROFILE MODAL -------------------------------------------------------------
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo, onReport }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
