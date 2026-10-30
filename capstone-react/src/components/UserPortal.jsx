@@ -7066,13 +7066,14 @@ export default function UserPortal() {
                               return (
                                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}
                                   onClick={() => { 
-                                  setShowOnlineModal(false); 
-                                  if (m.sender_id === user?.student_id || m.sender_id === user?.ctu_id) {
-                                    setShowProfile(true);
-                                  } else {
-                                    viewUserProfile(m.sender_id); 
-                                  }
-                                }}>
+                                    setShowOnlineModal(false);
+                                    const memberStudentId = m.student_id || m.ctu_id;
+                                    if (memberStudentId === user?.student_id || memberStudentId === String(user?.ctu_id)) {
+                                      setShowProfile(true);
+                                    } else {
+                                      viewUserProfile(memberStudentId);
+                                    }
+                                  }}>
 
                                   <div style={{ position: 'relative', flexShrink: 0 }}>
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
@@ -7557,11 +7558,18 @@ export default function UserPortal() {
                           {label} ? {group.length}
                         </div>
                         {group.map(m => {
-                          const url = avatarCache[m.sender_id] || m.avatar_url;
+                          const memberStudentId = m.student_id || m.ctu_id;
+                          const url = avatarCache[memberStudentId] || m.avatar_url;
                           const initials = (m.full_name || '?')[0].toUpperCase();
                           const rankLabels = ['', 'MOD', 'CO-LEAD', 'LEADER'];
                           return (
-                            <div key={m.id} onClick={() => viewUserProfile(m.sender_id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
+                            <div key={m.id} onClick={() => {
+                              if (memberStudentId === user?.student_id || memberStudentId === String(user?.ctu_id)) {
+                                setShowProfile(true);
+                              } else {
+                                viewUserProfile(memberStudentId);
+                              }
+                            }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
                               <div style={{ position: 'relative', flexShrink: 0 }}>
                                 <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
                                   {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
