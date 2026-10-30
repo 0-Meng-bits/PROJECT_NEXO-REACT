@@ -3197,31 +3197,24 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     {customizations.badge.preview_url}
                   </span>
                 )}
-                {/* Gender icon */}
+                {/* Line 1: Name + gender icon */}
                 {user?.gender === 'Male' && <i className="fa-solid fa-mars" style={{ fontSize: 13, color: 'var(--cyber-cyan)', marginLeft: 4 }} title="Male" />}
                 {user?.gender === 'Female' && <i className="fa-solid fa-venus" style={{ fontSize: 13, color: '#f472b6', marginLeft: 4 }} title="Female" />}
-                <span style={{
-                  fontSize: 13,
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  letterSpacing: 1,
-                  ...(customizations?.name_color?.css_data
-                    ? (() => {
-                        const d = typeof customizations.name_color.css_data === 'string'
-                          ? JSON.parse(customizations.name_color.css_data)
-                          : customizations.name_color.css_data;
-                        return d.gradient
-                          ? { background: d.gradient, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }
-                          : { color: d.color };
-                      })()
-                    : { color: 'var(--cyber-cyan)' })
-                }}>
-                  <i className="fa-solid fa-id-card" style={{ marginRight: 5 }}></i>{user.student_id}</span>
               </div>
-              <div style={{ marginTop: 6 }}>
+              {/* Line 2: ID + verified icon */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <span style={{
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  fontWeight: 600,
+                  letterSpacing: 1,
+                  color: 'rgba(0,240,255,0.65)',
+                }}>
+                  <i className="fa-solid fa-id-card" style={{ marginRight: 5 }}></i>{user.student_id}
+                </span>
                 {user.is_verified
-                  ? <span className="verified-badge" style={{ fontSize: 11 }}><i className="fa-solid fa-shield-halved" style={{ marginRight: 5 }} />Verified {user.user_type || 'Student'}</span>
-                  : <span className="verified-badge" style={{ fontSize: 11, borderColor: 'var(--orange)', color: 'var(--orange)', background: 'rgba(247,169,79,0.05)' }}><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />Pending Verification</span>
+                  ? <i className="fa-solid fa-shield-halved" style={{ fontSize: 13, color: 'var(--cyber-cyan)' }} title="Verified Student" />
+                  : <i className="fa-solid fa-clock" style={{ fontSize: 13, color: 'var(--orange)' }} title="Pending Verification" />
                 }
               </div>
             </div>
