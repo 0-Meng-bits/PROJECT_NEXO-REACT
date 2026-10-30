@@ -99,7 +99,7 @@ function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
       <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
       <span>{Number.isInteger(points) ? points : points.toFixed(1)}</span>
-      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>· {color.label}</span>}
+      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>ï¿½ {color.label}</span>}
     </div>
   );
 }
@@ -508,7 +508,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             )}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {isAnon ? 'Anonymous' : a.author_type} ï¿½ {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
@@ -575,13 +575,13 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
+                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% ï¿½ {votes}</span>}
                 </div>
               </button>
             );
           })}
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` · You voted "${myVote}"` : a.event_metadata?.is_closed ? " · Poll Closed" : " · Click to vote"}
+            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` ï¿½ You voted "${myVote}"` : a.event_metadata?.is_closed ? " ï¿½ Poll Closed" : " ï¿½ Click to vote"}
           </div>
         </div>
       )}
@@ -601,7 +601,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           <i className="fa-solid fa-lock"></i>
           <span>
             Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` · Winning option: ${a.event_metadata.winning_option}`}
+            {a.event_metadata.winning_option && ` ï¿½ Winning option: ${a.event_metadata.winning_option}`}
           </span>
         </div>
       )}
@@ -773,7 +773,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           {isSolutionComment ? '? Unmark Solution' : '? Mark as Solution'}
                         </button>
                       )}
-                      {/* Heart + Reply — inside bubble so they don't overflow on mobile */}
+                      {/* Heart + Reply ï¿½ inside bubble so they don't overflow on mobile */}
                       {user?.is_verified && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
                           <button onClick={() => toggleCommentHeart(c.id)}
@@ -1163,7 +1163,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
 
         {Object.entries(reactions).some(([, users]) => users.length > 0) && (
           <div style={{ position: 'relative' }}>
-            {/* Single row of all reaction chips — click any to open the unified popup */}
+            {/* Single row of all reaction chips ï¿½ click any to open the unified popup */}
             <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
               {[['heart','??'],['laugh','??'],['sad','??'],['fire','??'],['wow','??']].map(([type, emoji]) =>
                 reactions[type]?.length > 0 ? (
@@ -1175,7 +1175,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               )}
             </div>
 
-            {/* Unified reactions popup — rendered as fixed overlay to avoid layout glitch */}
+            {/* Unified reactions popup ï¿½ rendered as fixed overlay to avoid layout glitch */}
             {showReactors && (
               <>
                 {/* Backdrop to close on outside click */}
@@ -1358,10 +1358,10 @@ function CreateModal({ onClose, onCreated, userId }) {
   const canSubmit = form.name.trim() && form.interest_tag;
 
   const openHint = invitees.length === 0
-    ? 'Required — you have no invited connections. Circle will recruit members publicly.'
+    ? 'Required ï¿½ you have no invited connections. Circle will recruit members publicly.'
     : invitees.length === 1
-    ? 'Required — you need 1 more member. Circle will also recruit publicly.'
-    : 'Optional — you have 2 invites. Circle can activate privately or stay open.';
+    ? 'Required ï¿½ you need 1 more member. Circle will also recruit publicly.'
+    : 'Optional ï¿½ you have 2 invites. Circle can activate privately or stay open.';
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -1389,7 +1389,7 @@ function CreateModal({ onClose, onCreated, userId }) {
       alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
       onClose();
     } catch {
-      alert('Network error — could not submit request.');
+      alert('Network error ï¿½ could not submit request.');
     }
     setLoading(false);
   };
@@ -1414,7 +1414,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           </select>
         </div>
 
-        {/* Interest tag — REQUIRED, single select, filtered by category */}
+        {/* Interest tag ï¿½ REQUIRED, single select, filtered by category */}
         {interestOptions.length > 0 && (
           <div className="input-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1427,7 +1427,7 @@ function CreateModal({ onClose, onCreated, userId }) {
                 <option key={i} value={i}>{INTEREST_LABELS_MAP[i] || i}</option>
               ))}
             </select>
-            {!form.interest_tag && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Required — pick what this circle is about.</div>}
+            {!form.interest_tag && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Required ï¿½ pick what this circle is about.</div>}
           </div>
         )}
 
@@ -1451,7 +1451,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
         </div>
 
-        {/* Open for Applications — auto-locked when invitees < 2 */}
+        {/* Open for Applications ï¿½ auto-locked when invitees < 2 */}
         <div className="input-group">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <label style={{ margin: 0 }}>OPEN FOR APPLICATIONS</label>
@@ -1465,7 +1465,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           </div>
         </div>
 
-        {/* Invite connections — clean card style */}
+        {/* Invite connections ï¿½ clean card style */}
         {connectionsLoaded && connections.length > 0 && (
           <div className="input-group">
             <label>INVITE YOUR CONNECTIONS</label>
@@ -1494,7 +1494,7 @@ function CreateModal({ onClose, onCreated, userId }) {
               <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', marginTop: 6 }}>
                 <i className="fa-solid fa-users" style={{ marginRight: 5 }}></i>
                 {invitees.length} connection{invitees.length !== 1 ? 's' : ''} selected
-                {invitees.length < 2 && ' — select 1 more to make Open optional'}
+                {invitees.length < 2 && ' ï¿½ select 1 more to make Open optional'}
               </div>
             )}
           </div>
@@ -2426,7 +2426,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [customizations, setCustomizations] = useState(null);
   const [ownedItems, setOwnedItems] = useState([]);
   const [custSettings, setCustSettings] = useState(null);
-  // Pending (staged) customization selections — only committed on Save
+  // Pending (staged) customization selections ï¿½ only committed on Save
   const [pendingCustSettings, setPendingCustSettings] = useState(null);
   const [profilePhotos, setProfilePhotos] = useState({ 1: null, 2: null }); // slot -> { id, photo_url, is_public }
   const [pendingPhotos, setPendingPhotos] = useState({ 1: null, 2: null }); // staged changes
@@ -2471,7 +2471,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     const token = localStorage.getItem('accessToken');
 
     if (readOnly) {
-      // Viewing someone else's profile — count their connections via Supabase directly
+      // Viewing someone else's profile ï¿½ count their connections via Supabase directly
       supabase
         .from('connections')
         .select('id', { count: 'exact', head: true })
@@ -2479,7 +2479,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .eq('status', 'accepted')
         .then(({ count }) => setConnectionsCount(count || 0));
     } else {
-      // Own profile — load full connections list
+      // Own profile ï¿½ load full connections list
       fetch(getApiUrl('/api/connections'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
@@ -2639,14 +2639,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
       const photoUrl = urlData.publicUrl;
-      // Stage in pending — DB write happens on Save
+      // Stage in pending ï¿½ DB write happens on Save
       setPendingPhotos(prev => ({ ...prev, [slot]: { ...(prev[slot] || {}), photo_url: photoUrl, slot, is_public: prev[slot]?.is_public ?? true } }));
     } catch (err) { console.error('Photo upload error:', err); }
     setPhotoUploading(null);
   };
 
   const handlePhotoDelete = async (slot) => {
-    // Stage deletion — DB write happens on Save
+    // Stage deletion ï¿½ DB write happens on Save
     setPendingPhotos(prev => ({ ...prev, [slot]: null }));
   };
 
@@ -2655,7 +2655,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   };
 
   const applyCustomization = async (type, itemId) => {
-    // Only stage the change locally — committed to DB on Save
+    // Only stage the change locally ï¿½ committed to DB on Save
     setPendingCustSettings(prev => ({ ...prev, [`active_${type}`]: itemId }));
     if (itemId) {
       const { data: item } = await supabase.from('shop_items').select('*').eq('id', itemId).single();
@@ -2708,7 +2708,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.onerror = reject;
         img.src = objectUrl;
       });
-      // Stage only — saved to DB on Save
+      // Stage only ï¿½ saved to DB on Save
       setPendingCoverUrl(compressed);
     } catch (err) { console.error(err); }
     finally { setCoverUploading(false); }
@@ -2735,7 +2735,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         img.onerror = reject;
         img.src = objectUrl;
       });
-      // Stage only — saved to DB on Save
+      // Stage only ï¿½ saved to DB on Save
       setPendingAvatarUrl(compressed);
       setAvatarUrl(compressed); // preview immediately
     } catch (err) { console.error(err); }
@@ -2824,7 +2824,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCoverChange} />
             </>
           )}
-          {/* Report cover photo — only when viewing another user's profile and cover exists */}
+          {/* Report cover photo ï¿½ only when viewing another user's profile and cover exists */}
           {readOnly && user?.cover_url && onReport && (
             <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Cover photo of ${user.full_name}`, reportedUserId: user.id })}
               title="Report this cover photo"
@@ -2890,7 +2890,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
                 </>
               )}
-              {/* Report avatar — only when viewing another user's profile */}
+              {/* Report avatar ï¿½ only when viewing another user's profile */}
               {readOnly && avatarUrl && onReport && (
                 <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Avatar photo of ${user.full_name}`, reportedUserId: user.id })}
                   title="Report this profile photo"
@@ -2971,7 +2971,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                           : { color: d.color };
                       })()
                     : { color: 'var(--cyber-cyan)' })
-                }}>· {user.student_id}</span>
+                }}>ï¿½ {user.student_id}</span>
               </div>
               <div style={{ marginTop: 6 }}>
                 {user.is_verified
@@ -3027,7 +3027,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {/* Member Since — always read-only */}
+              {/* Member Since ï¿½ always read-only */}
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px', gridColumn: '1 / -1' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>BIO</div>
                 {editing ? (
@@ -3047,13 +3047,13 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   </div>
                 )}
               </div>
-              {/* Program — read-only, contact admin to change */}
+              {/* Program ï¿½ read-only, contact admin to change */}
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>PROGRAM</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '—'}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || 'ï¿½'}</div>
                 {editing && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>Contact admin to change your program.</div>}
               </div>
-              {/* Year — editable inline, students only */}
+              {/* Year ï¿½ editable inline, students only */}
               {user.user_type !== 'Faculty' && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>YEAR</div>
@@ -3065,7 +3065,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                     {['1st Year','2nd Year','3rd Year','4th Year'].map(y => <option key={y} value={y} style={{ background: '#1a1a2e', color: 'white' }}>{y}</option>)}
                   </select>
                 ) : (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.year_level || '—'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.year_level || 'ï¿½'}</div>
                 )}
               </div>
               )}
@@ -3074,7 +3074,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             {/* Trust Points Badge */}
             <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
 
-            {/* Appear in Discover toggle — only for own profile in edit mode */}
+            {/* Appear in Discover toggle ï¿½ only for own profile in edit mode */}
             {!readOnly && editing && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -3090,7 +3090,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               </div>
             )}
 
-            {/* Interests — view or edit inline */}
+            {/* Interests ï¿½ view or edit inline */}
             {(!editing && profile.interests?.length > 0) && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
@@ -3132,7 +3132,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
               onReport={onReport}
             />
 
-            {/* CUSTOMIZE panel — shown in edit mode */}
+            {/* CUSTOMIZE panel ï¿½ shown in edit mode */}
             {!readOnly && editing && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>
@@ -4290,7 +4290,7 @@ export default function UserPortal() {
   const [mutedCategories, setMutedCategories] = useState([]); // notification category mutes
   const [streakCount, setStreakCount] = useState(0); // login streak for flame icon
 
-  // Block navigation away from /portal when on home feed — show logout modal instead
+  // Block navigation away from /portal when on home feed ï¿½ show logout modal instead
   const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
 
   useEffect(() => {
@@ -4437,7 +4437,7 @@ export default function UserPortal() {
       }
     });
 
-    // Add reactors as implicit readers — use accounts.id (UUID) for consistent dedup
+    // Add reactors as implicit readers ï¿½ use accounts.id (UUID) for consistent dedup
     (reacts || []).forEach(r => {
       const uuid = r.accounts?.id;
       if (!uuid) return;
@@ -4451,7 +4451,7 @@ export default function UserPortal() {
       }
     });
 
-    // Final dedup pass — ensure no duplicate reader_ids per message
+    // Final dedup pass ï¿½ ensure no duplicate reader_ids per message
     Object.keys(grouped).forEach(msgId => {
       const seen = new Set();
       grouped[msgId] = grouped[msgId].filter(r => {
@@ -4485,7 +4485,7 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
-  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } — message being replied to
+  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } ï¿½ message being replied to
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
@@ -5097,7 +5097,7 @@ export default function UserPortal() {
   useEffect(() => { sectionRef.current = section; }, [section]);
 
   // Ref that always holds the latest state values needed by the back handler.
-  // Avoids stale closures — listener registered once, reads fresh values via ref.
+  // Avoids stale closures ï¿½ listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
   useEffect(() => {
     backStateRef.current = {
@@ -5109,8 +5109,8 @@ export default function UserPortal() {
   });
 
   // Guard flag: set to true when WE trigger replaceState/pushState so popstate
-  // Back-button / swipe-back handler — registered ONCE on mount.
-  // pushState never fires popstate — only the user's back gesture does.
+  // Back-button / swipe-back handler ï¿½ registered ONCE on mount.
+  // pushState never fires popstate ï¿½ only the user's back gesture does.
   // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
     // Push a trap entry so we can intercept the back button
@@ -5483,7 +5483,7 @@ export default function UserPortal() {
       navTo('home', 'global');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error — could not delete circle.');
+      showToast('Network error ï¿½ could not delete circle.');
     }
   };
 
@@ -5563,7 +5563,7 @@ export default function UserPortal() {
     c.id === 'global' || c.creator_id === user?.id || isMember(c.id)
   );
 
-  // Circles for profile display — excludes the global feed
+  // Circles for profile display ï¿½ excludes the global feed
   const myCirclesForProfile = myCircles.filter(c => c.id !== 'global');
 
   return (
@@ -5677,7 +5677,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT — notifications + user hud */}
+        {/* RIGHT ï¿½ notifications + user hud */}
         <div className="user-hud">
           {/* Desktop-only: Shop + Theme + Calendar buttons */}
           <button className="notif-bell desktop-only-btn" onClick={() => setShowShop(true)} title="Profile Shop">
@@ -5784,7 +5784,7 @@ export default function UserPortal() {
             <span className="hud-value">{user?.student_id}</span>
           </div>
           {streakCount > 0 && (
-            <div className="hud-chip" title={`${streakCount}-day login streak — log in daily to earn trust points!`}
+            <div className="hud-chip" title={`${streakCount}-day login streak ï¿½ log in daily to earn trust points!`}
               onClick={() => showToast(`?? ${streakCount}-day streak! Log in daily to earn up to +5 Trust Points per day.`)}
               style={{ cursor: 'pointer' }}>
               <span style={{ fontSize: 13 }}>??</span>
@@ -6139,7 +6139,7 @@ export default function UserPortal() {
               {/* -- POST COMPOSER "? verified users only -- */}
               {user?.is_verified && (
                 <div className="home-post-composer">
-                  {/* Collapsed prompt — click to expand */}
+                  {/* Collapsed prompt ï¿½ click to expand */}
                   {!showComposer ? (
                     <div className="home-composer-header" onClick={() => setShowComposer(true)}
                       style={{ cursor: 'pointer' }}>
@@ -6241,7 +6241,7 @@ export default function UserPortal() {
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously — click to use your name' : 'Post anonymously'}>
+                        title={newPost.anonymous ? 'Posting anonymously ï¿½ click to use your name' : 'Post anonymously'}>
                         <i className="fa-solid fa-user-secret"></i>
                         <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
                       </button>
@@ -6584,7 +6584,7 @@ export default function UserPortal() {
                           {c.status === 'pending' && (
                             <div style={{ fontSize: 11, color: 'var(--orange)', background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.2)', borderRadius: 6, padding: '5px 10px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                               <i className="fa-solid fa-circle-info"></i>
-                              This circle is forming — needs members to activate. Apply to join!
+                              This circle is forming ï¿½ needs members to activate. Apply to join!
                             </div>
                           )}
                           <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.description || 'No description provided.'}</p>
@@ -6688,7 +6688,7 @@ export default function UserPortal() {
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button — top-right, only for creator */}
+                  {/* Cover photo edit button ï¿½ top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -6749,7 +6749,7 @@ export default function UserPortal() {
                       />
                     </label>
                   )}
-                  {/* Report circle cover/logo — visible to non-owners when cover exists */}
+                  {/* Report circle cover/logo ï¿½ visible to non-owners when cover exists */}
                   {!isOwner && activeComm.cover_url && user?.user_type !== 'Admin' && (
                     <button onClick={() => setShowReport({ type: 'circle_photo', id: activeComm.id, preview: `Cover photo of circle: ${activeComm.name}`, reportedUserId: activeComm.creator_id })}
                       title="Report this circle cover photo"
