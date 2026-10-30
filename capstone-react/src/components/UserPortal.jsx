@@ -4409,18 +4409,12 @@ export default function UserPortal() {
   // Also treats reactors as implicit readers since reacting means they saw the message
   const fetchReadCounts = useCallback(async (msgIds) => {
     if (!msgIds?.length) return;
-
-    // Fetch actual reads
-    const { data: reads } = await supabase
-      .from('message_reads')
-      .select('message_id, reader_id, accounts:reader_id(full_name, account_details(avatar_url))')
-      .in('message_id', msgIds);
-
-    // Fetch reactors (implicit reads)
-    const { data: reacts } = await supabase
-      .from('message_reactions')
-      .select('message_id, sender_id')
-      .in('message_id', msgIds);
+    const _chunk = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i*n, i*n+n));
+    const _batches = _chunk(msgIds, 50);
+    const [reads, reacts] = await Promise.all([
+      Promise.all(_batches.map(b => supabase.from('message_reads').select('message_id, reader_id, accounts:reader_id(full_name, account_details(avatar_url))').in('message_id', b).then(r => r.data || []))).then(r => r.flat()),
+      Promise.all(_batches.map(b => supabase.from('message_reactions').select('message_id, sender_id').in('message_id', b).then(r => r.data || []))).then(r => r.flat()),
+    ]);
 
     const grouped = {};
     msgIds.forEach(id => { grouped[id] = []; });
