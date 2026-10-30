@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
-/* ── DEFAULT / CYBER DARK THEME ── */
+/* â”€â”€ DEFAULT / CYBER DARK THEME â”€â”€ */
 :root,
 [data-theme="cyber-dark"] {
   --bg-black: #0d0d12;
@@ -25,7 +25,7 @@
   --grid-line: rgba(0,240,255,0.05);
 }
 
-/* ── MIDNIGHT BLUE THEME ── */
+/* â”€â”€ MIDNIGHT BLUE THEME â”€â”€ */
 [data-theme="midnight-blue"] {
   --bg-black: #0a0e1a;
   --card-bg: #111827;
@@ -49,7 +49,7 @@
   --grid-line: rgba(79,142,247,0.04);
 }
 
-/* ── NEON PURPLE THEME ── */
+/* â”€â”€ NEON PURPLE THEME â”€â”€ */
 [data-theme="neon-purple"] {
   --bg-black: #0d0a1a;
   --card-bg: #1a1028;
@@ -73,7 +73,7 @@
   --grid-line: rgba(192,132,252,0.04);
 }
 
-/* ── LIGHT THEME ── */
+/* â”€â”€ LIGHT THEME â”€â”€ */
 [data-theme="light"] {
   --bg-black: #f1f5f9;
   --card-bg: #ffffff;
@@ -97,7 +97,7 @@
   --grid-line: rgba(14,165,233,0.06);
 }
 
-/* ── FOREST THEME ── */
+/* â”€â”€ FOREST THEME â”€â”€ */
 [data-theme="forest"] {
   --bg-black: #0a1a0e;
   --card-bg: #0f2318;
@@ -284,7 +284,7 @@ body {
   box-sizing: border-box;
 }
 
-/* Glow blobs � same as landing hero */
+/* Glow blobs ï¿½ same as landing hero */
 .auth-page::before,
 .auth-page::after {
   content: '';
@@ -382,6 +382,11 @@ body {
   color: #888;
   margin-bottom: 8px;
 }
+/* Hide browser native password reveal button (Edge/Chrome) */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+input[type="password"]::-webkit-credentials-auto-fill-button { display: none; }
+
 .input-group input,
 .input-group select {
   width: 100%;
@@ -551,7 +556,7 @@ body {
   overflow: visible;
 }
 
-/* LEFT — clock */
+/* LEFT â€” clock */
 .nav-clock {
   display: flex;
   flex-direction: column;
@@ -579,7 +584,7 @@ body {
   .nav-clock-date { font-size: 8px; letter-spacing: 0.5px; }
 }
 
-/* CENTER — search */
+/* CENTER â€” search */
 .nav-search-wrap {
   flex: 1;
   max-width: 480px;
@@ -680,7 +685,7 @@ body {
   gap: 12px;
 }
 
-/* Hidden on desktop — dock handles create circle there */
+/* Hidden on desktop â€” dock handles create circle there */
 .mobile-create-circle-btn { display: none; }
 .hud-chip {
   background: rgba(21, 21, 30, 0.8);
@@ -834,7 +839,7 @@ body {
   justify-content: flex-start;
 }
 
-/* Scrollable inner area — everything below the brand header */
+/* Scrollable inner area â€” everything below the brand header */
 .sidebar-scroll {
   flex: 1;
   overflow-y: auto;
@@ -969,7 +974,7 @@ body {
   pointer-events: none;
 }
 
-/* Channel delete X — hidden until hover */
+/* Channel delete X â€” hidden until hover */
 .channel-delete-btn {
   margin-left: auto;
   font-size: 11px;
@@ -1084,7 +1089,7 @@ body {
 
 .stat-val { color: var(--cyber-cyan); font-weight: 700; }
 
-/* MEMBERS PANEL — Discord/reference style */
+/* MEMBERS PANEL â€” Discord/reference style */
 .members-banner {
   text-align: center;
   padding: 32px 20px 20px;
@@ -1284,7 +1289,7 @@ body {
 .manage-tab:hover { color: white; background: rgba(255,255,255,0.03); }
 .manage-tab.active { color: var(--cyber-yellow); border-bottom-color: var(--cyber-yellow); }
 
-/* On small screens — icon only, no text */
+/* On small screens â€” icon only, no text */
 @media (max-width: 480px) {
   .manage-tab { padding: 10px 4px; font-size: 10px; gap: 0; }
   .manage-tab span { display: none; }
@@ -1740,7 +1745,7 @@ body {
 .reaction-chip:hover { background: rgba(255,255,255,0.1); }
 .reaction-chip.mine { background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.35); color: var(--cyber-cyan); }
 
-/* Reaction names tooltip — shows on hover */
+/* Reaction names tooltip â€” shows on hover */
 .reaction-names-tooltip { opacity: 0; pointer-events: none; }
 div:hover > .reaction-names-tooltip { opacity: 1; }
 .req-badge {
@@ -1797,7 +1802,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   border-radius: 0 0 15px 15px;
 }
 
-/* c-feed directly above composer — remove bottom radius and gap so they connect */
+/* c-feed directly above composer â€” remove bottom radius and gap so they connect */
 .c-feed + .composer {
   margin-top: 0;
 }
@@ -1807,7 +1812,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   margin-bottom: 0;
 }
 
-/* Chat view — transparent/floating style like Messenger */
+/* Chat view â€” transparent/floating style like Messenger */
 .c-feed-chat {
   background: transparent !important;
   border: none !important;
@@ -1843,7 +1848,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   flex: 1 1 0% !important;
 }
 
-/* Media/voice buttons — always visible */
+/* Media/voice buttons â€” always visible */
 .chat-input-wrap .chat-action-btn {
   transition: opacity 0.2s;
   opacity: 1;
@@ -1851,7 +1856,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   overflow: visible;
 }
 
-/* Send button — small icon circle */
+/* Send button â€” small icon circle */
 .chat-send-btn {
   width: 34px;
   height: 34px;
@@ -2174,9 +2179,9 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .adm-search:focus { border-color: var(--cyber-cyan); }
 .adm-search::placeholder { color: var(--text-muted); }
 
-/* ══════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    ANALYTICS SECTION
-══════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .analytics-controls {
   display: flex;
   align-items: center;
@@ -2408,7 +2413,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   line-height: 1.6;
 }
 
-/* ── HOME FEED POST COMPOSER ── */
+/* â”€â”€ HOME FEED POST COMPOSER â”€â”€ */
 .home-post-composer {
   background: var(--card-bg);
   border: 1px solid rgba(0,240,255,0.15);
@@ -2541,7 +2546,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   font-size: 14px;
 }
 
-/* GLOBAL FEED — ANNOUNCEMENTS */
+/* GLOBAL FEED â€” ANNOUNCEMENTS */
 .announcement-composer {
   background: var(--card-bg);
   border: 1px solid rgba(0,240,255,0.15);
@@ -2780,7 +2785,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   border-color: rgba(0,240,255,0.15);
 }
 
-/* HOME FEED — hero, featured, popular */
+/* HOME FEED â€” hero, featured, popular */
 .home-hero {
   border-radius: 14px;
   background: linear-gradient(135deg, #0d1a3a 0%, #1a0d3a 50%, #0d2a1a 100%);
@@ -2986,7 +2991,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   word-break: break-word;
 }
 .circle-cover-overlay > div:last-child { min-width: 0; flex: 1; }
-/* Camera button � top-right corner */
+/* Camera button ï¿½ top-right corner */
 .circle-cover-edit-btn {
   position: absolute;
   top: 10px;
@@ -3024,7 +3029,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* ===================== MOBILE RESPONSIVENESS ===================== */
 
-/* Tablet — hide dock, collapse sidebar */
+/* Tablet â€” hide dock, collapse sidebar */
 @media (max-width: 900px) {
   .mobile-only-create-circle { display: flex; }
   .sidebar {
@@ -3045,7 +3050,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   .adm-stats-row { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Mobile — full screen single panel */
+/* Mobile â€” full screen single panel */
 @media (max-width: 640px) {
   /* Portal layout stacks vertically */
   .portal-layout { flex-direction: column; }
@@ -3103,7 +3108,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 @media (max-width: 640px) {
 
-  /* Hide circle dock by default on mobile — shown as overlay when dock-mobile-open */
+  /* Hide circle dock by default on mobile â€” shown as overlay when dock-mobile-open */
   .circle-dock {
     display: none;
     position: fixed;
@@ -3116,7 +3121,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
   .circle-dock.dock-mobile-open { display: flex; }
 
-  /* Hide sidebar by default on mobile — toggled via hamburger */
+  /* Hide sidebar by default on mobile â€” toggled via hamburger */
   .sidebar {
     position: fixed;
     top: 60px;
@@ -3143,7 +3148,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   .c-feed:has(+ .composer) { margin-bottom: 0 !important; border-radius: 15px 15px 0 0 !important; }
   .c-feed + .composer { margin-top: 0; }
 
-  /* Circle view — banner and feed flush together, no side gaps */
+  /* Circle view â€” banner and feed flush together, no side gaps */
   .circle-banner-wrap {
     margin: 10px 10px 0 10px !important;
     border-radius: 15px 15px 0 0 !important;
@@ -3153,7 +3158,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     margin: 0 10px 10px 10px !important;
     border-radius: 0 0 15px 15px !important;
   }
-  /* Post type buttons — smaller on mobile so they fit in 2 rows max */
+  /* Post type buttons â€” smaller on mobile so they fit in 2 rows max */
   .home-type-btn {
     padding: 4px 9px;
     font-size: 10px;
@@ -3213,7 +3218,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   .members-table { font-size: 11px; }
 }
 
-/* Hamburger button — shown only on mobile */
+/* Hamburger button â€” shown only on mobile */
 .mobile-menu-btn {
   display: none;
   background: rgba(255,255,255,0.04);
@@ -3752,7 +3757,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   line-height: 1.5;
 }
 
-/* Onboarding � override input/select/button colors */
+/* Onboarding ï¿½ override input/select/button colors */
 .onboarding-card .input-group label {
   color: var(--text-muted);
 }
@@ -3861,7 +3866,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .theme-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
 .theme-card.active { border-color: var(--cyber-cyan); }
 .theme-card.active::after {
-  content: '✓';
+  content: 'âœ“';
   position: absolute;
   top: 8px;
   right: 10px;
@@ -4153,7 +4158,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   text-align: center;
 }
 
-/* ── Camera view ── */
+/* â”€â”€ Camera view â”€â”€ */
 .id-camera-wrap { width: 100%; }
 .id-camera-frame {
   position: relative;
@@ -4300,7 +4305,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   box-shadow: 0 4px 14px rgba(0,240,255,0.3);
 }
 
-/* -- HERO � SPLIT LAYOUT -- */
+/* -- HERO ï¿½ SPLIT LAYOUT -- */
 .lnd-hero {
   min-height: 100vh;
   display: flex;
@@ -4461,7 +4466,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .lnd-stat-lbl { font-size: 9px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; text-align: center; white-space: nowrap; }
 .lnd-stat-sep { width: 1px; height: 34px; background: var(--border); flex-shrink: 0; }
 
-/* RIGHT � visual orb */
+/* RIGHT ï¿½ visual orb */
 .lnd-hero-right {
   position: relative;
   z-index: 1;
@@ -5424,7 +5429,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
 }
 
-/* ── MOBILE: Banner compact + Task board horizontal scroll ── */
+/* â”€â”€ MOBILE: Banner compact + Task board horizontal scroll â”€â”€ */
 @media (max-width: 640px) {
   .circle-cover-banner,
   .circle-cover-overlay {
@@ -5442,7 +5447,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     font-size: 22px !important;
   }
 
-  /* Task board — horizontal scroll so columns don't squish */
+  /* Task board â€” horizontal scroll so columns don't squish */
   .task-board-columns {
     display: flex !important;
     flex-direction: row !important;
@@ -5457,7 +5462,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
 }
 
-/* ── MOBILE: Explore circle cards stack vertically ── */
+/* â”€â”€ MOBILE: Explore circle cards stack vertically â”€â”€ */
 @media (max-width: 640px) {
   .circle-explore-card {
     flex-direction: column !important;
@@ -5474,16 +5479,16 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
 }
 
-/* ── MOBILE: Profile modal, Theme picker, Profile Shop ── */
+/* â”€â”€ MOBILE: Profile modal, Theme picker, Profile Shop â”€â”€ */
 @media (max-width: 640px) {
-  /* Profile modal — single column, tighter padding */
+  /* Profile modal â€” single column, tighter padding */
   .profile-modal-body {
     grid-template-columns: 1fr !important;
     padding: 16px !important;
     gap: 14px !important;
   }
 
-  /* Profile modal cover + avatar — scale down on mobile */
+  /* Profile modal cover + avatar â€” scale down on mobile */
   .profile-modal-cover {
     height: 160px !important;
   }
@@ -5501,7 +5506,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     left: -16px !important;
   }
 
-  /* Edit/Cancel/Save buttons — push to new row on mobile */
+  /* Edit/Cancel/Save buttons â€” push to new row on mobile */
   .profile-edit-actions {
     margin-left: 0 !important;
     width: 100%;
@@ -5511,7 +5516,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     flex: 1;
   }
 
-  /* Theme picker — 2 columns instead of 3 */
+  /* Theme picker â€” 2 columns instead of 3 */
   .theme-picker-modal {
     padding: 20px 16px !important;
     margin: 12px !important;
@@ -5522,7 +5527,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     gap: 10px !important;
   }
 
-  /* Profile Shop modal — ensure it fits */
+  /* Profile Shop modal â€” ensure it fits */
   .modal-box {
     margin: 8px !important;
     max-height: 94vh !important;
@@ -5531,7 +5536,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 }
 
 
-/* ── MOBILE: Announcement card header + comments ── */
+/* â”€â”€ MOBILE: Announcement card header + comments â”€â”€ */
 @media (max-width: 640px) {
   .announcement-header {
     flex-wrap: nowrap;
@@ -5546,7 +5551,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
     flex-shrink: 0;
   }
 
-  /* Hide badge label text — keep only the icon */
+  /* Hide badge label text â€” keep only the icon */
   .post-type-label {
     display: none;
   }
@@ -5564,7 +5569,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   }
 }
 
-/* ── MOBILE: Sidebar logo — show only icon, hide text ── */
+/* â”€â”€ MOBILE: Sidebar logo â€” show only icon, hide text â”€â”€ */
 .sidebar-logo-icon { display: none; }
 
 @media (max-width: 640px) {
