@@ -4622,6 +4622,11 @@ export default function UserPortal() {
 
   const viewUserProfile = async (studentId) => {
     if (!studentId) return;
+    // If clicking on own profile, open the full own-profile modal instead of read-only view
+    if (String(studentId) === String(user?.student_id) || String(studentId) === String(user?.ctu_id)) {
+      setShowProfile(true);
+      return;
+    }
     const { data, error } = await supabase
       .from('accounts')
       .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url, gender)')
