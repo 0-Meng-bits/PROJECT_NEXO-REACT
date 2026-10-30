@@ -3045,7 +3045,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
+      <div className="profile-modal-box" onClick={e => e.stopPropagation()} style={{
         backgroundColor: 'var(--card-bg)',
         ...getBackgroundStyle(),
         ...getThemeStyle(),
@@ -3053,7 +3053,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         borderRadius: 16, width: '100%', maxWidth: 820,
         maxHeight: '92vh', overflowY: 'auto',
         boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
-        scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,240,255,0.2) transparent',
+        scrollbarWidth: 'none',
       }}>
 
         {/* COVER */}
