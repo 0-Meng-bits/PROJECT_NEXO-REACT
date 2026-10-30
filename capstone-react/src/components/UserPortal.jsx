@@ -1123,7 +1123,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
               </button>
               {showEmojiPicker && (
                 <div style={{ position: 'absolute', bottom: '100%', [isOwnerMsg ? 'right' : 'left']: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','??'],['laugh','??'],['sad','??'],['fire','??'],['wow','??']].map(([type, icon, color]) => (
+                  {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) => (
                     <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
                       style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
@@ -1165,7 +1165,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           <div style={{ position: 'relative' }}>
             {/* Single row of all reaction chips ÃƒÂ¯Ã‚Â¿Ã‚Â½ click any to open the unified popup */}
             <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-              {[['heart','??'],['laugh','??'],['sad','??'],['fire','??'],['wow','??']].map(([type, icon, color]) =>
+              {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) =>
                 reactions[type]?.length > 0 ? (
                   <button key={type} onClick={() => { setShowReactors(true); setReactorTab(type); }}
                     style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
@@ -1199,7 +1199,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                       </button>
                     );
                   })()}
-                  {[['heart','??'],['laugh','??'],['sad','??'],['fire','??'],['wow','??']].map(([type, icon, color]) =>
+                  {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) =>
                     reactions[type]?.length > 0 ? (
                       <button key={type} onClick={() => setReactorTab(type)}
                         style={{ background: reactorTab === type ? 'rgba(0,240,255,0.15)' : 'none', border: `1px solid ${reactorTab === type ? 'var(--cyber-cyan)' : 'transparent'}`, borderRadius: 20, padding: '3px 8px', fontSize: 12, cursor: 'pointer', color: reactorTab === type ? 'var(--cyber-cyan)' : 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -1219,7 +1219,7 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                     .flatMap(([type, icon, color]) =>
                       (reactions[type] || []).map(id => ({ id, icon, color, type }))
                     )
-                    .map(({ id, icon, color }) => (
+                    .map(({ id, icon, color, type }) => (
                       <div key={type + '-' + id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', borderRadius: 8 }}>
                         <span style={{ fontSize: 13, color: id === currentStudentId ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.85)' }}>
                           {reactorNames[id] || '...'}
