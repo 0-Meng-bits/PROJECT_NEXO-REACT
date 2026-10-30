@@ -2403,7 +2403,7 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
 }
 
 // -- CIRCLE INFO CARD MODAL --------------------------------------------------
-function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onViewLeaderProfile }) {
+function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile }) {
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [leaderProfile, setLeaderProfile] = useState(null);
 
@@ -2453,16 +2453,30 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   let actionBtn = null;
   if (isActive) {
     actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
-        <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 7 }}></i>ENTER CIRCLE
-      </button>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
+          <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 7 }}></i>ENTER CIRCLE
+        </button>
+        {/* Leave — only for members, not the owner */}
+        {!isOwner && (
+          <button className="group-action-btn terminate" onClick={() => onLeave && onLeave(circle.id)} title="Leave circle" style={{ fontSize: 13, padding: '8px 12px' }}>
+            <i className="fa-solid fa-right-from-bracket"></i>
+          </button>
+        )}
+      </div>
     );
   } else if (isInvitedState) {
     actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onEnter(circle.id)}
-        style={{ fontSize: 13, padding: '8px 22px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
-        <i className="fa-solid fa-check" style={{ marginRight: 7 }}></i>ACCEPT INVITE
-      </button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="group-action-btn manage" onClick={() => onAcceptInvite && onAcceptInvite(circle.id)}
+          style={{ fontSize: 13, padding: '8px 18px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+          <i className="fa-solid fa-check" style={{ marginRight: 7 }}></i>ACCEPT
+        </button>
+        <button className="group-action-btn terminate" onClick={() => onDeclineInvite && onDeclineInvite(circle.id)}
+          style={{ fontSize: 13, padding: '8px 18px' }}>
+          <i className="fa-solid fa-xmark" style={{ marginRight: 7 }}></i>DECLINE
+        </button>
+      </div>
     );
   } else if (!isVerified) {
     actionBtn = (
@@ -2480,9 +2494,12 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
     const appColors = { pending: 'var(--cyber-yellow)', approved: 'var(--green)', rejected: 'var(--red)' };
     const appColor = appColors[myApp.status] || 'var(--cyber-cyan)';
     actionBtn = (
-      <span style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}` }}>
-        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>APPLICATION {(myApp.status || '').toUpperCase()}
-      </span>
+      <button onClick={() => onViewApplication && onViewApplication(myApp, circle)}
+        style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}`, background: 'transparent', cursor: 'pointer' }}>
+        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>
+        APPLICATION {(myApp.status || '').toUpperCase()}
+        <i className="fa-solid fa-eye" style={{ marginLeft: 8, fontSize: 10, opacity: 0.7 }}></i>
+      </button>
     );
   } else if (circle.application_enabled && !circle.internal_Application) {
     actionBtn = (
@@ -6797,118 +6814,65 @@ export default function UserPortal() {
                 return filtered.length === 0 ? (
                   <div className="post"><p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles found in this category.</p></div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {filtered.map(c => {
                       const owned = c.creator_id === user?.id;
                       const joined = isMember(c.id);
                       const pending = isPending(c.id);
                       const invited = isInvited(c.id);
                       const myApplication = getMyApplication(c.id);
+
+                      // Status indicator shown on the card (quick glance only)
+                      let statusBadge = null;
+                      if (invited) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-envelope" style={{ marginRight: 4 }}></i>INVITED</span>;
+                      else if (owned) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-crown" style={{ marginRight: 4 }}></i>YOUR CIRCLE</span>;
+                      else if (joined) statusBadge = <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>JOINED</span>;
+                      else if (pending) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-clock" style={{ marginRight: 4 }}></i>PENDING</span>;
+                      else if (myApplication) statusBadge = <span style={{ fontSize: 10, color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result), border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`, padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>{ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}</span>;
+
                       return (
-                        <div key={c.id} className="post circle-explore-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setShowCircleInfo(c)}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                              {c.logo_url
-                                ? <img src={c.logo_url} alt={c.name} style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
-                                : <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
-                              }
-                              <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
-                              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
-                              {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
-                              {c.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-                              {c.is_open && c.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-                              {c.application_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-                            </div>
-                            {c.status === 'pending' && (
-                              <div style={{ fontSize: 11, color: 'var(--orange)', background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.2)', borderRadius: 6, padding: '5px 10px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <i className="fa-solid fa-circle-info"></i>
-                                This circle is forming — needs members to activate. Apply to join!
-                              </div>
-                            )}
-                            <p style={{ color: 'var(--text-muted)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{c.description || 'No description provided.'}</p>
+                        <div key={c.id} className="post circle-explore-card"
+                          style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', cursor: 'pointer' }}
+                          onClick={() => setShowCircleInfo(c)}>
+
+                          {/* Logo */}
+                          <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, overflow: 'hidden', background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {c.logo_url
+                              ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <i className={c.icon || getCategoryIcon(c.category)} style={{ fontSize: 18, color: 'var(--cyber-cyan)' }} />
+                            }
                           </div>
-                        <div style={{ flexShrink: 0, marginLeft: 20 }}>
-                          {owned || joined ? (
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <button className="group-action-btn manage"
-                                onClick={() => { navTo('circles', c.id); }}>
-                                <i className="fa-solid fa-arrow-right-to-bracket"></i> ENTER
-                              </button>
-                              {!owned && (
-                                <button className="group-action-btn terminate"
-                                  onClick={() => leaveCircle(c.id)}
-                                  title="Leave circle">
-                                  <i className="fa-solid fa-right-from-bracket"></i>
-                                </button>
-                              )}
+
+                          {/* Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 3 }}>
+                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</span>
+                              <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '1px 6px', borderRadius: 4, letterSpacing: 1 }}>{c.category}</span>
+                              {c.status === 'pending' && <span style={{ fontSize: 9, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '1px 6px', borderRadius: 4 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 3 }}></i>Forming</span>}
+                              {c.is_open && c.status !== 'pending' && <span style={{ fontSize: 9, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '1px 6px', borderRadius: 4 }}><i className="fa-solid fa-door-open" style={{ marginRight: 3 }}></i>Open</span>}
+                              {c.application_enabled && <span style={{ fontSize: 9, color: 'var(--cyber-cyan)', border: '1px solid rgba(0,240,255,0.4)', padding: '1px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 3 }}></i>Application</span>}
                             </div>
-                          ) : invited ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                              <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1 }}>
-                                <i className="fa-solid fa-envelope" style={{ marginRight: 5 }}></i>INVITED
+                            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.description || <span style={{ fontStyle: 'italic', opacity: 0.4 }}>No description</span>}
+                            </p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                <i className="fa-solid fa-users" style={{ fontSize: 9, marginRight: 4 }}></i>{memberCounts[c.id] || 0} member{(memberCounts[c.id] || 0) !== 1 ? 's' : ''}
                               </span>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button className="group-action-btn manage"
-                                  onClick={() => acceptInvite(c.id)}
-                                  style={{ background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
-                                  <i className="fa-solid fa-check"></i> ACCEPT
-                                </button>
-                                <button className="group-action-btn terminate"
-                                  onClick={() => declineInvite(c.id)}>
-                                  <i className="fa-solid fa-xmark"></i> DECLINE
-                                </button>
-                              </div>
+                              {statusBadge}
                             </div>
-                          ) : !user?.is_verified ? (
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)', border: '1px solid #333', padding: '5px 12px', borderRadius: 20 }}>
-                              <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>Verify to join
-                            </span>
-                          ) : pending ? (
-                            <span style={{ fontSize: 11, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '5px 12px', borderRadius: 20 }}>
-                              <i className="fa-solid fa-clock" style={{ marginRight: 5 }}></i>PENDING
-                            </span>
-                          ) : myApplication ? (
-                            <span
-                              style={{
-                                fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 20,
-                                color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result),
-                                border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`,
-                                cursor: 'pointer',
-                              }}
-                              onClick={async () => {
-                                const [rRes, qRes] = await Promise.all([
-                                  supabase.from('application_submissions').select('*').eq('id', myApplication.id).single(),
-                                  supabase.from('Application_questions').select('*').eq('community_id', c.id).order('order_index'),
-                                ]);
-                                setViewingApplication({ response: rRes.data, community: c, questions: qRes.data || [] });
-                              }}
-                            >
-                              <i className="fa-solid fa-microphone" style={{ marginRight: 5 }}></i>
-                              {ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}
-                              <i className="fa-solid fa-eye" style={{ marginLeft: 6, fontSize: 9 }}></i>
-                            </span>
-                          ) : (
-                            c.application_enabled ? (
-                              // Internal Application: outsiders can still REQUEST to join; Application is only for existing members
-                              c.internal_Application ? (
-                                <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
-                                  <i className="fa-solid fa-paper-plane"></i> REQUEST
-                                </button>
-                              ) : (
-                                <button className="group-action-btn manage" onClick={() => setShowApplicationForm({ comm: c })}>
-                                  <i className="fa-solid fa-microphone"></i> APPLY
-                                </button>
-                              )
-                            ) : (
-                              <button className="group-action-btn manage" onClick={() => requestJoin(c.id)}>
-                                <i className="fa-solid fa-paper-plane"></i> REQUEST
-                              </button>
-                            )
-                          )}
+                          </div>
+
+                          {/* Single CTA */}
+                          <button
+                            className="group-action-btn manage"
+                            onClick={e => { e.stopPropagation(); setShowCircleInfo(c); }}
+                            style={{ flexShrink: 0, fontSize: 11, padding: '6px 14px', whiteSpace: 'nowrap' }}>
+                            <i className="fa-solid fa-eye" style={{ marginRight: 6 }}></i>VIEW
+                          </button>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -7742,6 +7706,17 @@ export default function UserPortal() {
           onEnter={(commId) => { setShowCircleInfo(null); navTo('circles', commId); }}
           onRequestJoin={async (commId) => { await requestJoin(commId); setShowCircleInfo(null); }}
           onApply={(comm) => { setShowCircleInfo(null); setShowApplicationForm({ comm }); }}
+          onAcceptInvite={async (commId) => { await acceptInvite(commId); setShowCircleInfo(null); }}
+          onDeclineInvite={async (commId) => { await declineInvite(commId); setShowCircleInfo(null); }}
+          onLeave={async (commId) => { await leaveCircle(commId); setShowCircleInfo(null); }}
+          onViewApplication={async (myApp, circle) => {
+            const [rRes, qRes] = await Promise.all([
+              supabase.from('application_submissions').select('*').eq('id', myApp.id).single(),
+              supabase.from('Application_questions').select('*').eq('community_id', circle.id).order('order_index'),
+            ]);
+            setShowCircleInfo(null);
+            setViewingApplication({ response: rRes.data, community: circle, questions: qRes.data || [] });
+          }}
           onViewLeaderProfile={viewUserProfile}
         />
       )}
