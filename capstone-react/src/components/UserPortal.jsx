@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -2402,8 +2402,235 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
   );
 }
 
+// -- CIRCLE INFO CARD MODAL --------------------------------------------------
+function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onViewLeaderProfile }) {
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [leaderProfile, setLeaderProfile] = useState(null);
+
+  // Parse interest tags (stored as string or array)
+  const rawTags = circle.interest_tag;
+  const tags = Array.isArray(rawTags)
+    ? rawTags
+    : (rawTags ? String(rawTags).split(',').map(t => t.trim()).filter(Boolean) : []);
+  const visibleTags = tagsExpanded ? tags : tags.slice(0, 5);
+  const hiddenCount = tags.length - 5;
+
+  // Fetch leader profile (avatar + name)
+  useEffect(() => {
+    if (!circle.creator_id) return;
+    supabase
+      .from('accounts')
+      .select('id, full_name, ctu_id, account_details(avatar_url)')
+      .eq('id', circle.creator_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setLeaderProfile({
+            id: data.id,
+            full_name: data.full_name,
+            ctu_id: data.ctu_id,
+            avatar_url: data.account_details?.avatar_url || null,
+          });
+        }
+      });
+  }, [circle.creator_id]);
+
+  // Determine membership state
+  const getMembership = (commId) => myMemberships.find(m => m.community_id === commId);
+  const isOwner = circle.creator_id === currentUser?.id;
+  const membership = getMembership(circle.id);
+  const isActive = isOwner || membership?.status === 'active';
+  const isPending = membership?.status === 'pending';
+  const isInvitedState = membership?.status === 'invited';
+  const myApp = myApplications.find(a => a.community_id === circle.id);
+  const isVerified = currentUser?.is_verified;
+
+  // Category accent colour
+  const catColors = { academic: 'var(--cyber-cyan)', project: 'var(--cyber-yellow)', hobby: 'var(--green)', social: '#a78bfa' };
+  const catColor = catColors[circle.category] || 'var(--cyber-cyan)';
+
+  // Resolve action button
+  let actionBtn = null;
+  if (isActive) {
+    actionBtn = (
+      <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
+        <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 7 }}></i>ENTER CIRCLE
+      </button>
+    );
+  } else if (isInvitedState) {
+    actionBtn = (
+      <button className="group-action-btn manage" onClick={() => onEnter(circle.id)}
+        style={{ fontSize: 13, padding: '8px 22px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+        <i className="fa-solid fa-check" style={{ marginRight: 7 }}></i>ACCEPT INVITE
+      </button>
+    );
+  } else if (!isVerified) {
+    actionBtn = (
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', border: '1px solid #333', padding: '8px 18px', borderRadius: 20 }}>
+        <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Verify to join
+      </span>
+    );
+  } else if (isPending) {
+    actionBtn = (
+      <span style={{ fontSize: 12, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '8px 18px', borderRadius: 20 }}>
+        <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>PENDING APPROVAL
+      </span>
+    );
+  } else if (myApp) {
+    const appColors = { pending: 'var(--cyber-yellow)', approved: 'var(--green)', rejected: 'var(--red)' };
+    const appColor = appColors[myApp.status] || 'var(--cyber-cyan)';
+    actionBtn = (
+      <span style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}` }}>
+        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>APPLICATION {(myApp.status || '').toUpperCase()}
+      </span>
+    );
+  } else if (circle.application_enabled && !circle.internal_Application) {
+    actionBtn = (
+      <button className="group-action-btn manage" onClick={() => onApply(circle)} style={{ fontSize: 13, padding: '8px 22px' }}>
+        <i className="fa-solid fa-microphone" style={{ marginRight: 7 }}></i>APPLY TO JOIN
+      </button>
+    );
+  } else {
+    actionBtn = (
+      <button className="group-action-btn manage" onClick={() => onRequestJoin(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
+        <i className="fa-solid fa-paper-plane" style={{ marginRight: 7 }}></i>JOIN CIRCLE
+      </button>
+    );
+  }
+
+  const initials = leaderProfile?.full_name
+    ? leaderProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 540, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
+
+        {/* Cover banner */}
+        <div style={{
+          height: 130, position: 'relative',
+          background: circle.cover_url
+            ? `url(${circle.cover_url}) center/cover no-repeat`
+            : 'linear-gradient(135deg, rgba(0,240,255,0.2) 0%, rgba(100,0,255,0.2) 100%)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <button onClick={onClose} style={{
+            position: 'absolute', top: 10, right: 12,
+            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
+            cursor: 'pointer', fontSize: 15, borderRadius: '50%',
+            width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+          {/* Floating logo */}
+          <div style={{
+            position: 'absolute', bottom: -26, left: 20,
+            width: 54, height: 54, borderRadius: 12,
+            border: '3px solid var(--bg-primary)',
+            overflow: 'hidden', background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {circle.logo_url
+              ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
+            }
+          </div>
+        </div>
+
+        {/* Content body */}
+        <div style={{ padding: '36px 22px 22px 22px', overflowY: 'auto', maxHeight: 'calc(85vh - 130px)' }}>
+
+          {/* Name + stat badges */}
+          <div style={{ marginBottom: 12 }}>
+            <h2 style={{ margin: '0 0 8px 0', fontSize: 19, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0.3 }}>{circle.name}</h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, textTransform: 'uppercase', fontWeight: 700 }}>{circle.category}</span>
+              {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+              {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
+              {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
+              {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #333', padding: '2px 9px', borderRadius: 20 }}>
+                <i className="fa-solid fa-users" style={{ fontSize: 9 }}></i>{memberCount} member{memberCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p style={{
+            fontSize: 13, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)',
+            lineHeight: 1.65, margin: '0 0 16px 0',
+            fontStyle: circle.description ? 'normal' : 'italic',
+            borderLeft: circle.description ? '3px solid rgba(0,240,255,0.25)' : 'none',
+            paddingLeft: circle.description ? 12 : 0,
+          }}>
+            {circle.description || 'No description provided.'}
+          </p>
+
+          {/* Interest tags */}
+          {tags.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 7 }}>INTERESTS</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {visibleTags.map((tag, i) => (
+                  <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>
+                    {tag}
+                  </span>
+                ))}
+                {!tagsExpanded && hiddenCount > 0 && (
+                  <button onClick={() => setTagsExpanded(true)} style={{ fontSize: 11, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: 20, cursor: 'pointer' }}>
+                    +{hiddenCount} more
+                  </button>
+                )}
+                {tagsExpanded && tags.length > 5 && (
+                  <button onClick={() => setTagsExpanded(false)} style={{ fontSize: 11, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: 20, cursor: 'pointer' }}>
+                    Show less
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Leader row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, marginBottom: 20 }}>
+            <i className="fa-solid fa-crown" style={{ fontSize: 11, color: 'var(--cyber-yellow)', flexShrink: 0 }}></i>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Leader</span>
+            {leaderProfile ? (
+              <button
+                onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                  background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700, color: 'var(--cyber-cyan)',
+                }}>
+                  {leaderProfile.avatar_url
+                    ? <img src={leaderProfile.avatar_url} alt={leaderProfile.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : initials
+                  }
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
+                <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 9, color: 'var(--text-muted)' }}></i>
+              </button>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {circle.accounts?.full_name || <span style={{ color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Loading...</span>}
+              </span>
+            )}
+          </div>
+
+          {/* Action button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {actionBtn}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // -- PROFILE MODAL -------------------------------------------------------------
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
@@ -3211,7 +3438,18 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
                   {communities.map(c => (
                     <div key={c.id}
-                      onClick={() => { if (onClose) onClose(); if (c.id && c.id !== 'global') { setTimeout(() => { window.dispatchEvent(new CustomEvent('nexo-navigate-circle', { detail: { circleId: c.id } })); }, 100); } }}
+                      onClick={() => {
+                        if (readOnly && onCircleInfo) {
+                          // Viewing someone else's profile — show Circle Info Card
+                          onCircleInfo(c);
+                        } else {
+                          // Own profile — navigate directly to the circle
+                          if (onClose) onClose();
+                          if (c.id && c.id !== 'global') {
+                            setTimeout(() => { window.dispatchEvent(new CustomEvent('nexo-navigate-circle', { detail: { circleId: c.id } })); }, 100);
+                          }
+                        }
+                      }}
                       style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 8, padding: '4px 6px', transition: 'background 0.15s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.07)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -4289,6 +4527,8 @@ export default function UserPortal() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [mutedCategories, setMutedCategories] = useState([]); // notification category mutes
   const [streakCount, setStreakCount] = useState(0); // login streak for flame icon
+  const [showCircleInfo, setShowCircleInfo] = useState(null); // circle object for Circle Info Card modal
+  const [showOnlineModal, setShowOnlineModal] = useState(false); // online members modal in circle chat
 
   // Block navigation away from /portal when on home feed ÃƒÂ¯Ã‚Â¿Ã‚Â½ show logout modal instead
   const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
@@ -6565,24 +6805,27 @@ export default function UserPortal() {
                       const myApplication = getMyApplication(c.id);
                       return (
                         <div key={c.id} className="post circle-explore-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                              <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
+                          <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setShowCircleInfo(c)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                              {c.logo_url
+                                ? <img src={c.logo_url} alt={c.name} style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                                : <i className={(c.icon || getCategoryIcon(c.category))} style={{ color: 'var(--cyber-cyan)', fontSize: 16 }}></i>
+                              }
                               <span style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</span>
-                            <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
-                            {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
-                            {c.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-                            {c.is_open && c.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-                            {c.application_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-                          </div>
-                          {c.status === 'pending' && (
-                            <div style={{ fontSize: 11, color: 'var(--orange)', background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.2)', borderRadius: 6, padding: '5px 10px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <i className="fa-solid fa-circle-info"></i>
-                              This circle is forming ÃƒÂ¯Ã‚Â¿Ã‚Â½ needs members to activate. Apply to join!
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', border: '1px solid #333', padding: '2px 6px', borderRadius: 4 }}>{c.category}</span>
+                              {owned && <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 6px', borderRadius: 4 }}>YOUR CIRCLE</span>}
+                              {c.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+                              {c.is_open && c.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
+                              {c.application_enabled && !owned && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 6px', borderRadius: 4 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
                             </div>
-                          )}
-                          <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.description || 'No description provided.'}</p>
-                        </div>
+                            {c.status === 'pending' && (
+                              <div style={{ fontSize: 11, color: 'var(--orange)', background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.2)', borderRadius: 6, padding: '5px 10px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <i className="fa-solid fa-circle-info"></i>
+                                This circle is forming — needs members to activate. Apply to join!
+                              </div>
+                            )}
+                            <p style={{ color: 'var(--text-muted)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{c.description || 'No description provided.'}</p>
+                          </div>
                         <div style={{ flexShrink: 0, marginLeft: 20 }}>
                           {owned || joined ? (
                             <div style={{ display: 'flex', gap: 6 }}>
@@ -7383,6 +7626,7 @@ export default function UserPortal() {
           onAvatarUpdate={() => {}}
           currentAvatarUrl={viewingProfile.avatar_url}
           onReport={(data) => setShowReport(data)}
+          onCircleInfo={(c) => setShowCircleInfo(c)}
           readOnly
         />
       )}
@@ -7475,6 +7719,22 @@ export default function UserPortal() {
       {/* Help Center Modal */}
       {showHelp && (
         <HelpModal user={user} onClose={() => setShowHelp(false)} />
+      )}
+
+      {/* Circle Info Card Modal */}
+      {showCircleInfo && (
+        <CircleInfoCard
+          circle={showCircleInfo}
+          memberCount={memberCounts[showCircleInfo.id] || 0}
+          myMemberships={myMemberships}
+          myApplications={myApplications}
+          currentUser={user}
+          onClose={() => setShowCircleInfo(null)}
+          onEnter={(commId) => { setShowCircleInfo(null); navTo('circles', commId); }}
+          onRequestJoin={async (commId) => { await requestJoin(commId); setShowCircleInfo(null); }}
+          onApply={(comm) => { setShowCircleInfo(null); setShowApplicationForm({ comm }); }}
+          onViewLeaderProfile={viewUserProfile}
+        />
       )}
 
       {/* Theme Picker Modal */}
