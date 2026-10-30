@@ -4218,7 +4218,7 @@ export default function UserPortal() {
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
-  const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [showHierarchyHelp, setShowHierarchyHelp] = useState(false);
   const [circleChatMembers, setCircleChatMembers] = useState([]); // members for the panel
   const [showApplicationForm, setShowApplicationForm] = useState(null); // { comm, Application? }
   const [myApplications, setMyApplications] = useState([]);
@@ -7300,7 +7300,7 @@ export default function UserPortal() {
               )}
               {showMembersPanel && (
                 <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
-                  <div style={{ padding: '0 14px 10px', fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS ? {circleChatMembers.length}</div>
+                  <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS - {circleChatMembers.length}</span><button onClick={() => setShowHierarchyHelp(true)} title='Role Hierarchy' style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}><i className='fa-solid fa-circle-question'></i></button></div>
                   {[
                     { label: 'ONLINE', filter: m => isOnline(m.id) },
                     { label: 'OFFLINE', filter: m => !isOnline(m.id) },
@@ -7428,6 +7428,50 @@ export default function UserPortal() {
       {showShop && (
         <ProfileShop user={user} onClose={() => setShowShop(false)} />
       )}
+      {/* Circle Hierarchy Help Modal */}
+      {showHierarchyHelp && (
+        <div className='modal-overlay' onClick={() => setShowHierarchyHelp(false)}>
+          <div className='modal-box' onClick={e => e.stopPropagation()} style={{ maxWidth: 480, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ margin: 0, fontSize: 14, color: 'var(--cyber-cyan)', letterSpacing: 1 }}><i className='fa-solid fa-shield-halved' style={{ marginRight: 8 }}></i>CIRCLE ROLE HIERARCHY</h3>
+              <button onClick={() => setShowHierarchyHelp(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}><i className='fa-solid fa-xmark'></i></button>
+            </div>
+            <div style={{ padding: '16px 20px', overflowY: 'auto', maxHeight: '75vh' }}>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>Each role has a daily TP giving cap per recipient. You cannot give points upward (e.g. Member cannot give to Leader). 24-hour cooldown per person.</p>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead><tr style={{ background: 'rgba(0,240,255,0.08)' }}>
+                  {['Role','Max','TP Given','Pool','Total'].map(h => <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1, fontSize: 10, borderBottom: '1px solid rgba(0,240,255,0.2)' }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {[
+                    { role: 'Leader',     color: 'var(--cyber-yellow)', icon: 'fa-solid fa-crown',       max: '1',         tp: 5, pool: 1, total: 6 },
+                    { role: 'Co-Leader',  color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-star',        max: '2',         tp: 4, pool: 1, total: 5 },
+                    { role: 'Moderator',  color: 'var(--green)',        icon: 'fa-solid fa-shield',      max: '3',         tp: 3, pool: 1, total: 4 },
+                    { role: 'Member',     color: 'var(--text-muted)',   icon: 'fa-solid fa-user',        max: 'Unlimited', tp: 2, pool: 1, total: 3 },
+                  ].map((r, i) => (
+                    <tr key={r.role} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                      <td style={{ padding: '10px 10px' }}><span style={{ color: r.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><i className={r.icon} style={{ fontSize: 11 }}></i>{r.role}</span></td>
+                      <td style={{ padding: '10px 10px', color: 'var(--text-muted)' }}>{r.max}</td>
+                      <td style={{ padding: '10px 10px', color: 'var(--cyber-yellow)', fontWeight: 700 }}>+{r.tp} TP</td>
+                      <td style={{ padding: '10px 10px', color: 'var(--text-muted)' }}>+{r.pool} TP</td>
+                      <td style={{ padding: '10px 10px', color: 'var(--green)', fontWeight: 700 }}>{r.total} TP</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                <strong style={{ color: 'var(--cyber-yellow)' }}>Rules:</strong><br/>
+                - Max column = max of that role per circle<br/>
+                - TP Given = points given to the recipient<br/>
+                - Pool = points added to the circle TP pool<br/>
+                - You cannot give TP to someone of higher rank<br/>
+                - 24-hour cooldown per recipient
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Help Center Modal */}
       {showHelp && (
         <HelpModal user={user} onClose={() => setShowHelp(false)} />
