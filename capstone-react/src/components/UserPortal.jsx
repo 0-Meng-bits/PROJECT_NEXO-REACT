@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -1789,6 +1789,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState(viewerIsOwner ? 'settings' : 'members');
   const [inviteSearch, setInviteSearch] = useState('');
+
+  const sysMsg = async (text) => {
+    await supabase.from('messages').insert([{
+      sender_id: null, full_name: 'System', content: text,
+      message_type: 'system', community_id: comm.id, channel_id: null,
+    }]);
+  };
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteSearching, setInviteSearching] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -1910,7 +1917,6 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     const { error } = await supabase.from('memberships')
       .update({ status: 'active' }).eq('id', memberId);
     if (!error) {
-      // Send notification to the applicant
       if (member?.user_id) {
         await supabase.from('notifications').insert([{
           user_id: member.user_id,
@@ -1919,6 +1925,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
           link_comm_id: comm.id,
         }]);
       }
+      await sysMsg(`${member?.accounts?.full_name || 'A user'} joined the circle.`);
       fetchMembers();
     }
   };
@@ -1951,6 +1958,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
           message: `You have been removed from "${comm.name}".`,
         }]);
       }
+      await sysMsg(`${name} was removed from the circle.`);
       fetchMembers();
     }
   };
@@ -1975,6 +1983,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
           link_comm_id: comm.id,
         }]);
       }
+      const rankLabels = ['Member', 'Moderator', 'Co-Leader', 'Leader'];
+      const memberName = member?.accounts?.full_name || 'A member';
+      const isPromotion = level > (member?.rank_level ?? 0);
+      await sysMsg(isPromotion
+        ? `${memberName} was promoted to ${rankLabels[level]}.`
+        : `${memberName} was set to ${rankLabels[level]}.`
+      );
       fetchMembers();
     }
   };
@@ -5656,6 +5671,17 @@ export default function UserPortal() {
   const isInvited = (commId) => getMembership(commId)?.status === 'invited';
   const getMyApplication = (commId) => myApplications.find(a => a.community_id === commId);
 
+  const insertSystemMessage = async (commId, text) => {
+    await supabase.from('messages').insert([{
+      sender_id: null,
+      full_name: 'System',
+      content: text,
+      message_type: 'system',
+      community_id: commId,
+      channel_id: null,
+    }]);
+  };
+
   const requestJoin = async (commId) => {
     const { error } = await supabase.from('memberships').insert([{
       community_id: commId, user_id: user.id, rank_level: 0, status: 'pending'
@@ -5669,6 +5695,7 @@ export default function UserPortal() {
     if (!membership) return;
     const { error } = await supabase.from('memberships').update({ status: 'active' }).eq('id', membership.id);
     if (!error) {
+      await insertSystemMessage(commId, `${user.full_name} joined the circle.`);
       await loadMyMemberships();
       showToast('You joined the circle!');
       navTo('circles', commId);
@@ -5834,6 +5861,7 @@ export default function UserPortal() {
     if (!membership) return;
     const { error } = await supabase.from('memberships').delete().eq('id', membership.id);
     if (error) { showToast('Failed to leave circle.'); return; }
+    await insertSystemMessage(commId, `${user.full_name} left the circle.`);
     showToast('You have left the circle.');
     await loadMyMemberships();
     navTo('home', 'global');
@@ -7477,6 +7505,15 @@ export default function UserPortal() {
                           {m.id === firstUnreadId && (
                             <div ref={firstUnreadRef}><UnreadDivider /></div>
                           )}
+                          {m.message_type === 'system' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
+                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>
+                                {m.content}
+                              </span>
+                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                            </div>
+                          ) : (
                           <MessageItem
                             m={m}
                             tagColor={tagColor}
@@ -7502,6 +7539,7 @@ export default function UserPortal() {
                             userCustomizations={userCustomizations}
                             onReply={(msg) => setReplyTo(msg)}
                           />
+                          )}
                         </React.Fragment>
                       );
                     });
