@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -1792,8 +1792,11 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
 
   const sysMsg = async (text) => {
     await supabase.from('messages').insert([{
-      sender_id: null, full_name: 'System', content: text,
-      message_type: 'system', community_id: comm.id, channel_id: null,
+      full_name: 'System',
+      content: '__SYS__' + text,
+      message_type: 'text',
+      community_id: comm.id,
+      channel_id: null,
     }]);
   };
   const [inviteResult, setInviteResult] = useState(null);
@@ -5673,10 +5676,9 @@ export default function UserPortal() {
 
   const insertSystemMessage = async (commId, text) => {
     await supabase.from('messages').insert([{
-      sender_id: null,
       full_name: 'System',
-      content: text,
-      message_type: 'system',
+      content: '__SYS__' + text,
+      message_type: 'text',
       community_id: commId,
       channel_id: null,
     }]);
@@ -7505,11 +7507,11 @@ export default function UserPortal() {
                           {m.id === firstUnreadId && (
                             <div ref={firstUnreadRef}><UnreadDivider /></div>
                           )}
-                          {m.message_type === 'system' ? (
+                          {m.message_type === 'system' || m.content?.startsWith('__SYS__') ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
                               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>
-                                {m.content}
+                                {m.content?.replace('__SYS__', '')}
                               </span>
                               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                             </div>
