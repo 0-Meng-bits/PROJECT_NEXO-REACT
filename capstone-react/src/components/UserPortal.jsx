@@ -2214,7 +2214,7 @@ const INTEREST_LABELS = {
   bxgl: 'Watching BL/GL',
 };
 const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
-const PROGRAMS = ['BEED','BIT AUTO TECH','BIT COM TECH','BIT ELEC TECH','BSED MATH','BSFI','BSHM','BSIE','BSIT','BTLED-HE'];
+const PROGRAMS = ['BEED','BIT - AUTOMOTIVE','BIT - COMPUTER TECHNOLOGY','BIT - ELECTRONICS','BSED - MATH','BSFI','BSHM','BSIE','BSIT','BTLED - HE'];
 
 // -- PROFILE TRUST POINTS SECTION ---------------------------------------------
 function ProfileTrustPointsSection({ userId, onViewHistory }) {

@@ -7,15 +7,15 @@ import VideoEmbed from './VideoEmbed';
 
 const PROGRAMS = [
   'BEED',
-  'BIT AUTO TECH',
-  'BIT COM TECH',
-  'BIT ELEC TECH',
-  'BSED MATH',
+  'BIT - AUTOMOTIVE',
+  'BIT - COMPUTER TECHNOLOGY',
+  'BIT - ELECTRONICS',
+  'BSED - MATH',
   'BSFI',
   'BSHM',
   'BSIE',
   'BSIT',
-  'BTLED-HE',
+  'BTLED - HE',
 ];
 
 const YEAR_LEVELS = ['1st', '2nd', '3rd', '4th'];
