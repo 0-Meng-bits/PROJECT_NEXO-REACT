@@ -7757,10 +7757,10 @@ export default function UserPortal() {
             let saved = false;
             try {
               const token = localStorage.getItem('accessToken');
-              const serverRes = await fetch(getApiUrl('/api/upload-cover'), {
+              const serverRes = await fetch(getApiUrl('/api/upload'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ cover_url: croppedDataUrl, communityId: activeCommId }),
+                body: JSON.stringify({ action: 'upload-cover', cover_url: croppedDataUrl, communityId: activeCommId }),
               });
               if (serverRes.ok) saved = true;
             } catch (err) { console.error('[circle cover crop]', err); }
