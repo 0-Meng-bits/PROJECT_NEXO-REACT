@@ -1855,13 +1855,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     // Use service-role API to bypass RLS
     try {
       const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl(`/api/upload-cover`), {
+      const res = await fetch(getApiUrl(`/api/upload`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ...updates, communityId: comm.id }),
+        body: JSON.stringify({ action: 'upload-cover', ...updates, communityId: comm.id }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
