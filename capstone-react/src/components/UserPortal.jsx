@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -1793,7 +1793,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
   const sysMsg = async (text) => {
     await supabase.from('messages').insert([{
       full_name: 'System',
-      content: '__SYS__' + text,
+      content: 'NEXOSYS:' + text,
       message_type: 'text',
       community_id: comm.id,
       channel_id: null,
@@ -5677,7 +5677,7 @@ export default function UserPortal() {
   const insertSystemMessage = async (commId, text) => {
     await supabase.from('messages').insert([{
       full_name: 'System',
-      content: '__SYS__' + text,
+      content: 'NEXOSYS:' + text,
       message_type: 'text',
       community_id: commId,
       channel_id: null,
@@ -7484,6 +7484,7 @@ export default function UserPortal() {
                       r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
                     );
                     return circleChatMessages.map((m, idx) => {
+                      const isSysMsg = m.content?.startsWith('NEXOSYS:');
                       const isOwnerMsg = m.sender_id === user?.student_id;
                       const canDelete = isOwnerMsg || canModerate;
                       const prev = circleChatMessages[idx - 1];
@@ -7493,25 +7494,27 @@ export default function UserPortal() {
                       const isLastMsg = m.id === lastMsgId;
                       
                       // Group consecutive messages from same user within 3 minutes
-                      const isGrouped = prev && 
-                        prev.sender_id === m.sender_id && 
+                      // Group consecutive messages from same user within 3 minutes
+                      const isGrouped = !isSysMsg && prev &&
+                        !prev.content?.startsWith('NEXOSYS:') &&
+                        prev.sender_id === m.sender_id &&
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
                       
-                      const isLastInGroup = !next || 
-                        next.sender_id !== m.sender_id || 
+                      const isLastInGroup = isSysMsg || !next ||
+                        next.content?.startsWith('NEXOSYS:') ||
+                        next.sender_id !== m.sender_id ||
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
-
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
                           {m.id === firstUnreadId && (
                             <div ref={firstUnreadRef}><UnreadDivider /></div>
                           )}
-                          {m.message_type === 'system' || m.content?.startsWith('__SYS__') ? (
+                          {m.content?.startsWith('NEXOSYS:') ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
                               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>
-                                {m.content?.replace('__SYS__', '')}
+                                {m.content.slice('NEXOSYS:'.length)}
                               </span>
                               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                             </div>
