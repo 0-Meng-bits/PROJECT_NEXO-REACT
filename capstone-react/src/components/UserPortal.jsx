@@ -3,6 +3,116 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
+import Cropper from 'react-easy-crop';
+
+// -- IMAGE CROP MODAL ---------------------------------------------------------
+// Reusable crop modal for avatar (circular 1:1) and cover (3:1 banner)
+function getCroppedImg(imageSrc, pixelCrop, outputW, outputH) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = outputW;
+      canvas.height = outputH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(
+        img,
+        pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height,
+        0, 0, outputW, outputH
+      );
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
+}
+
+function ImageCropModal({ file, aspect, circular, outputW, outputH, onConfirm, onCancel }) {
+  const [imageSrc, setImageSrc] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setImageSrc(reader.result);
+    reader.readAsDataURL(file);
+  }, [file]);
+
+  const onCropComplete = useCallback((_, cap) => setCroppedAreaPixels(cap), []);
+
+  const handleConfirm = async () => {
+    if (!croppedAreaPixels || !imageSrc) return;
+    setConfirming(true);
+    try {
+      const result = await getCroppedImg(imageSrc, croppedAreaPixels, outputW, outputH);
+      onConfirm(result);
+    } catch (err) {
+      console.error('Crop error:', err);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  if (!imageSrc) return null;
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 9999 }} onClick={onCancel}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}
+        style={{ maxWidth: 520, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
+        {/* Header */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ margin: 0, fontSize: 14, color: 'var(--cyber-cyan)', letterSpacing: 1 }}>
+            <i className="fa-solid fa-crop-simple" style={{ marginRight: 8 }}></i>
+            {circular ? 'CROP PROFILE PHOTO' : 'CROP COVER PHOTO'}
+          </h3>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        {/* Crop area */}
+        <div style={{ position: 'relative', width: '100%', height: circular ? 340 : 220, background: '#000' }}>
+          <Cropper
+            image={imageSrc}
+            crop={crop}
+            zoom={zoom}
+            aspect={aspect}
+            cropShape={circular ? 'round' : 'rect'}
+            showGrid={!circular}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+          />
+        </div>
+
+        {/* Zoom slider */}
+        <div style={{ padding: '14px 20px 6px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <i className="fa-solid fa-magnifying-glass-minus" style={{ fontSize: 12, color: 'var(--text-muted)' }}></i>
+          <input type="range" min={1} max={3} step={0.05} value={zoom}
+            onChange={e => setZoom(Number(e.target.value))}
+            style={{ flex: 1, accentColor: 'var(--cyber-cyan)' }} />
+          <i className="fa-solid fa-magnifying-glass-plus" style={{ fontSize: 12, color: 'var(--text-muted)' }}></i>
+        </div>
+
+        {/* Actions */}
+        <div style={{ padding: '10px 20px 18px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button className="cyber-btn secondary" onClick={onCancel} style={{ fontSize: 12, padding: '7px 18px' }}>
+            <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>CANCEL
+          </button>
+          <button className="cyber-btn" onClick={handleConfirm} disabled={confirming} style={{ fontSize: 12, padding: '7px 18px' }}>
+            {confirming
+              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>PROCESSING...</>
+              : <><i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>CONFIRM</>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 import { ApplicationFormBuilder, ApplicationReviewPanel, ApplicationApplicationForm, ApplicationStatusLabel, ApplicationStatusColor } from './ApplicationSystem';
 import ThemePicker from './ThemePicker';
 import ProfileShop from './ProfileShop';
@@ -2665,6 +2775,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
   const [coverUploading, setCoverUploading] = useState(false);
+  const [pendingCropFile, setPendingCropFile] = useState(null); // { file, type: 'avatar'|'cover' }
   const [showWarningHistory, setShowWarningHistory] = useState(false);
   const [appealingWarning, setAppealingWarning] = useState(null);
   const [customizations, setCustomizations] = useState(null);
@@ -2930,60 +3041,18 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
     } finally { setIdUploading(false); }
   };
 
-  const handleCoverChange = async (e) => {
+  const handleCoverChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setCoverUploading(true);
-    try {
-      const compressed = await new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          const W = 900, H = 300;
-          const canvas = document.createElement('canvas');
-          canvas.width = W; canvas.height = H;
-          const ctx = canvas.getContext('2d');
-          const scale = Math.max(W / img.width, H / img.height);
-          const sw = img.width * scale, sh = img.height * scale;
-          ctx.drawImage(img, (W - sw) / 2, (H - sh) / 2, sw, sh);
-          resolve(canvas.toDataURL('image/jpeg', 0.82));
-        };
-        img.onerror = reject;
-        img.src = objectUrl;
-      });
-      // Stage only · saved to DB on Save
-      setPendingCoverUrl(compressed);
-    } catch (err) { console.error(err); }
-    finally { setCoverUploading(false); }
+    setPendingCropFile({ file, type: 'cover' });
+    e.target.value = '';
   };
 
-  const handleAvatarChange = async (e) => {
+  const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploading(true);
-    try {
-      const compressed = await new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          const MAX = 200;
-          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.82));
-        };
-        img.onerror = reject;
-        img.src = objectUrl;
-      });
-      // Stage only · saved to DB on Save
-      setPendingAvatarUrl(compressed);
-      setAvatarUrl(compressed); // preview immediately
-    } catch (err) { console.error(err); }
-    finally { setUploading(false); }
+    setPendingCropFile({ file, type: 'avatar' });
+    e.target.value = '';
   };
 
   const coverGradients = [
@@ -3620,6 +3689,27 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           warning={appealingWarning}
           userId={user.id}
           onClose={() => { setAppealingWarning(null); setShowWarningHistory(true); }}
+        />
+      )}
+
+      {/* Image Crop Modal */}
+      {pendingCropFile && (
+        <ImageCropModal
+          file={pendingCropFile.file}
+          aspect={pendingCropFile.type === 'avatar' ? 1 : 3}
+          circular={pendingCropFile.type === 'avatar'}
+          outputW={pendingCropFile.type === 'avatar' ? 300 : 900}
+          outputH={pendingCropFile.type === 'avatar' ? 300 : 300}
+          onConfirm={(croppedDataUrl) => {
+            if (pendingCropFile.type === 'avatar') {
+              setPendingAvatarUrl(croppedDataUrl);
+              setAvatarUrl(croppedDataUrl);
+            } else {
+              setPendingCoverUrl(croppedDataUrl);
+            }
+            setPendingCropFile(null);
+          }}
+          onCancel={() => setPendingCropFile(null)}
         />
       )}
     </div>
@@ -4540,6 +4630,7 @@ export default function UserPortal() {
   const [streakCount, setStreakCount] = useState(0); // login streak for flame icon
   const [showCircleInfo, setShowCircleInfo] = useState(null); // circle object for Circle Info Card modal
   const [showOnlineModal, setShowOnlineModal] = useState(false); // online members modal in circle chat
+  const [pendingCircleCropFile, setPendingCircleCropFile] = useState(null); // file pending crop for circle cover
 
   // Block navigation away from /portal when on home feed · show logout modal instead
   const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
@@ -6896,55 +6987,11 @@ export default function UserPortal() {
                         type="file"
                         accept="image/*"
                         style={{ display: 'none' }}
-                        onChange={async (e) => {
+                        onChange={(e) => {
                           const file = e.target.files[0];
                           if (!file) return;
-                          const compressed = await new Promise((resolve, reject) => {
-                            const img = new Image();
-                            const objUrl = URL.createObjectURL(file);
-                            img.onload = () => {
-                              URL.revokeObjectURL(objUrl);
-                              const MAX_W = 900, MAX_H = 300;
-                              const scale = Math.min(1, MAX_W / img.width, MAX_H / img.height);
-                              const w = Math.round(img.width * scale);
-                              const h = Math.round(img.height * scale);
-                              const canvas = document.createElement('canvas');
-                              canvas.width = w; canvas.height = h;
-                              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                              resolve(canvas.toDataURL('image/jpeg', 0.82));
-                            };
-                            img.onerror = reject;
-                            img.src = objUrl;
-                          });
-
-                          // Optimistically update UI immediately
-                          setCommunities(prev => prev.map(c =>
-                            c.id === activeComm.id ? { ...c, cover_url: compressed } : c
-                          ));
-
-                          // Save via server (uses service role key, bypasses RLS)
-                          let saved = false;
-                          try {
-                            const token = localStorage.getItem('accessToken');
-                            const serverRes = await fetch(getApiUrl(`/api/upload-cover`), {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                              },
-                              body: JSON.stringify({ cover_url: compressed, communityId: activeComm.id }),
-                            });
-                            if (serverRes.ok) {
-                              saved = true;
-                            } else {
-                              const errBody = await serverRes.json().catch(() => ({}));
-                              console.error('[cover upload] server error:', serverRes.status, errBody);
-                            }
-                          } catch (fetchErr) {
-                            console.error('[cover upload] fetch failed:', fetchErr);
-                          }
-
-                          showToast(saved ? 'COVER_PHOTO_UPDATED' : 'UPLOAD_FAILED');
+                          setPendingCircleCropFile(file);
+                          e.target.value = '';
                         }}
                       />
                     </label>
@@ -7692,9 +7739,39 @@ export default function UserPortal() {
         <HelpModal user={user} onClose={() => setShowHelp(false)} />
       )}
 
+      {/* Circle Cover Crop Modal */}
+      {pendingCircleCropFile && (
+        <ImageCropModal
+          file={pendingCircleCropFile}
+          aspect={3}
+          circular={false}
+          outputW={900}
+          outputH={300}
+          onConfirm={async (croppedDataUrl) => {
+            setPendingCircleCropFile(null);
+            // Optimistically update UI
+            setCommunities(prev => prev.map(c =>
+              c.id === activeCommId ? { ...c, cover_url: croppedDataUrl } : c
+            ));
+            // Save via server
+            let saved = false;
+            try {
+              const token = localStorage.getItem('accessToken');
+              const serverRes = await fetch(getApiUrl('/api/upload-cover'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({ cover_url: croppedDataUrl, communityId: activeCommId }),
+              });
+              if (serverRes.ok) saved = true;
+            } catch (err) { console.error('[circle cover crop]', err); }
+            showToast(saved ? 'COVER_PHOTO_UPDATED' : 'UPLOAD_FAILED');
+          }}
+          onCancel={() => setPendingCircleCropFile(null)}
+        />
+      )}
+
       {/* Circle Info Card Modal */}
-      {showCircleInfo && (
-        <CircleInfoCard
+      {showCircleInfo && (        <CircleInfoCard
           circle={showCircleInfo}
           memberCount={memberCounts[showCircleInfo.id] || 0}
           myMemberships={myMemberships}
