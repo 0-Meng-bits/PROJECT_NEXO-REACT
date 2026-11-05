@@ -30,9 +30,21 @@ export default async function handler(req, res) {
         return res.json({ ok: true });
       }
       if (action === 'update_ticket') {
-        const { status } = payload;
+        const { status, user_id } = payload;
         const { error } = await supabaseAdmin.from('support_tickets').update({ status }).eq('id', id);
         if (error) return res.status(400).json({ message: error.message });
+        // Notify the user
+        if (user_id) {
+          const msg = status === 'resolved'
+            ? 'Your support ticket has been resolved. Thank you for reaching out!'
+            : 'Your support ticket has been closed.';
+          await supabaseAdmin.from('notifications').insert([{
+            user_id,
+            type: 'ticket_update',
+            message: msg,
+            category: 'Campus',
+          }]);
+        }
         return res.json({ ok: true });
       }
       return res.status(400).json({ message: 'Unknown action.' });

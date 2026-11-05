@@ -243,12 +243,12 @@ function SupportTicketsSection() {
       .catch(() => setLoadingTickets(false));
   }, []);
 
-  const updateStatus = async (id, status) => {
+  const updateStatus = async (id, status, userId) => {
     const token = localStorage.getItem('accessToken');
     await fetch(getApiUrl('/api/admin-data'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'update_ticket', id, status }),
+      body: JSON.stringify({ action: 'update_ticket', id, status, user_id: userId }),
     });
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
   };
@@ -287,8 +287,8 @@ function SupportTicketsSection() {
                   <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {t.status === 'open' && <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 10 }} onClick={() => updateStatus(t.id, 'resolved')}><i className="fa-solid fa-check"></i> Resolve</button>}
-                      {t.status !== 'closed' && <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }} onClick={() => updateStatus(t.id, 'closed')}>Close</button>}
+                      {t.status === 'open' && <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 10 }} onClick={() => updateStatus(t.id, 'resolved', t.user_id)}><i className="fa-solid fa-check"></i> Resolve</button>}
+                      {t.status !== 'closed' && <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333', fontSize: 10 }} onClick={() => updateStatus(t.id, 'closed', t.user_id)}>Close</button>}
                     </div>
                   </td>
                 </tr>
