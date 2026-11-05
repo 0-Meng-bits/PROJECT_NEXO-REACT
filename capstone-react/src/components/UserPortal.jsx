@@ -7662,6 +7662,7 @@ export default function UserPortal() {
           viewerRankLevel={myRankLevel}
           onSaved={(updated) => {
             setCommunities(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
+            loadCommunities();
             showToast('SETTINGS_SAVED');
           }}
           onGivePoints={(member) => {
