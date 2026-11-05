@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -7359,6 +7359,15 @@ export default function UserPortal() {
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
+                          {m.content?.startsWith('NEXOSYS:') ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
+                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>
+                                {m.content.slice('NEXOSYS:'.length)}
+                              </span>
+                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                            </div>
+                          ) : (
                           <MessageItem
                             m={m}
                             tagColor={tagColor}
@@ -7378,6 +7387,7 @@ export default function UserPortal() {
                             userCustomizations={userCustomizations}
                             onReply={(msg) => setReplyTo(msg)}
                           />
+                          )}
                         </React.Fragment>
                       );
                     });
