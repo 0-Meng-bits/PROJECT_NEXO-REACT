@@ -6,7 +6,21 @@ export default async function handler(req, res) {
     const { action, id, ...payload } = req.body;
     try {
       if (action === 'add_event') {
-        const { data, error } = await supabaseAdmin.from('campus_events').insert([payload]).select().single();
+        const { title, description, category, event_date, event_end_date, event_time, location, poster_name, poster_type } = payload;
+        const eventData = {
+          title,
+          description: description || null,
+          category: category || 'general',
+          event_date,
+          event_end_date: event_end_date || event_date || null,
+          event_time: event_time || null,
+          location: location || null,
+          poster_name: poster_name || 'Admin',
+          poster_type: poster_type || 'Admin',
+          community_id: null,
+          is_official: true,
+        };
+        const { data, error } = await supabaseAdmin.from('campus_events').insert([eventData]).select().single();
         if (error) return res.status(400).json({ message: error.message });
         return res.json({ event: data });
       }
@@ -27,18 +41,18 @@ export default async function handler(req, res) {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-      supabaseAdmin.from('audition_responses').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
+      supabaseAdmin.from('application_submissions').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('memberships').select('community_id, status, created_at'),
-      supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, student_id), reported:reported_user_id(full_name, student_id)').order('created_at', { ascending: false }),
+      supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, ctu_id), reported:reported_user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
-      supabaseAdmin.from('campus_events').select('*').order('start_date', { ascending: true }),
+      supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
     ]);
     res.json({
       students: studRes.data || [],
       announcements: annRes.data || [],
-      auditions: audRes.data || [],
+      applications: audRes.data || [],
       messages: msgRes.data || [],
       memberships: membRes.data || [],
       reports: repRes.data || [],
