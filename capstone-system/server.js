@@ -314,8 +314,18 @@ app.post('/api/admin-data', async (req, res) => {
   const { action, id, ...payload } = req.body;
   try {
     if (action === 'add_event') {
-      // Explicitly set community_id to NULL for campus-wide events
-      const eventData = { ...payload, community_id: null };
+      const { title, description, category, start_date, end_date, poster_name, poster_type } = payload;
+      const eventData = {
+        title,
+        description: description || null,
+        category: category || 'general',
+        start_date,
+        end_date: end_date || start_date,
+        poster_name: poster_name || 'Admin',
+        poster_type: poster_type || 'Admin',
+        community_id: null,
+        is_official: true,
+      };
       const { data, error } = await supabaseAdmin.from('campus_events').insert([eventData]).select().single();
       if (error) return res.status(400).json({ message: error.message });
       return res.json({ event: data });
