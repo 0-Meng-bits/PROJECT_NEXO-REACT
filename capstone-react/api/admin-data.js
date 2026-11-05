@@ -29,6 +29,12 @@ export default async function handler(req, res) {
         if (error) return res.status(400).json({ message: error.message });
         return res.json({ ok: true });
       }
+      if (action === 'update_ticket') {
+        const { status } = payload;
+        const { error } = await supabaseAdmin.from('support_tickets').update({ status }).eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
       return res.status(400).json({ message: 'Unknown action.' });
     } catch (err) {
       return res.status(500).json({ message: err.message });
@@ -38,7 +44,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   try {
-    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes] = await Promise.all([
+    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
       supabaseAdmin.from('application_submissions').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
@@ -48,6 +54,7 @@ export default async function handler(req, res) {
       supabaseAdmin.from('messages').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
+      supabaseAdmin.from('support_tickets').select('*, accounts:user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
     ]);
     res.json({
       students: studRes.data || [],
@@ -59,6 +66,7 @@ export default async function handler(req, res) {
       allMessages: allMsgRes.data || [],
       circleAnnouncements: circAnnRes.data || [],
       campusEvents: eventsRes.data || [],
+      tickets: ticketsRes.data || [],
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

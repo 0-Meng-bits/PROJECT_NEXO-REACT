@@ -234,14 +234,22 @@ function SupportTicketsSection() {
   const [loadingTickets, setLoadingTickets] = useState(true);
 
   useEffect(() => {
-    supabase.from('support_tickets')
-      .select('*, accounts:user_id(full_name, ctu_id)')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { setTickets(data || []); setLoadingTickets(false); });
+    const token = localStorage.getItem('accessToken');
+    fetch(getApiUrl('/api/admin-data'), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then(d => { setTickets(d.tickets || []); setLoadingTickets(false); })
+      .catch(() => setLoadingTickets(false));
   }, []);
 
   const updateStatus = async (id, status) => {
-    await supabase.from('support_tickets').update({ status }).eq('id', id);
+    const token = localStorage.getItem('accessToken');
+    await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'update_ticket', id, status }),
+    });
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
   };
 
