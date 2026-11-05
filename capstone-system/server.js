@@ -314,13 +314,15 @@ app.post('/api/admin-data', async (req, res) => {
   const { action, id, ...payload } = req.body;
   try {
     if (action === 'add_event') {
-      const { title, description, category, start_date, end_date, poster_name, poster_type } = payload;
+      const { title, description, category, event_date, event_end_date, event_time, location, poster_name, poster_type } = payload;
       const eventData = {
         title,
         description: description || null,
         category: category || 'general',
-        start_date,
-        end_date: end_date || start_date,
+        event_date,
+        event_end_date: event_end_date || event_date || null,
+        event_time: event_time || null,
+        location: location || null,
         poster_name: poster_name || 'Admin',
         poster_type: poster_type || 'Admin',
         community_id: null,

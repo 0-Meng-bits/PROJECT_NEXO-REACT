@@ -328,7 +328,7 @@ export default function AdminDashboard() {
   const [campusEvents, setCampusEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', event_date: '', event_end_date: '', event_time: '', location: '' });
   const [postingEvent, setPostingEvent] = useState(false);
 
   const EVENT_CATS = [
@@ -355,7 +355,7 @@ export default function AdminDashboard() {
   };
 
   const submitEvent = async () => {
-    if (!newEvent.title.trim() || !newEvent.start_date) return;
+    if (!newEvent.title.trim() || !newEvent.event_date) return;
     setPostingEvent(true);
     const token = localStorage.getItem('accessToken');
     try {
@@ -367,15 +367,16 @@ export default function AdminDashboard() {
           title: newEvent.title.trim(),
           description: newEvent.description.trim(),
           category: newEvent.category,
-          start_date: newEvent.start_date,
-          end_date: newEvent.end_date || newEvent.start_date,
-          poster_id: admin?.id,
+          event_date: newEvent.event_date,
+          event_end_date: newEvent.event_end_date || newEvent.event_date,
+          event_time: newEvent.event_time || null,
+          location: newEvent.location.trim() || null,
           poster_name: admin?.full_name || 'Admin',
           poster_type: 'Admin',
         }),
       });
       if (res.ok) {
-        setNewEvent({ title: '', description: '', category: 'general', start_date: '', end_date: '' });
+        setNewEvent({ title: '', description: '', category: 'general', event_date: '', event_end_date: '', event_time: '', location: '' });
         setShowEventForm(false);
         loadCampusEvents();
         showToast('Event added.');
@@ -1599,12 +1600,16 @@ export default function AdminDashboard() {
                       onChange={e => setNewEvent(p => ({ ...p, category: e.target.value }))}>
                       {EVENT_CATS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                     </select>
-                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
-                      value={newEvent.start_date} onChange={e => setNewEvent(p => ({ ...p, start_date: e.target.value }))} />
-                    <input type="date" className="analytics-date-input" style={{ flex: 1 }}
-                      value={newEvent.end_date} onChange={e => setNewEvent(p => ({ ...p, end_date: e.target.value }))} />
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }} placeholder="Start date"
+                      value={newEvent.event_date} onChange={e => setNewEvent(p => ({ ...p, event_date: e.target.value }))} />
+                    <input type="date" className="analytics-date-input" style={{ flex: 1 }} placeholder="End date"
+                      value={newEvent.event_end_date} onChange={e => setNewEvent(p => ({ ...p, event_end_date: e.target.value }))} />
+                    <input type="time" className="analytics-date-input" style={{ flex: 1 }} placeholder="Time (optional)"
+                      value={newEvent.event_time} onChange={e => setNewEvent(p => ({ ...p, event_time: e.target.value }))} />
+                    <input className="adm-search" style={{ flex: 2 }} placeholder="Location (optional)"
+                      value={newEvent.location} onChange={e => setNewEvent(p => ({ ...p, location: e.target.value }))} />
                   </div>
-                  <button className="adm-btn approve" onClick={submitEvent} disabled={postingEvent || !newEvent.title.trim() || !newEvent.start_date}>
+                  <button className="adm-btn approve" onClick={submitEvent} disabled={postingEvent || !newEvent.title.trim() || !newEvent.event_date}>
                     <i className="fa-solid fa-calendar-plus"></i> {postingEvent ? 'Adding...' : 'Add Event'}
                   </button>
                 </div>
@@ -1628,8 +1633,8 @@ export default function AdminDashboard() {
                         <tr key={ev.id}>
                           <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{ev.title}</td>
                           <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: cat.color, border: `1px solid ${cat.color}`, background: `${cat.color}15` }}>{cat.label}</span></td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(ev.start_date).toLocaleDateString()}</td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.end_date ? new Date(ev.end_date).toLocaleDateString() : '-'}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-'}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_end_date ? new Date(ev.event_end_date).toLocaleDateString() : '-'}</td>
                           <td><button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteEvent(ev.id)}><i className="fa-solid fa-trash"></i></button></td>
                         </tr>
                       );
