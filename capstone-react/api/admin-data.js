@@ -47,6 +47,71 @@ export default async function handler(req, res) {
         }
         return res.json({ ok: true });
       }
+      if (action === 'issue_warning') {
+        const { user_id, admin_id, reason } = payload;
+        const { data: profile } = await supabaseAdmin.from('account_status')
+          .select('warning_count, trust_points, is_banned, suspended_until')
+          .eq('id', user_id).single();
+
+        if (profile?.is_banned) return res.json({ alreadyBanned: true });
+
+        const currentPoints = profile?.trust_points ?? 10;
+        const newPoints = Math.max(0, currentPoints - 1);
+        const newWarnings = (profile?.warning_count || 0) + 1;
+        const isAlreadySuspended = profile?.suspended_until && new Date(profile.suspended_until) > new Date();
+
+        // Auto-ban: already suspended and gets another warning
+        if (isAlreadySuspended) {
+          await supabaseAdmin.from('account_status').update({ is_banned: true, suspended_until: null }).eq('id', user_id);
+          await supabaseAdmin.from('user_warnings').insert([{ user_id, admin_id, type: 'ban', reason: `Auto-banned after repeated violations. ${reason}` }]);
+          await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: `Your account has been permanently banned due to repeated violations. Reason: ${reason}` }]);
+          return res.json({ autoBanned: true });
+        }
+
+        const willSuspend = newPoints === 0;
+        const suspendedUntil = willSuspend ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null;
+
+        await supabaseAdmin.from('user_warnings').insert([{ user_id, admin_id, type: 'warning', reason }]);
+        await supabaseAdmin.from('point_transactions').insert([{ user_id, amount: -1, transaction_type: 'warning', from_user_id: admin_id, reason }]);
+        await supabaseAdmin.from('account_status').update({
+          warning_count: newWarnings,
+          trust_points: newPoints,
+          ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
+        }).eq('id', user_id);
+
+        const notifMsg = willSuspend
+          ? `🚫 Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+          : `⚠️ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
+        await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: notifMsg }]);
+
+        return res.json({ newPoints, willSuspend, newWarnings });
+      }
+      if (action === 'issue_flag_warning') {
+        const { flag_id, user_id, admin_id, severity, points_deducted, community_id, reason } = payload;
+        const { data: warning } = await supabaseAdmin.from('user_warnings').insert([{
+          user_id, admin_id, type: 'warning', severity, points_deducted, community_id, reason
+        }]).select().single();
+        await supabaseAdmin.from('point_transactions').insert([{
+          user_id, amount: -points_deducted, transaction_type: 'warning', reason: `Warning: ${reason}`, reference_id: warning?.id
+        }]);
+        const { data: status } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', user_id).single();
+        const newTP = Math.max(0, (status?.trust_points ?? 10) - points_deducted);
+        await supabaseAdmin.from('account_status').update({ trust_points: newTP }).eq('id', user_id);
+        await supabaseAdmin.from('user_flags').update({ status: 'warning_issued', reviewed_by: admin_id, reviewed_at: new Date().toISOString() }).eq('id', flag_id);
+        return res.json({ ok: true });
+      }
+      if (action === 'ban_user') {
+        const { user_id, admin_id, reason } = payload;
+        await supabaseAdmin.from('account_status').update({ is_banned: true }).eq('id', user_id);
+        await supabaseAdmin.from('user_warnings').insert([{ user_id, admin_id, type: 'ban', reason }]);
+        await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: `🚫 Your account has been banned: ${reason}` }]);
+        return res.json({ ok: true });
+      }
+      if (action === 'unban_user') {
+        const { user_id } = payload;
+        await supabaseAdmin.from('account_status').update({ is_banned: false }).eq('id', user_id);
+        return res.json({ ok: true });
+      }
       return res.status(400).json({ message: 'Unknown action.' });
     } catch (err) {
       return res.status(500).json({ message: err.message });

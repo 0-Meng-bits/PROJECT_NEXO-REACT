@@ -127,19 +127,26 @@ function UserFlagsSection({ admin }) {
     if (!selectedFlag) return;
     setIssuing(true);
     try {
-      const { data: warning, error: warnError } = await supabase.from('user_warnings').insert([{
-        user_id: selectedFlag.flagged_user_id, admin_id: admin?.id, type: 'warning',
-        severity, points_deducted: pointsToDeduct, community_id: selectedFlag.community_id, reason: selectedFlag.reason
-      }]).select().single();
-      if (warnError) throw warnError;
-      await supabase.from('point_transactions').insert([{
-        user_id: selectedFlag.flagged_user_id, amount: -pointsToDeduct,
-        transaction_type: 'warning', reason: `Warning: ${selectedFlag.reason}`, reference_id: warning.id
-      }]);
-      await supabase.from('user_flags').update({ status: 'warning_issued', reviewed_by: admin?.id, reviewed_at: new Date().toISOString() }).eq('id', flagId);
-      setFlags(prev => prev.map(f => f.id === flagId ? { ...f, status: 'warning_issued' } : f));
-      setSelectedFlag(null);
-      alert('Warning issued successfully!');
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          action: 'issue_flag_warning',
+          flag_id: flagId,
+          user_id: selectedFlag.flagged_user_id,
+          admin_id: admin?.id,
+          severity,
+          points_deducted: pointsToDeduct,
+          community_id: selectedFlag.community_id,
+          reason: selectedFlag.reason,
+        }),
+      });
+      if (res.ok) {
+        setFlags(prev => prev.map(f => f.id === flagId ? { ...f, status: 'warning_issued' } : f));
+        setSelectedFlag(null);
+        alert('Warning issued successfully!');
+      } else { alert('Failed to issue warning'); }
     } catch (err) { console.error(err); alert('Failed to issue warning'); }
     setIssuing(false);
   };
@@ -582,92 +589,50 @@ export default function AdminDashboard() {
   };
 
   const issueWarning = async (userId, userName, reason) => {
-    // Get current trust points
-    const { data: profile } = await supabase
-      .from('account_status')
-      .select('warning_count, trust_points, is_banned')
-      .eq('id', userId).single();
-
-    if (profile?.is_banned) { showToast(`${userName} is already banned.`); return; }
-
-    const currentPoints = profile?.trust_points ?? 10;
-    const newPoints = Math.max(0, currentPoints - 1);
-    const newWarnings = (profile?.warning_count || 0) + 1;
-    const isAlreadySuspended = profile?.suspended_until && new Date(profile.suspended_until) > new Date();
-
-    // Auto-ban: if user is already suspended and gets another warning → permanent ban
-    if (isAlreadySuspended) {
-      await supabase.from('account_status').update({ is_banned: true, suspended_until: null }).eq('id', userId);
-      await supabase.from('user_warnings').insert([{ user_id: userId, admin_id: admin?.id, type: 'ban', reason: `Auto-banned after repeated violations. ${reason}` }]);
-      await supabase.from('notifications').insert([{ user_id: userId, type: 'audition_update', message: `Your account has been permanently banned due to repeated violations. Reason: ${reason}` }]);
-      showToast(`${userName} has been permanently banned.`);
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'issue_warning', user_id: userId, admin_id: admin?.id, reason }),
+      });
+      const result = await res.json();
+      if (result.alreadyBanned) { showToast(`${userName} is already banned.`); return; }
+      if (result.autoBanned) { showToast(`${userName} has been permanently banned.`); fetchData(); return; }
+      if (result.willSuspend) { showToast(`${userName} suspended for 7 days.`); }
+      else { showToast(`Warning issued to ${userName}. ${result.newPoints} point(s) left.`); }
       fetchData();
-      return;
-    }
-
-    const willSuspend = newPoints === 0;
-
-    // Insert warning record
-    await supabase.from('user_warnings').insert([{
-      user_id: userId, admin_id: admin?.id, type: 'warning', reason,
-    }]);
-
-    // Deduct 1 point directly and update trust_points in account_status
-    await supabase.from('point_transactions').insert([{
-      user_id: userId,
-      amount: -1,
-      transaction_type: 'warning',
-      from_user_id: admin?.id,
-      reason,
-    }]);
-
-    // Update warning count, trust_points, and suspension directly
-    const suspendedUntil = willSuspend
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      : null;
-
-    await supabase.from('account_status').update({
-      warning_count: newWarnings,
-      trust_points: newPoints,
-      ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
-    }).eq('id', userId);
-
-    // Send notification to user
-    const notifMsg = willSuspend
-      ? `🚫 Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
-      : `⚠️ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
-
-    await supabase.from('notifications').insert([{
-      user_id: userId,
-      type: 'audition_update',
-      message: notifMsg,
-    }]);
-
-    showToast(willSuspend ? `${userName} suspended for 7 days.` : `Warning issued to ${userName}. ${newPoints} point(s) left.`);
-    fetchData();
+    } catch { showToast('Failed to issue warning.'); }
   };
 
   const banUser = async (userId, userName) => {
     if (!confirm(`Ban ${userName}? They will lose access to the platform.`)) return;
     const reason = prompt('Reason for ban:');
     if (!reason) return;
-    await supabase.from('account_status').update({ is_banned: true }).eq('id', userId);
-    await supabase.from('user_warnings').insert([{
-      user_id: userId, admin_id: admin?.id, type: 'ban', reason,
-    }]);
-    await supabase.from('notifications').insert([{
-      user_id: userId, type: 'audition_update',
-      message: `🚫 Your account has been banned: ${reason}`,
-    }]);
-    showToast(`${userName} has been banned.`);
-    fetchData();
+    const token = localStorage.getItem('accessToken');
+    try {
+      await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'ban_user', user_id: userId, admin_id: admin?.id, reason }),
+      });
+      showToast(`${userName} has been banned.`);
+      fetchData();
+    } catch { showToast('Failed to ban user.'); }
   };
 
   const unbanUser = async (userId, userName) => {
     if (!confirm(`Unban ${userName}?`)) return;
-    await supabase.from('account_status').update({ is_banned: false }).eq('id', userId);
-    showToast(`${userName} has been unbanned.`);
-    fetchData();
+    const token = localStorage.getItem('accessToken');
+    try {
+      await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'unban_user', user_id: userId }),
+      });
+      showToast(`${userName} has been unbanned.`);
+      fetchData();
+    } catch { showToast('Failed to unban user.'); }
   };
 
   const deleteUser = async (userId, userName) => {
