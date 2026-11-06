@@ -274,9 +274,9 @@ export default function Auth() {
           <h2 style={{ color: 'var(--red)', letterSpacing: 2, marginBottom: 12 }}>ACCOUNT BANNED</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 24 }}>
             Your account has been permanently banned due to serious violations of community guidelines.
-            Please contact the administrator if you believe this is a mistake.
           </p>
-          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%' }}>
+          <BanAppealForm type="ban" ctuId={form.ctuId} />
+          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%', marginTop: 12 }}>
             BACK TO LOGIN
           </button>
         </div>
@@ -297,16 +297,14 @@ export default function Auth() {
           <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
             Your account has been temporarily suspended due to community guideline violations.
           </p>
-          <div style={{ background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 24 }}>
+          <div style={{ background: 'rgba(247,169,79,0.08)', border: '1px solid rgba(247,169,79,0.3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
             <p style={{ color: 'var(--orange)', fontSize: 13, fontWeight: 700 }}>
               <i className="fa-solid fa-clock" style={{ marginRight: 8 }}></i>
               Access restored on: {until}
             </p>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
-            Please review the community guidelines before your suspension ends.
-          </p>
-          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%' }}>
+          <BanAppealForm type="suspension" ctuId={form.ctuId} />
+          <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%', marginTop: 12 }}>
             BACK TO LOGIN
           </button>
         </div>
@@ -588,6 +586,77 @@ export default function Auth() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── BAN/SUSPENSION APPEAL FORM (no login required) ──────────────────────────
+function BanAppealForm({ type, ctuId }) {
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [localCtuId, setLocalCtuId] = useState(ctuId || '');
+
+  const submit = async () => {
+    if (!localCtuId.trim() || !message.trim()) { setError('Please fill in all fields.'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit_ban_appeal', ctu_id: localCtuId.trim(), message: message.trim(), ticket_type: type }),
+      });
+      const data = await res.json();
+      if (res.ok) { setSubmitted(true); }
+      else { setError(data.message || 'Failed to submit.'); }
+    } catch { setError('Network error. Please try again.'); }
+    setSubmitting(false);
+  };
+
+  if (submitted) {
+    return (
+      <div style={{ background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)', fontSize: 24, marginBottom: 8, display: 'block' }}></i>
+        <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>Appeal Submitted</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>An admin will review your appeal within 24–48 hours.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'left' }}>
+      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--cyber-cyan)', marginBottom: 12 }}>
+        <i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>
+        Submit an Appeal
+      </div>
+      {!ctuId && (
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>YOUR CTU ID</label>
+          <input
+            value={localCtuId}
+            onChange={e => setLocalCtuId(e.target.value)}
+            placeholder="e.g. 2100000"
+            style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13 }}
+          />
+        </div>
+      )}
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>YOUR APPEAL</label>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder={type === 'ban' ? 'Explain why you believe this ban is a mistake...' : 'Explain your side or request early reinstatement...'}
+          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+        />
+      </div>
+      {error && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{error}</div>}
+      <button className="cyber-btn" style={{ width: '100%' }} onClick={submit} disabled={submitting || !message.trim()}>
+        {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
+      </button>
     </div>
   );
 }

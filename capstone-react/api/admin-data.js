@@ -112,6 +112,18 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('account_status').update({ is_banned: false }).eq('id', user_id);
         return res.json({ ok: true });
       }
+      if (action === 'submit_ban_appeal') {
+        const { ctu_id, message, ticket_type } = payload;
+        const { data: account } = await supabaseAdmin.from('accounts').select('id, full_name').eq('ctu_id', ctu_id).maybeSingle();
+        if (!account) return res.status(404).json({ message: 'CTU ID not found.' });
+        await supabaseAdmin.from('support_tickets').insert([{
+          user_id: account.id,
+          category: ticket_type === 'ban' ? 'Ban Appeal' : 'Suspension Appeal',
+          message: `[${ticket_type === 'ban' ? 'BAN APPEAL' : 'SUSPENSION APPEAL'}] ${message}`,
+          status: 'open',
+        }]);
+        return res.json({ ok: true });
+      }
       if (action === 'resolve_appeal') {
         const { warning_id, user_id, decision, admin_note, admin_id } = payload;
         // Update the appeal status
