@@ -112,6 +112,39 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('account_status').update({ is_banned: false }).eq('id', user_id);
         return res.json({ ok: true });
       }
+      if (action === 'resolve_appeal') {
+        const { warning_id, user_id, decision, admin_note, admin_id } = payload;
+        // Update the appeal status
+        await supabaseAdmin.from('warning_appeals').update({
+          status: decision, // 'approved' or 'rejected'
+          admin_note: admin_note || null,
+          reviewed_by: admin_id,
+          reviewed_at: new Date().toISOString(),
+        }).eq('id', id);
+        // Update the warning status too
+        await supabaseAdmin.from('user_warnings').update({
+          status: decision === 'approved' ? 'overturned' : 'active',
+        }).eq('id', warning_id);
+        // If approved: restore the 1 TP that was deducted + 1 bonus
+        if (decision === 'approved') {
+          const { data: current } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', user_id).single();
+          const restored = (current?.trust_points ?? 0) + 2; // 1 restored + 1 bonus
+          await supabaseAdmin.from('account_status').update({ trust_points: Math.min(restored, 10) }).eq('id', user_id);
+          await supabaseAdmin.from('point_transactions').insert([{
+            user_id, amount: 2, transaction_type: 'appeal_approved', reason: 'Warning overturned by admin appeal',
+          }]);
+          await supabaseAdmin.from('notifications').insert([{
+            user_id, type: 'audition_update',
+            message: `✅ Your warning appeal has been approved! The warning has been overturned and your trust points have been restored (+2 bonus).${admin_note ? ` Admin note: ${admin_note}` : ''}`,
+          }]);
+        } else {
+          await supabaseAdmin.from('notifications').insert([{
+            user_id, type: 'audition_update',
+            message: `❌ Your warning appeal has been reviewed and rejected. The warning remains on your account.${admin_note ? ` Admin note: ${admin_note}` : ''}`,
+          }]);
+        }
+        return res.json({ ok: true });
+      }
       if (action === 'dismiss_flag') {
         const { flag_id, admin_id } = payload;
         await supabaseAdmin.from('user_flags').update({ status: 'dismissed', reviewed_by: admin_id, reviewed_at: new Date().toISOString() }).eq('id', flag_id);
@@ -176,6 +209,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'GET') return res.status(405).end();
+
+  // Scoped fetch for appeals only
+  if (req.query?.type === 'appeals') {
+    try {
+      const { data } = await supabaseAdmin
+        .from('warning_appeals')
+        .select('*, accounts:user_id(full_name, ctu_id), user_warnings:warning_id(reason, type, severity)')
+        .order('created_at', { ascending: false });
+      return res.json({ appeals: data || [] });
+    } catch (err) {
+      return res.status(500).json({ message: err.message });
+    }
+  }
 
   try {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes] = await Promise.all([

@@ -17,6 +17,7 @@ const SECTIONS = [
   { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
   { key: 'user_flags',    label: 'User Flags',            icon: 'fa-solid fa-flag' },
   { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield' },
+  { key: 'appeals',       label: 'Warning Appeals',       icon: 'fa-solid fa-gavel' },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -1776,9 +1777,176 @@ export default function AdminDashboard() {
         {/* ── SUPPORT TICKETS ── */}
         {section === 'support' && <SupportTicketsSection />}
 
+        {/* ── WARNING APPEALS ── */}
+        {section === 'appeals' && <WarningAppealsSection admin={admin} showToast={showToast} />}
+
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
+    </div>
+  );
+}
+
+// ── WARNING APPEALS SECTION ──────────────────────────────────────────────────
+function WarningAppealsSection({ admin, showToast }) {
+  const [appeals, setAppeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('pending'); // 'pending' | 'approved' | 'rejected'
+  const [selected, setSelected] = useState(null);
+  const [note, setNote] = useState('');
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => { loadAppeals(); }, []);
+
+  const loadAppeals = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data?type=appeals'), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setAppeals(d.appeals || []);
+    }
+    setLoading(false);
+  };
+
+  const resolveAppeal = async (appealId, warningId, userId, decision) => {
+    setProcessing(true);
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'resolve_appeal', id: appealId, warning_id: warningId, user_id: userId, decision, admin_note: note, admin_id: admin?.id }),
+    });
+    if (res.ok) {
+      showToast(decision === 'approved' ? 'Appeal approved — warning overturned.' : 'Appeal rejected.');
+      setSelected(null);
+      setNote('');
+      loadAppeals();
+    } else {
+      showToast('Failed to resolve appeal.');
+    }
+    setProcessing(false);
+  };
+
+  const filtered = appeals.filter(a =>
+    tab === 'pending' ? a.status === 'pending' :
+    tab === 'approved' ? a.status === 'approved' :
+    a.status === 'rejected'
+  );
+
+  const pendingCount = appeals.filter(a => a.status === 'pending').length;
+
+  return (
+    <div className="adm-card">
+      <div className="adm-card-head">
+        <span>Warning Appeals</span>
+        {pendingCount > 0 && <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{pendingCount} pending</span>}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {[['pending','Pending'],['approved','Approved'],['rejected','Rejected']].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: tab === key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.04)',
+              color: tab === key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+            }}>
+            {label} {key === 'pending' && pendingCount > 0 ? `(${pendingCount})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="adm-empty"><i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i></div>
+      ) : filtered.length === 0 ? (
+        <div className="adm-empty"><i className="fa-solid fa-inbox" style={{ fontSize: 28, marginBottom: 10 }}></i><div>No {tab} appeals.</div></div>
+      ) : (
+        <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+          {filtered.map(a => (
+            <div key={a.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{a.accounts?.full_name || 'Unknown'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    ID: {a.accounts?.ctu_id} · Appealed {new Date(a.created_at).toLocaleString()}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>ORIGINAL WARNING: </span>
+                    <span style={{ color: 'var(--orange)' }}>{a.user_warnings?.reason || 'N/A'}</span>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+                    <span style={{ color: 'var(--cyber-cyan)', fontSize: 11, fontWeight: 700 }}>APPEAL: </span>
+                    <span>{a.appeal_reason}</span>
+                  </div>
+                  {a.evidence && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px 12px' }}>
+                      Evidence: {a.evidence}
+                    </div>
+                  )}
+                  {a.status !== 'pending' && a.admin_note && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+                      Admin note: {a.admin_note}
+                    </div>
+                  )}
+                </div>
+                {a.status === 'pending' && (
+                  <button className="cyber-btn" style={{ fontSize: 11, padding: '6px 14px', whiteSpace: 'nowrap' }}
+                    onClick={() => { setSelected(a); setNote(''); }}>
+                    Review
+                  </button>
+                )}
+                {a.status !== 'pending' && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6,
+                    color: a.status === 'approved' ? 'var(--green)' : 'var(--red)',
+                    background: a.status === 'approved' ? 'rgba(62,207,142,0.1)' : 'rgba(247,95,95,0.1)',
+                    border: `1px solid ${a.status === 'approved' ? 'var(--green)' : 'var(--red)'}`,
+                  }}>
+                    {a.status === 'approved' ? 'Approved' : 'Rejected'}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Review modal */}
+      {selected && (
+        <div className="modal-overlay" onClick={() => setSelected(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <h3 style={{ marginBottom: 16, color: 'var(--cyber-cyan)' }}>
+              <i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>Review Appeal
+            </h3>
+            <div style={{ marginBottom: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 14 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{selected.accounts?.full_name}</div>
+              <div style={{ fontSize: 12, color: 'var(--orange)', marginBottom: 8 }}>Warning: {selected.user_warnings?.reason}</div>
+              <div style={{ fontSize: 13 }}><strong style={{ color: 'var(--cyber-cyan)' }}>Their appeal:</strong> {selected.appeal_reason}</div>
+              {selected.evidence && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontStyle: 'italic' }}>Evidence: {selected.evidence}</div>}
+            </div>
+            <div className="input-group" style={{ marginBottom: 16 }}>
+              <label>ADMIN NOTE (optional)</label>
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
+                placeholder="Explain your decision to the user..."
+                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="cyber-btn" disabled={processing}
+                style={{ flex: 1, background: 'rgba(62,207,142,0.15)', color: 'var(--green)', border: '1px solid var(--green)' }}
+                onClick={() => resolveAppeal(selected.id, selected.warning_id, selected.user_id, 'approved')}>
+                <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>{processing ? 'Processing...' : 'Approve & Overturn'}
+              </button>
+              <button className="cyber-btn" disabled={processing}
+                style={{ flex: 1, background: 'rgba(247,95,95,0.15)', color: 'var(--red)', border: '1px solid var(--red)' }}
+                onClick={() => resolveAppeal(selected.id, selected.warning_id, selected.user_id, 'rejected')}>
+                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>{processing ? 'Processing...' : 'Reject Appeal'}
+              </button>
+            </div>
+            <button className="cyber-btn secondary" style={{ width: '100%', marginTop: 10 }} onClick={() => setSelected(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
