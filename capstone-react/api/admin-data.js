@@ -112,6 +112,63 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('account_status').update({ is_banned: false }).eq('id', user_id);
         return res.json({ ok: true });
       }
+      if (action === 'dismiss_flag') {
+        const { flag_id, admin_id } = payload;
+        await supabaseAdmin.from('user_flags').update({ status: 'dismissed', reviewed_by: admin_id, reviewed_at: new Date().toISOString() }).eq('id', flag_id);
+        return res.json({ ok: true });
+      }
+      if (action === 'admin_post') {
+        const { admin_id, admin_name, title, content, post_type } = payload;
+        const { error } = await supabaseAdmin.from('announcements').insert([{
+          author_id: admin_id,
+          author_name: admin_name || 'Admin',
+          author_type: 'Admin',
+          title, content, post_type: post_type || 'announcement',
+          community_id: null,
+        }]);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
+      if (action === 'delete_community') {
+        const { error } = await supabaseAdmin.from('communities').delete().eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
+      if (action === 'delete_announcement') {
+        const { error } = await supabaseAdmin.from('announcements').delete().eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
+      if (action === 'toggle_pin') {
+        const { pinned } = payload;
+        await supabaseAdmin.from('announcements').update({ pinned: !pinned }).eq('id', id);
+        return res.json({ ok: true });
+      }
+      if (action === 'delete_message') {
+        const { error } = await supabaseAdmin.from('messages').delete().eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true });
+      }
+      if (action === 'resolve_report') {
+        const { status, note, admin_id } = payload;
+        await supabaseAdmin.from('reports').update({
+          status, admin_note: note, reviewed_at: new Date().toISOString(), reviewed_by: admin_id,
+        }).eq('id', id);
+        return res.json({ ok: true });
+      }
+      if (action === 'delete_content') {
+        const { content_type } = payload;
+        if (content_type === 'message') {
+          await supabaseAdmin.from('messages').delete().eq('id', id);
+        } else if (content_type === 'announcement') {
+          await supabaseAdmin.from('announcements').delete().eq('id', id);
+        } else if (content_type === 'profile_photo') {
+          await supabaseAdmin.from('account_details').update({ avatar_url: null, cover_url: null }).eq('id', id);
+        } else if (content_type === 'circle_photo') {
+          await supabaseAdmin.from('communities').update({ cover_url: null }).eq('id', id);
+        }
+        return res.json({ ok: true });
+      }
       return res.status(400).json({ message: 'Unknown action.' });
     } catch (err) {
       return res.status(500).json({ message: err.message });

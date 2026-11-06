@@ -39,4 +39,13 @@ export default async function handler(req, res) {
   }
 
   res.json({ message: 'Student verified!' });
+
+  // Send notification (non-fatal)
+  try {
+    await supabaseAdmin.from('notifications').insert([{
+      user_id: id,
+      type: 'join_approved',
+      message: 'Your account has been verified! You now have full access to NEXO Connect.',
+    }]);
+  } catch { /* non-fatal */ }
 }

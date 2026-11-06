@@ -152,7 +152,12 @@ function UserFlagsSection({ admin }) {
   };
 
   const dismissFlag = async (flagId) => {
-    await supabase.from('user_flags').update({ status: 'dismissed', reviewed_by: admin?.id, reviewed_at: new Date().toISOString() }).eq('id', flagId);
+    const token = localStorage.getItem('accessToken');
+    await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'dismiss_flag', flag_id: flagId, admin_id: admin?.id }),
+    });
     setFlags(prev => prev.map(f => f.id === flagId ? { ...f, status: 'dismissed' } : f));
     setSelectedFlag(null);
   };
@@ -417,23 +422,27 @@ export default function AdminDashboard() {
   const submitAdminPost = async () => {
     if (!newAdminPost.title.trim() || !newAdminPost.content.trim()) return;
     setPostingAdminPost(true);
-    const { error } = await supabase.from('announcements').insert([{
-      author_id: admin?.id,
-      author_name: admin?.full_name || 'Admin',
-      author_type: 'Admin',
-      title: newAdminPost.title.trim(),
-      content: newAdminPost.content.trim(),
-      post_type: newAdminPost.post_type,
-      community_id: null,
-    }]);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          action: 'admin_post',
+          admin_id: admin?.id,
+          admin_name: admin?.full_name || 'Admin',
+          title: newAdminPost.title.trim(),
+          content: newAdminPost.content.trim(),
+          post_type: newAdminPost.post_type,
+        }),
+      });
+      if (res.ok) {
+        setNewAdminPost({ title: '', content: '', post_type: 'announcement' });
+        showToast('Post published.');
+        fetchData();
+      } else showToast('Failed to post.');
+    } catch { showToast('Failed to post.'); }
     setPostingAdminPost(false);
-    if (!error) {
-      setNewAdminPost({ title: '', content: '', post_type: 'announcement' });
-      showToast('Post published.');
-      fetchData();
-    } else {
-      showToast('Failed to post.');
-    }
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -541,14 +550,7 @@ export default function AdminDashboard() {
     if (!confirm('Approve this student?')) return;
     const res = await fetch(getApiUrl(`/api/verify-student/${id}`), { method: 'POST' });
     if (res.ok) {
-      // Send notification to the student
-      await supabase.from('notifications').insert([{
-        user_id: id,
-        type: 'join_approved',
-        message: 'Your account has been verified! You now have full access to NEXO Connect.',
-      }]);
       showToast(`${name} approved.`);
-      // Optimistically remove from pending list
       setStudents(prev => prev.map(s => s.id === id ? { ...s, is_verified: true } : s));
     } else showToast('Failed to approve.');
   };
@@ -566,26 +568,47 @@ export default function AdminDashboard() {
 
   const deleteCommunity = async (id, name) => {
     if (!confirm(`Delete circle "${name}"? This cannot be undone.`)) return;
-    const { error } = await supabase.from('communities').delete().eq('id', id);
-    if (!error) { showToast('Circle deleted.'); fetchData(); setSelectedCircle(null); }
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'delete_community', id }),
+    });
+    if (res.ok) { showToast('Circle deleted.'); fetchData(); setSelectedCircle(null); }
     else showToast('Failed to delete.');
   };
 
   const deleteAnnouncement = async (id) => {
     if (!confirm('Delete this post?')) return;
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
-    if (!error) { showToast('Post deleted.'); fetchData(); }
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'delete_announcement', id }),
+    });
+    if (res.ok) { showToast('Post deleted.'); fetchData(); }
+    else showToast('Failed to delete.');
   };
 
   const togglePin = async (id, pinned) => {
-    await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
+    const token = localStorage.getItem('accessToken');
+    await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'toggle_pin', id, pinned }),
+    });
     fetchData();
   };
 
   const deleteMessage = async (id) => {
     if (!confirm('Delete this message?')) return;
-    const { error } = await supabase.from('messages').delete().eq('id', id);
-    if (!error) setGlobalMessages(prev => prev.filter(m => m.id !== id));
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'delete_message', id }),
+    });
+    if (res.ok) setGlobalMessages(prev => prev.filter(m => m.id !== id));
   };
 
   const issueWarning = async (userId, userName, reason) => {
@@ -657,11 +680,7 @@ export default function AdminDashboard() {
         showToast(d.message || 'Failed to delete user.');
       }
     } catch {
-      // Fallback: delete from accounts
-      await supabase.from('accounts').delete().eq('id', userId);
-      showToast(`${userName} deleted.`);
-      setSelectedUser(null);
-      fetchData();
+      showToast('Network error. Failed to delete user.');
     }
   };
 
@@ -675,25 +694,24 @@ export default function AdminDashboard() {
   };
 
   const resolveReport = async (reportId, status, note) => {
-    await supabase.from('reports').update({
-      status, admin_note: note, reviewed_at: new Date().toISOString(), reviewed_by: admin?.id,
-    }).eq('id', reportId);
+    const token = localStorage.getItem('accessToken');
+    await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'resolve_report', id: reportId, status, note, admin_id: admin?.id }),
+    });
     showToast('Report updated.');
     fetchData();
   };
 
   const deleteContent = async (type, id) => {
     if (!confirm('Delete this content?')) return;
-    if (type === 'message') await supabase.from('messages').delete().eq('id', id);
-    if (type === 'announcement') await supabase.from('announcements').delete().eq('id', id);
-    if (type === 'profile_photo') {
-      // id is the user's account id — clear their avatar and cover
-      await supabase.from('account_details').update({ avatar_url: null, cover_url: null }).eq('id', id);
-    }
-    if (type === 'circle_photo') {
-      // id is the community id — clear the circle cover
-      await supabase.from('communities').update({ cover_url: null }).eq('id', id);
-    }
+    const token = localStorage.getItem('accessToken');
+    await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'delete_content', id, content_type: type }),
+    });
     showToast('Content removed.');
     fetchData();
   };
