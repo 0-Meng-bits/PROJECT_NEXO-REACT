@@ -1688,6 +1688,11 @@ export default function AdminDashboard() {
                         <td><span className="adm-tag">{r.content_type}</span></td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 200 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reason}</div>
+                          {r.content_preview && (
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10, fontStyle: 'italic', marginTop: 2, opacity: 0.6 }}>
+                              "{r.content_preview}"
+                            </div>
+                          )}
                         </td>
                         <td>
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
