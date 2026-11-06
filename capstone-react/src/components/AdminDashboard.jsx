@@ -593,6 +593,18 @@ export default function AdminDashboard() {
     const currentPoints = profile?.trust_points ?? 10;
     const newPoints = Math.max(0, currentPoints - 1);
     const newWarnings = (profile?.warning_count || 0) + 1;
+    const isAlreadySuspended = profile?.suspended_until && new Date(profile.suspended_until) > new Date();
+
+    // Auto-ban: if user is already suspended and gets another warning → permanent ban
+    if (isAlreadySuspended) {
+      await supabase.from('account_status').update({ is_banned: true, suspended_until: null }).eq('id', userId);
+      await supabase.from('user_warnings').insert([{ user_id: userId, admin_id: admin?.id, type: 'ban', reason: `Auto-banned after repeated violations. ${reason}` }]);
+      await supabase.from('notifications').insert([{ user_id: userId, type: 'audition_update', message: `Your account has been permanently banned due to repeated violations. Reason: ${reason}` }]);
+      showToast(`${userName} has been permanently banned.`);
+      fetchData();
+      return;
+    }
+
     const willSuspend = newPoints === 0;
 
     // Insert warning record
