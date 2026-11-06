@@ -4584,6 +4584,7 @@ export default function UserPortal() {
   const [viewingApplication, setViewingApplication] = useState(null); // { response, community, questions }
   const [search, setSearch] = useState('');
   const [searchUsers, setSearchUsers] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const searchTimeout = useRef(null);
   const [clock, setClock] = useState(new Date());
   const [channels, setChannels] = useState([]);
@@ -6001,7 +6002,8 @@ export default function UserPortal() {
               const val = e.target.value;
               setSearch(val);
               clearTimeout(searchTimeout.current);
-              if (val.trim().length < 2) { setSearchUsers([]); return; }
+              if (val.trim().length < 2) { setSearchUsers([]); setSearchLoading(false); return; }
+              setSearchLoading(true);
               searchTimeout.current = setTimeout(async () => {
                 const { data } = await supabase.from('accounts')
                   .select('id, full_name, ctu_id, account_details(avatar_url)')
@@ -6009,6 +6011,7 @@ export default function UserPortal() {
                   .neq('ctu_id', user?.student_id)
                   .limit(5);
                 setSearchUsers(data || []);
+                setSearchLoading(false);
               }, 300);
             }}
           />
@@ -6063,9 +6066,14 @@ export default function UserPortal() {
                   ))}
                 </>
               )}
-              {/* No results */}
+              {/* No results / loading */}
               {communities.filter(c => c.id !== 'global' && c.name.toLowerCase().includes(search.toLowerCase())).length === 0 && searchUsers.length === 0 && (
-                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>No results found.</div>
+                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>
+                  {searchLoading
+                    ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Searching...</>
+                    : search.trim().length >= 2 ? 'No results found.' : null
+                  }
+                </div>
               )}            </div>
           )}
         </div>
