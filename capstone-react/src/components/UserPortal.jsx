@@ -1803,6 +1803,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
   };
   const [inviteResult, setInviteResult] = useState(null);
   const [inviteSearching, setInviteSearching] = useState(false);
+  const [inviteHasSearched, setInviteHasSearched] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [logoUrl, setLogoUrl] = useState(comm.logo_url || null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -2016,6 +2017,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
     if (!inviteSearch.trim()) return;
     setInviteSearching(true);
     setInviteResult(null);
+    setInviteHasSearched(true);
     const { data } = await supabase.from('accounts')
       .select('id, full_name, ctu_id')
       .ilike('ctu_id', `%${inviteSearch.trim()}%`)
@@ -2295,7 +2297,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                 style={{ flex: 1, padding: '10px 12px', fontSize: 13 }}
                 placeholder="Enter Student ID (e.g. 1234567)"
                 value={inviteSearch}
-                onChange={e => setInviteSearch(e.target.value)}
+                onChange={e => { setInviteSearch(e.target.value); setInviteHasSearched(false); setInviteResult(null); }}
                 onKeyDown={e => e.key === 'Enter' && searchInviteStudent()}
               />
               <button className="cyber-btn" style={{ padding: '8px 16px', fontSize: 12 }}
@@ -2304,7 +2306,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
               </button>
             </div>
 
-            {inviteResult === null && inviteSearch.trim() && !inviteSearching && (
+            {inviteResult === null && inviteSearch.trim() && !inviteSearching && inviteHasSearched && (
               <p style={{ fontSize: 12, color: 'var(--red)', padding: '10px 0' }}>
                 <i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>No student found with that ID.
               </p>
