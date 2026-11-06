@@ -2022,7 +2022,16 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       .select('id, full_name, ctu_id')
       .ilike('ctu_id', `%${inviteSearch.trim()}%`)
       .limit(1).single();
-    setInviteResult(data ? { ...data, student_id: data.ctu_id } : null);
+    if (data) {
+      const { data: membership } = await supabase.from('memberships')
+        .select('status')
+        .eq('community_id', comm.id)
+        .eq('user_id', data.id)
+        .maybeSingle();
+      setInviteResult({ ...data, student_id: data.ctu_id, membershipStatus: membership?.status || null });
+    } else {
+      setInviteResult(null);
+    }
     setInviteSearching(false);
   };
 
@@ -2324,10 +2333,20 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                   <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{inviteResult.full_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'monospace', marginTop: 2 }}>{inviteResult.student_id}</div>
                 </div>
-                <button className="cyber-btn" style={{ padding: '8px 18px', fontSize: 12 }}
-                  onClick={inviteMember} disabled={inviting}>
-                  {inviting ? 'Inviting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Invite</>}
-                </button>
+                {inviteResult.membershipStatus === 'active' ? (
+                  <span style={{ padding: '8px 18px', fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>
+                    <i className="fa-solid fa-check-circle" style={{ marginRight: 6 }}></i>Member
+                  </span>
+                ) : inviteResult.membershipStatus === 'invited' ? (
+                  <span style={{ padding: '8px 18px', fontSize: 12, color: 'var(--cyber-cyan)', fontWeight: 700 }}>
+                    <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Invited
+                  </span>
+                ) : (
+                  <button className="cyber-btn" style={{ padding: '8px 18px', fontSize: 12 }}
+                    onClick={inviteMember} disabled={inviting}>
+                    {inviting ? 'Inviting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Invite</>}
+                  </button>
+                )}
               </div>
             )}
           </div>
