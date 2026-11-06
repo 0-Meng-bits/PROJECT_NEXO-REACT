@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -257,7 +257,7 @@ const FEEDBACK_TAGS = [
   { id: 'impact',    label: 'Impact',    emoji: '??', color: '#ef4444' },
 ];
 
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents, onViewProfile }) {
+function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents, onViewProfile, onViewProfileById }) {
   const type = POST_TYPE[a.post_type] || POST_TYPE.general;
   const isAnon = a.author_name === 'Anonymous';
   const displayName = isAnon ? 'Anonymous' : a.author_name;
@@ -725,8 +725,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           hasEventMetadata={!!a.event_metadata?.event_date}
           isClosed={!!a.event_metadata?.is_closed}
           onPollClosed={(eventId) => {
-            // Reload announcements to show updated state
-            window.location.reload();
+            onReload?.();
           }}
         />
       )}
@@ -793,7 +792,10 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                   return (
                   <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                     {/* Avatar */}
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
+                    <div
+                      style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden', cursor: onViewProfileById ? 'pointer' : 'default' }}
+                      onClick={() => onViewProfileById && onViewProfileById(c.author_id)}
+                      title={onViewProfileById ? `View ${c.author_name}'s profile` : undefined}>
                       {avatarCache?.[c.author_id]
                         ? <img src={avatarCache[c.author_id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : (c.author_name || 'U')[0].toUpperCase()}
@@ -4748,13 +4750,11 @@ export default function UserPortal() {
         ...(data.account_details || {}),
       };
       delete flat.account_status; delete flat.account_details;
-      // fetch their active circle memberships
       const { data: memberships } = await supabase
         .from('memberships')
         .select('community_id')
         .eq('user_id', data.id)
         .in('status', ['active', 'approved']);
-      
       let circles = [];
       if (memberships?.length) {
         const commIds = memberships.map(m => m.community_id);
@@ -4767,6 +4767,28 @@ export default function UserPortal() {
       setViewingProfile({ ...flat, _circles: circles });
     } else {
       console.error('viewUserProfile error:', error, 'studentId:', studentId);
+    }
+  };
+
+  // View profile by UUID - used when only author_id (UUID) is available (e.g. comment avatars)
+  const viewUserProfileById = async (userId) => {
+    if (!userId) return;
+    if (userId === user?.id) { setShowProfile(true); return; }
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url, gender)')
+      .eq('id', userId).single();
+    if (!error && data) {
+      const flat = { ...data, student_id: data.ctu_id, is_verified: data.account_status?.is_verified, ...(data.account_details || {}) };
+      delete flat.account_status; delete flat.account_details;
+      const { data: memberships } = await supabase.from('memberships').select('community_id').eq('user_id', data.id).in('status', ['active', 'approved']);
+      let circles = [];
+      if (memberships?.length) {
+        const commIds = memberships.map(m => m.community_id);
+        const { data: comms } = await supabase.from('communities').select('id, name, icon, cover_url, logo_url, category').in('id', commIds);
+        circles = comms || [];
+      }
+      setViewingProfile({ ...flat, _circles: circles });
     }
   };
 
@@ -6687,6 +6709,7 @@ export default function UserPortal() {
                         onVote={handleVote}
                         onReport={(data) => setShowReport(data)}
                         onViewProfile={viewUserProfile}
+                        onViewProfileById={viewUserProfileById}
                         onApply={(ann) => {
                           const match = ann.title?.match(/\(([^)]+)\)$/);
                           const commName = match?.[1];
@@ -7298,6 +7321,7 @@ export default function UserPortal() {
                             onVote={handleCircleVote}
                             onReport={(data) => setShowReport(data)}
                             onViewProfile={viewUserProfile}
+                            onViewProfileById={viewUserProfileById}
                             onApply={() => setShowApplicationForm({ comm: activeComm })}
                             communityCreatorId={activeComm?.creator_id}
                             onReload={() => loadCircleAnnouncements(activeCommId)}

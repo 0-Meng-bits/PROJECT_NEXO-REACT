@@ -5591,3 +5591,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* Hide scrollbar on profile modal — still scrollable, just no visible track */
 .profile-modal-box::-webkit-scrollbar { display: none; }
+
+/* Post type badge — icon only on all screen sizes (#11) */
+.post-type-label { display: none; }
+.post-type-badge { padding: 3px 6px !important; }
