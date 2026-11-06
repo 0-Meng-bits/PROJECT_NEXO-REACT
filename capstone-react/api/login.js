@@ -99,18 +99,6 @@ export default async function handler(req, res) {
   const status = account.account_status || {};
   const details = account.account_details || {};
 
-  if (status.is_banned) {
-    return res.status(403).json({ message: 'Your account has been banned.', banned: true });
-  }
-
-  if (status.suspended_until && new Date(status.suspended_until) > new Date()) {
-    return res.status(403).json({
-      message: `Your account is suspended until ${new Date(status.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
-      suspended: true,
-      suspended_until: status.suspended_until,
-    });
-  }
-
   const isPending = !status.is_verified;
 
   let authData;
@@ -137,6 +125,19 @@ export default async function handler(req, res) {
     }
   } else {
     authData = firstAuthData;
+  }
+
+  // Check ban/suspension AFTER password is verified — don't leak account status to wrong-password attempts
+  if (status.is_banned) {
+    return res.status(403).json({ message: 'Your account has been banned.', banned: true });
+  }
+
+  if (status.suspended_until && new Date(status.suspended_until) > new Date()) {
+    return res.status(403).json({
+      message: `Your account is suspended until ${new Date(status.suspended_until).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
+      suspended: true,
+      suspended_until: status.suspended_until,
+    });
   }
 
   // Process login streak — only for verified users
