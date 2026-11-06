@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -4900,7 +4900,6 @@ export default function UserPortal() {
           category
         )
       `)
-      .gte('event_date', today)
       .order('event_date', { ascending: true })
       .order('event_time', { ascending: true })
       .limit(50);

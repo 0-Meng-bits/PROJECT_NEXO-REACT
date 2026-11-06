@@ -12,14 +12,6 @@ function validateEventMetadata(metadata) {
     throw new Error('Event date is required');
   }
 
-  const eventDate = new Date(metadata.event_date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (eventDate < today) {
-    throw new Error('Event date cannot be in the past');
-  }
-
   if (!metadata.event_time) {
     throw new Error('Event time is required');
   }
@@ -199,19 +191,20 @@ export default async function handler(req, res) {
         }
         
         // Create event
-        const { data: newEvent, error: eventError } = await supabase
+        const { data: newEvent, error: eventError } = await supabaseAdmin
           .from('campus_events')
           .insert({
             title: winningOption,
             description: `This event was created from the poll '${poll.title}' - winning option: '${winningOption}'`,
-            start_date: poll.event_metadata.event_date,
-            start_time: convertTimeToSQL(poll.event_metadata.event_time),
+            event_date: poll.event_metadata.event_date,
+            event_time: convertTimeToSQL(poll.event_metadata.event_time),
+            event_end_date: poll.event_metadata.event_date,
             location: poll.event_metadata.location,
-            poster_id: creator.id,
+            community_id: poll.community_id || communityId || null,
             poster_name: creator.full_name,
             poster_type: creator.user_type,
             category: 'social',
-            is_official: false
+            is_official: false,
           })
           .select()
           .single();
