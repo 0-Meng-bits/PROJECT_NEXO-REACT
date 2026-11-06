@@ -1792,8 +1792,9 @@ export default function AdminDashboard() {
 // ── WARNING APPEALS SECTION ──────────────────────────────────────────────────
 function WarningAppealsSection({ admin, showToast }) {
   const [appeals, setAppeals] = useState([]);
+  const [banAppeals, setBanAppeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('pending'); // 'pending' | 'approved' | 'rejected'
+  const [tab, setTab] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'ban_appeals'
   const [selected, setSelected] = useState(null);
   const [note, setNote] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -1803,12 +1804,21 @@ function WarningAppealsSection({ admin, showToast }) {
   const loadAppeals = async () => {
     setLoading(true);
     const token = localStorage.getItem('accessToken');
-    const res = await fetch(getApiUrl('/api/admin-data?type=appeals'), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (res.ok) {
-      const d = await res.json();
+    const [warningRes, ticketsRes] = await Promise.all([
+      fetch(getApiUrl('/api/admin-data?type=appeals'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+      fetch(getApiUrl('/api/admin-data'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    ]);
+    if (warningRes.ok) {
+      const d = await warningRes.json();
       setAppeals(d.appeals || []);
+    }
+    if (ticketsRes.ok) {
+      const d = await ticketsRes.json();
+      setBanAppeals((d.tickets || []).filter(t => t.category === 'Ban Appeal' || t.category === 'Suspension Appeal'));
     }
     setLoading(false);
   };
@@ -1839,29 +1849,65 @@ function WarningAppealsSection({ admin, showToast }) {
   );
 
   const pendingCount = appeals.filter(a => a.status === 'pending').length;
+  const banPendingCount = banAppeals.filter(t => t.status === 'open').length;
+  const totalPending = pendingCount + banPendingCount;
 
   return (
     <div className="adm-card">
       <div className="adm-card-head">
         <span>Warning Appeals</span>
-        {pendingCount > 0 && <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{pendingCount} pending</span>}
+        {totalPending > 0 && <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{totalPending} pending</span>}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {[['pending','Pending'],['approved','Approved'],['rejected','Rejected']].map(([key, label]) => (
+      <div style={{ display: 'flex', gap: 8, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+        {[['pending','Pending'],['approved','Approved'],['rejected','Rejected'],['ban_appeals','Ban/Suspension']].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
               background: tab === key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.04)',
               color: tab === key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
             }}>
-            {label} {key === 'pending' && pendingCount > 0 ? `(${pendingCount})` : ''}
+            {label}
+            {key === 'pending' && pendingCount > 0 ? ` (${pendingCount})` : ''}
+            {key === 'ban_appeals' && banPendingCount > 0 ? ` (${banPendingCount})` : ''}
           </button>
         ))}
       </div>
 
       {loading ? (
         <div className="adm-empty"><i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i></div>
+      ) : tab === 'ban_appeals' ? (
+        banAppeals.length === 0
+          ? <div className="adm-empty"><i className="fa-solid fa-inbox" style={{ fontSize: 28, marginBottom: 10 }}></i><div>No ban/suspension appeals.</div></div>
+          : <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+              {banAppeals.map(t => (
+                <div key={t.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{t.accounts?.full_name || 'Unknown'}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                          color: t.category === 'Ban Appeal' ? '#ff4444' : 'var(--orange)',
+                          border: `1px solid ${t.category === 'Ban Appeal' ? '#ff4444' : 'var(--orange)'}`,
+                          background: t.category === 'Ban Appeal' ? 'rgba(255,68,68,0.1)' : 'rgba(247,169,79,0.1)',
+                        }}>{t.category}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                        CTU ID: {t.accounts?.ctu_id} · {new Date(t.created_at).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 13, background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: '8px 12px' }}>
+                        {t.message}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 6, whiteSpace: 'nowrap',
+                      color: t.status === 'open' ? 'var(--orange)' : t.status === 'resolved' ? 'var(--green)' : 'var(--text-muted)',
+                      border: `1px solid ${t.status === 'open' ? 'var(--orange)' : t.status === 'resolved' ? 'var(--green)' : '#444'}`,
+                      background: t.status === 'open' ? 'rgba(247,169,79,0.08)' : 'transparent',
+                    }}>{t.status?.toUpperCase()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
       ) : filtered.length === 0 ? (
         <div className="adm-empty"><i className="fa-solid fa-inbox" style={{ fontSize: 28, marginBottom: 10 }}></i><div>No {tab} appeals.</div></div>
       ) : (

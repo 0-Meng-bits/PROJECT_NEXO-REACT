@@ -597,6 +597,7 @@ function BanAppealForm({ type, ctuId }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [rateLimited, setRateLimited] = useState(false);
   const [localCtuId, setLocalCtuId] = useState(ctuId || '');
 
   const submit = async () => {
@@ -614,7 +615,8 @@ function BanAppealForm({ type, ctuId }) {
         setSubmitted(true);
       } else if (res.status === 429) {
         setError(data.message);
-        setOpen(false); // collapse after rate limit hit
+        setRateLimited(true);
+        // do NOT collapse — keep form open so user can see the error
       } else {
         setError(data.message || 'Failed to submit.');
       }
@@ -636,11 +638,18 @@ function BanAppealForm({ type, ctuId }) {
     <div style={{ border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
       {/* Collapsible header */}
       <button
-        onClick={() => { setOpen(o => !o); setError(''); }}
+        onClick={() => setOpen(o => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: 'none', cursor: 'pointer', color: 'var(--cyber-cyan)', fontWeight: 700, fontSize: 13 }}>
         <span><i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>Submit an Appeal</span>
         <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 11 }}></i>
       </button>
+
+      {/* Error shown OUTSIDE collapsible body so it's always visible */}
+      {error && (
+        <div style={{ padding: '10px 16px', background: 'rgba(247,95,95,0.08)', borderTop: '1px solid rgba(247,95,95,0.3)', fontSize: 12, color: 'var(--red)' }}>
+          <i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>{error}
+        </div>
+      )}
 
       {/* Collapsible body */}
       {open && (
@@ -674,8 +683,7 @@ function BanAppealForm({ type, ctuId }) {
             <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
             You may submit 1 appeal per day. Make it count.
           </div>
-          {error && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}><i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>{error}</div>}
-          <button className="cyber-btn" style={{ width: '100%' }} onClick={submit} disabled={submitting || !message.trim()}>
+          <button className="cyber-btn" style={{ width: '100%' }} onClick={submit} disabled={submitting || !message.trim() || rateLimited}>
             {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
           </button>
         </div>
