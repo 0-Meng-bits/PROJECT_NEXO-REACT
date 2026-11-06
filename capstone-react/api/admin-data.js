@@ -116,6 +116,22 @@ export default async function handler(req, res) {
         const { ctu_id, message, ticket_type } = payload;
         const { data: account } = await supabaseAdmin.from('accounts').select('id, full_name').eq('ctu_id', ctu_id).maybeSingle();
         if (!account) return res.status(404).json({ message: 'CTU ID not found.' });
+
+        // 1-per-day limit — check appeals submitted today (PH time UTC+8)
+        const now = new Date();
+        const phTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+        const todayPH = phTime.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+        const todayStart = new Date(todayPH + 'T00:00:00+08:00').toISOString();
+        const { count } = await supabaseAdmin
+          .from('support_tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', account.id)
+          .in('category', ['Ban Appeal', 'Suspension Appeal'])
+          .gte('created_at', todayStart);
+        if (count > 0) {
+          return res.status(429).json({ message: 'You already submitted an appeal today. Please wait 24 hours before submitting again.' });
+        }
+
         await supabaseAdmin.from('support_tickets').insert([{
           user_id: account.id,
           category: ticket_type === 'ban' ? 'Ban Appeal' : 'Suspension Appeal',

@@ -592,6 +592,7 @@ export default function Auth() {
 
 // ── BAN/SUSPENSION APPEAL FORM (no login required) ──────────────────────────
 function BanAppealForm({ type, ctuId }) {
+  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -609,54 +610,76 @@ function BanAppealForm({ type, ctuId }) {
         body: JSON.stringify({ action: 'submit_ban_appeal', ctu_id: localCtuId.trim(), message: message.trim(), ticket_type: type }),
       });
       const data = await res.json();
-      if (res.ok) { setSubmitted(true); }
-      else { setError(data.message || 'Failed to submit.'); }
+      if (res.ok) {
+        setSubmitted(true);
+      } else if (res.status === 429) {
+        setError(data.message);
+        setOpen(false); // collapse after rate limit hit
+      } else {
+        setError(data.message || 'Failed to submit.');
+      }
     } catch { setError('Network error. Please try again.'); }
     setSubmitting(false);
   };
 
   if (submitted) {
     return (
-      <div style={{ background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+      <div style={{ background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
         <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)', fontSize: 24, marginBottom: 8, display: 'block' }}></i>
-        <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 6 }}>Appeal Submitted</div>
+        <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>Appeal Submitted</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>An admin will review your appeal within 24–48 hours.</div>
       </div>
     );
   }
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'left' }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--cyber-cyan)', marginBottom: 12 }}>
-        <i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>
-        Submit an Appeal
-      </div>
-      {!ctuId && (
-        <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>YOUR CTU ID</label>
-          <input
-            value={localCtuId}
-            onChange={e => setLocalCtuId(e.target.value)}
-            placeholder="e.g. 2100000"
-            style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13 }}
-          />
+    <div style={{ border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
+      {/* Collapsible header */}
+      <button
+        onClick={() => { setOpen(o => !o); setError(''); }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: 'none', cursor: 'pointer', color: 'var(--cyber-cyan)', fontWeight: 700, fontSize: 13 }}>
+        <span><i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>Submit an Appeal</span>
+        <i className={`fa-solid fa-chevron-${open ? 'up' : 'down'}`} style={{ fontSize: 11 }}></i>
+      </button>
+
+      {/* Collapsible body */}
+      {open && (
+        <div style={{ padding: 16, background: 'rgba(255,255,255,0.02)', textAlign: 'left' }}>
+          {!ctuId && (
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>YOUR CTU ID</label>
+              <input
+                value={localCtuId}
+                onChange={e => setLocalCtuId(e.target.value)}
+                placeholder="e.g. 2100000"
+                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13 }}
+              />
+            </div>
+          )}
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              YOUR APPEAL <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(max 500 chars)</span>
+            </label>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder={type === 'ban' ? 'Explain why you believe this ban is a mistake...' : 'Explain your side or request early reinstatement...'}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>{message.length}/500</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+            <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
+            You may submit 1 appeal per day. Make it count.
+          </div>
+          {error && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}><i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>{error}</div>}
+          <button className="cyber-btn" style={{ width: '100%' }} onClick={submit} disabled={submitting || !message.trim()}>
+            {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
+          </button>
         </div>
       )}
-      <div style={{ marginBottom: 10 }}>
-        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>YOUR APPEAL</label>
-        <textarea
-          value={message}
-          onChange={e => setMessage(e.target.value)}
-          rows={3}
-          maxLength={500}
-          placeholder={type === 'ban' ? 'Explain why you believe this ban is a mistake...' : 'Explain your side or request early reinstatement...'}
-          style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
-        />
-      </div>
-      {error && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 8 }}>{error}</div>}
-      <button className="cyber-btn" style={{ width: '100%' }} onClick={submit} disabled={submitting || !message.trim()}>
-        {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
-      </button>
     </div>
   );
 }
