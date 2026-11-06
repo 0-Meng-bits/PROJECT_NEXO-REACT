@@ -268,11 +268,13 @@ function SupportTicketsSection() {
 
   const statusColor = { open: 'var(--orange)', resolved: 'var(--green)', closed: 'var(--text-muted)' };
   const categoryColor = {
-    'Bug Report':       { color: 'var(--red)',          bg: 'rgba(247,95,95,0.08)',     border: 'rgba(247,95,95,0.3)' },
-    'Account Issue':    { color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.08)',    border: 'rgba(252,238,10,0.3)' },
-    'General Question': { color: 'var(--cyber-cyan)',   bg: 'rgba(0,240,255,0.08)',     border: 'rgba(0,240,255,0.2)' },
-    'Circle Problem':   { color: '#a855f7',             bg: 'rgba(168,85,247,0.08)',    border: 'rgba(168,85,247,0.3)' },
-    'Other':            { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
+    'Bug Report':         { color: 'var(--red)',          bg: 'rgba(247,95,95,0.08)',     border: 'rgba(247,95,95,0.3)' },
+    'Account Issue':      { color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.08)',    border: 'rgba(252,238,10,0.3)' },
+    'General Question':   { color: 'var(--cyber-cyan)',   bg: 'rgba(0,240,255,0.08)',     border: 'rgba(0,240,255,0.2)' },
+    'Circle Problem':     { color: '#a855f7',             bg: 'rgba(168,85,247,0.08)',    border: 'rgba(168,85,247,0.3)' },
+    'Other':              { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
+    'Ban Appeal':         { color: '#ff4444',             bg: 'rgba(255,68,68,0.12)',     border: 'rgba(255,68,68,0.4)' },
+    'Suspension Appeal':  { color: 'var(--orange)',       bg: 'rgba(247,169,79,0.12)',    border: 'rgba(247,169,79,0.4)' },
   };
 
   return (
