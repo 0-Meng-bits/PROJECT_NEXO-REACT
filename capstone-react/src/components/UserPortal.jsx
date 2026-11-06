@@ -4900,6 +4900,7 @@ export default function UserPortal() {
           category
         )
       `)
+      .gte('event_date', today)
       .order('event_date', { ascending: true })
       .order('event_time', { ascending: true })
       .limit(50);
