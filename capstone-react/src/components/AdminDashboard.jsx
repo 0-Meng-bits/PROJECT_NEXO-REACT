@@ -600,7 +600,7 @@ export default function AdminDashboard() {
       user_id: userId, admin_id: admin?.id, type: 'warning', reason,
     }]);
 
-    // Deduct point via point_transactions — DB trigger syncs account_status.trust_points
+    // Deduct 1 point directly and update trust_points in account_status
     await supabase.from('point_transactions').insert([{
       user_id: userId,
       amount: -1,
@@ -609,13 +609,14 @@ export default function AdminDashboard() {
       reason,
     }]);
 
-    // Update warning count and suspension separately (not trust_points — that's handled by trigger)
+    // Update warning count, trust_points, and suspension directly
     const suspendedUntil = willSuspend
       ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       : null;
 
     await supabase.from('account_status').update({
       warning_count: newWarnings,
+      trust_points: newPoints,
       ...(willSuspend ? { suspended_until: suspendedUntil } : {}),
     }).eq('id', userId);
 
@@ -1252,7 +1253,7 @@ export default function AdminDashboard() {
                   <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {!selectedUser.is_banned && selectedUser.is_verified && (
                       <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)' }}
-                        onClick={() => { const r = prompt('Warning reason:'); if (r) { issueWarning(selectedUser.id, selectedUser.full_name, r); setSelectedUser(prev => ({ ...prev, warning_count: (prev.warning_count || 0) + 1, trust_points: Math.max(0, (prev.trust_points ?? 3) - 1) })); } }}>
+                        onClick={() => { const r = prompt('Warning reason:'); if (r) { issueWarning(selectedUser.id, selectedUser.full_name, r); setSelectedUser(prev => ({ ...prev, warning_count: (prev.warning_count || 0) + 1, trust_points: Math.max(0, (prev.trust_points ?? 10) - 1) })); } }}>
                         <i className="fa-solid fa-triangle-exclamation"></i> Issue Warning
                       </button>
                     )}
