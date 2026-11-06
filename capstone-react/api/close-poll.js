@@ -139,17 +139,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'BAD_REQUEST', message: 'announcementId and communityId required' });
     }
     
-    // 1. Authorization: Verify user is community leader with approved status
+    // 1. Authorization: Verify user is community leader or co-leader
     const { data: membership, error: memberError } = await supabase
       .from('memberships')
       .select('rank_level')
       .eq('user_id', closerId)
       .eq('community_id', communityId)
-      .eq('status', 'approved')
+      .in('status', ['active', 'approved'])
       .single();
     
     if (memberError || !membership || membership.rank_level <= 0) {
-      return res.status(403).json({ error: 'FORBIDDEN', message: 'Only community leaders can close polls' });
+      // Also allow if user is the circle creator
+      const { data: comm } = await supabase.from('communities').select('creator_id').eq('id', communityId).single();
+      if (!comm || comm.creator_id !== closerId) {
+        return res.status(403).json({ error: 'FORBIDDEN', message: 'Only community leaders can close polls' });
+      }
     }
     
     // 2. Fetch poll data
