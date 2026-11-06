@@ -6134,8 +6134,15 @@ export default function UserPortal() {
                       onClick={() => {
                         markRead(n.id);
                         if (n.type === 'circle_invite' && n.link_comm_id) {
-                          setActiveCategory('all');
-                          navTo('activity', 'global');
+                          // Open the Circle Info Card for the invited circle directly
+                          const invitedCircle = communities.find(c => c.id === n.link_comm_id);
+                          if (invitedCircle) {
+                            setShowCircleInfo(invitedCircle);
+                          } else {
+                            // Circle not yet in local state — navigate to Explore and filter
+                            setActiveCategory('all');
+                            navTo('activity', 'global');
+                          }
                         } else if (n.link_comm_id) {
                           setActiveChannelId(null);
                           navTo('circles', n.link_comm_id);
