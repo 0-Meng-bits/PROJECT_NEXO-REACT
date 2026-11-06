@@ -277,20 +277,22 @@ function SupportTicketsSection() {
     'Suspension Appeal':  { color: 'var(--orange)',       bg: 'rgba(247,169,79,0.12)',    border: 'rgba(247,169,79,0.4)' },
   };
 
+  const supportTickets = tickets.filter(t => t.category !== 'Ban Appeal' && t.category !== 'Suspension Appeal');
+
   return (
     <div className="adm-card">
       <div className="adm-card-head">
         <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
-        <span className="adm-badge">{tickets.filter(t => t.status === 'open').length} open</span>
+        <span className="adm-badge">{supportTickets.filter(t => t.status === 'open').length} open</span>
       </div>
       {loadingTickets ? <div className="adm-empty">Loading...</div>
-      : tickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
+      : supportTickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
       : (
         <div style={{ overflowY: 'auto', maxHeight: '65vh' }}>
           <table className="adm-table">
             <thead><tr><th>USER</th><th>CATEGORY</th><th>MESSAGE</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr></thead>
             <tbody>
-              {tickets.map(t => (
+              {supportTickets.map(t => (
                 <tr key={t.id}>
                   <td style={{ fontSize: 11 }}>
                     <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{t.accounts?.full_name || '—'}</div>
