@@ -110,6 +110,13 @@ export default async function handler(req, res) {
       if (action === 'unban_user') {
         const { user_id } = payload;
         await supabaseAdmin.from('account_status').update({ is_banned: false }).eq('id', user_id);
+        await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: '✅ Your ban has been lifted. You can now log back in to NEXO Connect.' }]);
+        return res.json({ ok: true });
+      }
+      if (action === 'unsuspend_user') {
+        const { user_id } = payload;
+        await supabaseAdmin.from('account_status').update({ suspended_until: null }).eq('id', user_id);
+        await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: '✅ Your suspension has been lifted early. You can now log back in to NEXO Connect.' }]);
         return res.json({ ok: true });
       }
       if (action === 'submit_ban_appeal') {

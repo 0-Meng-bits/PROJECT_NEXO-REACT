@@ -1815,6 +1815,9 @@ function WarningAppealsSection({ admin, showToast }) {
     if (warningRes.ok) {
       const d = await warningRes.json();
       setAppeals(d.appeals || []);
+      // Auto-switch to ban_appeals tab if no pending warning appeals
+      const pendingWarnings = (d.appeals || []).filter(a => a.status === 'pending');
+      if (pendingWarnings.length === 0) setTab('ban_appeals');
     }
     if (ticketsRes.ok) {
       const d = await ticketsRes.json();
@@ -1842,8 +1845,33 @@ function WarningAppealsSection({ admin, showToast }) {
     setProcessing(false);
   };
 
-  const filtered = appeals.filter(a =>
-    tab === 'pending' ? a.status === 'pending' :
+  const resolveBanAppeal = async (ticketId, userId, category, decision) => {
+    const token = localStorage.getItem('accessToken');
+    if (decision === 'approve') {
+      // Unban or unsuspend
+      await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: category === 'Ban Appeal' ? 'unban_user' : 'unsuspend_user', user_id: userId }),
+      });
+      await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'update_ticket', id: ticketId, status: 'resolved', user_id: userId }),
+      });
+      showToast(category === 'Ban Appeal' ? 'User unbanned.' : 'Suspension lifted.');
+    } else {
+      await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'update_ticket', id: ticketId, status: 'closed', user_id: userId }),
+      });
+      showToast('Appeal dismissed.');
+    }
+    loadAppeals();
+  };
+
+  const filtered = appeals.filter(a =>    tab === 'pending' ? a.status === 'pending' :
     tab === 'approved' ? a.status === 'approved' :
     a.status === 'rejected'
   );
@@ -1898,6 +1926,19 @@ function WarningAppealsSection({ admin, showToast }) {
                       <div style={{ fontSize: 13, background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: '8px 12px' }}>
                         {t.message}
                       </div>
+                      {t.status === 'open' && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                          <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)', fontSize: 11 }}
+                            onClick={() => resolveBanAppeal(t.id, t.user_id, t.category, 'approve')}>
+                            <i className="fa-solid fa-lock-open" style={{ marginRight: 5 }}></i>
+                            {t.category === 'Ban Appeal' ? 'Unban User' : 'Lift Suspension'}
+                          </button>
+                          <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#444', fontSize: 11 }}
+                            onClick={() => resolveBanAppeal(t.id, t.user_id, t.category, 'dismiss')}>
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 6, whiteSpace: 'nowrap',
                       color: t.status === 'open' ? 'var(--orange)' : t.status === 'resolved' ? 'var(--green)' : 'var(--text-muted)',
