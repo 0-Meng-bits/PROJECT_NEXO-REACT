@@ -3924,7 +3924,18 @@ function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRank
             {/* Daily limit info */}
             <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-yellow)' }}>
               <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
-              Daily limit: {maxRecipients} recipients ? Cooldown: 12 hours per person
+              Daily limit: {maxRecipients} recipients · Cooldown: 12 hours per person
+            </div>
+            {/* Rank info */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ marginBottom: 6, color: myRankLevel >= 2 ? '#f5e642' : 'var(--cyber-cyan)', fontWeight: 700 }}>
+                <i className={`fa-solid ${myRankLevel >= 3 ? 'fa-crown' : myRankLevel >= 2 ? 'fa-crown' : myRankLevel >= 1 ? 'fa-shield' : 'fa-user'}`} style={{ marginRight: 6 }}></i>
+                Your rank: {myRankLevel >= 3 ? 'Leader' : myRankLevel >= 2 ? 'Co-Leader' : myRankLevel >= 1 ? 'Moderator' : 'Member'} — can give up to +{maxAmount} TP · {maxRecipients} people/day
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-crown" style={{ marginRight: 5, color: '#f5e642' }}></i>Leader / Co-Leader</span><span>Max +5 TP · 5 people/day</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-shield" style={{ marginRight: 5, color: 'var(--cyber-cyan)' }}></i>Moderator / Member</span><span>Max +3 TP · 3 people/day</span></div>
+              </div>
             </div>
 
             {error && (
