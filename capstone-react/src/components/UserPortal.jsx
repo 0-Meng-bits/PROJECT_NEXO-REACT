@@ -733,7 +733,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
         </div>{/* end action bar */}
 
         {showComments && (
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
             {/* Sort bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sort:</span>
@@ -747,6 +747,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 </button>
               ))}
             </div>
+            {/* Scrollable comment list — max 400px, input stays pinned below */}
+            <div style={{ overflowY: 'auto', maxHeight: 400, paddingRight: 4 }}>
             {loadingComments ? (
               <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Loading comments...</p>
             ) : comments.length === 0 ? (
@@ -780,6 +782,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 containsBadWord={containsBadWord}
               />
             )}
+            </div>{/* end scrollable */}
             {user?.is_verified && (
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, marginTop: 8 }}>
                 {replyingTo && (
