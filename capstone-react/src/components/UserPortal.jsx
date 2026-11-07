@@ -881,7 +881,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                             <i className={commentHearts[c.id]?.likedByMe ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
                             {commentHearts[c.id]?.count > 0 && <span>{commentHearts[c.id].count}</span>}
                           </button>
-                          <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
+                          <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.parent_id || c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
                             onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
                             onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
@@ -889,12 +889,12 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           </button>
                         </div>
                       )}
-                      {/* Inline reply input */}
-                      {replyingTo?.id === c.id && (
+                      {/* Inline reply input — show on this comment if it's the target or if it's a reply whose root is the target */}
+                      {(replyingTo?.id === c.id || replyingTo?.id === c.parent_id) && !c.parent_id && (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
                           <input value={replyInput} onChange={e => setReplyInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
-                            placeholder={`Reply to ${c.author_name}...`}
+                            placeholder={`Reply to ${replyingTo?.author_name}...`}
                             autoFocus
                             style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none' }} />
                           <button onClick={() => submitReply()} disabled={!replyInput.trim()}
