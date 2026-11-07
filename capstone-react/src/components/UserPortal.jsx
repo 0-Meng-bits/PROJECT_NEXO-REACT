@@ -128,6 +128,7 @@ import { loadTheme } from '../lib/theme';
 import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaMessage } from './MediaMessageHelpers';
 import HelpModal from './HelpModal';
 import DiscoverPeople from './DiscoverPeople';
+import CommentTree from './CommentTree';
 
 const SHOP_API = window.location.hostname === 'localhost'
   ? '/api/shop'
@@ -309,11 +310,13 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const [commentInput, setCommentInput] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
-  const [replyingTo, setReplyingTo] = useState(null); // { id, author_name }
+  const [replyingTo, setReplyingTo] = useState(null); // { id, author_name, author_id }
   const [replyInput, setReplyInput] = useState('');
   const [commentHearts, setCommentHearts] = useState({}); // commentId -> { count, likedByMe }
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentVal, setEditingCommentVal] = useState('');
+  const [commentSort, setCommentSort] = useState('new'); // 'new' | 'old' | 'top'
+  const [collapsedThreads, setCollapsedThreads] = useState({});
 
   // Post like state
   const [postLiked, setPostLiked] = useState(false);
@@ -358,27 +361,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       .eq('announcement_id', a.id)
       .order('created_at', { ascending: true });
 
-    // Re-order: group replies under their parent using parent_id (fall back to @mention for old comments)
-    const reordered = [];
-    if (data?.length) {
-      const topLevel = data.filter(c => !c.parent_id);
-      const replies = data.filter(c => !!c.parent_id);
-
-      for (const c of topLevel) {
-        reordered.push(c);
-        // Insert all replies to this comment right after it
-        const children = replies.filter(r => r.parent_id === c.id);
-        reordered.push(...children);
-      }
-
-      // Fall back: any replies whose parent wasn't found (old @mention-only rows) append at end
-      const placed = new Set(reordered.map(c => c.id));
-      for (const c of data) {
-        if (!placed.has(c.id)) reordered.push(c);
-      }
-    }
-
-    setComments(reordered);
+    // Store flat — tree is built at render time by CommentTree
+    setComments(data || []);
     setLoadingComments(false);
     // Load heart counts for these comments
     if (data?.length && user?.id) {
@@ -514,17 +498,8 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       parent_id: replyingTo.id,
     }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at, parent_id, edited').single();
     if (!error && data) {
-      // Insert reply right after the parent comment (and any existing replies to it)
-      setComments(prev => {
-        const idx = prev.findIndex(c => c.id === replyingTo.id);
-        if (idx === -1) return [...prev, data];
-        // Skip over any replies already after the parent
-        let afterIdx = idx + 1;
-        while (afterIdx < prev.length && prev[afterIdx].parent_id === replyingTo.id) afterIdx++;
-        const next = [...prev];
-        next.splice(afterIdx, 0, data);
-        return next;
-      });
+      // Just append flat — CommentTree handles ordering via parent_id
+      setComments(prev => [...prev, data]);
       setCommentCount(prev => prev + 1);
       setReplyInput('');
       setReplyingTo(null);
@@ -759,184 +734,88 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
 
         {showComments && (
           <div style={{ marginTop: 12 }}>
-            {/* Comment list */}
+            {/* Sort bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sort:</span>
+              {[['new','New'],['old','Old'],['top','Top']].map(([key, label]) => (
+                <button key={key} onClick={() => setCommentSort(key)}
+                  style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    fontWeight: commentSort === key ? 700 : 400,
+                    background: commentSort === key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)',
+                    color: commentSort === key ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             {loadingComments ? (
               <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Loading comments...</p>
             ) : comments.length === 0 ? (
               <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No comments yet. Be the first!</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                {comments.map(c => {
-                  const isSolutionComment = c.id === a.solution_comment_id;
-                  return (
-                  <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginLeft: c.parent_id ? 32 : 0 }}>
-                    {/* Reply indicator line */}
-                    {c.parent_id && (
-                      <div style={{ width: 2, alignSelf: 'stretch', background: 'rgba(0,240,255,0.2)', borderRadius: 2, flexShrink: 0, marginRight: -4 }} />
-                    )}
-                    {/* Avatar */}
-                    <div
-                      style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden', cursor: onViewProfileById ? 'pointer' : 'default' }}
-                      onClick={() => onViewProfileById && onViewProfileById(c.author_id)}
-                      title={onViewProfileById ? `View ${c.author_name}'s profile` : undefined}>
-                      {avatarCache?.[c.author_id]
-                        ? <img src={avatarCache[c.author_id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : (c.author_name || 'U')[0].toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, background: isSolutionComment ? 'rgba(34,211,238,0.04)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isSolutionComment ? 'rgba(34,211,238,0.4)' : containsBadWord(c.content) ? 'rgba(247,95,95,0.3)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 12px' }}>
-                      {/* Solution badge */}
-                      {isSolutionComment && (
-                        <div style={{ fontSize: 10, color: '#22d3ee', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          ? Accepted Answer
-                          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>
-                            ? solved {timeSince(c.created_at)}
-                          </span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{c.author_name}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                            {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {c.edited && (
-                            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>· edited</span>
-                          )}
-                          {/* Edit + Delete own comment or admin delete */}
-                          {c.author_id === user?.id && (
-                            <button onClick={() => { setEditingCommentId(c.id); setEditingCommentVal(c.content); }}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '0 2px' }}
-                              onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
-                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                              <i className="fa-solid fa-pen"></i>
-                            </button>
-                          )}
-                          {(c.author_id === user?.id || user?.user_type === 'Admin') && (
-                            <button onClick={() => deleteComment(c.id)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '0 2px' }}
-                              onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
-                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                              <i className="fa-solid fa-trash-can"></i>
-                            </button>
-                          )}
-                          {/* Report comment */}
-                          {onReport && c.author_id !== user?.id && user?.user_type !== 'Admin' && (
-                            <button onClick={() => onReport({ type: 'message', id: c.id, preview: c.content, reportedUserId: c.author_id })}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '0 2px', opacity: 0.5 }}
-                              onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                              onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
-                              title="Report comment">
-                              <i className="fa-solid fa-flag"></i>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {containsBadWord(c.content) && (
-                        <div style={{ fontSize: 10, color: 'var(--red)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <i className="fa-solid fa-triangle-exclamation"></i> Flagged
-                        </div>
-                      )}
-                      {editingCommentId === c.id ? (
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
-                          <input
-                            value={editingCommentVal}
-                            onChange={e => setEditingCommentVal(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') updateComment(c.id, editingCommentVal); if (e.key === 'Escape') { setEditingCommentId(null); setEditingCommentVal(''); } }}
-                            autoFocus
-                            style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.35)', borderRadius: 8, padding: '5px 10px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
-                          <button onClick={() => updateComment(c.id, editingCommentVal)} disabled={!editingCommentVal.trim()}
-                            style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: '#000', fontSize: 11 }}>
-                            <i className="fa-solid fa-check" />
-                          </button>
-                          <button onClick={() => { setEditingCommentId(null); setEditingCommentVal(''); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
-                            <i className="fa-solid fa-xmark" />
-                          </button>
-                        </div>
-                      ) : (
-                        <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>{c.content}</p>
-                      )}
-                      {/* Mark / Unmark Solution button */}
-                      {isQuestion && isAuthorizedSolver && (
-                        <button
-                          onClick={() => markSolution(c.id)}
-                          disabled={markingSolution}
-                          style={{
-                            marginTop: 6, fontSize: 10, padding: '2px 8px', borderRadius: 8, cursor: 'pointer',
-                            border: isSolutionComment ? '1px solid rgba(34,211,238,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                            background: isSolutionComment ? 'rgba(34,211,238,0.1)' : 'transparent',
-                            color: isSolutionComment ? '#22d3ee' : 'var(--text-muted)',
-                          }}
-                        >
-                          {isSolutionComment ? '? Unmark Solution' : '? Mark as Solution'}
-                        </button>
-                      )}
-                      {/* Heart + Reply · inside bubble so they don't overflow on mobile */}
-                      {user?.is_verified && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                          <button onClick={() => toggleCommentHeart(c.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
-                            onMouseLeave={e => e.currentTarget.style.color = commentHearts[c.id]?.likedByMe ? '#f43f5e' : 'var(--text-muted)'}>
-                            <i className={commentHearts[c.id]?.likedByMe ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
-                            {commentHearts[c.id]?.count > 0 && <span>{commentHearts[c.id].count}</span>}
-                          </button>
-                          <button onClick={() => { setReplyingTo(replyingTo?.id === c.id ? null : { id: c.parent_id || c.id, author_name: c.author_name, author_id: c.author_id }); setReplyInput(''); }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'inherit', transition: 'color 0.2s', display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                            <i className="fa-solid fa-reply"></i>Reply
-                          </button>
-                        </div>
-                      )}
-                      {/* Inline reply input — show on this comment if it's the target or if it's a reply whose root is the target */}
-                      {(replyingTo?.id === c.id || replyingTo?.id === c.parent_id) && !c.parent_id && (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
-                          <input value={replyInput} onChange={e => setReplyInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
-                            placeholder={`Reply to ${replyingTo?.author_name}...`}
-                            autoFocus
-                            style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '6px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none' }} />
-                          <button onClick={() => submitReply()} disabled={!replyInput.trim()}
-                            style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: replyInput.trim() ? 1 : 0.4 }}>
-                            <i className="fa-solid fa-paper-plane"></i>
-                          </button>
-                          <button onClick={() => setReplyingTo(null)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>
-                            <i className="fa-solid fa-xmark"></i>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
+              <CommentTree
+                comments={comments}
+                commentSort={commentSort}
+                commentHearts={commentHearts}
+                collapsedThreads={collapsedThreads}
+                setCollapsedThreads={setCollapsedThreads}
+                editingCommentId={editingCommentId}
+                editingCommentVal={editingCommentVal}
+                setEditingCommentId={setEditingCommentId}
+                setEditingCommentVal={setEditingCommentVal}
+                replyingTo={replyingTo}
+                setReplyingTo={setReplyingTo}
+                setReplyInput={setReplyInput}
+                user={user}
+                avatarCache={avatarCache}
+                onViewProfileById={onViewProfileById}
+                onReport={onReport}
+                isQuestion={isQuestion}
+                isAuthorizedSolver={isAuthorizedSolver}
+                solutionCommentId={a.solution_comment_id}
+                markingSolution={markingSolution}
+                markSolution={markSolution}
+                updateComment={updateComment}
+                deleteComment={deleteComment}
+                toggleCommentHeart={toggleCommentHeart}
+                containsBadWord={containsBadWord}
+              />
             )}
-
-            {/* Comment input */}
             {user?.is_verified && (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                  {(user.full_name || 'U')[0].toUpperCase()}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, marginTop: 8 }}>
+                {replyingTo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '4px 10px', background: 'rgba(0,240,255,0.06)', borderRadius: 8, fontSize: 11 }}>
+                    <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 10 }}></i>
+                    <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>Replying to {replyingTo.author_name}</span>
+                    <button onClick={() => setReplyingTo(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, padding: 0 }}>
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
+                    {avatarCache?.[user.id] ? <img src={avatarCache[user.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user.full_name || 'U')[0].toUpperCase()}
+                  </div>
+                  <input
+                    value={replyingTo ? replyInput : commentInput}
+                    onChange={e => replyingTo ? setReplyInput(e.target.value) : setCommentInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { replyingTo ? submitReply() : submitComment(); } }}
+                    placeholder={replyingTo ? `Reply to ${replyingTo.author_name}...` : 'Write a comment...'}
+                    style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '7px 14px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', transition: 'border-color 0.2s' }}
+                    onFocus={e => e.target.style.borderColor = 'rgba(0,240,255,0.3)'}
+                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                  />
+                  <button
+                    onClick={() => replyingTo ? submitReply() : submitComment()}
+                    disabled={postingComment || !(replyingTo ? replyInput.trim() : commentInput.trim())}
+                    style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: (replyingTo ? replyInput.trim() : commentInput.trim()) ? 1 : 0.4 }}>
+                    <i className="fa-solid fa-paper-plane"></i>
+                  </button>
                 </div>
-                <input
-                  value={commentInput}
-                  onChange={e => setCommentInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()}
-                  placeholder="Write a comment..."
-                  style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '7px 14px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', transition: 'border-color 0.2s' }}
-                  onFocus={e => e.target.style.borderColor = 'rgba(0,240,255,0.3)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                />
-                <button onClick={submitComment} disabled={postingComment || !commentInput.trim()}
-                  style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 13, flexShrink: 0, opacity: commentInput.trim() ? 1 : 0.4, transition: 'opacity 0.2s' }}>
-                  <i className="fa-solid fa-paper-plane"></i>
-                </button>
               </div>
             )}
           </div>
         )}
+
       </div>
     </div>
   );
