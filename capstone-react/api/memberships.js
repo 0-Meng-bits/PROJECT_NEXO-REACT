@@ -99,13 +99,13 @@ export default async function handler(req, res) {
   if (action === 'accept_invite') {
     if (!community_id) return res.status(400).json({ message: 'Missing community_id.' });
 
-    // Update membership status from pending to active
+    // Update membership status from 'pending' or 'invited' to active
     const { data: membership, error } = await supabaseAdmin
       .from('memberships')
       .update({ status: 'active' })
       .eq('community_id', community_id)
       .eq('user_id', userId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'invited'])
       .select()
       .single();
 

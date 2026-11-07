@@ -5616,15 +5616,25 @@ export default function UserPortal() {
   };
 
   const acceptInvite = async (commId) => {
-    const membership = myMemberships.find(m => m.community_id === commId && m.status === 'invited');
-    if (!membership) return;
-    const { error } = await supabase.from('memberships').update({ status: 'active' }).eq('id', membership.id);
-    if (!error) {
-      await insertSystemMessage(commId, `${user.full_name} joined the circle.`);
-      await loadMyMemberships();
-      showToast('You joined the circle!');
-      navTo('circles', commId);
-    } else showToast('Failed to accept invite.');
+    const token = localStorage.getItem('accessToken');
+    try {
+      const res = await fetch(getApiUrl('/api/memberships'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'accept_invite', community_id: commId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await insertSystemMessage(commId, `${user.full_name} joined the circle.`);
+        await loadMyMemberships();
+        showToast(data.activated ? 'Circle is now active! Chat unlocked.' : 'You joined the circle!');
+        navTo('circles', commId);
+      } else {
+        showToast(data.message || 'Failed to accept invite.');
+      }
+    } catch {
+      showToast('Failed to accept invite.');
+    }
   };
 
   const declineInvite = async (commId) => {
