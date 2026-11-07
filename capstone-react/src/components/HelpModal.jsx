@@ -135,7 +135,7 @@ export default function HelpModal({ user, onClose }) {
           </div>
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4 }}>
-            {[['guide','fa-solid fa-book-open','Guide'],['video','fa-solid fa-circle-play','Video'],['faq','fa-solid fa-circle-question','FAQ'],['contact','fa-solid fa-headset','Support']].map(([id, icon, label]) => (
+            {[['guide','fa-solid fa-book-open','Guide'],['video','fa-solid fa-circle-play','Video'],['faq','fa-solid fa-circle-question','FAQ'],['tp','fa-solid fa-fire','Trust Points'],['contact','fa-solid fa-headset','Support']].map(([id, icon, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 style={{ flex: 1, padding: '8px 0', background: tab === id ? 'rgba(0,240,255,0.1)' : 'none', border: 'none', borderBottom: `2px solid ${tab === id ? 'var(--cyber-cyan)' : 'transparent'}`, color: tab === id ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: '0.15s' }}>
                 <i className={icon}></i> {label}
@@ -228,6 +228,91 @@ export default function HelpModal({ user, onClose }) {
               ))}
               <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, fontSize: 12, color: 'var(--text-muted)' }}>
                 Can't find your answer? <button onClick={() => setTab('contact')} style={{ background: 'none', border: 'none', color: 'var(--cyber-cyan)', cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: 0 }}>Contact Support →</button>
+              </div>
+            </div>
+          )}
+
+          {/* TRUST POINTS TAB */}
+          {tab === 'tp' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* What is TP */}
+              <div style={{ background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontWeight: 700, color: 'var(--cyber-cyan)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fa-solid fa-fire"></i> What are Trust Points?
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7, margin: 0 }}>
+                  Trust Points (TP) measure your standing in the NEXO Connect community. Every verified account starts with <strong style={{ color: 'white' }}>10 TP</strong>. They reflect your behavior, participation, and peer recognition.
+                </p>
+              </div>
+
+              {/* How to earn */}
+              <div style={{ background: 'rgba(62,207,142,0.05)', border: '1px solid rgba(62,207,142,0.2)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontWeight: 700, color: 'var(--green)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fa-solid fa-arrow-up"></i> How to Earn TP
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-calendar-check" style={{ marginRight: 6, color: 'var(--green)' }}></i>Daily login streak</span>
+                    <span style={{ color: 'var(--green)', fontWeight: 700 }}>+1 to +5 TP/day</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-heart" style={{ marginRight: 6, color: 'var(--green)' }}></i>Peer appreciation (given by members)</span>
+                    <span style={{ color: 'var(--green)', fontWeight: 700 }}>+1 to +5 TP</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-gavel" style={{ marginRight: 6, color: 'var(--green)' }}></i>Warning appeal approved by admin</span>
+                    <span style={{ color: 'var(--green)', fontWeight: 700 }}>+2 TP bonus</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Giving TP by rank */}
+              <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontWeight: 700, color: 'var(--cyber-yellow)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fa-solid fa-users"></i> Giving TP — By Circle Rank
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
+                  {[
+                    { rank: 'Leader / Co-Leader', icon: 'fa-solid fa-crown', color: '#f5e642', max: 5, recipients: 5 },
+                    { rank: 'Moderator', icon: 'fa-solid fa-shield', color: 'var(--cyber-cyan)', max: 3, recipients: 3 },
+                    { rank: 'Member', icon: 'fa-solid fa-user', color: 'var(--text-muted)', max: 3, recipients: 3 },
+                  ].map(r => (
+                    <div key={r.rank} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                      <i className={r.icon} style={{ color: r.color, width: 16, textAlign: 'center' }}></i>
+                      <span style={{ flex: 1, color: 'white', fontWeight: 600 }}>{r.rank}</span>
+                      <span style={{ color: 'var(--green)', fontWeight: 700 }}>Max +{r.max} TP</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{r.recipients} people/day</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    <i className="fa-solid fa-clock" style={{ marginRight: 5 }}></i>12-hour cooldown per person
+                  </div>
+                </div>
+              </div>
+
+              {/* Losing TP / consequences */}
+              <div style={{ background: 'rgba(247,95,95,0.05)', border: '1px solid rgba(247,95,95,0.2)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontWeight: 700, color: 'var(--red)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fa-solid fa-arrow-down"></i> Losing TP & Consequences
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6, color: 'var(--orange)' }}></i>Admin warning</span>
+                    <span style={{ color: 'var(--red)', fontWeight: 700 }}>-1 TP per warning</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-clock" style={{ marginRight: 6, color: 'var(--orange)' }}></i>TP reaches 0</span>
+                    <span style={{ color: 'var(--orange)', fontWeight: 700 }}>7-day suspension</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-ban" style={{ marginRight: 6, color: 'var(--red)' }}></i>Warning while suspended</span>
+                    <span style={{ color: 'var(--red)', fontWeight: 700 }}>Permanent ban</span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(0,240,255,0.05)', borderRadius: 8, fontSize: 11, color: 'var(--cyber-cyan)' }}>
+                  <i className="fa-solid fa-gavel" style={{ marginRight: 6 }}></i>
+                  You can appeal warnings from your <strong>Profile → Warning History</strong>. Banned or suspended users can appeal from the login screen.
+                </div>
               </div>
             </div>
           )}
