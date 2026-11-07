@@ -358,47 +358,23 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       .eq('announcement_id', a.id)
       .order('created_at', { ascending: true });
 
-    // Re-order: replies (starting with @name) should appear right after the comment they reply to
+    // Re-order: group replies under their parent using parent_id (fall back to @mention for old comments)
     const reordered = [];
     if (data?.length) {
-      // Build a set of all known author names (longest first to avoid partial matches)
-      const authorNames = [...new Set(data.map(c => c.author_name).filter(Boolean))]
-        .sort((a, b) => b.length - a.length);
+      const topLevel = data.filter(c => !c.parent_id);
+      const replies = data.filter(c => !!c.parent_id);
 
+      for (const c of topLevel) {
+        reordered.push(c);
+        // Insert all replies to this comment right after it
+        const children = replies.filter(r => r.parent_id === c.id);
+        reordered.push(...children);
+      }
+
+      // Fall back: any replies whose parent wasn't found (old @mention-only rows) append at end
+      const placed = new Set(reordered.map(c => c.id));
       for (const c of data) {
-        // Check if this comment is a reply by matching @authorName at the start
-        let targetName = null;
-        if (c.content.startsWith('@')) {
-          for (const name of authorNames) {
-            if (c.content.startsWith(`@${name} `) || c.content === `@${name}`) {
-              targetName = name;
-              break;
-            }
-          }
-        }
-
-        if (targetName) {
-          // Find the last index of target author's comment in reordered
-          let insertIdx = -1;
-          for (let i = reordered.length - 1; i >= 0; i--) {
-            if (reordered[i].author_name === targetName) { insertIdx = i; break; }
-          }
-          if (insertIdx !== -1) {
-            // Insert right after that comment (skip over any existing replies that follow it)
-            let afterIdx = insertIdx + 1;
-            while (afterIdx < reordered.length) {
-              const next = reordered[afterIdx];
-              const isReply = authorNames.some(n => next.content.startsWith(`@${n} `) || next.content === `@${n}`);
-              if (isReply) afterIdx++;
-              else break;
-            }
-            reordered.splice(afterIdx, 0, c);
-          } else {
-            reordered.push(c);
-          }
-        } else {
-          reordered.push(c);
-        }
+        if (!placed.has(c.id)) reordered.push(c);
       }
     }
 
@@ -517,10 +493,10 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const updateComment = async (commentId, newContent) => {
     if (!newContent.trim()) return;
     const { error } = await supabase.from('post_comments')
-      .update({ content: newContent.trim() })
+      .update({ content: newContent.trim(), edited: true })
       .eq('id', commentId);
     if (!error) {
-      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent.trim() } : c));
+      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent.trim(), edited: true } : c));
       setEditingCommentId(null);
       setEditingCommentVal('');
     }
@@ -535,20 +511,23 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
       author_name: user.full_name || user.student_id || 'User',
       author_type: user.user_type || 'Student',
       content,
-    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at').single();
+      parent_id: replyingTo.id,
+    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at, parent_id, edited').single();
     if (!error && data) {
-      // Insert reply right after the parent comment, not at the bottom
+      // Insert reply right after the parent comment (and any existing replies to it)
       setComments(prev => {
         const idx = prev.findIndex(c => c.id === replyingTo.id);
         if (idx === -1) return [...prev, data];
+        // Skip over any replies already after the parent
+        let afterIdx = idx + 1;
+        while (afterIdx < prev.length && prev[afterIdx].parent_id === replyingTo.id) afterIdx++;
         const next = [...prev];
-        next.splice(idx + 1, 0, data);
+        next.splice(afterIdx, 0, data);
         return next;
       });
       setCommentCount(prev => prev + 1);
       setReplyInput('');
       setReplyingTo(null);
-      // Notify the person being replied to
       if (replyingTo.author_id && replyingTo.author_id !== user.id) {
         await supabase.from('notifications').insert([{
           user_id: replyingTo.author_id,
@@ -790,7 +769,11 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 {comments.map(c => {
                   const isSolutionComment = c.id === a.solution_comment_id;
                   return (
-                  <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginLeft: c.parent_id ? 32 : 0 }}>
+                    {/* Reply indicator line */}
+                    {c.parent_id && (
+                      <div style={{ width: 2, alignSelf: 'stretch', background: 'rgba(0,240,255,0.2)', borderRadius: 2, flexShrink: 0, marginRight: -4 }} />
+                    )}
                     {/* Avatar */}
                     <div
                       style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden', cursor: onViewProfileById ? 'pointer' : 'default' }}
@@ -816,6 +799,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                             {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {c.edited && (
+                            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>· edited</span>
+                          )}
                           {/* Edit + Delete own comment or admin delete */}
                           {c.author_id === user?.id && (
                             <button onClick={() => { setEditingCommentId(c.id); setEditingCommentVal(c.content); }}
