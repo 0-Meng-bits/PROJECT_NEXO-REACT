@@ -1220,9 +1220,9 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
           <div className={`chat-meta${isOwnerMsg ? ' own' : ''}`} style={!isOwnerMsg ? { marginTop: 2 } : {}}>
             {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
             {isLastInGroup && <span className="chat-time">{time}</span>}
-            {isOwnerMsg && isLastInGroup && readers?.length > 0 && (
+            {isLastInGroup && readers?.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', marginLeft: 4 }} title={`Seen by: ${readers.map(r => r.full_name).join(', ')}`}>
-                {readers.slice(0, 3).map((r, i) => (
+                {readers.slice(0, 5).map((r, i) => (
                   <div key={r.reader_id} style={{
                     width: 14, height: 14, borderRadius: '50%',
                     border: '1px solid var(--card-bg)',
@@ -1237,9 +1237,9 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
                     }
                   </div>
                 ))}
-                {readers.length > 3 && (
+                {readers.length > 5 && (
                   <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--card-bg)', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: 'var(--text-muted)', marginLeft: -4, flexShrink: 0 }}>
-                    +{readers.length - 3}
+                    +{readers.length - 5}
                   </div>
                 )}
               </div>
