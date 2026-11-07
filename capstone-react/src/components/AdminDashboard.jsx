@@ -245,6 +245,7 @@ function UserFlagsSection({ admin }) {
 function SupportTicketsSection() {
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -282,9 +283,28 @@ function SupportTicketsSection() {
   return (
     <div className="adm-card">
       <div className="adm-card-head">
-        <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2><i className="fa-solid fa-headset" style={{ marginRight: 10 }}></i>Support Tickets</h2>
+          <button onClick={() => setShowInfo(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showInfo ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 15, padding: 0 }} title="What do these statuses mean?">
+            <i className="fa-solid fa-circle-info"></i>
+          </button>
+        </div>
         <span className="adm-badge">{supportTickets.filter(t => t.status === 'open').length} open</span>
       </div>
+      {showInfo && (
+        <div style={{ margin: '0 20px 12px', padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, fontSize: 12 }}>
+          <div style={{ fontWeight: 700, color: 'var(--cyber-cyan)', marginBottom: 8 }}>Status Guide</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div><span style={{ color: 'var(--orange)', fontWeight: 700 }}>OPEN</span> — Ticket is waiting for admin action. Newly submitted tickets start here.</div>
+            <div><span style={{ color: 'var(--green)', fontWeight: 700 }}>RESOLVED</span> — Issue was addressed and solved. User gets notified that their ticket is resolved.</div>
+            <div><span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>CLOSED</span> — Ticket dismissed without action (e.g. spam, duplicate, not a real issue). User gets notified.</div>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+            <i className="fa-solid fa-lightbulb" style={{ marginRight: 5, color: 'var(--cyber-yellow)' }}></i>
+            Use <strong>Resolve</strong> when you've actually fixed the problem. Use <strong>Close</strong> when the ticket doesn't need action.
+          </div>
+        </div>
+      )}
       {loadingTickets ? <div className="adm-empty">Loading...</div>
       : supportTickets.length === 0 ? <div className="adm-empty">No support tickets yet.</div>
       : (
@@ -1796,10 +1816,11 @@ function WarningAppealsSection({ admin, showToast }) {
   const [appeals, setAppeals] = useState([]);
   const [banAppeals, setBanAppeals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'ban_appeals'
+  const [tab, setTab] = useState('pending');
   const [selected, setSelected] = useState(null);
   const [note, setNote] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => { loadAppeals(); }, []);
 
@@ -1885,9 +1906,29 @@ function WarningAppealsSection({ admin, showToast }) {
   return (
     <div className="adm-card">
       <div className="adm-card-head">
-        <span>Warning Appeals</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Warning Appeals</span>
+          <button onClick={() => setShowInfo(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showInfo ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 15, padding: 0 }} title="What do these statuses mean?">
+            <i className="fa-solid fa-circle-info"></i>
+          </button>
+        </div>
         {totalPending > 0 && <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{totalPending} pending</span>}
       </div>
+      {showInfo && (
+        <div style={{ margin: '0 20px 12px', padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, fontSize: 12 }}>
+          <div style={{ fontWeight: 700, color: 'var(--cyber-cyan)', marginBottom: 8 }}>Status Guide</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div><span style={{ color: 'var(--cyber-yellow)', fontWeight: 700 }}>PENDING</span> — Appeal submitted by user, waiting for your review. Check the reason and decide.</div>
+            <div><span style={{ color: 'var(--green)', fontWeight: 700 }}>APPROVED</span> — You agreed the warning was unfair. The warning is overturned, TP restored (+2 bonus), user notified.</div>
+            <div><span style={{ color: 'var(--red)', fontWeight: 700 }}>REJECTED</span> — You reviewed and the warning stands. User is notified with your admin note.</div>
+            <div><span style={{ color: 'var(--orange)', fontWeight: 700 }}>BAN/SUSPENSION TAB</span> — Appeals from banned or suspended users who can't log in. You can Unban, Lift Suspension, or Dismiss.</div>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+            <i className="fa-solid fa-lightbulb" style={{ marginRight: 5, color: 'var(--cyber-yellow)' }}></i>
+            Always write an admin note when rejecting — users deserve to know why their appeal was denied.
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
