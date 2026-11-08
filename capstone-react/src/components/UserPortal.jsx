@@ -5028,10 +5028,12 @@ export default function UserPortal() {
       const valid = newCirclePost.pollOptions.filter(o => o.trim());
       if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
+    // Restrict posting to Leader (3) and Co-Leader (2) only
+    if (myRankLevel < 2) { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
     setPostingAnnouncement(true);
     const pollOptions = newCirclePost.post_type === 'poll'
       ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
-    const { error } = await supabase.from('announcements').insert([{
+    const postPayload = {
       author_id: user.id,
       author_student_id: user.student_id,
       author_name: user.full_name,
@@ -5042,11 +5044,24 @@ export default function UserPortal() {
       community_id: commId,
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
       ...(newCirclePost.post_type === 'poll' && newCirclePost.event_metadata ? { event_metadata: newCirclePost.event_metadata } : {}),
-    }]);
+    };
+    const { error } = await supabase.from('announcements').insert([postPayload]);
+
+    // If circle is verified (is_official), also post to Home Feed (community_id: null)
+    const comm = communities.find(c => c.id === commId);
+    if (!error && comm?.is_official) {
+      await supabase.from('announcements').insert([{
+        ...postPayload,
+        community_id: null,
+        author_name: `${user.full_name} (${comm.name})`,
+      }]);
+    }
+
     setPostingAnnouncement(false);
     if (!error) {
       setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
       loadCircleAnnouncements(commId);
+      if (comm?.is_official) loadAnnouncements();
 
       // Notify all active members
       const { data: members } = await supabase
@@ -5057,7 +5072,6 @@ export default function UserPortal() {
         .neq('user_id', user.id);
 
       if (members && members.length > 0) {
-        const comm = communities.find(c => c.id === commId);
         const notifs = members.map(m => ({
           user_id: m.user_id,
           type: 'new_announcement',
@@ -6994,6 +7008,11 @@ export default function UserPortal() {
                     <div>
                       <h2 className="circle-cover-title">
                         {activeComm.name.toUpperCase()}
+                        {activeComm.is_official && (
+                          <span style={{ marginLeft: 10, fontSize: 12, background: 'rgba(62,207,142,0.2)', border: '1px solid var(--green)', color: 'var(--green)', borderRadius: 20, padding: '2px 10px', fontWeight: 700, letterSpacing: 1, verticalAlign: 'middle' }}>
+                            <i className="fa-solid fa-circle-check" style={{ marginRight: 5 }}></i>VERIFIED
+                          </span>
+                        )}
                         {activeChannelId && channels.find(c => c.id === activeChannelId) && (
                           <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 400, fontSize: 15, marginLeft: 10 }}>
                             # {channels.find(c => c.id === activeChannelId)?.name}
@@ -7122,16 +7141,24 @@ export default function UserPortal() {
                 ) : showCircleAnnouncements ? (
                   /* -- CIRCLE ANNOUNCEMENTS VIEW -- */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer "? all members can post */}
-                    {isMember(activeCommId) && user?.is_verified && (
+                    {/* Post composer — Leader and Co-Leader only */}
+                    {isMember(activeCommId) && user?.is_verified && myRankLevel >= 2 && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
                           <div className="home-composer-avatar" style={{ background: 'rgba(252,238,10,0.15)', border: '1px solid rgba(252,238,10,0.3)', color: 'var(--cyber-yellow)' }}>
                             {initials}
                           </div>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
-                            Post to {activeComm.name}
-                          </span>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+                              Post to {activeComm.name}
+                            </span>
+                            {activeComm.is_official && (
+                              <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>
+                                <i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>
+                                Verified circle — posts also appear in Home Feed
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <input className="home-composer-title" placeholder="Title"
                           value={newCirclePost.title}

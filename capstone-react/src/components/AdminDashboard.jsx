@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -589,6 +589,20 @@ export default function AdminDashboard() {
     });
     if (res.ok) { showToast('Student rejected and removed.'); fetchData(); }
     else showToast('Failed to reject.');
+  };
+
+  const toggleOfficialCircle = async (id, currentValue, name) => {
+    const next = !currentValue;
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/admin-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'toggle_official', id, is_official: next }),
+    });
+    if (res.ok) {
+      showToast(next ? `"${name}" marked as Verified Circle.` : `"${name}" unverified.`);
+      fetchData();
+    } else showToast('Failed to update.');
   };
 
   const deleteCommunity = async (id, name) => {
@@ -1322,7 +1336,7 @@ export default function AdminDashboard() {
             : communities.length === 0 ? <div className="adm-empty">No circles found.</div>
             : (
               <table className="adm-table">
-                <thead><tr><th>Name</th><th>Category</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Category</th><th>Verified</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
                 <tbody>
                   {communities.map(c => (
                     <tr key={c.id}>
@@ -1332,6 +1346,15 @@ export default function AdminDashboard() {
                         <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
                       </td>
                       <td><span className="adm-tag">{c.category}</span></td>
+                      <td>
+                        <button onClick={() => toggleOfficialCircle(c.id, c.is_official, c.name)}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit',
+                            background: c.is_official ? 'rgba(62,207,142,0.15)' : 'rgba(255,255,255,0.05)',
+                            color: c.is_official ? 'var(--green)' : 'var(--text-muted)',
+                            border: `1px solid ${c.is_official ? 'var(--green)' : '#444'}` }}>
+                          {c.is_official ? <><i className="fa-solid fa-circle-check" style={{ marginRight: 5 }}></i>Verified</> : 'Unverified'}
+                        </button>
+                      </td>
                       <td>
                         <span style={{ fontSize: 11, color: c.application_enabled ? 'var(--green)' : 'var(--text-muted)' }}>
                           <i className={`fa-solid ${c.application_enabled ? 'fa-microphone' : 'fa-microphone-slash'}`} style={{ marginRight: 4 }}></i>
