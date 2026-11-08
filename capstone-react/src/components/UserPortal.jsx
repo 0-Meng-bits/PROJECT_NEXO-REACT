@@ -153,6 +153,7 @@ function notifIcon(type) {
     promoted:         'fa-solid fa-arrow-up',
     application_update:  'fa-solid fa-microphone',
     new_announcement: 'fa-solid fa-bullhorn',
+    shoutout:         'fa-solid fa-star',
     invite_accepted:  'fa-solid fa-envelope-open-text',
     circle_invite:    'fa-solid fa-envelope',
   };
@@ -6215,7 +6216,17 @@ export default function UserPortal() {
                     <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
                       onClick={() => {
                         markRead(n.id);
-                        if (n.type === 'circle_invite' && n.link_comm_id) {
+                        if (n.type === 'shoutout') {
+                          // Navigate to the circle chat where shoutout happened, or Global Feed
+                          setShowNotifications(false);
+                          if (n.link_comm_id) {
+                            setActiveChannelId(null);
+                            setShowCircleAnnouncements(false);
+                            navTo('circles', n.link_comm_id);
+                          } else {
+                            navTo('global', 'global');
+                          }
+                        } else if (n.type === 'circle_invite' && n.link_comm_id) {
                           // Open the Circle Info Card for the invited circle directly
                           const invitedCircle = communities.find(c => c.id === n.link_comm_id);
                           if (invitedCircle) {
@@ -6998,7 +7009,7 @@ export default function UserPortal() {
                       onCancel={() => setPendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                     <MediaUploadButton 
                       onMediaSelected={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
@@ -7598,7 +7609,7 @@ export default function UserPortal() {
                       onCancel={() => setPendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                     <MediaUploadButton 
                       onMediaSelected={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
@@ -7765,7 +7776,7 @@ export default function UserPortal() {
                       onCancel={() => setCirclePendingMedia(null)}
                     />
                   )}
-                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                     <MediaUploadButton 
                       onMediaSelected={setCirclePendingMedia} 
                       disabled={uploading || !!circlePendingMedia}
