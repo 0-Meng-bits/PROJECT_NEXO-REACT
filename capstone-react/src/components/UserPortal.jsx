@@ -4512,6 +4512,7 @@ export default function UserPortal() {
   const [newChannelType, setNewChannelType] = useState('chat'); // chat, tasks (tasks only for project circles)
   const [activeCategory, setActiveCategory] = useState('all');
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
+  const [homeFeedTab, setHomeFeedTab] = useState('official'); // 'official' | 'community'
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
@@ -6468,8 +6469,8 @@ export default function UserPortal() {
                 </>
               )}
 
-              {/* -- POST COMPOSER "? verified users only -- */}
-              {user?.is_verified && (
+              {/* -- POST COMPOSER -- community tab only */}
+              {homeFeedTab === 'community' && (
                 <div className="home-post-composer">
                   {/* Collapsed prompt · click to expand */}
                   {!showComposer ? (
@@ -6598,13 +6599,43 @@ export default function UserPortal() {
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
               </div>
 
+              {/* Official / Community tabs */}
+              <div style={{ display: 'flex', gap: 0, marginBottom: 14, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, overflow: 'hidden' }}>
+                {[
+                  { key: 'official', label: 'Official', icon: 'fa-solid fa-circle-check', color: 'var(--green)' },
+                  { key: 'community', label: 'Community', icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
+                ].map(t => (
+                  <button key={t.key} onClick={() => { setHomeFeedTab(t.key); setFeedFilter('all'); }}
+                    style={{ flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                      background: homeFeedTab === t.key ? `${t.color}18` : 'rgba(255,255,255,0.02)',
+                      color: homeFeedTab === t.key ? t.color : 'var(--text-muted)',
+                      borderBottom: `2px solid ${homeFeedTab === t.key ? t.color : 'transparent'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: '0.2s' }}>
+                    <i className={t.icon} style={{ fontSize: 11 }}></i>{t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Official tab description */}
+              {homeFeedTab === 'official' && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)' }}></i>
+                  Posts from Admin and verified circles only
+                </div>
+              )}
+
+              {/* Post composer — Community tab only */}
+              {homeFeedTab === 'community' && user?.is_verified && (
+                <div style={{ height: 0 }} />
+              )}
+
               {/* Feed filter tabs */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                 {[
                   { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
                   { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
                   { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
-                  { key: 'shoutout',     label: 'Shoutout',     icon: 'fa-solid fa-star' },
+                  ...(homeFeedTab === 'community' ? [{ key: 'shoutout', label: 'Shoutout', icon: 'fa-solid fa-star' }] : []),
                   { key: 'general',      label: 'General',      icon: 'fa-solid fa-comment' },
                   { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
                 ].map(f => {
@@ -6628,13 +6659,23 @@ export default function UserPortal() {
               </div>
 
               {(() => {
-                const filtered = feedFilter === 'all' ? announcements : announcements.filter(a => a.post_type === feedFilter);
+                // Split announcements by tab
+                const officialPosts = announcements.filter(a =>
+                  a.author_type === 'Admin' || a.community_id !== null
+                );
+                const communityPosts = announcements.filter(a =>
+                  a.author_type !== 'Admin' && a.community_id === null
+                );
+                const tabPosts = homeFeedTab === 'official' ? officialPosts : communityPosts;
+                const filtered = feedFilter === 'all' ? tabPosts : tabPosts.filter(a => a.post_type === feedFilter);
                 return filtered.length === 0 ? (
                   <div className="post" style={{ textAlign: 'center', padding: 32 }}>
                     <i className="fa-solid fa-bullhorn" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                       {feedFilter === 'all'
-                        ? (user?.is_verified ? 'No posts yet. Be the first to share something!' : 'No posts yet. Verify your account to post.')
+                        ? homeFeedTab === 'official'
+                          ? 'No official posts yet.'
+                          : (user?.is_verified ? 'No community posts yet. Be the first to share something!' : 'No posts yet. Verify your account to post.')
                         : `No ${feedFilter} posts yet.`}
                     </p>
                   </div>
