@@ -1674,27 +1674,50 @@ export default function AdminDashboard() {
               </div>
               {eventsLoading ? <div className="adm-empty">Loading...</div>
               : campusEvents.length === 0 ? <div className="adm-empty">No events yet. Add one above.</div>
-              : (
-                <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
-                <table className="adm-table">
-                  <thead><tr><th>TITLE</th><th>CATEGORY</th><th>START</th><th>END</th><th>ACTION</th></tr></thead>
-                  <tbody>
-                    {campusEvents.map(ev => {
-                      const cat = EVENT_CATS.find(c => c.key === ev.category) || EVENT_CATS[EVENT_CATS.length - 1];
-                      return (
-                        <tr key={ev.id}>
-                          <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{ev.title}</td>
-                          <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: cat.color, border: `1px solid ${cat.color}`, background: `${cat.color}15` }}>{cat.label}</span></td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-'}</td>
-                          <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_end_date ? new Date(ev.event_end_date).toLocaleDateString() : '-'}</td>
-                          <td><button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteEvent(ev.id)}><i className="fa-solid fa-trash"></i></button></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                </div>
-              )}
+              : (() => {
+                const today = new Date().toISOString().split('T')[0];
+                const upcoming = campusEvents.filter(ev => (ev.event_date || '') >= today);
+                const past = campusEvents.filter(ev => (ev.event_date || '') < today);
+                const [evTab, setEvTab] = React.useState('upcoming');
+                const displayed = evTab === 'upcoming' ? upcoming : past;
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      {[['upcoming', `Upcoming (${upcoming.length})`], ['past', `Past (${past.length})`]].map(([key, label]) => (
+                        <button key={key} onClick={() => setEvTab(key)}
+                          style={{ flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
+                            background: evTab === key ? 'rgba(0,240,255,0.08)' : 'transparent',
+                            color: evTab === key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                            borderBottom: `2px solid ${evTab === key ? 'var(--cyber-cyan)' : 'transparent'}` }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ overflowY: 'auto', maxHeight: '60vh' }}>
+                      {displayed.length === 0 ? <div className="adm-empty">No {evTab} events.</div> : (
+                      <table className="adm-table">
+                        <thead><tr><th>TITLE</th><th>CATEGORY</th><th>START</th><th>END</th><th>ACTION</th></tr></thead>
+                        <tbody>
+                          {displayed.map(ev => {
+                            const cat = EVENT_CATS.find(c => c.key === ev.category) || EVENT_CATS[EVENT_CATS.length - 1];
+                            return (
+                              <tr key={ev.id} style={{ opacity: evTab === 'past' ? 0.65 : 1 }}>
+                                <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{ev.title}</td>
+                                <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: cat.color, border: `1px solid ${cat.color}`, background: `${cat.color}15` }}>{cat.label}</span></td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString() : '-'}</td>
+                                <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.event_end_date ? new Date(ev.event_end_date).toLocaleDateString() : '-'}</td>
+                                <td><button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteEvent(ev.id)}><i className="fa-solid fa-trash"></i></button></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      )}
+                    </div>
+                  </>
+                );
+              })()
+              }
             </div>
           </div>
         )}
