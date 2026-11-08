@@ -202,6 +202,7 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('communities').update({ is_official }).eq('id', id);
         return res.json({ ok: true });
       }
+      if (action === 'delete_community') {
         const { error } = await supabaseAdmin.from('communities').delete().eq('id', id);
         if (error) return res.status(400).json({ message: error.message });
         return res.json({ ok: true });
