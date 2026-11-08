@@ -7618,11 +7618,25 @@ export default function UserPortal() {
                       onVoiceRecorded={setPendingMedia} 
                       disabled={uploading || !!pendingMedia}
                     />
-                    <input ref={msgInputRef} onChange={() => setSendError('')}
+                    <input ref={msgInputRef} onChange={e => handleChatInputChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
                       placeholder={`Say something to ${activeComm?.name || 'Circle Chat'}...`}
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
+                    {shoutoutSuggestions.length > 0 && (
+                      <div style={{ position: 'absolute', bottom: 52, left: 0, right: 0, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(0,240,255,0.3)', borderRadius: 10, overflow: 'hidden', zIndex: 300, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)' }}>
+                        {shoutoutSuggestions.map(p => (
+                          <div key={p.id} onMouseDown={e => { e.preventDefault(); selectShoutoutMention(p, msgInputRef); }}
+                            style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.1)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            {p.id === 'everyone'
+                              ? <><i className="fa-solid fa-users" style={{ color: 'var(--cyber-cyan)', width: 16 }}></i><span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>@everyone</span><span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>(circle only)</span></>
+                              : <><i className="fa-solid fa-user" style={{ color: 'var(--text-muted)', width: 16 }}></i><span>{p.full_name}</span></>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <button className="chat-send-btn" onClick={sendPost} disabled={uploading} title="Send">
                       <i className="fa-solid fa-paper-plane"></i>
                     </button>
