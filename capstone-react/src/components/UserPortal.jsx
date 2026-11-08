@@ -5729,6 +5729,39 @@ export default function UserPortal() {
         if (msgInputRef.current) msgInputRef.current.value = '';
         setPendingMedia(null);
         setReplyTo(null);
+
+        // Shoutout notifications
+        if (isShoutout) {
+          const shoutText = msgInput.trim().replace(/^shoutout!\s*/i, '');
+          const mentionMatch = shoutText.match(/^@(\S+(?:\s+\S+)?)/);
+          const mention = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+
+          if (mention === 'everyone' && activeCommId !== 'global') {
+            // @everyone in a circle → notify all active members
+            const { data: members } = await supabase.from('memberships')
+              .select('user_id').eq('community_id', activeCommId).eq('status', 'active').neq('user_id', user.id);
+            if (members?.length) {
+              const comm = communities.find(c => c.id === activeCommId);
+              await supabase.from('notifications').insert(members.map(m => ({
+                user_id: m.user_id, type: 'new_announcement',
+                message: `📣 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
+                link_comm_id: activeCommId,
+              })));
+            }
+          } else if (mention && mention !== 'everyone') {
+            // @name → find user by first or full name (case-insensitive)
+            const { data: mentioned } = await supabase.from('accounts')
+              .select('id, full_name').ilike('full_name', `${mention}%`).limit(1).maybeSingle();
+            if (mentioned && mentioned.id !== user.id) {
+              const message = shoutText.replace(/^@\S+(?:\s+\S+)?\s*/i, '');
+              await supabase.from('notifications').insert([{
+                user_id: mentioned.id, type: 'new_announcement',
+                message: `⭐ ${user.full_name} shouted you out: ${message || shoutText}`,
+                link_comm_id: activeCommId !== 'global' ? activeCommId : null,
+              }]);
+            }
+          }
+        }
       } else {
         throw new Error(error?.message || 'Failed to send');
       }
@@ -5791,6 +5824,37 @@ export default function UserPortal() {
         if (circleChatInputRef.current) circleChatInputRef.current.value = '';
         setCirclePendingMedia(null);
         setReplyTo(null);
+
+        // Shoutout notifications for circle chat
+        if (isShoutout) {
+          const shoutText = circleChatInput.trim().replace(/^shoutout!\s*/i, '');
+          const mentionMatch = shoutText.match(/^@(\S+(?:\s+\S+)?)/);
+          const mention = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+
+          if (mention === 'everyone') {
+            const { data: members } = await supabase.from('memberships')
+              .select('user_id').eq('community_id', activeCommId).eq('status', 'active').neq('user_id', user.id);
+            if (members?.length) {
+              const comm = communities.find(c => c.id === activeCommId);
+              await supabase.from('notifications').insert(members.map(m => ({
+                user_id: m.user_id, type: 'new_announcement',
+                message: `📣 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
+                link_comm_id: activeCommId,
+              })));
+            }
+          } else if (mention) {
+            const { data: mentioned } = await supabase.from('accounts')
+              .select('id, full_name').ilike('full_name', `${mention}%`).limit(1).maybeSingle();
+            if (mentioned && mentioned.id !== user.id) {
+              const message = shoutText.replace(/^@\S+(?:\s+\S+)?\s*/i, '');
+              await supabase.from('notifications').insert([{
+                user_id: mentioned.id, type: 'new_announcement',
+                message: `⭐ ${user.full_name} shouted you out: ${message || shoutText}`,
+                link_comm_id: activeCommId,
+              }]);
+            }
+          }
+        }
       } else {
         throw new Error(error?.message || 'Failed to send');
       }
