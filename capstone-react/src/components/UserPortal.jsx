@@ -1063,6 +1063,24 @@ function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onR
             <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
             <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
           </div>
+        ) : m.message_type === 'shoutout' ? (
+          // -- SHOUTOUT BUBBLE --
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(252,238,10,0.15), rgba(247,169,79,0.1))',
+            border: '1.5px solid rgba(252,238,10,0.5)',
+            borderRadius: 16, padding: '10px 16px',
+            boxShadow: '0 0 16px rgba(252,238,10,0.15)',
+            position: 'relative', maxWidth: 320,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <i className="fa-solid fa-star" style={{ color: '#f5e642', fontSize: 13 }}></i>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#f5e642', letterSpacing: 2, textTransform: 'uppercase' }}>Shoutout</span>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {m.content.replace(/^shoutout!\s*/i, '')}
+            </p>
+            {m.edited && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>edited</span>}
+          </div>
         ) : (
           <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}
             style={{
@@ -5681,6 +5699,9 @@ export default function UserPortal() {
       let mediaDuration = null;
       let messageType = 'text';
 
+      // Detect shoutout prefix
+      const isShoutout = msgInput.trim().toLowerCase().startsWith('shoutout!');
+
       if (pendingMedia) {
         mediaUrl = await uploadMediaFile(pendingMedia.file, user.id, pendingMedia.mediaType);
         mediaSize = pendingMedia.file.size;
@@ -5692,7 +5713,7 @@ export default function UserPortal() {
         sender_id: user.student_id,
         full_name: user.full_name,
         content: msgInput.trim() || '',
-        message_type: messageType,
+        message_type: isShoutout ? 'shoutout' : messageType,
         media_url: mediaUrl,
         media_size: mediaSize,
         media_duration: mediaDuration,
@@ -5741,6 +5762,8 @@ export default function UserPortal() {
       let mediaDuration = null;
       let messageType = 'text';
 
+      const isShoutout = circleChatInput.trim().toLowerCase().startsWith('shoutout!');
+
       if (circlePendingMedia) {
         mediaUrl = await uploadMediaFile(circlePendingMedia.file, user.id, circlePendingMedia.mediaType);
         mediaSize = circlePendingMedia.file.size;
@@ -5752,7 +5775,7 @@ export default function UserPortal() {
         sender_id: user.student_id,
         full_name: user.full_name,
         content: circleChatInput.trim() || '',
-        message_type: messageType,
+        message_type: isShoutout ? 'shoutout' : messageType,
         media_url: mediaUrl,
         media_size: mediaSize,
         media_duration: mediaDuration,
