@@ -5683,11 +5683,11 @@ export default function UserPortal() {
 
   const handleChatInputChange = async (value) => {
     setSendError('');
-    // Detect shoutout @mention for autocomplete
-    const shoutMatch = value.match(/^shoutout!\s+@(\w[\w\s]*)$/i);
+    // Detect shoutout @mention for autocomplete — match 'shoutout! @query' anywhere at start
+    const shoutMatch = value.match(/^shoutout!\s+@([^\s][\w\s]*)/i);
     if (shoutMatch) {
       const query = shoutMatch[1].trim();
-      if (query.toLowerCase() === 'everyone') {
+      if (query.toLowerCase().startsWith('everyone')) {
         setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
         setShoutoutQuery(query);
       } else if (query.length >= 1) {
@@ -5695,6 +5695,8 @@ export default function UserPortal() {
         const { data } = await supabase.from('accounts')
           .select('id, full_name').ilike('full_name', `${query}%`).limit(5);
         setShoutoutSuggestions(data || []);
+      } else {
+        setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
       }
     } else {
       setShoutoutSuggestions([]);
