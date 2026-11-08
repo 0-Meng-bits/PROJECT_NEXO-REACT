@@ -5694,7 +5694,7 @@ export default function UserPortal() {
       } else if (query.length >= 1) {
         setShoutoutQuery(query);
         const { data } = await supabase.from('accounts')
-          .select('id, full_name').ilike('full_name', `${query}%`).limit(5);
+          .select('id, full_name').ilike('full_name', `${query}%`).neq('id', user.id).limit(5);
         setShoutoutSuggestions(data || []);
       } else {
         setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
@@ -7020,7 +7020,7 @@ export default function UserPortal() {
                     />
                     <input ref={msgInputRef} onChange={e => handleChatInputChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
-                      placeholder="Say something... (shoutout! @name)"
+                      placeholder="Say something to the Global Feed..."
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
                     {shoutoutSuggestions.length > 0 && (
