@@ -4786,6 +4786,9 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
+  const [shoutoutMention, setShoutoutMention] = useState(null); // { id, full_name } - selected user
+  const [shoutoutSuggestions, setShoutoutSuggestions] = useState([]); // dropdown results
+  const [shoutoutQuery, setShoutoutQuery] = useState(''); // current @query being typed
   const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } · message being replied to
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -5678,6 +5681,41 @@ export default function UserPortal() {
     else showToast('Failed to decline invite.');
   };
 
+  const handleChatInputChange = async (value) => {
+    setSendError('');
+    // Detect shoutout @mention for autocomplete
+    const shoutMatch = value.match(/^shoutout!\s+@(\w[\w\s]*)$/i);
+    if (shoutMatch) {
+      const query = shoutMatch[1].trim();
+      if (query.toLowerCase() === 'everyone') {
+        setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
+        setShoutoutQuery(query);
+      } else if (query.length >= 1) {
+        setShoutoutQuery(query);
+        const { data } = await supabase.from('accounts')
+          .select('id, full_name').ilike('full_name', `${query}%`).limit(5);
+        setShoutoutSuggestions(data || []);
+      }
+    } else {
+      setShoutoutSuggestions([]);
+      setShoutoutQuery('');
+      if (!value.toLowerCase().startsWith('shoutout!')) setShoutoutMention(null);
+    }
+  };
+
+  const selectShoutoutMention = (person, inputRef) => {
+    if (inputRef.current) {
+      const current = inputRef.current.value;
+      // Replace the @query part with the selected name
+      const base = current.replace(/@[\w\s]*$/, `@${person.full_name} `);
+      inputRef.current.value = base;
+      inputRef.current.focus();
+    }
+    setShoutoutMention(person.id === 'everyone' ? { id: 'everyone', full_name: 'everyone' } : person);
+    setShoutoutSuggestions([]);
+    setShoutoutQuery('');
+  };
+
   const sendPost = async () => {
     const msgInput = msgInputRef.current?.value || '';
     if (!msgInput.trim() && !pendingMedia) return;
@@ -5730,14 +5768,13 @@ export default function UserPortal() {
         setPendingMedia(null);
         setReplyTo(null);
 
-        // Shoutout notifications
+        // Shoutout notifications — use exact ID if selected from dropdown
         if (isShoutout) {
           const shoutText = msgInput.trim().replace(/^shoutout!\s*/i, '');
-          const mentionMatch = shoutText.match(/^@(\S+(?:\s+\S+)?)/);
-          const mention = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+          const isEveryoneShout = shoutoutMention?.id === 'everyone' ||
+            shoutText.toLowerCase().startsWith('@everyone');
 
-          if (mention === 'everyone' && activeCommId !== 'global') {
-            // @everyone in a circle → notify all active members
+          if (isEveryoneShout && activeCommId !== 'global') {
             const { data: members } = await supabase.from('memberships')
               .select('user_id').eq('community_id', activeCommId).eq('status', 'active').neq('user_id', user.id);
             if (members?.length) {
@@ -5748,19 +5785,31 @@ export default function UserPortal() {
                 link_comm_id: activeCommId,
               })));
             }
-          } else if (mention && mention !== 'everyone') {
-            // @name → find user by first or full name (case-insensitive)
-            const { data: mentioned } = await supabase.from('accounts')
-              .select('id, full_name').ilike('full_name', `${mention}%`).limit(1).maybeSingle();
-            if (mentioned && mentioned.id !== user.id) {
-              const message = shoutText.replace(/^@\S+(?:\s+\S+)?\s*/i, '');
-              await supabase.from('notifications').insert([{
-                user_id: mentioned.id, type: 'new_announcement',
-                message: `⭐ ${user.full_name} shouted you out: ${message || shoutText}`,
-                link_comm_id: activeCommId !== 'global' ? activeCommId : null,
-              }]);
+          } else if (shoutoutMention?.id && shoutoutMention.id !== 'everyone') {
+            // Exact user selected from dropdown
+            const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
+            await supabase.from('notifications').insert([{
+              user_id: shoutoutMention.id, type: 'new_announcement',
+              message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+              link_comm_id: activeCommId !== 'global' ? activeCommId : null,
+            }]);
+          } else {
+            // Fallback: no dropdown selection, search by name
+            const mentionMatch = shoutText.match(/^@([\w\s]+?)(?:\s|$)/i);
+            if (mentionMatch) {
+              const { data: mentioned } = await supabase.from('accounts')
+                .select('id, full_name').ilike('full_name', `${mentionMatch[1].trim()}%`).limit(1).maybeSingle();
+              if (mentioned && mentioned.id !== user.id) {
+                const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
+                await supabase.from('notifications').insert([{
+                  user_id: mentioned.id, type: 'new_announcement',
+                  message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  link_comm_id: activeCommId !== 'global' ? activeCommId : null,
+                }]);
+              }
             }
           }
+          setShoutoutMention(null);
         }
       } else {
         throw new Error(error?.message || 'Failed to send');
@@ -5828,10 +5877,10 @@ export default function UserPortal() {
         // Shoutout notifications for circle chat
         if (isShoutout) {
           const shoutText = circleChatInput.trim().replace(/^shoutout!\s*/i, '');
-          const mentionMatch = shoutText.match(/^@(\S+(?:\s+\S+)?)/);
-          const mention = mentionMatch ? mentionMatch[1].toLowerCase() : null;
+          const isEveryoneShout = shoutoutMention?.id === 'everyone' ||
+            shoutText.toLowerCase().startsWith('@everyone');
 
-          if (mention === 'everyone') {
+          if (isEveryoneShout) {
             const { data: members } = await supabase.from('memberships')
               .select('user_id').eq('community_id', activeCommId).eq('status', 'active').neq('user_id', user.id);
             if (members?.length) {
@@ -5842,18 +5891,29 @@ export default function UserPortal() {
                 link_comm_id: activeCommId,
               })));
             }
-          } else if (mention) {
-            const { data: mentioned } = await supabase.from('accounts')
-              .select('id, full_name').ilike('full_name', `${mention}%`).limit(1).maybeSingle();
-            if (mentioned && mentioned.id !== user.id) {
-              const message = shoutText.replace(/^@\S+(?:\s+\S+)?\s*/i, '');
-              await supabase.from('notifications').insert([{
-                user_id: mentioned.id, type: 'new_announcement',
-                message: `⭐ ${user.full_name} shouted you out: ${message || shoutText}`,
-                link_comm_id: activeCommId,
-              }]);
+          } else if (shoutoutMention?.id) {
+            const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
+            await supabase.from('notifications').insert([{
+              user_id: shoutoutMention.id, type: 'new_announcement',
+              message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+              link_comm_id: activeCommId,
+            }]);
+          } else {
+            const mentionMatch = shoutText.match(/^@([\w\s]+?)(?:\s|$)/i);
+            if (mentionMatch) {
+              const { data: mentioned } = await supabase.from('accounts')
+                .select('id, full_name').ilike('full_name', `${mentionMatch[1].trim()}%`).limit(1).maybeSingle();
+              if (mentioned && mentioned.id !== user.id) {
+                const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
+                await supabase.from('notifications').insert([{
+                  user_id: mentioned.id, type: 'new_announcement',
+                  message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  link_comm_id: activeCommId,
+                }]);
+              }
             }
           }
+          setShoutoutMention(null);
         }
       } else {
         throw new Error(error?.message || 'Failed to send');
