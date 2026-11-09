@@ -4532,6 +4532,12 @@ export default function UserPortal() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [feedFilter, setFeedFilter] = useState('all'); // filter for home feed post types
   const [homeFeedTab, setHomeFeedTab] = useState('official'); // 'official' | 'community'
+  const [showHomeFeedArchive, setShowHomeFeedArchive] = useState(false);
+  const [pastAnnouncements, setPastAnnouncements] = useState([]);
+  const [loadingPastAnnouncements, setLoadingPastAnnouncements] = useState(false);
+  const [showCircleArchive, setShowCircleArchive] = useState(false);
+  const [pastCircleAnnouncements, setPastCircleAnnouncements] = useState([]);
+  const [loadingPastCircle, setLoadingPastCircle] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
@@ -4988,6 +4994,23 @@ export default function UserPortal() {
       }
     }
   }, []);
+
+  const loadPastAnnouncements = async () => {
+    setLoadingPastAnnouncements(true);
+    const { data } = await supabase.from('announcements')
+      .select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50);
+    setPastAnnouncements(data || []);
+    setLoadingPastAnnouncements(false);
+  };
+
+  const loadPastCircleAnnouncements = async (commId) => {
+    if (!commId || commId === 'global') return;
+    setLoadingPastCircle(true);
+    const { data } = await supabase.from('announcements')
+      .select('*').eq('community_id', commId).order('created_at', { ascending: false }).limit(30);
+    setPastCircleAnnouncements(data || []);
+    setLoadingPastCircle(false);
+  };
 
   const loadCircleAnnouncements = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleAnnouncements([]); return; }
@@ -7468,7 +7491,7 @@ export default function UserPortal() {
                         ))}
                       </div>
                     )}
-                    {circleAnnouncements.length === 0 ? (
+                    {!showCircleArchive && circleAnnouncements.length === 0 ? (
                       <div className="post" style={{ textAlign: 'center', padding: 40 }}>
                         <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}></i>
                         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No announcements yet.</p>
