@@ -6821,13 +6821,22 @@ export default function UserPortal() {
                   ...(homeFeedTab === 'community' ? [{ key: 'shoutout', label: 'Shoutout', icon: 'fa-solid fa-star' }] : []),
                   { key: 'general',      label: 'General',      icon: 'fa-solid fa-comment' },
                   { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
+                  { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
                 ].map(f => {
                   const cfg = POST_TYPE[f.key];
-                  const color = cfg?.color || 'var(--cyber-cyan)';
-                  const isActive = feedFilter === f.key;
+                  const color = f.key === 'archive' ? 'var(--text-muted)' : (cfg?.color || 'var(--cyber-cyan)');
+                  const isActive = f.key === 'archive' ? showHomeFeedArchive : feedFilter === f.key;
                   return (
                     <button key={f.key}
-                      onClick={() => setFeedFilter(f.key)}
+                      onClick={() => {
+                        if (f.key === 'archive') {
+                          setShowHomeFeedArchive(v => !v);
+                          if (!showHomeFeedArchive) loadPastAnnouncements();
+                        } else {
+                          setFeedFilter(f.key);
+                          setShowHomeFeedArchive(false);
+                        }
+                      }}
                       style={{
                         padding: '5px 12px', borderRadius: 20, border: `1px solid ${isActive ? color : 'rgba(255,255,255,0.1)'}`,
                         background: isActive ? `${color}18` : 'transparent',
