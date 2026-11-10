@@ -611,6 +611,14 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
 
       <h3 className="announcement-title">{a.title}</h3>
       {a.content && <p className="announcement-body">{a.content}</p>}
+      {a.media_url && (
+        <div style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}>
+          {a.media_url.match(/\.(mp4|webm|mov)$/i)
+            ? <video src={a.media_url} controls style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, display: 'block' }} />
+            : <img src={a.media_url} alt="Post attachment" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, cursor: 'pointer', display: 'block' }} onClick={() => window.open(a.media_url, '_blank')} />
+          }
+        </div>
+      )}
 
       {/* -- Application APPLY BUTTON -- */}
       {isApplicationPost && onApply && (
@@ -4544,6 +4552,7 @@ export default function UserPortal() {
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
+  const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
   const [showComposer, setShowComposer] = useState(false);
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -5033,6 +5042,12 @@ export default function UserPortal() {
     const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'general';
     setPostingAnnouncement(true);
     const pollOptions = type === 'poll' ? newPost.pollOptions.filter(o => o.trim()) : null;
+
+    let mediaUrl = null;
+    if (postPendingMedia) {
+      try { mediaUrl = await uploadMediaFile(postPendingMedia.file, user.id, postPendingMedia.mediaType); } catch { /* non-fatal */ }
+    }
+
     const { error } = await supabase.from('announcements').insert([{
       author_id: user.id,
       author_student_id: user.student_id,
@@ -5042,6 +5057,7 @@ export default function UserPortal() {
       content: newPost.content.trim(),
       post_type: type,
       community_id: null,
+      media_url: mediaUrl,
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
       ...(type === 'poll' && newPost.event_metadata ? { event_metadata: newPost.event_metadata } : {}),
     }]);
@@ -5060,6 +5076,7 @@ export default function UserPortal() {
         }
       }
       setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
+      setPostPendingMedia(null);
       loadAnnouncements();
     } else {
       console.error('Post announcement error:', error);
@@ -5079,6 +5096,12 @@ export default function UserPortal() {
     setPostingAnnouncement(true);
     const pollOptions = newCirclePost.post_type === 'poll'
       ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
+
+    let mediaUrl = null;
+    if (postPendingMedia) {
+      try { mediaUrl = await uploadMediaFile(postPendingMedia.file, user.id, postPendingMedia.mediaType); } catch { /* non-fatal */ }
+    }
+
     const postPayload = {
       author_id: user.id,
       author_student_id: user.student_id,
@@ -5088,6 +5111,7 @@ export default function UserPortal() {
       content: newCirclePost.content.trim(),
       post_type: newCirclePost.post_type,
       community_id: commId,
+      media_url: mediaUrl,
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
       ...(newCirclePost.post_type === 'poll' && newCirclePost.event_metadata ? { event_metadata: newCirclePost.event_metadata } : {}),
     };
@@ -5106,6 +5130,7 @@ export default function UserPortal() {
     setPostingAnnouncement(false);
     if (!error) {
       setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
+      setPostPendingMedia(null);
       loadCircleAnnouncements(commId);
       if (comm?.is_official) loadAnnouncements();
 
@@ -6739,6 +6764,9 @@ export default function UserPortal() {
                       />
                     </>
                   )}
+                  {postPendingMedia && (
+                    <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
+                  )}
                   <div className="home-composer-footer">
                     <div className="home-composer-types">
                       {['announcement', 'event', 'shoutout', 'general', 'poll'].map(t => {
@@ -6754,6 +6782,7 @@ export default function UserPortal() {
                       })}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
                       <button
                         className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
                         onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
@@ -7457,6 +7486,9 @@ export default function UserPortal() {
                             />
                           </>
                         )}
+                        {postPendingMedia && (
+                          <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
+                        )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
                             {['announcement', 'event', 'shoutout', 'general', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])].map(t => {
@@ -7479,6 +7511,7 @@ export default function UserPortal() {
                               ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
                               : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
                           </button>
+                          <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
                         </div>
                       </div>
                     )}
