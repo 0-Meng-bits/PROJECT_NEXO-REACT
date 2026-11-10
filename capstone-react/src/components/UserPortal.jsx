@@ -5078,6 +5078,26 @@ export default function UserPortal() {
       setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
       setPostPendingMedia(null);
       loadAnnouncements();
+
+      // Auto-sync to Campus Events if admin posts an Event type with metadata
+      if (type === 'event' && user?.user_type === 'Admin' && newPost.event_metadata?.event_date) {
+        const token = localStorage.getItem('accessToken');
+        fetch(getApiUrl('/api/admin-data'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            action: 'add_event',
+            title: newPost.title.trim(),
+            description: newPost.content.trim() || null,
+            category: 'general',
+            event_date: newPost.event_metadata.event_date,
+            event_time: newPost.event_metadata.event_time || null,
+            location: newPost.event_metadata.location || null,
+            poster_name: user.full_name || 'Admin',
+            poster_type: 'Admin',
+          }),
+        }).catch(() => {}); // non-fatal
+      }
     } else {
       console.error('Post announcement error:', error);
       showToast('Failed to post: ' + (error.message || 'Unknown error'));
@@ -5133,6 +5153,26 @@ export default function UserPortal() {
       setPostPendingMedia(null);
       loadCircleAnnouncements(commId);
       if (comm?.is_official) loadAnnouncements();
+
+      // Auto-sync to Campus Events if verified circle posts an Event type with metadata
+      if (newCirclePost.post_type === 'event' && comm?.is_official && newCirclePost.event_metadata?.event_date) {
+        const token = localStorage.getItem('accessToken');
+        fetch(getApiUrl('/api/admin-data'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({
+            action: 'add_event',
+            title: newCirclePost.title.trim(),
+            description: newCirclePost.content.trim() || null,
+            category: 'general',
+            event_date: newCirclePost.event_metadata.event_date,
+            event_time: newCirclePost.event_metadata.event_time || null,
+            location: newCirclePost.event_metadata.location || null,
+            poster_name: `${user.full_name} (${comm.name})`,
+            poster_type: 'Student',
+          }),
+        }).catch(() => {});
+      }
 
       // Notify all active members
       const { data: members } = await supabase
@@ -6726,9 +6766,15 @@ export default function UserPortal() {
                       rows={3}
                     />
                   )}
+                  {/* Event metadata form — show for Event post type */}
+                  {newPost.post_type === 'event' && (
+                    <PollEventMetadataForm
+                      communityCategory="social"
+                      onChange={(metadata) => setNewPost(p => ({ ...p, event_metadata: metadata }))}
+                    />
+                  )}
                   {/* Poll options */}
-                  {newPost.post_type === 'poll' && (
-                    <>
+                  {newPost.post_type === 'poll' && (                    <>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                         {newPost.pollOptions.map((opt, i) => (
                           <div key={i} style={{ display: 'flex', gap: 6 }}>
