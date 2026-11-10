@@ -7574,9 +7574,13 @@ export default function UserPortal() {
                           ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
                           : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll'
                           ? circleAnnouncements.filter(a => a.post_type === qaFilter)
-                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll'
-                          ? circleAnnouncements.filter(a => a.post_type === qaFilter)
                           : circleAnnouncements;
+                        if (filtered.length === 0) return (
+                          <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                            <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No {qaFilter === 'all' ? '' : qaFilter + ' '}posts yet.</p>
+                          </div>
+                        );
                         return filtered.map(a => (
                           <AnnouncementCard key={a.id} a={a} user={user}
                             avatarCache={avatarCache}
