@@ -7482,8 +7482,69 @@ export default function UserPortal() {
                         </div>
                       </div>
                     )}
+                    {/* Circle filter bar — All, Announcement, Event, Poll, Archive */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {[
+                        { key: 'all', label: 'All', icon: 'fa-solid fa-layer-group' },
+                        { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
+                        { key: 'event', label: 'Event', icon: 'fa-solid fa-calendar' },
+                        { key: 'poll', label: 'Poll', icon: 'fa-solid fa-chart-bar' },
+                        { key: 'archive', label: 'Archive', icon: 'fa-solid fa-box-archive' },
+                      ].map(f => {
+                        const active = f.key === 'archive' ? showCircleArchive : (!showCircleArchive && (f.key === 'all' ? qaFilter === 'all' : qaFilter === f.key));
+                        return (
+                          <button key={f.key}
+                            onClick={() => {
+                              if (f.key === 'archive') {
+                                setShowCircleArchive(v => !v);
+                                if (!showCircleArchive) loadPastCircleAnnouncements(activeCommId);
+                              } else {
+                                setShowCircleArchive(false);
+                                setQaFilter(f.key);
+                              }
+                            }}
+                            style={{ padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                              border: active ? '1px solid var(--cyber-cyan)' : '1px solid rgba(0,240,255,0.15)',
+                              background: active ? 'rgba(0,240,255,0.1)' : 'rgba(0,0,0,0.2)',
+                              color: active ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                              fontWeight: active ? 700 : 400, transition: 'all 0.2s',
+                              display: 'flex', alignItems: 'center', gap: 5,
+                            }}>
+                            <i className={f.icon} style={{ fontSize: 9 }}></i>{f.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Archive view */}
+                    {showCircleArchive && (
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <i className="fa-solid fa-box-archive" style={{ color: 'var(--cyber-cyan)' }}></i>
+                          Older posts from this circle
+                        </div>
+                        {loadingPastCircle ? (
+                          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
+                        ) : pastCircleAnnouncements.length === 0 ? (
+                          <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                            <i className="fa-solid fa-box-archive" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No archived posts yet.</p>
+                          </div>
+                        ) : pastCircleAnnouncements.map(a => (
+                          <AnnouncementCard key={a.id} a={a} user={user}
+                            avatarCache={avatarCache} onPin={togglePin}
+                            onDelete={(id) => { supabase.from('announcements').delete().eq('id', id); loadPastCircleAnnouncements(activeCommId); }}
+                            onVote={handleCircleVote} onReport={(data) => setShowReport(data)}
+                            onViewProfile={viewUserProfile} onViewProfileById={viewUserProfileById}
+                            communityCreatorId={activeComm?.creator_id}
+                            onReload={() => loadPastCircleAnnouncements(activeCommId)}
+                            onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
+                        ))}
+                      </div>
+                    )}
+
                     {/* Q&A Filter bar ? academic circles only */}
-                    {activeComm?.category === 'academic' && (
+                    {!showCircleArchive && activeComm?.category === 'academic' && (
                       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                         {[
                           { key: 'all', label: 'All Posts' },
@@ -7505,12 +7566,16 @@ export default function UserPortal() {
                         <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}></i>
                         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No announcements yet.</p>
                       </div>
-                    ) : (
+                    ) : !showCircleArchive ? (
                       (() => {
                         const filtered = qaFilter === 'questions'
                           ? circleAnnouncements.filter(a => a.post_type === 'question')
                           : qaFilter === 'unanswered'
                           ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
+                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll'
+                          ? circleAnnouncements.filter(a => a.post_type === qaFilter)
+                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll'
+                          ? circleAnnouncements.filter(a => a.post_type === qaFilter)
                           : circleAnnouncements;
                         return filtered.map(a => (
                           <AnnouncementCard key={a.id} a={a} user={user}
@@ -7527,7 +7592,7 @@ export default function UserPortal() {
                             onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                         ));
                       })()
-                    )}
+                    ) : null}
                   </div>
                 ) : (
                   (() => {
