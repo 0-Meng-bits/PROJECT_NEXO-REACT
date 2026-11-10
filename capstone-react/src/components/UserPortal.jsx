@@ -136,7 +136,7 @@ const SHOP_API = window.location.hostname === 'localhost'
 
 function getCategoryIcon(category) {
   const map = {
-    academic: 'fa-solid fa-graduati?on-cap',
+    academic: 'fa-solid fa-graduation-cap',
     project:  'fa-solid fa-flask',
     hobby:    'fa-solid fa-gamepad',
     social:   'fa-solid fa-user-group',
@@ -568,7 +568,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 color: isSolved ? '#22d3ee' : '#fbbf24',
                 border: `1px solid ${isSolved ? 'rgba(34,211,238,0.3)' : 'rgba(251,191,36,0.3)'}`,
               }}>
-                {isSolved ? '? Solved' : '? Unanswered'}
+                {isSolved ? '✓ Solved' : '⏳ Unanswered'}
               </span>
             )}
           </div>
@@ -7340,7 +7340,7 @@ export default function UserPortal() {
                         return (
                           <div key={label}>
                             <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                              {label} ? {group.length}
+                              {label} · {group.length}
                             </div>
                             {group.map(m => {
                               const url = avatarCache[m.sender_id] || m.avatar_url;
@@ -7503,6 +7503,7 @@ export default function UserPortal() {
                               );
                             })}
                           </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <button className="cyber-btn"
                             style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
                             disabled={postingAnnouncement || !newCirclePost.title.trim() || (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim())}
@@ -7512,6 +7513,7 @@ export default function UserPortal() {
                               : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
                           </button>
                           <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -7581,8 +7583,8 @@ export default function UserPortal() {
                       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                         {[
                           { key: 'all', label: 'All Posts' },
-                          { key: 'questions', label: '? Questions' },
-                          { key: 'unanswered', label: '?? Unanswered' },
+                          { key: 'questions', label: '📌 Questions' },
+                          { key: 'unanswered', label: '⏳ Unanswered' },
                         ].map(f => (
                           <button key={f.key} onClick={() => setQaFilter(f.key)} style={{
                             padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer',
@@ -7970,7 +7972,7 @@ export default function UserPortal() {
                     return (
                       <div key={label}>
                         <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                          {label} ? {group.length}
+                          {label} · {group.length}
                         </div>
                         {group.map(m => {
                           const memberStudentId = m.student_id || m.ctu_id;
