@@ -230,7 +230,8 @@ const POST_TYPE = {
   announcement: { label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
   event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
   shoutout:     { label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
-  general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
+  general:      { label: 'Thread',        color: '#a78bfa',             icon: 'fa-solid fa-comments' },
+  thread:       { label: 'Thread',        color: '#a78bfa',             icon: 'fa-solid fa-comments' },
   poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
   showcase:     { label: 'Showcase',      color: '#f59e0b',             icon: 'fa-solid fa-palette' },
   question:     { label: 'Question',      color: '#22d3ee',             icon: 'fa-solid fa-circle-question' },
@@ -4572,7 +4573,7 @@ export default function UserPortal() {
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
-  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
+  const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
   const [crossPostToFeed, setCrossPostToFeed] = useState(false);
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
@@ -5134,8 +5135,8 @@ export default function UserPortal() {
       const valid = newCirclePost.pollOptions.filter(o => o.trim());
       if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
-    // Restrict posting to Leader (3) and Co-Leader (2) only
-    if (myRankLevel < 2) { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
+    // Restrict posting to Leader (3) and Co-Leader (2) only — except Thread which all members can post
+    if (myRankLevel < 2 && newCirclePost.post_type !== 'thread') { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
     setPostingAnnouncement(true);
     const pollOptions = newCirclePost.post_type === 'poll'
       ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
@@ -5173,7 +5174,7 @@ export default function UserPortal() {
 
     setPostingAnnouncement(false);
     if (!error) {
-      setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
+      setNewCirclePost({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
       setCrossPostToFeed(false);
       setPostPendingMedia(null);
       loadCircleAnnouncements(commId);
@@ -7488,8 +7489,8 @@ export default function UserPortal() {
                 ) : showCircleAnnouncements ? (
                   /* -- CIRCLE ANNOUNCEMENTS VIEW -- */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer — Leader and Co-Leader only */}
-                    {isMember(activeCommId) && user?.is_verified && myRankLevel >= 2 && (
+                    {/* Post composer — Leaders/Co-Leaders for all types; all verified members for Thread */}
+                    {isMember(activeCommId) && user?.is_verified && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
                           <div className="home-composer-avatar" style={{ background: 'rgba(252,238,10,0.15)', border: '1px solid rgba(252,238,10,0.3)', color: 'var(--cyber-yellow)' }}>
@@ -7562,7 +7563,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['announcement', 'event', 'shoutout', 'general', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])].map(t => {
+                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'shoutout', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
@@ -7603,11 +7604,12 @@ export default function UserPortal() {
                     {/* Circle filter bar — All, Announcement, Event, Poll, Archive */}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                       {[
-                        { key: 'all', label: 'All', icon: 'fa-solid fa-layer-group' },
+                        { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
                         { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
-                        { key: 'event', label: 'Event', icon: 'fa-solid fa-calendar' },
-                        { key: 'poll', label: 'Poll', icon: 'fa-solid fa-chart-bar' },
-                        { key: 'archive', label: 'Archive', icon: 'fa-solid fa-box-archive' },
+                        { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
+                        { key: 'thread',       label: 'Thread',       icon: 'fa-solid fa-comments' },
+                        { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
+                        { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
                       ].map(f => {
                         const active = f.key === 'archive' ? showCircleArchive : (!showCircleArchive && (f.key === 'all' ? qaFilter === 'all' : qaFilter === f.key));
                         return (
@@ -7690,8 +7692,8 @@ export default function UserPortal() {
                           ? circleAnnouncements.filter(a => a.post_type === 'question')
                           : qaFilter === 'unanswered'
                           ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
-                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll'
-                          ? circleAnnouncements.filter(a => a.post_type === qaFilter)
+                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll' || qaFilter === 'thread'
+                          ? circleAnnouncements.filter(a => a.post_type === qaFilter || (qaFilter === 'thread' && a.post_type === 'general'))
                           : circleAnnouncements;
                         if (filtered.length === 0) return (
                           <div className="post" style={{ textAlign: 'center', padding: 32 }}>
