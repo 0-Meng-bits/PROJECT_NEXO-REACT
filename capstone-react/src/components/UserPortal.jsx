@@ -314,6 +314,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
   const [replyingTo, setReplyingTo] = useState(null); // { id, author_name, author_id }
   const [replyInput, setReplyInput] = useState('');
   const [commentHearts, setCommentHearts] = useState({}); // commentId -> { count, likedByMe }
+  const [commentAvatarCache, setCommentAvatarCache] = useState({}); // author_id (UUID) -> avatar_url
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentVal, setEditingCommentVal] = useState('');
   const [commentSort, setCommentSort] = useState('new'); // 'new' | 'old' | 'top'
@@ -380,6 +381,21 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           if (h.user_id === user.id) map[h.comment_id].likedByMe = true;
         });
         setCommentHearts(map);
+      }
+    }
+    // Load avatars for comment authors (keyed by their UUID)
+    if (data?.length) {
+      const authorIds = [...new Set([...data.map(c => c.author_id).filter(Boolean), user?.id].filter(Boolean))];
+      if (authorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('accounts')
+          .select('id, account_details(avatar_url)')
+          .in('id', authorIds);
+        if (profiles) {
+          const map = {};
+          profiles.forEach(p => { if (p.account_details?.avatar_url) map[p.id] = p.account_details.avatar_url; });
+          setCommentAvatarCache(map);
+        }
       }
     }
   };
@@ -575,6 +591,12 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
             {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
+          {a.cross_posted_from && (
+            <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="fa-solid fa-circle-check"></i>
+              Originally posted in a verified circle
+            </div>
+          )}
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -777,7 +799,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 setReplyingTo={setReplyingTo}
                 setReplyInput={setReplyInput}
                 user={user}
-                avatarCache={avatarCache}
+                avatarCache={{ ...avatarCache, ...commentAvatarCache }}
                 onViewProfileById={onViewProfileById}
                 onReport={onReport}
                 isQuestion={isQuestion}
@@ -805,7 +827,7 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
                 )}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
-                    {avatarCache?.[user.id] ? <img src={avatarCache[user.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user.full_name || 'U')[0].toUpperCase()}
+                    {commentAvatarCache?.[user.id] || avatarCache?.[user.id] ? <img src={commentAvatarCache[user.id] || avatarCache[user.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user.full_name || 'U')[0].toUpperCase()}
                   </div>
                   <input
                     value={replyingTo ? replyInput : commentInput}
@@ -4551,6 +4573,7 @@ export default function UserPortal() {
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
+  const [crossPostToFeed, setCrossPostToFeed] = useState(false);
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
   const [showComposer, setShowComposer] = useState(false);
@@ -5137,12 +5160,13 @@ export default function UserPortal() {
     };
     const { error } = await supabase.from('announcements').insert([postPayload]);
 
-    // If circle is verified (is_official), also post to Home Feed (community_id: null)
+    // If leader/co-leader manually toggled "Post to Home Feed" on a verified circle
     const comm = communities.find(c => c.id === commId);
-    if (!error && comm?.is_official) {
+    if (!error && comm?.is_official && crossPostToFeed) {
       await supabase.from('announcements').insert([{
         ...postPayload,
         community_id: null,
+        cross_posted_from: commId,
         author_name: `${user.full_name} (${comm.name})`,
       }]);
     }
@@ -5150,6 +5174,7 @@ export default function UserPortal() {
     setPostingAnnouncement(false);
     if (!error) {
       setNewCirclePost({ title: '', content: '', post_type: 'announcement', pollOptions: ['', ''], event_metadata: null });
+      setCrossPostToFeed(false);
       setPostPendingMedia(null);
       loadCircleAnnouncements(commId);
       if (comm?.is_official) loadAnnouncements();
@@ -7475,9 +7500,9 @@ export default function UserPortal() {
                               Post to {activeComm.name}
                             </span>
                             {activeComm.is_official && (
-                              <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 2 }}>
-                                <i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>
-                                Verified circle — posts also appear in Home Feed
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                                <i className="fa-solid fa-circle-check" style={{ marginRight: 4, color: 'var(--green)' }}></i>
+                                Verified circle
                               </div>
                             )}
                           </div>
@@ -7550,6 +7575,18 @@ export default function UserPortal() {
                             })}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {activeComm.is_official && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: crossPostToFeed ? 'var(--green)' : 'var(--text-muted)', userSelect: 'none' }}>
+                              <input
+                                type="checkbox"
+                                checked={crossPostToFeed}
+                                onChange={e => setCrossPostToFeed(e.target.checked)}
+                                style={{ accentColor: 'var(--green)', width: 13, height: 13, cursor: 'pointer' }}
+                              />
+                              <i className="fa-solid fa-earth-asia" style={{ fontSize: 10 }}></i>
+                              Post to Home Feed
+                            </label>
+                          )}
                           <button className="cyber-btn"
                             style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
                             disabled={postingAnnouncement || !newCirclePost.title.trim() || (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim())}

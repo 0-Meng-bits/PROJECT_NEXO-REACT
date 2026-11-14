@@ -42,7 +42,18 @@ function CommentNode({
           {isSolution && <div style={{ fontSize: 10, color: '#22d3ee', fontWeight: 700, marginBottom: 4 }}>✓ Accepted Answer</div>}
           {/* Header row */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-            <span style={{ fontSize: 11, fontWeight: 700 }}>{c.author_name}</span>
+            <span
+              onClick={() => onViewProfileById && onViewProfileById(c.author_id)}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: onViewProfileById ? 'pointer' : 'default',
+                color: onViewProfileById ? 'var(--cyber-cyan)' : 'var(--text-primary)',
+              }}
+              onMouseEnter={e => { if (onViewProfileById) e.currentTarget.style.textDecoration = 'underline'; }}
+              onMouseLeave={e => { if (onViewProfileById) e.currentTarget.style.textDecoration = 'none'; }}>
+              {c.author_name}
+            </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{timeSince(c.created_at)}</span>
               {c.edited && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>· edited</span>}
