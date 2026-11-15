@@ -6496,6 +6496,10 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
+                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => { navTo('bulletin', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                  <i className="nav-icon fa-solid fa-thumbtack"></i>
+                  <span className="node-name">Bulletin</span>
+                </div>
                 <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
@@ -6504,17 +6508,13 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-compass"></i>
                   <span className="node-name">Explore</span>
                 </div>
-                <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-calendar-days"></i>
-                  <span className="node-name">Campus Events</span>
-                </div>
                 <div className={`ls-item ${section === 'discover' ? 'active' : ''}`} onClick={() => { navTo('discover', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-people-group"></i>
                   <span className="node-name">Discover People</span>
                 </div>
-                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => { navTo('bulletin', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-thumbtack"></i>
-                  <span className="node-name">Bulletin</span>
+                <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
+                  <i className="nav-icon fa-solid fa-calendar-days"></i>
+                  <span className="node-name">Campus Events</span>
                 </div>
               </div>
               </div>
