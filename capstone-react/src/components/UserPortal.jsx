@@ -6724,16 +6724,11 @@ export default function UserPortal() {
 
               {/* Hero banner */}
               {/* Slim greeting */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 4px 6px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 12 }}>
-                <div>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Welcome back, </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{user?.full_name || 'Technologist'}</span>
-                  <span style={{ fontSize: 13, color: 'var(--cyber-cyan)', marginLeft: 6 }}>👋</span>
+              <div style={{ padding: '16px 4px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Welcome back</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0.5 }}>
+                  {user?.full_name || 'Technologist'} <span style={{ fontSize: 20 }}>👋</span>
                 </div>
-                <button onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}
-                  style={{ background: 'none', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <i className="fa-solid fa-compass" style={{ fontSize: 10 }}></i> Explore Circles
-                </button>
               </div>
 
               {/* Popular Right Now ? moved up, replaces redundant welcome/stats cards */}
