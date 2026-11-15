@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 export function ApplicationStatusLabel(status, phase2Result) {
@@ -21,7 +21,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
-  const [newForm, setNewForm] = useState({ title: '', description: '', type: 'external', post_to_feed: false });
+  const [newForm, setNewForm] = useState({ title: '', description: '', type: 'external', post_to_feed: false, deadline: '' });
   const [newQuestions, setNewQuestions] = useState([]); // questions for the new Application being created
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -58,6 +58,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
       post_to_feed: newForm.post_to_feed,
       is_open: true,
       created_by: comm.creator_id,
+      deadline: newForm.deadline ? new Date(newForm.deadline).toISOString() : null,
     }]).select().single();
 
     if (!error && data) {
@@ -295,6 +296,16 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
             value={newForm.description}
             onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))} />
         </div>
+        <div className="input-group" style={{ marginBottom: 12 }}>
+          <label>DEADLINE (optional)</label>
+          <input type="datetime-local"
+            style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '8px 10px', color: 'white', borderRadius: 6, fontFamily: 'inherit', fontSize: 12, outline: 'none', colorScheme: 'dark' }}
+            value={newForm.deadline}
+            onChange={e => setNewForm(f => ({ ...f, deadline: e.target.value }))} />
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+            Applications submitted after this date will no longer be accepted.
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <button onClick={() => setNewForm(f => ({ ...f, type: 'external' }))}
             style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, transition: '0.2s',
@@ -497,6 +508,23 @@ export function ApplicationApplicationForm({ comm, Application, applicantId, onS
         <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 20, marginTop: -10 }}>
           {Application?.description || 'Fill out the form below. The circle leader will review your application.'}
         </p>
+        {Application?.deadline && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+            background: new Date(Application.deadline) < new Date() ? 'rgba(247,95,95,0.08)' : 'rgba(252,238,10,0.07)',
+            border: '1px solid ' + (new Date(Application.deadline) < new Date() ? 'rgba(247,95,95,0.3)' : 'rgba(252,238,10,0.3)') }}>
+            <i className="fa-solid fa-clock" style={{ color: new Date(Application.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)', fontSize: 13 }}></i>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: new Date(Application.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)' }}>
+                {new Date(Application.deadline) < new Date() ? 'Application Closed' : 'Deadline'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                {new Date(Application.deadline).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
+                {' at '}
+                {new Date(Application.deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          </div>
+        )}
         {questions.length === 0 && (
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
             No questions set yet. You can still submit your application.
