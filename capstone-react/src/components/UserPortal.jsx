@@ -591,6 +591,9 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
             {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {!isAnon && a.post_type === 'thread' && a.author_student_id && (
+              <span style={{ marginLeft: 4, color: 'var(--text-muted)' }}>· {a.author_student_id}</span>
+            )}
           </div>
           {a.cross_posted_from && (
             <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -5062,8 +5065,8 @@ export default function UserPortal() {
       const validOptions = newPost.pollOptions.filter(o => o.trim());
       if (validOptions.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
-    const allowedTypes = ['announcement', 'event', 'shoutout', 'general', 'poll'];
-    const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'general';
+    const allowedTypes = ['announcement', 'event', 'shoutout', 'thread', 'general', 'poll'];
+    const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'thread';
     setPostingAnnouncement(true);
     const pollOptions = type === 'poll' ? newPost.pollOptions.filter(o => o.trim()) : null;
 
@@ -6486,6 +6489,10 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-people-group"></i>
                   <span className="node-name">Discover People</span>
                 </div>
+                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => { navTo('bulletin', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                  <i className="nav-icon fa-solid fa-thumbtack"></i>
+                  <span className="node-name">Bulletin</span>
+                </div>
               </div>
               </div>
             </>
@@ -6743,238 +6750,76 @@ export default function UserPortal() {
                 </>
               )}
 
-              {/* -- POST COMPOSER -- community tab only */}
-              {homeFeedTab === 'community' && (
+              {/* -- THREAD COMPOSER -- all verified users */}
+              {user?.is_verified && (
                 <div className="home-post-composer">
-                  {/* Collapsed prompt · click to expand */}
                   {!showComposer ? (
-                    <div className="home-composer-header" onClick={() => setShowComposer(true)}
-                      style={{ cursor: 'pointer' }}>
+                    <div className="home-composer-header" onClick={() => setShowComposer(true)} style={{ cursor: 'pointer' }}>
                       <div className="home-composer-avatar">
-                        {navAvatarUrl
-                          ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : initials
-                        }
+                        {navAvatarUrl ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
                       </div>
                       <span style={{ color: 'var(--text-muted)', fontSize: 13, flex: 1 }}>
-                        What's on your mind? Share news, events, shoutouts...
+                        Share your thoughts, invite others to your circle...
                       </span>
                       <i className="fa-solid fa-pen-to-square" style={{ color: 'var(--cyber-cyan)', fontSize: 14 }}></i>
                     </div>
                   ) : (
                     <>
-                  <div className="home-composer-header">
-                    <div className="home-composer-avatar">
-                      {navAvatarUrl
-                        ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : initials
-                      }
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', flex: 1 }}>Share something with the campus</span>
-                    <button onClick={() => { setShowComposer(false); setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null }); }}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                  <input
-                    className="home-composer-title"
-                    placeholder="Title"
-                    value={newPost.title}
-                    onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))}
-                    autoFocus
-                  />
-                  {newPost.post_type !== 'poll' && (
-                    <textarea
-                      className="home-composer-body"
-                      placeholder="What's on your mind? Share news, events, shoutouts..."
-                      value={newPost.content}
-                      onChange={e => setNewPost(p => ({ ...p, content: e.target.value }))}
-                      rows={3}
-                    />
-                  )}
-                  {/* Event metadata form — show for Event post type */}
-                  {newPost.post_type === 'event' && (
-                    <PollEventMetadataForm
-                      communityCategory="social"
-                      onChange={(metadata) => setNewPost(p => ({ ...p, event_metadata: metadata }))}
-                    />
-                  )}
-                  {/* Poll options */}
-                  {newPost.post_type === 'poll' && (                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-                        {newPost.pollOptions.map((opt, i) => (
-                          <div key={i} style={{ display: 'flex', gap: 6 }}>
-                            <input
-                              className="home-composer-title"
-                              style={{ marginBottom: 0, flex: 1 }}
-                              placeholder={`Option ${i + 1}`}
-                              value={opt}
-                              onChange={e => {
-                                const opts = [...newPost.pollOptions];
-                                opts[i] = e.target.value;
-                                setNewPost(p => ({ ...p, pollOptions: opts }));
-                              }}
-                            />
-                            {newPost.pollOptions.length > 2 && (
-                              <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
-                                style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
-                                <i className="fa-solid fa-xmark"></i>
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                        {newPost.pollOptions.length < 6 && (
-                          <button type="button" onClick={() => setNewPost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
-                            style={{ background: 'none', border: '1px dashed rgba(168,85,247,0.4)', borderRadius: 8, color: '#a855f7', cursor: 'pointer', padding: '8px', fontSize: 12, fontFamily: 'inherit' }}>
-                            <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Add Option
-                          </button>
-                        )}
+                      <div className="home-composer-header">
+                        <div className="home-composer-avatar">
+                          {navAvatarUrl ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                        </div>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', flex: 1 }}>New Thread</span>
+                        <button onClick={() => { setShowComposer(false); setNewPost({ title: '', content: '', post_type: 'thread', anonymous: false, pollOptions: ['', ''], event_metadata: null }); }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
                       </div>
-                      <PollEventMetadataForm
-                        communityCategory="social"
-                        onChange={(metadata) => setNewPost(p => ({ ...p, event_metadata: metadata }))}
-                      />
-                    </>
-                  )}
-                  {postPendingMedia && (
-                    <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
-                  )}
-                  <div className="home-composer-footer">
-                    <div className="home-composer-types">
-                      {['announcement', 'event', 'shoutout', 'general', 'poll'].map(t => {
-                        const cfg = POST_TYPE[t];
-                        return (
-                          <button key={t}
-                            className={`home-type-btn ${newPost.post_type === t ? 'active' : ''}`}
-                            style={{ '--type-color': cfg.color }}
-                            onClick={() => setNewPost(p => ({ ...p, post_type: t }))}>
-                            <i className={cfg.icon}></i> {cfg.label}
+                      <input className="home-composer-title" placeholder="Title" value={newPost.title}
+                        onChange={e => setNewPost(p => ({ ...p, title: e.target.value }))} autoFocus />
+                      <textarea className="home-composer-body" placeholder="Share your thoughts, invite others to your circle..."
+                        value={newPost.content} onChange={e => setNewPost(p => ({ ...p, content: e.target.value }))} rows={3} />
+                      {postPendingMedia && (
+                        <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
+                      )}
+                      <div className="home-composer-footer">
+                        <div style={{ fontSize: 11, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <i className="fa-solid fa-comments" style={{ fontSize: 10 }}></i> Thread · {user.student_id}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
+                          <button className="cyber-btn" style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
+                            disabled={postingAnnouncement || !newPost.title.trim() || !newPost.content.trim()}
+                            onClick={() => { setNewPost(p => ({ ...p, post_type: 'thread' })); postAnnouncement(); setShowComposer(false); }}>
+                            {postingAnnouncement
+                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
+                              : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
                           </button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
-                      <button
-                        className={`home-anon-btn ${newPost.anonymous ? 'active' : ''}`}
-                        onClick={() => setNewPost(p => ({ ...p, anonymous: !p.anonymous }))}
-                        title={newPost.anonymous ? 'Posting anonymously · click to use your name' : 'Post anonymously'}>
-                        <i className="fa-solid fa-user-secret"></i>
-                        <span>{newPost.anonymous ? 'Anonymous' : 'Post as me'}</span>
-                      </button>
-                      <button className="cyber-btn"
-                        style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
-                        disabled={postingAnnouncement || !newPost.title.trim() || (newPost.post_type !== 'poll' && !newPost.content.trim())}
-                        onClick={() => { postAnnouncement(); setShowComposer(false); }}>
-                        {postingAnnouncement
-                          ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
-                          : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
-                      </button>
-                    </div>
-                  </div>
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
               )}
 
-              {/* -- CAMPUS FEED -- */}
+              {/* -- THREADS FEED -- */}
               <div className="home-section-header" style={{ marginTop: 4 }}>
-                <span><i className="fa-solid fa-bullhorn" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>Campus Feed</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.length} posts</span>
-              </div>
-
-              {/* Official / Community tabs */}
-              <div style={{ display: 'flex', gap: 0, marginBottom: 14, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, overflow: 'hidden' }}>
-                {[
-                  { key: 'official', label: 'Official', icon: 'fa-solid fa-circle-check', color: 'var(--green)' },
-                  { key: 'community', label: 'Community', icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
-                ].map(t => (
-                  <button key={t.key} onClick={() => { setHomeFeedTab(t.key); setFeedFilter('all'); }}
-                    style={{ flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
-                      background: homeFeedTab === t.key ? `${t.color}18` : 'rgba(255,255,255,0.02)',
-                      color: homeFeedTab === t.key ? t.color : 'var(--text-muted)',
-                      borderBottom: `2px solid ${homeFeedTab === t.key ? t.color : 'transparent'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: '0.2s' }}>
-                    <i className={t.icon} style={{ fontSize: 11 }}></i>{t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Official tab description */}
-              {homeFeedTab === 'official' && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)' }}></i>
-                  Posts from Admin and verified circles only
-                </div>
-              )}
-
-              {/* Post composer — Community tab only */}
-              {homeFeedTab === 'community' && user?.is_verified && (
-                <div style={{ height: 0 }} />
-              )}
-
-              {/* Feed filter tabs */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                {[
-                  { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
-                  { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
-                  { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
-                  ...(homeFeedTab === 'community' ? [{ key: 'shoutout', label: 'Shoutout', icon: 'fa-solid fa-star' }] : []),
-                  { key: 'thread',       label: 'Thread',       icon: 'fa-solid fa-comments' },
-                  { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
-                  { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
-                ].map(f => {
-                  const cfg = POST_TYPE[f.key];
-                  const color = f.key === 'archive' ? 'var(--text-muted)' : (cfg?.color || 'var(--cyber-cyan)');
-                  const isActive = f.key === 'archive' ? showHomeFeedArchive : feedFilter === f.key;
-                  return (
-                    <button key={f.key}
-                      onClick={() => {
-                        if (f.key === 'archive') {
-                          setShowHomeFeedArchive(v => !v);
-                          if (!showHomeFeedArchive) loadPastAnnouncements();
-                        } else {
-                          setFeedFilter(f.key);
-                          setShowHomeFeedArchive(false);
-                        }
-                      }}
-                      style={{
-                        padding: '5px 12px', borderRadius: 20, border: `1px solid ${isActive ? color : 'rgba(255,255,255,0.1)'}`,
-                        background: isActive ? `${color}18` : 'transparent',
-                        color: isActive ? color : 'var(--text-muted)',
-                        fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: '0.2s',
-                        display: 'flex', alignItems: 'center', gap: 5,
-                      }}>
-                      <i className={f.icon} style={{ fontSize: 10 }}></i>{f.label}
-                    </button>
-                  );
-                })}
+                <span><i className="fa-solid fa-comments" style={{ marginRight: 8, color: '#a78bfa' }}></i>Threads</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{announcements.filter(a => a.post_type === 'thread' || a.post_type === 'general').length} posts</span>
               </div>
 
               {(() => {
-                // Split announcements by tab
-                const officialPosts = announcements.filter(a =>
-                  a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null
-                );
-                const communityPosts = announcements.filter(a =>
-                  a.author_type !== 'Admin' && a.community_id === null && a.cross_posted_from == null
-                );
-                const tabPosts = homeFeedTab === 'official' ? officialPosts : communityPosts;
-                const filtered = feedFilter === 'all' ? tabPosts : tabPosts.filter(a => a.post_type === feedFilter || (feedFilter === 'thread' && a.post_type === 'general'));
-                return filtered.length === 0 ? (
+                const threadPosts = announcements.filter(a => a.post_type === 'thread' || a.post_type === 'general');
+                return threadPosts.length === 0 ? (
                   <div className="post" style={{ textAlign: 'center', padding: 32 }}>
-                    <i className="fa-solid fa-bullhorn" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                    <i className="fa-solid fa-comments" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                      {feedFilter === 'all'
-                        ? homeFeedTab === 'official'
-                          ? 'No official posts yet.'
-                          : (user?.is_verified ? 'No community posts yet. Be the first to share something!' : 'No posts yet. Verify your account to post.')
-                        : `No ${feedFilter} posts yet.`}
+                      {user?.is_verified ? 'No threads yet. Be the first to start one!' : 'No threads yet. Verify your account to post.'}
                     </p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {filtered.map(a => (
+                    {threadPosts.map(a => (
                       <AnnouncementCard key={a.id} a={a} user={user}
                         avatarCache={avatarCache}
                         onPin={togglePin}
@@ -6990,7 +6835,7 @@ export default function UserPortal() {
                             ? communities.find(c => c.name === commName)
                             : communities.find(c => ann.title?.includes(c.name));
                           if (comm) setShowApplicationForm({ comm });
-                          else alert('Could not find the Application circle. Try visiting the circle directly.');
+                          else alert('Could not find the circle. Try visiting the circle directly.');
                         }}
                         onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                     ))}
@@ -7039,6 +6884,106 @@ export default function UserPortal() {
 
               {/* Popular by category ? now shown above, removed from here */}
 
+            </div>
+          )}
+
+          {/* -- BULLETIN -- official posts from Admin + verified circle leaders -- */}
+          {section === 'bulletin' && (
+            <div className="c-feed fade-in">
+              <div className="home-hero" style={{ background: 'linear-gradient(135deg, rgba(0,240,255,0.08), rgba(168,85,247,0.08))', minHeight: 'unset', padding: '24px 28px' }}>
+                <div className="home-hero-text">
+                  <h1 style={{ fontSize: 22, marginBottom: 6 }}><i className="fa-solid fa-thumbtack" style={{ marginRight: 10, color: 'var(--cyber-cyan)' }}></i>Bulletin</h1>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>Official announcements, events, and updates from Admin and verified circle leaders.</p>
+                </div>
+              </div>
+
+              {/* Filter bar */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '12px 0' }}>
+                {[
+                  { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
+                  { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
+                  { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
+                  { key: 'shoutout',     label: 'Shoutout',     icon: 'fa-solid fa-star' },
+                  { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
+                  { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
+                ].map(f => {
+                  const cfg = POST_TYPE[f.key];
+                  const color = f.key === 'archive' ? 'var(--text-muted)' : (cfg?.color || 'var(--cyber-cyan)');
+                  const isActive = f.key === 'archive' ? showHomeFeedArchive : feedFilter === f.key;
+                  return (
+                    <button key={f.key}
+                      onClick={() => {
+                        if (f.key === 'archive') {
+                          setShowHomeFeedArchive(v => !v);
+                          if (!showHomeFeedArchive) loadPastAnnouncements();
+                        } else {
+                          setFeedFilter(f.key);
+                          setShowHomeFeedArchive(false);
+                        }
+                      }}
+                      style={{
+                        padding: '5px 12px', borderRadius: 20, border: `1px solid ${isActive ? color : 'rgba(255,255,255,0.1)'}`,
+                        background: isActive ? `${color}18` : 'transparent',
+                        color: isActive ? color : 'var(--text-muted)',
+                        fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', transition: '0.2s',
+                        display: 'flex', alignItems: 'center', gap: 5,
+                      }}>
+                      <i className={f.icon} style={{ fontSize: 10 }}></i>{f.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Archive view */}
+              {showHomeFeedArchive ? (
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="fa-solid fa-box-archive" style={{ color: 'var(--cyber-cyan)' }}></i>
+                    Older official posts
+                  </div>
+                  {loadingPastAnnouncements ? (
+                    <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}><i className="fa-solid fa-spinner fa-spin"></i></div>
+                  ) : pastAnnouncements.filter(a => a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null).length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 20 }}>No archived posts.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {pastAnnouncements.filter(a => a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null).map(a => (
+                        <AnnouncementCard key={a.id} a={a} user={user} avatarCache={avatarCache}
+                          onPin={togglePin} onDelete={deleteAnnouncement} onVote={handleVote}
+                          onReport={(data) => setShowReport(data)} onViewProfile={viewUserProfile}
+                          onViewProfileById={viewUserProfileById}
+                          onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) setShowApplicationForm({ comm }); }}
+                          onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (() => {
+                const bulletinPosts = announcements.filter(a =>
+                  (a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null) &&
+                  (a.post_type !== 'thread' && a.post_type !== 'general')
+                );
+                const filtered = feedFilter === 'all' ? bulletinPosts : bulletinPosts.filter(a => a.post_type === feedFilter);
+                return filtered.length === 0 ? (
+                  <div className="post" style={{ textAlign: 'center', padding: 32 }}>
+                    <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
+                    <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      {feedFilter === 'all' ? 'No bulletin posts yet.' : `No ${feedFilter} posts yet.`}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {filtered.map(a => (
+                      <AnnouncementCard key={a.id} a={a} user={user} avatarCache={avatarCache}
+                        onPin={togglePin} onDelete={deleteAnnouncement} onVote={handleVote}
+                        onReport={(data) => setShowReport(data)} onViewProfile={viewUserProfile}
+                        onViewProfileById={viewUserProfileById}
+                        onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) setShowApplicationForm({ comm }); else alert('Could not find the circle. Try visiting the circle directly.'); }}
+                        onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -7585,7 +7530,7 @@ export default function UserPortal() {
                                 style={{ accentColor: 'var(--green)', width: 13, height: 13, cursor: 'pointer' }}
                               />
                               <i className="fa-solid fa-earth-asia" style={{ fontSize: 10 }}></i>
-                              Post to Home Feed
+                              Post to Bulletin
                             </label>
                           )}
                           <button className="cyber-btn"
