@@ -6920,7 +6920,7 @@ export default function UserPortal() {
                   { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
                   { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
                   ...(homeFeedTab === 'community' ? [{ key: 'shoutout', label: 'Shoutout', icon: 'fa-solid fa-star' }] : []),
-                  { key: 'general',      label: 'General',      icon: 'fa-solid fa-comment' },
+                  { key: 'thread',       label: 'Thread',       icon: 'fa-solid fa-comments' },
                   { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
                   { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
                 ].map(f => {
@@ -6960,7 +6960,7 @@ export default function UserPortal() {
                   a.author_type !== 'Admin' && a.community_id === null
                 );
                 const tabPosts = homeFeedTab === 'official' ? officialPosts : communityPosts;
-                const filtered = feedFilter === 'all' ? tabPosts : tabPosts.filter(a => a.post_type === feedFilter);
+                const filtered = feedFilter === 'all' ? tabPosts : tabPosts.filter(a => a.post_type === feedFilter || (feedFilter === 'thread' && a.post_type === 'general'));
                 return filtered.length === 0 ? (
                   <div className="post" style={{ textAlign: 'center', padding: 32 }}>
                     <i className="fa-solid fa-bullhorn" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
