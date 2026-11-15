@@ -601,6 +601,12 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
               Originally posted in a verified circle
             </div>
           )}
+          {a.visibility === 'connections' && (
+            <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <i className="fa-solid fa-lock"></i>
+              Connections only
+            </div>
+          )}
         </div>
         {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -4575,7 +4581,8 @@ export default function UserPortal() {
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
-  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
+  const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
+  const [connectedUserIds, setConnectedUserIds] = useState(new Set()); // accepted connection user IDs
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
   const [crossPostToFeed, setCrossPostToFeed] = useState(false);
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
@@ -5085,6 +5092,7 @@ export default function UserPortal() {
       post_type: type,
       community_id: null,
       media_url: mediaUrl,
+      visibility: newPost.visibility || 'public',
       ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
       ...(type === 'poll' && newPost.event_metadata ? { event_metadata: newPost.event_metadata } : {}),
     }]);
@@ -5102,7 +5110,7 @@ export default function UserPortal() {
           });
         }
       }
-      setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null });
+      setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
       setPostPendingMedia(null);
       loadAnnouncements();
 
@@ -5489,6 +5497,21 @@ export default function UserPortal() {
   }, [activeCommId, activeChannelId]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
+
+  // Load accepted connection user IDs for visibility filtering
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('connections')
+      .select('user_id, connected_user_id')
+      .or(`user_id.eq.${user.id},connected_user_id.eq.${user.id}`)
+      .eq('status', 'accepted')
+      .then(({ data }) => {
+        if (data) {
+          const ids = new Set(data.map(c => c.user_id === user.id ? c.connected_user_id : c.user_id));
+          setConnectedUserIds(ids);
+        }
+      });
+  }, [user?.id]);
 
   // Load current user's companion for nav avatar
   useEffect(() => {
@@ -6700,16 +6723,17 @@ export default function UserPortal() {
             <div className="c-feed fade-in">
 
               {/* Hero banner */}
-              <div className="home-hero">
-                <div className="home-hero-text">
-                  <p className="home-hero-welcome">Welcome, {user?.full_name || 'Technologist'}.</p>
-                  <h1>Find Your Circle<br/>at CTU</h1>
-                  <p>Discover communities built around your interests, join the conversation, and make your campus experience count.</p>
-                  <button className="cyber-btn" style={{ width: 'auto', padding: '10px 24px', marginTop: 16 }}
-                    onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}>
-                    <i className="fa-solid fa-compass" style={{ marginRight: 8 }}></i>Explore Circles
-                  </button>
+              {/* Slim greeting */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 4px 6px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 12 }}>
+                <div>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Welcome back, </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{user?.full_name || 'Technologist'}</span>
+                  <span style={{ fontSize: 13, color: 'var(--cyber-cyan)', marginLeft: 6 }}>👋</span>
                 </div>
+                <button onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}
+                  style={{ background: 'none', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '4px 12px', cursor: 'pointer', fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <i className="fa-solid fa-compass" style={{ fontSize: 10 }}></i> Explore Circles
+                </button>
               </div>
 
               {/* Popular Right Now ? moved up, replaces redundant welcome/stats cards */}
@@ -6783,8 +6807,23 @@ export default function UserPortal() {
                         <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
                       )}
                       <div className="home-composer-footer">
-                        <div style={{ fontSize: 11, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <i className="fa-solid fa-comments" style={{ fontSize: 10 }}></i> Thread · {user.student_id}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 11, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-comments" style={{ fontSize: 10 }}></i> Thread · {user.student_id}
+                          </div>
+                          {/* Visibility toggle */}
+                          <button
+                            type="button"
+                            onClick={() => setNewPost(p => ({ ...p, visibility: p.visibility === 'public' ? 'connections' : 'public' }))}
+                            style={{
+                              background: 'none', border: `1px solid ${newPost.visibility === 'connections' ? '#a78bfa' : 'rgba(255,255,255,0.15)'}`,
+                              borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
+                              color: newPost.visibility === 'connections' ? '#a78bfa' : 'var(--text-muted)',
+                              display: 'flex', alignItems: 'center', gap: 5, transition: '0.2s',
+                            }}>
+                            <i className={newPost.visibility === 'connections' ? 'fa-solid fa-lock' : 'fa-solid fa-earth-asia'} style={{ fontSize: 10 }}></i>
+                            {newPost.visibility === 'connections' ? 'Connections only' : 'Public'}
+                          </button>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
@@ -6809,7 +6848,14 @@ export default function UserPortal() {
               </div>
 
               {(() => {
-                const threadPosts = announcements.filter(a => a.post_type === 'thread' || a.post_type === 'general');
+                const threadPosts = announcements.filter(a => {
+                  if (a.post_type !== 'thread' && a.post_type !== 'general') return false;
+                  if (a.visibility === 'connections') {
+                    // Show if viewer is the author OR is an accepted connection of the author
+                    return a.author_id === user?.id || connectedUserIds.has(a.author_id);
+                  }
+                  return true; // public
+                });
                 return threadPosts.length === 0 ? (
                   <div className="post" style={{ textAlign: 'center', padding: 32 }}>
                     <i className="fa-solid fa-comments" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
@@ -6843,46 +6889,7 @@ export default function UserPortal() {
                 );
               })()}
 
-              {/* Featured Communities */}
-              <div className="home-section-header" style={{ marginTop: 16 }}>
-                <span>Featured Circles</span>
-                <span className="home-see-all" onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); }}>See all</span>
-              </div>
-              {communities.filter(c => c.id !== 'global').length === 0 ? (
-                <div className="post" style={{ textAlign: 'center', padding: 32 }}>
-                  <i className="fa-solid fa-network-wired" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No circles yet. Be the first to create one!</p>
-                  {user?.is_verified && (
-                    <button className="cyber-btn" style={{ width: 'auto', padding: '8px 20px', marginTop: 12 }}
-                      onClick={() => setShowCreate(true)}>
-                      <i className="fa-solid fa-plus" style={{ marginRight: 6 }}></i>Create a Circle
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="featured-grid">
-                  {communities.filter(c => c.id !== 'global').slice(0, 4).map(c => (
-                    <div key={c.id} className="featured-card"
-                      onClick={() => { navTo('circles', c.id); }}>
-                      <div className="featured-card-bg" style={{
-                        background: c.cover_url ? undefined : categoryGradient(c.category),
-                        backgroundImage: c.cover_url ? `url(${c.cover_url})` : undefined,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}></div>
-                      <div className="featured-card-body">
-                        <div className="featured-card-icon">
-                          <i className={(c.icon || getCategoryIcon(c.category))}></i>
-                        </div>
-                        <div className="featured-card-name">{c.name}</div>
-                        <div className="featured-card-desc">{c.description || 'No description provided.'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Popular by category ? now shown above, removed from here */}
+              {/* Popular by category — now shown above, removed from here */}
 
             </div>
           )}
