@@ -6954,10 +6954,10 @@ export default function UserPortal() {
               {(() => {
                 // Split announcements by tab
                 const officialPosts = announcements.filter(a =>
-                  a.author_type === 'Admin' || a.community_id !== null
+                  a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null
                 );
                 const communityPosts = announcements.filter(a =>
-                  a.author_type !== 'Admin' && a.community_id === null
+                  a.author_type !== 'Admin' && a.community_id === null && a.cross_posted_from == null
                 );
                 const tabPosts = homeFeedTab === 'official' ? officialPosts : communityPosts;
                 const filtered = feedFilter === 'all' ? tabPosts : tabPosts.filter(a => a.post_type === feedFilter || (feedFilter === 'thread' && a.post_type === 'general'));
