@@ -5019,9 +5019,13 @@ export default function UserPortal() {
   }, [user?.id]);
 
   const loadAnnouncements = useCallback(async () => {
+    // Only load posts from the last 30 days for the main feed
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
     const { data } = await supabase.from('announcements')
       .select('*')
       .is('community_id', null)
+      .gte('created_at', cutoff.toISOString())
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false });
     setAnnouncements(data || []);
@@ -6722,7 +6726,7 @@ export default function UserPortal() {
 
               {/* Hero banner */}
               {/* Slim greeting */}
-              <div style={{ padding: '16px 4px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 14 }}>
+              <div style={{ padding: '16px 4px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 14, background: 'linear-gradient(135deg, rgba(0,240,255,0.06), rgba(168,85,247,0.06))', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Welcome back</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0.5 }}>
                   {user?.full_name || 'Technologist'} <span style={{ fontSize: 20 }}>👋</span>
@@ -6754,7 +6758,7 @@ export default function UserPortal() {
                           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>
                             {c.category}
                             {memberCounts[c.id] > 0 && (
-                              <span style={{ marginLeft: 8, color: 'var(--cyber-cyan)' }}>
+                              <span style={{ marginLeft: 8, color: 'var(--cyber-yellow)' }}>
                                 <i className="fa-solid fa-user" style={{ fontSize: 9, marginRight: 3 }}></i> {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? "s" : ""}
                               </span>
                             )}
@@ -6903,7 +6907,6 @@ export default function UserPortal() {
                   { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
                   { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
                   { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
-                  { key: 'shoutout',     label: 'Shoutout',     icon: 'fa-solid fa-star' },
                   { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
                   { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
                 ].map(f => {
@@ -7199,7 +7202,7 @@ export default function UserPortal() {
                       // Status indicator shown on the card (quick glance only)
                       let statusBadge = null;
                       if (invited) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-envelope" style={{ marginRight: 4 }}></i>INVITED</span>;
-                      else if (owned) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-crown" style={{ marginRight: 4 }}></i>YOUR CIRCLE</span>;
+                      else if (owned) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>YOUR CIRCLE</span>;
                       else if (joined) statusBadge = <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>JOINED</span>;
                       else if (pending) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-clock" style={{ marginRight: 4 }}></i>PENDING</span>;
                       else if (myApplication) statusBadge = <span style={{ fontSize: 10, color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result), border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`, padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>{ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}</span>;
