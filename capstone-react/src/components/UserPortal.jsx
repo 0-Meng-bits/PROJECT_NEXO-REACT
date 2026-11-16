@@ -5283,6 +5283,17 @@ export default function UserPortal() {
 
   const deleteAnnouncement = async (id) => {
     if (!confirm('Delete this announcement?')) return;
+    // If post has a media file, delete it from storage too
+    const post = announcements.find(a => a.id === id) || circleAnnouncements.find(a => a.id === id);
+    if (post?.media_url) {
+      try {
+        const url = new URL(post.media_url);
+        const pathParts = url.pathname.split('/chat-media/');
+        if (pathParts.length > 1) {
+          await supabase.storage.from('chat-media').remove([decodeURIComponent(pathParts[1])]);
+        }
+      } catch { /* non-fatal — still delete the row */ }
+    }
     await supabase.from('announcements').delete().eq('id', id);
     loadAnnouncements();
   };
