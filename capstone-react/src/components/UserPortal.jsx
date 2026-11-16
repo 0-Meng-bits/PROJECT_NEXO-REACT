@@ -5283,17 +5283,8 @@ export default function UserPortal() {
 
   const deleteAnnouncement = async (id) => {
     if (!confirm('Delete this announcement?')) return;
-    // If post has a media file, delete it from storage too
     const post = announcements.find(a => a.id === id) || circleAnnouncements.find(a => a.id === id);
-    if (post?.media_url) {
-      try {
-        const url = new URL(post.media_url);
-        const pathParts = url.pathname.split('/chat-media/');
-        if (pathParts.length > 1) {
-          await supabase.storage.from('chat-media').remove([decodeURIComponent(pathParts[1])]);
-        }
-      } catch { /* non-fatal — still delete the row */ }
-    }
+    await deleteMediaFromStorage(post?.media_url);
     await supabase.from('announcements').delete().eq('id', id);
     loadAnnouncements();
   };
@@ -6205,8 +6196,21 @@ export default function UserPortal() {
   const canModerate = isOwner || myRankLevel >= 2; // leader or co-leader
   const tagColor = myRole === 'LEADER' ? 'var(--cyber-yellow)' : myRole === 'CO-LEADER' ? 'var(--cyber-cyan)' : 'var(--text-muted)';
 
+  const deleteMediaFromStorage = async (mediaUrl) => {
+    if (!mediaUrl) return;
+    try {
+      const url = new URL(mediaUrl);
+      const pathParts = url.pathname.split('/chat-media/');
+      if (pathParts.length > 1) {
+        await supabase.storage.from('chat-media').remove([decodeURIComponent(pathParts[1])]);
+      }
+    } catch { /* non-fatal */ }
+  };
+
   const deleteMessage = async (msgId) => {
     if (!confirm('Delete this message?')) return;
+    const msg = messages.find(m => m.id === msgId);
+    await deleteMediaFromStorage(msg?.media_url);
     const { error } = await supabase.from('messages').delete().eq('id', msgId);
     if (!error) setMessages(prev => prev.filter(m => m.id !== msgId));
     else showToast('DELETE_FAILED');
@@ -7969,6 +7973,8 @@ export default function UserPortal() {
                             canDelete={canDelete}
                             onDelete={async (id) => {
                               if (!confirm('Delete this message?')) return;
+                              const msg = circleChatMessages.find(m => m.id === id);
+                              await deleteMediaFromStorage(msg?.media_url);
                               await supabase.from('messages').delete().eq('id', id);
                               setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
                             }}
