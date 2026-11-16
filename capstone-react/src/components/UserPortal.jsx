@@ -2078,7 +2078,12 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
             </div>
             <div className="input-group">
               <label>CLASSIFICATION</label>
-              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+              <select value={form.category} onChange={e => {
+                const newCat = e.target.value;
+                const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
+                const available = catInterests[newCat] || [];
+                setForm(f => ({ ...f, category: newCat, interest_tags: f.interest_tags.filter(t => available.includes(t)) }));
+              }}>
                 <option value="academic">Academic / Study Group</option>
                 <option value="project">Special Project / Capstone</option>
                 <option value="hobby">Hobby / Interest</option>
@@ -2111,6 +2116,9 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 4 }}>
                 {(['research','debate','business','language_learning','robotics','reading','coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','sports','travel']).map(interest => {
                   const label = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'Esports', dancing:'Dancing', sports:'Sports', travel:'Travel' };
+                  const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
+                  const available = catInterests[form.category] || catInterests.academic;
+                  if (!available.includes(interest)) return null;
                   const selected = form.interest_tags.includes(interest);
                   return (
                     <button key={interest} type="button"
