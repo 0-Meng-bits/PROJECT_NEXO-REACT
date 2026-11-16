@@ -375,6 +375,7 @@ export default function AdminDashboard() {
   const [showEventForm, setShowEventForm] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', event_date: '', event_end_date: '', event_time: '', location: '' });
   const [postingEvent, setPostingEvent] = useState(false);
+  const [evTab, setEvTab] = useState('upcoming');
 
   const EVENT_CATS = [
     { key: 'semester',   label: 'Semester',           color: '#facc15' },
@@ -1678,7 +1679,6 @@ export default function AdminDashboard() {
                 const today = new Date().toISOString().split('T')[0];
                 const upcoming = campusEvents.filter(ev => (ev.event_date || '') >= today);
                 const past = campusEvents.filter(ev => (ev.event_date || '') < today);
-                const [evTab, setEvTab] = React.useState('upcoming');
                 const displayed = evTab === 'upcoming' ? upcoming : past;
                 return (
                   <>
