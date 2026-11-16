@@ -1710,7 +1710,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
 
 // -- MANAGE GROUP MODAL --------------------------------------------------------
 function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, onGivePoints, onFlagUser }) {
-  const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic' });
+  const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic', is_open: comm.is_open !== false });
   const [members, setMembers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [leader, setLeader] = useState(null);
@@ -1791,6 +1791,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       description: form.description.trim(),
       category: form.category,
       logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
+      is_open: form.is_open,
     };
     // Use service-role API to bypass RLS
     try {
@@ -2086,6 +2087,23 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
             <div className="input-group">
               <label>DESCRIPTION</label>
               <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe this channel's purpose..." />
+            </div>
+            <div className="input-group">
+              <label>JOIN TYPE</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, is_open: true }))}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${form.is_open ? '#3ecf8e' : '#333'}`, background: form.is_open ? 'rgba(62,207,142,0.1)' : 'transparent', color: form.is_open ? '#3ecf8e' : 'var(--text-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <i className="fa-solid fa-door-open" style={{ marginRight: 6 }}></i>Open
+                  <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, opacity: 0.8 }}>Anyone can request to join</div>
+                </button>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, is_open: false }))}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${!form.is_open ? 'var(--cyber-yellow)' : '#333'}`, background: !form.is_open ? 'rgba(252,238,10,0.08)' : 'transparent', color: !form.is_open ? 'var(--cyber-yellow)' : 'var(--text-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Closed
+                  <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, opacity: 0.8 }}>Invite only</div>
+                </button>
+              </div>
             </div>
             <div className="modal-actions">
               <button className="cyber-btn" onClick={saveSettings} disabled={saving} style={{ flex: 1 }}>
