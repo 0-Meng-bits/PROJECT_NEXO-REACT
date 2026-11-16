@@ -68,7 +68,7 @@ export default async function handler(req, res) {
 
     // ── UPLOAD COVER (COMMUNITY) ────────────────────────────────────────
     if (action === 'upload-cover') {
-      const { communityId, logo_url, cover_url, name, description, category, is_open } = req.body;
+      const { communityId, logo_url, cover_url, name, description, category, is_open, interest_tag } = req.body;
 
       if (!communityId) {
         return res.status(400).json({ error: 'Missing communityId' });
@@ -81,6 +81,7 @@ export default async function handler(req, res) {
       if (logo_url !== undefined) updates.logo_url = logo_url;
       if (cover_url !== undefined) updates.cover_url = cover_url;
       if (is_open !== undefined) updates.is_open = is_open;
+      if (interest_tag !== undefined) updates.interest_tag = interest_tag;
 
       const { error } = await supabaseAdmin
         .from('communities')

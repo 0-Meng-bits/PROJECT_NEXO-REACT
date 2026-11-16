@@ -1710,7 +1710,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
 
 // -- MANAGE GROUP MODAL --------------------------------------------------------
 function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, onGivePoints, onFlagUser }) {
-  const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic', is_open: comm.is_open !== false });
+  const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic', is_open: comm.is_open !== false, interest_tags: comm.interest_tag ? String(comm.interest_tag).split(',').map(t => t.trim()).filter(Boolean) : [] });
   const [members, setMembers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [leader, setLeader] = useState(null);
@@ -1792,6 +1792,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       category: form.category,
       logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
       is_open: form.is_open,
+      interest_tag: form.interest_tags.join(','),
     };
     // Use service-role API to bypass RLS
     try {
@@ -2103,6 +2104,27 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                   <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Closed
                   <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, opacity: 0.8 }}>Invite only</div>
                 </button>
+              </div>
+            </div>
+            <div className="input-group">
+              <label>INTERESTS <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>— select all that apply</span></label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 4 }}>
+                {(['research','debate','business','language_learning','robotics','reading','coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','sports','travel']).map(interest => {
+                  const label = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'Esports', dancing:'Dancing', sports:'Sports', travel:'Travel' };
+                  const selected = form.interest_tags.includes(interest);
+                  return (
+                    <button key={interest} type="button"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        interest_tags: selected
+                          ? f.interest_tags.filter(t => t !== interest)
+                          : [...f.interest_tags, interest]
+                      }))}
+                      style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', border: `1px solid ${selected ? 'var(--cyber-cyan)' : '#333'}`, background: selected ? 'rgba(0,240,255,0.12)' : 'transparent', color: selected ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontWeight: selected ? 700 : 400, transition: '0.15s' }}>
+                      {label[interest] || interest}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="modal-actions">
