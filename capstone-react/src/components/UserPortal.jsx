@@ -4875,20 +4875,18 @@ export default function UserPortal() {
       `)
       .gte('event_date', today)
       .order('event_date', { ascending: true })
-      .order('event_time', { ascending: true })
       .limit(50);
     
     if (!error && data) {
-      // Separate campus-wide from circle events
       const campus = data.filter(e => e.community_id === null);
       const circles = data.filter(e => e.community_id !== null);
-      
       setCampusEvents(campus);
       setCircleEvents(circles);
     } else if (error) {
       console.error('Failed to load events:', error);
+      setCampusEvents([]);
+      setCircleEvents([]);
     }
-    
     setEventsLoading(false);
   }, [user]);
 
