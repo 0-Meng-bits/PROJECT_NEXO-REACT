@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DailyIframe from '@daily-co/daily-js';
 
 export default function CallModal({ roomUrl, circleName, currentUser, onClose }) {
   const containerRef = useRef(null);
