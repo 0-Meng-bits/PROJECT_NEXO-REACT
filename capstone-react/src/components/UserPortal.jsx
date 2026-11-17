@@ -2640,37 +2640,35 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
           <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 15, borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fa-solid fa-xmark"></i>
           </button>
-          {/* Floating logo */}
-          <div style={{ position: 'absolute', bottom: -32, left: 20, width: 66, height: 66, borderRadius: 14, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 26, color: 'var(--cyber-cyan)' }} />}
+          {/* Logo + name + leader overlapping bottom of cover */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 12px', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)', display: 'flex', alignItems: 'flex-end', gap: 14 }}>
+            {/* Logo */}
+            <div style={{ width: 66, height: 66, borderRadius: 14, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 26, color: 'var(--cyber-cyan)' }} />}
+            </div>
+            {/* Name + Leader stacked */}
+            <div style={{ paddingBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{circle.name}</span>
+                {circle.is_official && <span style={{ fontSize: 10, color: 'var(--green)', border: '1px solid var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700, background: 'rgba(0,0,0,0.5)' }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Verified</span>}
+              </div>
+              {leaderProfile && (
+                <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '3px 10px 3px 5px', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Leader</span>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                    {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{leaderProfile.full_name}</span>
+                  <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}></i>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '44px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)' }}>
-
-          {/* Name + verified */}
-          <div style={{ marginBottom: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{circle.name}</h2>
-              {circle.is_official && <span style={{ fontSize: 10, color: 'var(--green)', border: '1px solid var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Verified</span>}
-            </div>
-          </div>
-
-          {/* Leader row — below name, no crown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Leader</span>
-            {leaderProfile && (
-              <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                  {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
-                <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'var(--text-muted)' }}></i>
-              </button>
-            )}
-          </div>
+        <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)' }}>
 
           {/* Badges row */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
