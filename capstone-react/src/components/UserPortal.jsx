@@ -6342,7 +6342,11 @@ export default function UserPortal() {
     setStartingCall(true);
     try {
       const token = await getFreshToken();
-      const res = await fetch(getApiUrl('/api/call'), {
+      // Always use Vercel for /api/call — it doesn't exist on Render
+      const callUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000/api/call'
+        : '/api/call';
+      const res = await fetch(callUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ action: 'create', community_id: commId }),
@@ -6358,7 +6362,10 @@ export default function UserPortal() {
     if (!activeCall) return;
     try {
       const token = await getFreshToken();
-      await fetch(getApiUrl('/api/call'), {
+      const callUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000/api/call'
+        : '/api/call';
+      await fetch(callUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ action: 'delete', room_name: activeCall.room_name }),
