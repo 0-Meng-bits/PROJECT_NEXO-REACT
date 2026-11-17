@@ -2530,38 +2530,41 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
 
 // -- CIRCLE INFO CARD MODAL --------------------------------------------------
 function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile }) {
-  const [tagsExpanded, setTagsExpanded] = useState(false);
   const [leaderProfile, setLeaderProfile] = useState(null);
+  const [recentMembers, setRecentMembers] = useState([]);
+  const [stats, setStats] = useState({ postsThisMonth: 0, activeThisWeek: 0, daysSinceCreated: 0 });
 
-  // Parse interest tags (stored as string or array)
   const rawTags = circle.interest_tag;
   const tags = Array.isArray(rawTags)
     ? rawTags
     : (rawTags ? String(rawTags).split(',').map(t => t.trim()).filter(Boolean) : []);
-  const visibleTags = tagsExpanded ? tags : tags.slice(0, 5);
-  const hiddenCount = tags.length - 5;
 
-  // Fetch leader profile (avatar + name)
+  // Fetch leader + recent members + stats
   useEffect(() => {
     if (!circle.creator_id) return;
-    supabase
-      .from('accounts')
-      .select('id, full_name, ctu_id, account_details(avatar_url)')
-      .eq('id', circle.creator_id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setLeaderProfile({
-            id: data.id,
-            full_name: data.full_name,
-            ctu_id: data.ctu_id,
-            avatar_url: data.account_details?.avatar_url || null,
-          });
-        }
-      });
-  }, [circle.creator_id]);
+    // Leader
+    supabase.from('accounts').select('id, full_name, ctu_id, account_details(avatar_url)')
+      .eq('id', circle.creator_id).maybeSingle()
+      .then(({ data }) => { if (data) setLeaderProfile({ id: data.id, full_name: data.full_name, ctu_id: data.ctu_id, avatar_url: data.account_details?.avatar_url || null }); });
+    // Recently joined (last 5 members)
+    supabase.from('memberships').select('user_id, created_at, accounts(full_name, account_details(avatar_url))')
+      .eq('community_id', circle.id).eq('status', 'active')
+      .order('created_at', { ascending: false }).limit(5)
+      .then(({ data }) => { if (data) setRecentMembers(data); });
+    // Stats
+    const now = new Date();
+    const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30);
+    const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+    const daysSince = circle.created_at ? Math.floor((now - new Date(circle.created_at)) / (1000 * 60 * 60 * 24)) : 0;
+    Promise.all([
+      supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).gte('created_at', monthAgo.toISOString()),
+      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active').gte('updated_at', weekAgo.toISOString()),
+    ]).then(([postsRes, activeRes]) => {
+      setStats({ postsThisMonth: postsRes.count || 0, activeThisWeek: activeRes.count || 0, daysSinceCreated: daysSince });
+    });
+  }, [circle.id, circle.creator_id, circle.created_at]);
 
-  // Determine membership state
+  // Membership state
   const getMembership = (commId) => myMemberships.find(m => m.community_id === commId);
   const isOwner = circle.creator_id === currentUser?.id;
   const membership = getMembership(circle.id);
@@ -2571,21 +2574,19 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   const myApp = myApplications.find(a => a.community_id === circle.id);
   const isVerified = currentUser?.is_verified;
 
-  // Category accent colour
   const catColors = { academic: 'var(--cyber-cyan)', project: 'var(--cyber-yellow)', hobby: 'var(--green)', social: '#a78bfa' };
   const catColor = catColors[circle.category] || 'var(--cyber-cyan)';
 
-  // Resolve action button
+  // Action button
   let actionBtn = null;
   if (isActive) {
     actionBtn = (
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 12, padding: '8px 20px' }}>
           <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 7 }}></i>ENTER CIRCLE
         </button>
-        {/* Leave — only for members, not the owner */}
         {!isOwner && (
-          <button className="group-action-btn terminate" onClick={() => onLeave && onLeave(circle.id)} title="Leave circle" style={{ fontSize: 13, padding: '8px 12px' }}>
+          <button className="group-action-btn terminate" onClick={() => onLeave && onLeave(circle.id)} style={{ fontSize: 12, padding: '8px 12px' }}>
             <i className="fa-solid fa-right-from-bracket"></i>
           </button>
         )}
@@ -2594,176 +2595,153 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   } else if (isInvitedState) {
     actionBtn = (
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="group-action-btn manage" onClick={() => onAcceptInvite && onAcceptInvite(circle.id)}
-          style={{ fontSize: 13, padding: '8px 18px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
+        <button className="group-action-btn manage" onClick={() => onAcceptInvite && onAcceptInvite(circle.id)} style={{ fontSize: 12, padding: '8px 18px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
           <i className="fa-solid fa-check" style={{ marginRight: 7 }}></i>ACCEPT
         </button>
-        <button className="group-action-btn terminate" onClick={() => onDeclineInvite && onDeclineInvite(circle.id)}
-          style={{ fontSize: 13, padding: '8px 18px' }}>
+        <button className="group-action-btn terminate" onClick={() => onDeclineInvite && onDeclineInvite(circle.id)} style={{ fontSize: 12, padding: '8px 18px' }}>
           <i className="fa-solid fa-xmark" style={{ marginRight: 7 }}></i>DECLINE
         </button>
       </div>
     );
   } else if (!isVerified) {
-    actionBtn = (
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', border: '1px solid #333', padding: '8px 18px', borderRadius: 20 }}>
-        <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Verify to join
-      </span>
-    );
+    actionBtn = <span style={{ fontSize: 12, color: 'var(--text-muted)', border: '1px solid #333', padding: '8px 18px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Verify to join</span>;
   } else if (isPending) {
-    actionBtn = (
-      <span style={{ fontSize: 12, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '8px 18px', borderRadius: 20 }}>
-        <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>PENDING APPROVAL
-      </span>
-    );
+    actionBtn = <span style={{ fontSize: 12, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '8px 18px', borderRadius: 20 }}><i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>PENDING APPROVAL</span>;
   } else if (myApp) {
-    const appColors = { pending: 'var(--cyber-yellow)', approved: 'var(--green)', rejected: 'var(--red)' };
-    const appColor = appColors[myApp.status] || 'var(--cyber-cyan)';
+    const appColor = { pending: 'var(--cyber-yellow)', approved: 'var(--green)', rejected: 'var(--red)' }[myApp.status] || 'var(--cyber-cyan)';
     actionBtn = (
       <button onClick={() => onViewApplication && onViewApplication(myApp, circle)}
         style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}`, background: 'transparent', cursor: 'pointer' }}>
-        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>
-        APPLICATION {(myApp.status || '').toUpperCase()}
-        <i className="fa-solid fa-eye" style={{ marginLeft: 8, fontSize: 10, opacity: 0.7 }}></i>
+        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>APPLICATION {(myApp.status || '').toUpperCase()}
       </button>
     );
   } else if (circle.application_enabled && !circle.internal_Application) {
     actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onApply(circle)} style={{ fontSize: 13, padding: '8px 22px' }}>
+      <button className="group-action-btn manage" onClick={() => onApply(circle)} style={{ fontSize: 12, padding: '8px 20px' }}>
         <i className="fa-solid fa-microphone" style={{ marginRight: 7 }}></i>APPLY TO JOIN
       </button>
     );
   } else {
     actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onRequestJoin(circle.id)} style={{ fontSize: 13, padding: '8px 22px' }}>
+      <button className="group-action-btn manage" onClick={() => onRequestJoin(circle.id)} style={{ fontSize: 12, padding: '8px 20px' }}>
         <i className="fa-solid fa-paper-plane" style={{ marginRight: 7 }}></i>JOIN CIRCLE
       </button>
     );
   }
 
-  const initials = leaderProfile?.full_name
-    ? leaderProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+  const initials = leaderProfile?.full_name ? leaderProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 540, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 660, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
 
         {/* Cover banner */}
-        <div style={{
-          height: 130, position: 'relative',
-          background: circle.cover_url
-            ? `url(${circle.cover_url}) center/cover no-repeat`
-            : 'linear-gradient(135deg, rgba(0,240,255,0.2) 0%, rgba(100,0,255,0.2) 100%)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <button onClick={onClose} style={{
-            position: 'absolute', top: 10, right: 12,
-            background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
-            cursor: 'pointer', fontSize: 15, borderRadius: '50%',
-            width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+        <div style={{ height: 110, position: 'relative', background: circle.cover_url ? `url(${circle.cover_url}) center/cover no-repeat` : `linear-gradient(135deg, ${catColor}30, rgba(0,0,0,0.6))`, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 15, borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fa-solid fa-xmark"></i>
           </button>
           {/* Floating logo */}
-          <div style={{
-            position: 'absolute', bottom: -26, left: 20,
-            width: 54, height: 54, borderRadius: 12,
-            border: '3px solid var(--bg-primary)',
-            overflow: 'hidden', background: 'rgba(0,0,0,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {circle.logo_url
-              ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
-            }
+          <div style={{ position: 'absolute', bottom: -24, left: 20, width: 50, height: 50, borderRadius: 12, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 20, color: 'var(--cyber-cyan)' }} />}
           </div>
         </div>
 
-        {/* Content body */}
-        <div style={{ padding: '36px 22px 22px 22px', overflowY: 'auto', maxHeight: 'calc(85vh - 130px)' }}>
+        {/* Body */}
+        <div style={{ padding: '32px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 110px)' }}>
 
-          {/* Name + stat badges */}
-          <div style={{ marginBottom: 12 }}>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: 19, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0.3 }}>{circle.name}</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, textTransform: 'uppercase', fontWeight: 700 }}>{circle.category}</span>
-              {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-              {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-              {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
-              {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #333', padding: '2px 9px', borderRadius: 20 }}>
-                <i className="fa-solid fa-users" style={{ fontSize: 9 }}></i>{memberCount} member{memberCount !== 1 ? 's' : ''}
-              </span>
+          {/* Name + verified + leader row */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{circle.name}</h2>
+              {circle.is_official && <span style={{ fontSize: 10, color: 'var(--green)', border: '1px solid var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Verified</span>}
+            </div>
+            {/* Leader inline */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <i className="fa-solid fa-crown" style={{ fontSize: 10, color: 'var(--cyber-yellow)' }}></i>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Leader</span>
+              {leaderProfile && (
+                <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                    {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
+                  <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'var(--text-muted)' }}></i>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Description */}
-          <p style={{
-            fontSize: 13, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)',
-            lineHeight: 1.65, margin: '0 0 16px 0',
-            fontStyle: circle.description ? 'normal' : 'italic',
-            borderLeft: circle.description ? '3px solid rgba(0,240,255,0.25)' : 'none',
-            paddingLeft: circle.description ? 12 : 0,
-          }}>
-            {circle.description || 'No description provided.'}
-          </p>
+          {/* Badges row */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+            <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
+            {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+            {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
+            {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
+            {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
+          </div>
 
-          {/* Interest tags */}
-          {tags.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 7 }}>INTERESTS</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {visibleTags.map((tag, i) => (
-                  <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>
-                    {tag}
-                  </span>
-                ))}
-                {!tagsExpanded && hiddenCount > 0 && (
-                  <button onClick={() => setTagsExpanded(true)} style={{ fontSize: 11, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: 20, cursor: 'pointer' }}>
-                    +{hiddenCount} more
-                  </button>
-                )}
-                {tagsExpanded && tags.length > 5 && (
-                  <button onClick={() => setTagsExpanded(false)} style={{ fontSize: 11, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-muted)', padding: '3px 10px', borderRadius: 20, cursor: 'pointer' }}>
-                    Show less
-                  </button>
-                )}
+          {/* Two-column layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+
+            {/* Left column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Description */}
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>DESCRIPTION</div>
+                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic' }}>
+                  {circle.description || 'No description provided.'}
+                </p>
               </div>
-            </div>
-          )}
-
-          {/* Leader row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, marginBottom: 20 }}>
-            <i className="fa-solid fa-crown" style={{ fontSize: 11, color: 'var(--cyber-yellow)', flexShrink: 0 }}></i>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>Leader</span>
-            {leaderProfile ? (
-              <button
-                onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-              >
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
-                  background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: 'var(--cyber-cyan)',
-                }}>
-                  {leaderProfile.avatar_url
-                    ? <img src={leaderProfile.avatar_url} alt={leaderProfile.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : initials
-                  }
+              {/* Interests */}
+              {tags.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {tags.map((tag, i) => (
+                      <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
+                    ))}
+                  </div>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
-                <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 9, color: 'var(--text-muted)' }}></i>
-              </button>
-            ) : (
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                {circle.accounts?.full_name || <span style={{ color: 'rgba(255,255,255,0.2)', fontStyle: 'italic' }}>Loading...</span>}
-              </span>
-            )}
+              )}
+              {/* Recently Joined */}
+              {recentMembers.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
+                  <div style={{ display: 'flex', gap: -6 }}>
+                    {recentMembers.map((m, i) => {
+                      const avatarUrl = m.accounts?.account_details?.avatar_url;
+                      const name = m.accounts?.full_name || '?';
+                      return (
+                        <div key={i} title={name} style={{ width: 30, height: 30, borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--cyber-cyan)', marginLeft: i > 0 ? -8 : 0, zIndex: recentMembers.length - i }}>
+                          {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name[0].toUpperCase()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right column — 2x2 stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
+                { label: 'Posts this month', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
+                { label: 'Active this week', value: stats.activeThisWeek, icon: 'fa-solid fa-fire', color: '#f43f5e' },
+                { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
+              ].map((s, i) => (
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <i className={s.icon} style={{ fontSize: 14, color: s.color }}></i>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.3 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Action button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
             {actionBtn}
           </div>
         </div>
