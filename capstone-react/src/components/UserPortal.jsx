@@ -4744,7 +4744,7 @@ export default function UserPortal() {
   const [connectedUserIds, setConnectedUserIds] = useState(new Set()); // accepted connection user IDs
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
   const [crossPostToFeed, setCrossPostToFeed] = useState(false);
-  const [activeCall, setActiveCall] = useState(null); // { room_url, room_name, comm_id }
+  const [activeCall, setActiveCall] = useState(null); // { token, livekit_url, room_name, comm_id }
   const [startingCall, setStartingCall] = useState(false);
   const [circleActiveCall, setCircleActiveCall] = useState(null); // active call for current circle from DB
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
@@ -6353,7 +6353,7 @@ export default function UserPortal() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.message || 'Failed to start call.'); setStartingCall(false); return; }
-      setActiveCall({ room_url: data.room_url, room_name: data.room_name, comm_id: commId });
+      setActiveCall({ token: data.token, livekit_url: data.livekit_url, room_name: data.room_name, comm_id: commId });
     } catch { showToast('Failed to start call.'); }
     setStartingCall(false);
   };
@@ -8553,7 +8553,8 @@ export default function UserPortal() {
       {/* Call Modal */}
       {activeCall && (
         <CallModal
-          roomUrl={activeCall.room_url}
+          token={activeCall.token}
+          livekitUrl={activeCall.livekit_url}
           circleName={communities.find(c => c.id === activeCall.comm_id)?.name || 'Circle'}
           currentUser={user}
           onClose={() => { endCall(); }}
