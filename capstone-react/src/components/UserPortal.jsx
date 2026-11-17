@@ -2668,7 +2668,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
         </div>
 
         {/* Body */}
-        <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)' }}>
+        <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)', height: 380 }}>
 
           {/* Badges row */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
@@ -2687,7 +2687,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               {/* Description */}
               <div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>DESCRIPTION</div>
-                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic' }}>
+                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
                   {circle.description || 'No description provided.'}
                 </p>
               </div>
