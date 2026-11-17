@@ -2636,40 +2636,40 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 660, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
 
         {/* Cover banner */}
-        <div style={{ height: 110, position: 'relative', background: circle.cover_url ? `url(${circle.cover_url}) center/cover no-repeat` : `linear-gradient(135deg, ${catColor}30, rgba(0,0,0,0.6))`, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ height: 160, position: 'relative', background: circle.cover_url ? `url(${circle.cover_url}) center/cover no-repeat` : `linear-gradient(135deg, ${catColor}30, rgba(0,0,0,0.6))`, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 15, borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <i className="fa-solid fa-xmark"></i>
           </button>
           {/* Floating logo */}
-          <div style={{ position: 'absolute', bottom: -24, left: 20, width: 50, height: 50, borderRadius: 12, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 20, color: 'var(--cyber-cyan)' }} />}
+          <div style={{ position: 'absolute', bottom: -32, left: 20, width: 66, height: 66, borderRadius: 14, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 26, color: 'var(--cyber-cyan)' }} />}
           </div>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '32px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 110px)' }}>
+        <div style={{ padding: '44px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)' }}>
 
-          {/* Name + verified + leader row */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+          {/* Name + verified */}
+          <div style={{ marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{circle.name}</h2>
               {circle.is_official && <span style={{ fontSize: 10, color: 'var(--green)', border: '1px solid var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Verified</span>}
             </div>
-            {/* Leader inline */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <i className="fa-solid fa-crown" style={{ fontSize: 10, color: 'var(--cyber-yellow)' }}></i>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Leader</span>
-              {leaderProfile && (
-                <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                    {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
-                  <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'var(--text-muted)' }}></i>
-                </button>
-              )}
-            </div>
+          </div>
+
+          {/* Leader row — below name, no crown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Leader</span>
+            {leaderProfile && (
+              <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                  {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{leaderProfile.full_name}</span>
+                <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'var(--text-muted)' }}></i>
+              </button>
+            )}
           </div>
 
           {/* Badges row */}
