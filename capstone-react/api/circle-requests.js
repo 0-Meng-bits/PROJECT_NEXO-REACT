@@ -83,7 +83,8 @@ export default async function handler(req, res) {
     // 3. Create default channels
     const defaultChannels = [
       { name: 'announcements', description: 'Official announcements', channel_type: 'chat' },
-      { name: 'general', description: 'General discussion', channel_type: 'chat' }
+      { name: 'general', description: 'General discussion', channel_type: 'chat' },
+      { name: 'voice', description: 'Voice & video calls', channel_type: 'voice' },
     ];
 
     for (const channel of defaultChannels) {

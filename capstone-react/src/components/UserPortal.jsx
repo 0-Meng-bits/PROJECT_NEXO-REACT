@@ -4746,6 +4746,7 @@ export default function UserPortal() {
   const [crossPostToFeed, setCrossPostToFeed] = useState(false);
   const [activeCall, setActiveCall] = useState(null); // { room_url, room_name, comm_id }
   const [startingCall, setStartingCall] = useState(false);
+  const [circleActiveCall, setCircleActiveCall] = useState(null); // active call for current circle from DB
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
   const [showComposer, setShowComposer] = useState(false);
@@ -5804,6 +5805,22 @@ export default function UserPortal() {
     }
   }, [activeCommId, loadChannels, loadCircleAnnouncements]);
 
+  // Load active call for current circle
+  useEffect(() => {
+    if (!activeCommId || activeCommId === 'global') { setCircleActiveCall(null); return; }
+    supabase.from('circle_calls').select('room_url, room_name, started_at')
+      .eq('community_id', activeCommId).eq('status', 'active').maybeSingle()
+      .then(({ data }) => setCircleActiveCall(data || null));
+    // Subscribe to circle_calls changes
+    const sub = supabase.channel(`circle-calls-${activeCommId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_calls', filter: `community_id=eq.${activeCommId}` }, () => {
+        supabase.from('circle_calls').select('room_url, room_name, started_at')
+          .eq('community_id', activeCommId).eq('status', 'active').maybeSingle()
+          .then(({ data }) => setCircleActiveCall(data || null));
+      }).subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [activeCommId]);
+
   // Avatar is persisted in localStorage "? no DB sync needed on mount
 
   // Realtime home feed (campus-wide announcements)
@@ -6332,15 +6349,6 @@ export default function UserPortal() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.message || 'Failed to start call.'); setStartingCall(false); return; }
-      // Post system message so other members see the call
-      await supabase.from('messages').insert([{
-        full_name: user.full_name,
-        content: `NEXOSYS:CALL_STARTED:${data.room_url}:${data.room_name}`,
-        message_type: 'text',
-        community_id: commId,
-        channel_id: null,
-        sender_id: user.student_id,
-      }]);
       setActiveCall({ room_url: data.room_url, room_name: data.room_name, comm_id: commId });
     } catch { showToast('Failed to start call.'); }
     setStartingCall(false);
@@ -6355,14 +6363,6 @@ export default function UserPortal() {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ action: 'delete', room_name: activeCall.room_name }),
       });
-      await supabase.from('messages').insert([{
-        full_name: user.full_name,
-        content: 'NEXOSYS:CALL_ENDED',
-        message_type: 'text',
-        community_id: activeCall.comm_id,
-        channel_id: null,
-        sender_id: user.student_id,
-      }]);
     } catch { /* non-fatal */ }
     setActiveCall(null);
   };
@@ -6792,16 +6792,40 @@ export default function UserPortal() {
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
-                    onClick={() => { setActiveChannelId(ch.id); navTo('circles', activeCommId); setShowCircleAnnouncements(false); }}
+                    onClick={() => {
+                      if (ch.channel_type === 'voice' || ch.type === 'voice') {
+                        // Voice channel — start or join call
+                        startCall(activeCommId);
+                      } else {
+                        setActiveChannelId(ch.id);
+                        navTo('circles', activeCommId);
+                        setShowCircleAnnouncements(false);
+                      }
+                    }}
                   >
-                    <i className="channel-hash">#</i>
-                    <span className="node-name">{ch.name}</span>
-                    {canModerate && (
-                      <i
-                        className="fa-solid fa-xmark channel-delete-btn"
-                        onClick={e => { e.stopPropagation(); deleteChannel(ch.id); }}
-                        title="Delete channel"
-                      ></i>
+                    {ch.channel_type === 'voice' || ch.type === 'voice' ? (
+                      <>
+                        <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
+                        <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>{ch.name}</span>
+                        {circleActiveCall && (
+                          <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }}></span>
+                            Live
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <i className="channel-hash">#</i>
+                        <span className="node-name">{ch.name}</span>
+                        {canModerate && (
+                          <i
+                            className="fa-solid fa-xmark channel-delete-btn"
+                            onClick={e => { e.stopPropagation(); deleteChannel(ch.id); }}
+                            title="Delete channel"
+                          ></i>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
