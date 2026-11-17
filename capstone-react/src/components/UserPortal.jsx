@@ -144,6 +144,7 @@ import { MediaUploadButton, VoiceRecorder, MediaPreview, uploadMediaFile, MediaM
 import HelpModal from './HelpModal';
 import DiscoverPeople from './DiscoverPeople';
 import CommentTree from './CommentTree';
+import CallModal from './CallModal';
 
 const SHOP_API = window.location.hostname === 'localhost'
   ? '/api/shop'
@@ -4743,6 +4744,8 @@ export default function UserPortal() {
   const [connectedUserIds, setConnectedUserIds] = useState(new Set()); // accepted connection user IDs
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
   const [crossPostToFeed, setCrossPostToFeed] = useState(false);
+  const [activeCall, setActiveCall] = useState(null); // { room_url, room_name, comm_id }
+  const [startingCall, setStartingCall] = useState(false);
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
   const [showComposer, setShowComposer] = useState(false);
@@ -6316,6 +6319,54 @@ export default function UserPortal() {
       }
     } catch { /* non-fatal */ }
   };
+
+  const startCall = async (commId) => {
+    if (startingCall) return;
+    setStartingCall(true);
+    try {
+      const token = await getFreshToken();
+      const res = await fetch(getApiUrl('/api/call'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'create', community_id: commId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.message || 'Failed to start call.'); setStartingCall(false); return; }
+      // Post system message so other members see the call
+      await supabase.from('messages').insert([{
+        full_name: user.full_name,
+        content: `NEXOSYS:CALL_STARTED:${data.room_url}:${data.room_name}`,
+        message_type: 'text',
+        community_id: commId,
+        channel_id: null,
+        sender_id: user.student_id,
+      }]);
+      setActiveCall({ room_url: data.room_url, room_name: data.room_name, comm_id: commId });
+    } catch { showToast('Failed to start call.'); }
+    setStartingCall(false);
+  };
+
+  const endCall = async () => {
+    if (!activeCall) return;
+    try {
+      const token = await getFreshToken();
+      await fetch(getApiUrl('/api/call'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'delete', room_name: activeCall.room_name }),
+      });
+      await supabase.from('messages').insert([{
+        full_name: user.full_name,
+        content: 'NEXOSYS:CALL_ENDED',
+        message_type: 'text',
+        community_id: activeCall.comm_id,
+        channel_id: null,
+        sender_id: user.student_id,
+      }]);
+    } catch { /* non-fatal */ }
+    setActiveCall(null);
+  };
+
 
   const deleteMessage = async (msgId) => {
     if (!confirm('Delete this message?')) return;
@@ -8010,6 +8061,15 @@ export default function UserPortal() {
                       <i className="fa-solid fa-users" />
                       <span>{circleChatMembers.length}</span>
                     </button>
+                    {/* Call button */}
+                    {user?.is_verified && (
+                      <button onClick={() => startCall(activeCommId)} disabled={startingCall || !!activeCall}
+                        title="Start voice/video call"
+                        style={{ background: activeCall ? 'rgba(62,207,142,0.15)' : 'transparent', border: `1px solid ${activeCall ? 'var(--green)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 8, color: activeCall ? 'var(--green)' : 'var(--text-muted)', padding: '5px 10px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, transition: '0.2s' }}>
+                        <i className={startingCall ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-phone'} />
+                        <span>{startingCall ? 'Starting...' : activeCall ? 'In Call' : 'Call'}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 6 }}>
@@ -8068,13 +8128,50 @@ export default function UserPortal() {
                             <div ref={firstUnreadRef}><UnreadDivider /></div>
                           )}
                           {m.content?.startsWith('NEXOSYS:') ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
-                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>
-                                {m.content.slice('NEXOSYS:'.length)}
-                              </span>
-                              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                            </div>
+                            (() => {
+                              const body = m.content.slice('NEXOSYS:'.length);
+                              if (body.startsWith('CALL_STARTED:')) {
+                                const parts = body.split(':');
+                                const roomName = parts[parts.length - 1];
+                                const roomUrl = parts.slice(1, parts.length - 1).join(':');
+                                const isInCall = activeCall?.room_name === roomName;
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', margin: '4px 0' }}>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.25)', borderRadius: 20, padding: '5px 14px' }}>
+                                      <i className="fa-solid fa-phone" style={{ fontSize: 11, color: '#3ecf8e' }}></i>
+                                      <span style={{ fontSize: 11, color: '#3ecf8e', fontWeight: 700 }}>Call in progress</span>
+                                      {!isInCall && (
+                                        <button onClick={() => setActiveCall({ room_url: roomUrl, room_name: roomName, comm_id: activeCommId })}
+                                          style={{ background: '#3ecf8e', border: 'none', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#000', fontFamily: 'inherit' }}>
+                                          Join
+                                        </button>
+                                      )}
+                                      {isInCall && <span style={{ fontSize: 10, color: '#3ecf8e', opacity: 0.7 }}>You are in this call</span>}
+                                    </div>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
+                                  </div>
+                                );
+                              }
+                              if (body === 'CALL_ENDED') {
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', padding: '0 6px' }}>
+                                      <i className="fa-solid fa-phone-slash" style={{ marginRight: 5 }}></i>Call ended
+                                    </span>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
+                                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>{body}</span>
+                                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                </div>
+                              );
+                            })()
                           ) : (
                           <MessageItem
                             m={m}
@@ -8422,6 +8519,16 @@ export default function UserPortal() {
         />
       )}
 
+      {/* Call Modal */}
+      {activeCall && (
+        <CallModal
+          roomUrl={activeCall.room_url}
+          circleName={communities.find(c => c.id === activeCall.comm_id)?.name || 'Circle'}
+          currentUser={user}
+          onClose={() => { endCall(); }}
+        />
+      )}
+
       {/* -- EVENTS MODAL -- */}
       {showEventsModal && (
         <div className="modal-overlay" onClick={() => setShowEventsModal(false)}>
@@ -8513,7 +8620,3 @@ export default function UserPortal() {
     </div>
   );
 }
-
-
-
-
