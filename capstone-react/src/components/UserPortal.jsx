@@ -2549,6 +2549,13 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   const [leaderProfile, setLeaderProfile] = useState(null);
   const [recentMembers, setRecentMembers] = useState([]);
   const [stats, setStats] = useState({ postsThisMonth: 0, activeThisWeek: 0, daysSinceCreated: 0 });
+  const [reviews, setReviews] = useState([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [myReview, setMyReview] = useState(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const rawTags = circle.interest_tag;
   const tags = Array.isArray(rawTags)
@@ -2587,6 +2594,20 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
     ]).then(([postsRes, activeRes]) => {
       setStats({ postsThisMonth: postsRes.count || 0, activeThisWeek: activeRes.count || 0, daysSinceCreated: daysSince });
     });
+    // Reviews
+    supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id, accounts:reviewer_id(full_name, account_details(avatar_url))')
+      .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3)
+      .then(({ data }) => {
+        if (data) {
+          setReviews(data);
+          const avg = data.length ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0;
+          setAvgRating(Math.round(avg * 10) / 10);
+        }
+      });
+    if (currentUser?.id) {
+      supabase.from('circle_reviews').select('id, rating, comment').eq('community_id', circle.id).eq('reviewer_id', currentUser.id).maybeSingle()
+        .then(({ data }) => { if (data) { setMyReview(data); setReviewRating(data.rating); setReviewComment(data.comment || ''); } });
+    }
   }, [circle.id, circle.creator_id, circle.created_at]);
 
   // Membership state
@@ -2655,6 +2676,23 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   }
 
   const initials = leaderProfile?.full_name ? leaderProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+
+  const submitReview = async () => {
+    if (!reviewRating) return;
+    setSubmittingReview(true);
+    if (myReview) {
+      await supabase.from('circle_reviews').update({ rating: reviewRating, comment: reviewComment.trim() }).eq('id', myReview.id);
+    } else {
+      await supabase.from('circle_reviews').insert([{ community_id: circle.id, reviewer_id: currentUser.id, rating: reviewRating, comment: reviewComment.trim() }]);
+    }
+    // Refresh reviews
+    const { data } = await supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id, accounts:reviewer_id(full_name, account_details(avatar_url))').eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3);
+    if (data) { setReviews(data); const avg = data.length ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0; setAvgRating(Math.round(avg * 10) / 10); }
+    const { data: mine } = await supabase.from('circle_reviews').select('id, rating, comment').eq('community_id', circle.id).eq('reviewer_id', currentUser.id).maybeSingle();
+    if (mine) setMyReview(mine);
+    setShowReviewForm(false);
+    setSubmittingReview(false);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2760,6 +2798,79 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Review section */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700 }}>REVIEWS</div>
+                {avgRating > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b' }}>{avgRating}</span>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {[1,2,3,4,5].map(s => (
+                        <i key={s} className={s <= Math.round(avgRating) ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 10, color: '#f59e0b' }} />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({reviews.length})</span>
+                  </div>
+                )}
+              </div>
+              {isActive && (
+                <button onClick={() => setShowReviewForm(v => !v)}
+                  style={{ fontSize: 11, color: 'var(--cyber-cyan)', background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '3px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {myReview ? 'Edit Review' : '+ Review'}
+                </button>
+              )}
+            </div>
+
+            {/* Review form */}
+            {showReviewForm && (
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {[1,2,3,4,5].map(s => (
+                    <button key={s} onClick={() => setReviewRating(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 20, color: s <= reviewRating ? '#f59e0b' : 'rgba(255,255,255,0.2)' }}>
+                      <i className={s <= reviewRating ? 'fa-solid fa-star' : 'fa-regular fa-star'} />
+                    </button>
+                  ))}
+                </div>
+                <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="Share your experience (optional)..."
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', resize: 'none', height: 60, boxSizing: 'border-box' }} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button onClick={submitReview} disabled={!reviewRating || submittingReview}
+                    style={{ flex: 1, background: 'var(--cyber-cyan)', border: 'none', borderRadius: 8, padding: '6px 0', cursor: 'pointer', color: '#000', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                    {submittingReview ? 'Saving...' : 'Submit'}
+                  </button>
+                  <button onClick={() => setShowReviewForm(false)}
+                    style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 0', cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit', fontSize: 12 }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Recent reviews list */}
+            {reviews.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>No reviews yet. Be the first!</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {reviews.map(r => (
+                  <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                        {r.accounts?.account_details?.avatar_url ? <img src={r.accounts.account_details.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (r.accounts?.full_name || '?')[0].toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{r.accounts?.full_name || 'Member'}</span>
+                      <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                        {[1,2,3,4,5].map(s => <i key={s} className={s <= r.rating ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 9, color: '#f59e0b' }} />)}
+                      </div>
+                    </div>
+                    {r.comment && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{r.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Action button */}
