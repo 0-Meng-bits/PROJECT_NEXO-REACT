@@ -5,6 +5,21 @@ import { getApiUrl } from '../lib/api';
 import { clearCustomizationCache } from '../lib/customization';
 import Cropper from 'react-easy-crop';
 
+// -- FRESH TOKEN HELPER -------------------------------------------------------
+// Always gets a fresh Supabase access token, refreshing if needed.
+// Falls back to localStorage if session refresh fails (e.g. offline).
+async function getFreshToken() {
+  try {
+    const { data } = await supabase.auth.refreshSession();
+    if (data?.session?.access_token) {
+      localStorage.setItem('accessToken', data.session.access_token);
+      localStorage.setItem('refreshToken', data.session.refresh_token);
+      return data.session.access_token;
+    }
+  } catch { /* fall through */ }
+  return localStorage.getItem('accessToken');
+}
+
 // -- IMAGE CROP MODAL ---------------------------------------------------------
 // Reusable crop modal for avatar (circular 1:1) and cover (3:1 banner)
 function getCroppedImg(imageSrc, pixelCrop, outputW, outputH) {
@@ -1355,7 +1370,7 @@ function CreateModal({ onClose, onCreated, userId }) {
   const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    getFreshToken().then(token => {
     fetch(getApiUrl('/api/connections'), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
@@ -1367,6 +1382,7 @@ function CreateModal({ onClose, onCreated, userId }) {
         setConnectionsLoaded(true);
       })
       .catch(() => setConnectionsLoaded(true));
+    });
   }, []);
 
   const acceptedCount = connections.length;
@@ -2546,11 +2562,20 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
     supabase.from('accounts').select('id, full_name, ctu_id, account_details(avatar_url)')
       .eq('id', circle.creator_id).maybeSingle()
       .then(({ data }) => { if (data) setLeaderProfile({ id: data.id, full_name: data.full_name, ctu_id: data.ctu_id, avatar_url: data.account_details?.avatar_url || null }); });
-    // Recently joined (last 5 members)
-    supabase.from('memberships').select('user_id, created_at, accounts(full_name, account_details(avatar_url))')
+    // Recently joined — two-step to avoid RLS join issues
+    supabase.from('memberships').select('user_id, created_at')
       .eq('community_id', circle.id).eq('status', 'active')
       .order('created_at', { ascending: false }).limit(5)
-      .then(({ data }) => { if (data) setRecentMembers(data); });
+      .then(async ({ data: mData }) => {
+        if (!mData?.length) return;
+        const ids = mData.map(m => m.user_id);
+        const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
+        if (accs) {
+          const map = {};
+          accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
+          setRecentMembers(mData.map(m => ({ ...m, _acc: map[m.user_id] || {} })));
+        }
+      });
     // Stats
     const now = new Date();
     const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30);
@@ -2558,7 +2583,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
     const daysSince = circle.created_at ? Math.floor((now - new Date(circle.created_at)) / (1000 * 60 * 60 * 24)) : 0;
     Promise.all([
       supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).gte('created_at', monthAgo.toISOString()),
-      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active').gte('updated_at', weekAgo.toISOString()),
+      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active').gte('created_at', weekAgo.toISOString()),
     ]).then(([postsRes, activeRes]) => {
       setStats({ postsThisMonth: postsRes.count || 0, activeThisWeek: activeRes.count || 0, daysSinceCreated: daysSince });
     });
@@ -2707,8 +2732,8 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
                   <div style={{ display: 'flex' }}>
                     {recentMembers.map((m, i) => {
-                      const avatarUrl = m.accounts?.account_details?.avatar_url;
-                      const name = m.accounts?.full_name || '?';
+                      const avatarUrl = m._acc?.avatar_url;
+                      const name = m._acc?.full_name || '?';
                       return (
                         <div key={i} title={name} style={{ width: 30, height: 30, borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--cyber-cyan)', marginLeft: i > 0 ? -8 : 0, zIndex: recentMembers.length - i }}>
                           {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name[0].toUpperCase()}
@@ -2814,7 +2839,6 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   // Load connections for this profile
   useEffect(() => {
     if (!user?.id) return;
-    const token = localStorage.getItem('accessToken');
 
     if (readOnly) {
       // Viewing someone else's profile · count their connections via Supabase directly
@@ -2826,7 +2850,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         .then(({ count }) => setConnectionsCount(count || 0));
     } else {
       // Own profile · load full connections list
-      fetch(getApiUrl('/api/connections'), {
+      getFreshToken().then(token => fetch(getApiUrl('/api/connections'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
         .then(r => r.json())
@@ -2835,7 +2859,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           setConnectionsCount(accepted.length);
           setProfileConnections(accepted);
         })
-        .catch(() => {});
+        .catch(() => {}));
     }
   }, [user?.id, readOnly]);
 

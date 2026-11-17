@@ -1,6 +1,19 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../lib/api';
 import { INTEREST_LABELS } from '../lib/constants';
+import { supabase } from '../lib/supabase';
+
+async function getFreshToken() {
+  try {
+    const { data } = await supabase.auth.refreshSession();
+    if (data?.session?.access_token) {
+      localStorage.setItem('accessToken', data.session.access_token);
+      localStorage.setItem('refreshToken', data.session.refresh_token);
+      return data.session.access_token;
+    }
+  } catch { /* fall through */ }
+  return localStorage.getItem('accessToken');
+}
 
 const CATEGORY_COLORS = {
   academic: '#3b82f6',
@@ -253,7 +266,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
   const fetchDiscover = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = await getFreshToken();
       const res = await fetch(getApiUrl('/api/discover'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -282,7 +295,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
     if (!connectionId) return;
     setConnecting(targetId);
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = await getFreshToken();
       const res = await fetch(getApiUrl('/api/connections'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -304,7 +317,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
     if (!connectionId) return;
     setConnecting(targetId);
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = await getFreshToken();
       const res = await fetch(getApiUrl('/api/connections'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -325,7 +338,7 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
   const handleConnect = async (targetId) => {
     setConnecting(targetId);
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = await getFreshToken();
       const res = await fetch(getApiUrl('/api/connections'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
