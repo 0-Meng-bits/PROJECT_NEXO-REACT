@@ -1913,7 +1913,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
       fetchMembers();
     }
   };
-
+  
   const setRank = async (memberId, level) => {
     if (level === 2 && members.filter(m => m.rank_level === 2).length >= 2) {
       alert('This circle already has 2 Co-Leaders. Demote one first.'); return;
@@ -7633,7 +7633,7 @@ export default function UserPortal() {
                           value={newCirclePost.title}
                           onChange={e => setNewCirclePost(p => ({ ...p, title: e.target.value }))} />
                         {newCirclePost.post_type !== 'poll' && (
-                          <textarea className="home-composer-body" placeholder="Write your announcement, event, or shoutout..."
+                          <textarea className="home-composer-body" placeholder={newCirclePost.post_type === 'thread' ? 'Share your thoughts with the circle...' : newCirclePost.post_type === 'event' ? 'Describe the event...' : newCirclePost.post_type === 'shoutout' ? 'Give a shoutout...' : 'Write your announcement...'}
                             value={newCirclePost.content}
                             onChange={e => setNewCirclePost(p => ({ ...p, content: e.target.value }))}
                             rows={3} />
@@ -7684,7 +7684,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'shoutout', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
+                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
