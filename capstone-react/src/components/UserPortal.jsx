@@ -2670,23 +2670,22 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
         {/* Body */}
         <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)', height: 380 }}>
 
-          {/* Badges row */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-            <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
-            {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-            {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-            {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
-            {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-          </div>
-
           {/* Two-column layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
 
-            {/* Left column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Left column — card box containing badges, description, interests, recently joined */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Badges */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
+                {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+                {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
+                {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
+                {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
+              </div>
               {/* Description */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>DESCRIPTION</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
                 <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
                   {circle.description || 'No description provided.'}
                 </p>
@@ -2706,7 +2705,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               {recentMembers.length > 0 && (
                 <div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
-                  <div style={{ display: 'flex', gap: -6 }}>
+                  <div style={{ display: 'flex' }}>
                     {recentMembers.map((m, i) => {
                       const avatarUrl = m.accounts?.account_details?.avatar_url;
                       const name = m.accounts?.full_name || '?';
