@@ -30,7 +30,7 @@ function RaiseHandButton() {
       title={raised ? 'Lower hand' : 'Raise hand'}
       style={{
         position: 'absolute',
-        bottom: 14,
+        bottom: 70,
         right: 16,
         zIndex: 10,
         background: raised ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
@@ -95,21 +95,32 @@ function PipContent({ circleName, onMaximize, onLeave }) {
 
   const onMouseDown = (e) => {
     dragging.current = true;
-    offset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    offset.current = { x: clientX - pos.x, y: clientY - pos.y };
     e.preventDefault();
   };
   React.useEffect(() => {
     const onMove = (e) => {
       if (!dragging.current) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       setPos({
-        x: Math.min(Math.max(0, e.clientX - offset.current.x), window.innerWidth - 280),
-        y: Math.min(Math.max(0, e.clientY - offset.current.y), window.innerHeight - 180),
+        x: Math.min(Math.max(0, clientX - offset.current.x), window.innerWidth - 280),
+        y: Math.min(Math.max(0, clientY - offset.current.y), window.innerHeight - 180),
       });
     };
     const onUp = () => { dragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
   }, []);
 
   return (
@@ -120,12 +131,13 @@ function PipContent({ circleName, onMaximize, onLeave }) {
       borderRadius: 14, overflow: 'hidden',
       boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
       backdropFilter: 'blur(12px)',
-      width: 280,
+      width: Math.min(280, window.innerWidth - 20),
       userSelect: 'none',
     }}>
       {/* Drag handle */}
       <div
         onMouseDown={onMouseDown}
+        onTouchStart={onMouseDown}
         style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.04)', cursor: 'grab', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <i className="fa-solid fa-grip-lines" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}></i>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>drag to move</span>
@@ -194,10 +206,12 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           width: '94%', maxWidth: 980,
           background: '#0d0d12',
           border: '1px solid rgba(0,240,255,0.12)',
-          borderRadius: 16, overflow: 'hidden',
-          height: '86vh',
+          borderRadius: window.innerWidth < 640 ? 0 : 16,
+          overflow: 'hidden',
+          height: window.innerWidth < 640 ? '100dvh' : '86vh',
           boxShadow: '0 0 60px rgba(0,0,0,0.7)',
           display: 'flex', flexDirection: 'column',
+          width: window.innerWidth < 640 ? '100%' : '94%',
         }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
