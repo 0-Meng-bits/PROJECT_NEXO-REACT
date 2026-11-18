@@ -88,16 +88,48 @@ function PipContent({ circleName, onMaximize, onLeave }) {
   );
   const activeTrack = tracks.find(t => !t.participant?.isLocal) || tracks[0];
 
+  // Draggable state
+  const [pos, setPos] = useState({ x: window.innerWidth - 300, y: window.innerHeight - 220 });
+  const dragging = React.useRef(false);
+  const offset = React.useRef({ x: 0, y: 0 });
+
+  const onMouseDown = (e) => {
+    dragging.current = true;
+    offset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+    e.preventDefault();
+  };
+  React.useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      setPos({
+        x: Math.min(Math.max(0, e.clientX - offset.current.x), window.innerWidth - 280),
+        y: Math.min(Math.max(0, e.clientY - offset.current.y), window.innerHeight - 180),
+      });
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
+
   return (
     <div style={{
-      position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+      position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999,
       background: 'rgba(13,13,18,0.96)',
       border: '1px solid rgba(62,207,142,0.35)',
       borderRadius: 14, overflow: 'hidden',
       boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
       backdropFilter: 'blur(12px)',
       width: 280,
+      userSelect: 'none',
     }}>
+      {/* Drag handle */}
+      <div
+        onMouseDown={onMouseDown}
+        style={{ padding: '6px 12px', background: 'rgba(255,255,255,0.04)', cursor: 'grab', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <i className="fa-solid fa-grip-lines" style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}></i>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>drag to move</span>
+      </div>
       {/* Thumbnail */}
       {activeTrack ? (
         <div style={{ height: 130, background: '#000', overflow: 'hidden' }}>
