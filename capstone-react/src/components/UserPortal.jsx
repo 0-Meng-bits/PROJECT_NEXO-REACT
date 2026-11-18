@@ -7603,7 +7603,7 @@ export default function UserPortal() {
                             : null;
                         })()}
                       </div>
-                      <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.5 }}>
+                      <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.5, display: 'none' }}>
                         {activeComm.description || 'No description provided.'}
                       </p>
                     </div>
