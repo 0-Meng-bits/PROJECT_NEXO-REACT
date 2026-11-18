@@ -8,27 +8,42 @@ const GUIDE_STEPS = [
   {
     icon: 'fa-solid fa-circle-nodes',
     title: 'Welcome to NEXO Connect',
-    desc: 'NEXO Connect is your campus community platform — connect with classmates, join circles, and stay updated with campus life.',
+    desc: 'NEXO Connect is your campus community platform — connect with classmates, join interest-based circles, and stay updated with everything happening at CTU Daanbantayan.',
   },
   {
     icon: 'fa-solid fa-house-chimney',
     title: 'Home Feed',
-    desc: 'The Home Feed is your campus bulletin board. Here you\'ll find announcements, events, shoutouts, polls, and general posts from the campus community.',
+    desc: 'The Home Feed is where verified users share threads — casual posts, thoughts, and circle invites. Everyone can post here. Connections-only posts are only visible to your accepted connections.',
+  },
+  {
+    icon: 'fa-solid fa-thumbtack',
+    title: 'Bulletin',
+    desc: 'The Bulletin is the official noticeboard — announcements, events, shoutouts, and polls from Admin and verified circle leaders only. Filter by type to find what matters to you.',
   },
   {
     icon: 'fa-solid fa-message',
     title: 'Global Feed',
-    desc: 'A campus-wide chat open to all verified users. Send messages, share media, react to messages, and reply to specific chats in real time.',
+    desc: 'A campus-wide real-time chat open to all verified users. Send messages, share media, react to messages, and reply to specific chats.',
   },
   {
     icon: 'fa-solid fa-compass',
     title: 'Explore Circles',
-    desc: 'Circles are groups built around interests, projects, or academic topics. Browse by category and send a join request to become a member.',
+    desc: 'Circles are groups built around interests, projects, or academic topics. Browse by category, view circle details including stats and reviews, then request to join.',
   },
   {
     icon: 'fa-solid fa-users',
-    title: 'Circle Chat',
-    desc: 'Once you\'re a member of a circle, you get access to its private chat, announcements, channels, and task boards — exclusive to members only.',
+    title: 'Circle Chat & Channels',
+    desc: 'Once you\'re a circle member you get access to private chat, announcements, task boards, and custom channels. Click the 🔊 call channel to start a voice/video call with your circle.',
+  },
+  {
+    icon: 'fa-solid fa-phone',
+    title: 'Voice & Video Calls',
+    desc: 'Every circle has a dedicated call channel. Click it to start or join a live call. Toggle your mic and camera, raise your hand, share your screen, or minimize the call to keep chatting.',
+  },
+  {
+    icon: 'fa-solid fa-people-group',
+    title: 'Discover People',
+    desc: 'Find other students with similar interests. Send connection requests — once accepted, you\'ll appear in each other\'s connections list and can see connections-only threads.',
   },
   {
     icon: 'fa-solid fa-user-circle',
@@ -38,7 +53,7 @@ const GUIDE_STEPS = [
   {
     icon: 'fa-solid fa-star',
     title: 'Trust Points',
-    desc: 'Trust Points are earned by being active and helpful. They can be spent in the shop for customizations. Violating community rules will reduce your points.',
+    desc: 'Trust Points reflect your standing in the community. Earn them through participation and peer appreciation. Violations reduce your points — reach 0 and face a temporary suspension.',
   },
 ];
 
@@ -46,7 +61,19 @@ const GUIDE_STEPS = [
 const FAQS = [
   {
     q: 'How do I join a circle?',
-    a: 'Go to Explore Circles, find a circle you\'re interested in, and click the "Request to Join" button. The circle leader will review your application.',
+    a: 'Go to Explore Circles, click any circle to view its info card, then hit Join Circle or Apply to Join. The circle leader will review your request.',
+  },
+  {
+    q: 'What is the difference between Home Feed and Bulletin?',
+    a: 'Home Feed is for everyone — verified users post threads, share thoughts, or invite others to their circles. Bulletin is official-only — Admin and verified circle leaders post announcements, events, and polls there.',
+  },
+  {
+    q: 'What is a Thread?',
+    a: 'A Thread is a casual post in the Home Feed. Any verified user can post one. You can set it to Public (everyone sees it) or Connections Only (only your accepted connections see it).',
+  },
+  {
+    q: 'How do I start a call in my circle?',
+    a: 'Inside your circle, click the 🔊 call channel in the sidebar. This starts or joins a live voice/video call for all circle members. You can minimize the call to keep chatting while on a call.',
   },
   {
     q: 'Why is my account still pending?',
@@ -54,35 +81,39 @@ const FAQS = [
   },
   {
     q: 'How do I earn Trust Points?',
-    a: 'You earn Trust Points by participating positively — posting in feeds, contributing to circles, and receiving appreciation from other members. Points can also be awarded by circle leaders.',
+    a: 'You earn Trust Points through positive participation — daily logins, receiving appreciation from other members, and having warning appeals approved. Points can also be awarded by circle leaders.',
   },
   {
     q: 'What happens if I get flagged?',
-    a: 'If your content is flagged and reviewed by an admin, you may receive a warning. Repeated violations can result in reduced trust points or account suspension.',
+    a: 'If your content is flagged and reviewed by an admin, you may receive a warning and lose 1 Trust Point. Reaching 0 TP results in a 7-day suspension. Repeated violations can lead to a permanent ban.',
   },
   {
     q: 'Can I create my own circle?',
-    a: 'Yes. Click the "+" button in the circle dock on the left sidebar to create a circle. Fill in the details and submit — it will be visible to others once created.',
+    a: 'Yes. Click the "+" button in the circle dock on the left sidebar. Fill in the details — you can set a logo (icon or photo), classification, interest tag, and invite your connections. It goes to admin for approval.',
   },
   {
-    q: 'What is the difference between Global Feed and Circle Chat?',
-    a: 'Global Feed is a campus-wide chat open to all verified users. Circle Chat is a private chat only accessible to members of that specific circle.',
-  },
-  {
-    q: 'How do I apply for a position in a circle?',
-    a: 'Some circles have an application process. When you request to join, you may be asked to answer questions. The circle leader reviews submissions and approves or rejects them.',
+    q: 'How does the cross-posting to Bulletin work?',
+    a: 'If you are the Leader or Co-Leader of a verified circle, you\'ll see a "Post to Bulletin" toggle when posting. Enable it and your post appears in both the circle and the Bulletin.',
   },
   {
     q: 'Can I post anonymously?',
-    a: 'Yes, when creating a post in the Home Feed, toggle the "Post as me" button to switch to anonymous mode before submitting.',
+    a: 'Anonymous posting is not available in the current version. All posts show your name and student ID.',
   },
   {
-    q: 'How do I report a user or content?',
-    a: 'Hover or tap on any message or post to see the report button (flag icon). For account issues, use the Contact Support tab in this Help center.',
+    q: 'What are connections?',
+    a: 'Connections are mutual follows between users with similar interests found in Discover People. Once connected, you can see each other\'s connections-only threads.',
+  },
+  {
+    q: 'How do I leave a circle?',
+    a: 'Open the circle, go to the info card or the circle modal, and click the leave button (arrow icon next to Enter Circle). You\'ll need to rejoin or reapply to get back in.',
   },
   {
     q: 'What are channels inside a circle?',
-    a: 'Channels are sub-spaces inside a circle for specific topics or tasks. Circle leaders can create chat channels or task board channels for better organization.',
+    a: 'Channels are sub-spaces inside a circle. Text channels (#) are for chat. The 🔊 call channel is for voice/video calls. Project circles can also have task board channels.',
+  },
+  {
+    q: 'How do I report a user or content?',
+    a: 'Tap or hover on any message or post to see the flag icon. For account issues, use the Contact Support tab in this Help Center.',
   },
 ];
 
