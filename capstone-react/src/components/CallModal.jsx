@@ -122,6 +122,8 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
                   chatMessageFormatter={undefined}
                   style={{ height: '100%', '--lk-bg': '#0d0d12' }}
                 />
+                {/* Hide LiveKit's built-in chat button via CSS */}
+                <style>{`.lk-chat-toggle, [data-lk-source="chat"] { display: none !important; }`}</style>
                 <RoomAudioRenderer />
               </LiveKitRoom>
             </div>
