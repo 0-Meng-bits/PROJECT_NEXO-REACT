@@ -2141,38 +2141,46 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
             {/* CIRCLE LOGO */}
             <div className="input-group">
               <label>CIRCLE LOGO</label>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              {/* Pill toggle */}
+              <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 3, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
                 <button type="button" onClick={() => setLogoMode('icon')}
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'icon' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'icon' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
-                  <i className="fa-solid fa-icons" style={{ marginRight: 6 }} />ICON
+                  style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'icon' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
+                  <i className="fa-solid fa-icons" style={{ marginRight: 5 }} />ICON
                 </button>
                 <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
-                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 6 }} />}PHOTO
+                  style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'photo' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
+                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 5 }} />}PHOTO
                 </button>
                 <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
               </div>
-              {/* Preview */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: 8, border: '1px solid #222' }}>
-                <div style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {logoMode === 'photo' && logoUrl
-                    ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
-                  }
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{form.name || comm.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {logoMode === 'photo' && logoUrl ? 'Custom photo set' : 'Using category icon'}
+              {/* Preview card */}
+              <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {logoMode === 'photo' && logoUrl
+                      ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
+                    }
                   </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{form.name || comm.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {logoMode === 'photo' && logoUrl ? '✓ Custom photo' : 'Category icon'}
+                    </div>
+                  </div>
+                  {logoMode === 'photo' && logoUrl && (
+                    <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14 }}>
+                      <i className="fa-solid fa-xmark" />
+                    </button>
+                  )}
+                  {logoMode === 'photo' && !logoUrl && (
+                    <button type="button" onClick={() => logoInputRef.current?.click()}
+                      style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                      Upload
+                    </button>
+                  )}
                 </div>
-                {logoMode === 'photo' && logoUrl && (
-                  <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
-                    title="Remove photo">
-                    <i className="fa-solid fa-xmark" />
-                  </button>
-                )}
               </div>
             </div>
             <div className="input-group">
