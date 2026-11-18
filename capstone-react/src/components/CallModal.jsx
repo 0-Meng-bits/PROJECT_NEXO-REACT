@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   LiveKitRoom,
   VideoConference,
@@ -6,9 +6,79 @@ import {
   useParticipants,
   useTracks,
   ParticipantTile,
+  useLocalParticipant,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import '@livekit/components-styles';
+
+// Raise hand button — overlays on top of the control bar
+function RaiseHandButton() {
+  const { localParticipant } = useLocalParticipant();
+  const [raised, setRaised] = useState(false);
+
+  const toggleHand = useCallback(async () => {
+    const next = !raised;
+    setRaised(next);
+    try {
+      await localParticipant.setMetadata(JSON.stringify({ handRaised: next }));
+    } catch { /* non-fatal */ }
+  }, [raised, localParticipant]);
+
+  return (
+    <button
+      onClick={toggleHand}
+      title={raised ? 'Lower hand' : 'Raise hand'}
+      style={{
+        position: 'absolute',
+        bottom: 14,
+        left: '50%',
+        transform: 'translateX(calc(-50% + 110px))', // sits right of Leave button
+        zIndex: 10,
+        background: raised ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
+        border: `1px solid ${raised ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)'}`,
+        borderRadius: 8,
+        color: raised ? '#fbbf24' : 'rgba(255,255,255,0.8)',
+        padding: '7px 14px',
+        cursor: 'pointer',
+        fontSize: 13,
+        fontFamily: 'inherit',
+        fontWeight: raised ? 700 : 400,
+        display: 'flex', alignItems: 'center', gap: 6,
+        transition: '0.2s',
+      }}>
+      <span style={{ fontSize: 16 }}>✋</span>
+      {raised ? 'Lower Hand' : 'Raise Hand'}
+    </button>
+  );
+}
+
+// Hand raised indicator — shows toast when others raise hand
+function HandRaisedWatcher() {
+  const participants = useParticipants();
+  const raisedNames = participants
+    .filter(p => { try { return JSON.parse(p.metadata || '{}').handRaised; } catch { return false; } })
+    .map(p => p.name || 'Someone');
+
+  if (raisedNames.length === 0) return null;
+
+  return (
+    <div style={{
+      position: 'absolute', top: 56, right: 16, zIndex: 10,
+      display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      {raisedNames.map((name, i) => (
+        <div key={i} style={{
+          background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
+          borderRadius: 10, padding: '6px 12px', fontSize: 12,
+          color: '#fbbf24', fontWeight: 700,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span>✋</span> {name} raised hand
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Pip content — rendered inside the single LiveKitRoom
 function PipContent({ circleName, onMaximize, onLeave }) {
@@ -109,13 +179,15 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           </div>
 
           {/* VideoConference */}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
             <VideoConference style={{ height: '100%', '--lk-bg': '#0d0d12' }} />
             <style>{`
               .lk-chat-toggle, [data-lk-source="chat"], .lk-chat-container { display: none !important; }
               .lk-focus-toggle-button { display: none !important; }
               .lk-participant-tile { border-radius: 10px; }
             `}</style>
+            <RaiseHandButton />
+            <HandRaisedWatcher />
           </div>
         </div>
       </div>
