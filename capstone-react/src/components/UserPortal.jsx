@@ -1494,11 +1494,73 @@ function CreateModal({ onClose, onCreated, userId }) {
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto', width: '100%', maxWidth: 480 }}>
         <h3 style={{ fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--cyber-cyan)', marginBottom: 20 }}>CREATE NEW CIRCLE</h3>
 
+        {/* 1. LOGO — top, sets visual identity first */}
+        <div className="input-group">
+          <label>CIRCLE LOGO</label>
+          {/* Pill toggle */}
+          <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 3, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <button type="button" onClick={() => setLogoMode('icon')}
+              style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'icon' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
+              <i className="fa-solid fa-icons" style={{ marginRight: 5 }} />ICON
+            </button>
+            <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+              style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'photo' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
+              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 5 }} />}PHOTO
+            </button>
+            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+          </div>
+
+          {/* Icon grid + live preview combined */}
+          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
+            {/* Preview */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: logoMode === 'icon' ? 14 : 0 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {logoMode === 'photo' && logoUrl
+                  ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <i className={form.icon} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: form.name ? 'var(--text-primary)' : 'rgba(255,255,255,0.3)' }}>{form.name || 'Circle Name'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {logoMode === 'photo' && logoUrl ? '✓ Custom photo' : 'Category icon'}
+                </div>
+              </div>
+              {logoMode === 'photo' && logoUrl && (
+                <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14 }}>
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              )}
+              {logoMode === 'photo' && !logoUrl && (
+                <button type="button" onClick={() => logoInputRef.current?.click()}
+                  style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                  Upload
+                </button>
+              )}
+            </div>
+            {/* Icon grid */}
+            {logoMode === 'icon' && (
+              <div className="icon-picker" style={{ gap: 6 }}>
+                {icons.map(opt => (
+                  <button key={opt.icon} type="button"
+                    className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
+                    onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
+                    <i className={opt.icon}></i>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. CIRCLE NAME */}
         <div className="input-group">
           <label>CIRCLE NAME</label>
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" />
         </div>
 
+        {/* 3. CLASSIFICATION */}
         <div className="input-group">
           <label>CLASSIFICATION</label>
           <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
@@ -1509,12 +1571,11 @@ function CreateModal({ onClose, onCreated, userId }) {
           </select>
         </div>
 
-        {/* Interest tag · REQUIRED, single select, filtered by category */}
+        {/* 4. INTEREST TAG */}
         {interestOptions.length > 0 && (
           <div className="input-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              CIRCLE INTEREST TAG
-              <span style={{ color: 'var(--red)', fontSize: 12 }}>*</span>
+              CIRCLE INTEREST TAG <span style={{ color: 'var(--red)', fontSize: 12 }}>*</span>
             </label>
             <select value={form.interest_tag} onChange={e => setForm(f => ({ ...f, interest_tag: e.target.value }))}>
               <option value="">Select an interest...</option>
@@ -1526,63 +1587,13 @@ function CreateModal({ onClose, onCreated, userId }) {
           </div>
         )}
 
-        {/* Logo — Icon or Photo */}
-        <div className="input-group">
-          <label>CIRCLE LOGO</label>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            <button type="button" onClick={() => setLogoMode('icon')}
-              style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'icon' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'icon' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
-              <i className="fa-solid fa-icons" style={{ marginRight: 6 }} />ICON
-            </button>
-            <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-              style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
-              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 6 }} />}PHOTO
-            </button>
-            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-          </div>
-          {/* Preview */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: 8, border: '1px solid #222', marginBottom: 10 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {logoMode === 'photo' && logoUrl
-                ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <i className={form.icon} style={{ fontSize: 20, color: 'var(--cyber-cyan)' }} />
-              }
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{form.name || 'Circle Name'}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                {logoMode === 'photo' && logoUrl ? 'Custom photo set' : 'Using category icon'}
-              </div>
-            </div>
-            {logoMode === 'photo' && logoUrl && (
-              <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
-                title="Remove photo">
-                <i className="fa-solid fa-xmark" />
-              </button>
-            )}
-          </div>
-          {/* Icon grid — only when icon mode */}
-          {logoMode === 'icon' && (
-            <div className="icon-picker">
-              {icons.map(opt => (
-                <button key={opt.icon} type="button"
-                  className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
-                  onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
-                  <i className={opt.icon}></i>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
+        {/* 5. DESCRIPTION */}
         <div className="input-group">
           <label>DESCRIPTION</label>
           <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
         </div>
 
-        {/* Open for Applications · auto-locked when invitees < 2 */}
+        {/* 6. OPEN FOR APPLICATIONS */}
         <div className="input-group">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <label style={{ margin: 0 }}>OPEN FOR APPLICATIONS</label>
@@ -1596,7 +1607,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           </div>
         </div>
 
-        {/* Invite connections · clean card style */}
+        {/* 7. INVITE CONNECTIONS */}
         {connectionsLoaded && connections.length > 0 && (
           <div className="input-group">
             <label>INVITE YOUR CONNECTIONS</label>
