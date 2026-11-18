@@ -6784,7 +6784,7 @@ export default function UserPortal() {
                   )}
                 </div>
 
-                {/* General ? virtual default channel, stores channel_id=null messages */}
+                {/* General — virtual default channel */}
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                   onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null); }}
@@ -6793,9 +6793,27 @@ export default function UserPortal() {
                   <span className="node-name">general</span>
                 </div>
 
+                {/* Huddle — hardcoded voice channel, always visible */}
+                {user?.is_verified && isMember(activeCommId) && (
+                  <div
+                    className="ls-item"
+                    onClick={() => startCall(activeCommId)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
+                    <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>call</span>
+                    {circleActiveCall && (
+                      <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block' }}></span>
+                        Live
+                      </span>
+                    )}
+                  </div>
+                )}
 
 
-                {channels.map(ch => (
+
+                {channels.filter(ch => ch.channel_type !== 'voice' && ch.type !== 'voice').map(ch => (
                   <div
                     key={ch.id}
                     className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
