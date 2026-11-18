@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     }
     if (!resolvedUserId) return res.status(401).json({ message: 'Unable to verify identity.' });
 
-    const { name, description, category, icon, interest_tag, is_open, invitees } = req.body;
+    const { name, description, category, icon, interest_tag, is_open, invitees, logo_url } = req.body;
     if (!name?.trim()) return res.status(400).json({ message: 'Circle name is required.' });
 
     // Insert into circle_requests for admin approval (existing flow)
@@ -47,6 +47,7 @@ export default async function handler(req, res) {
         interest_tag: interest_tag || null,
         is_open: is_open || false,
         invitees: invitees || [],
+        logo_url: logo_url || null,
       }])
       .select()
       .single();

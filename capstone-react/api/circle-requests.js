@@ -55,6 +55,7 @@ export default async function handler(req, res) {
         creator_id: request.creator_id,
         interest_tag: request.interest_tag || null,
         is_open: request.is_open || false,
+        logo_url: request.logo_url || null,
         status: 'pending',
         created_at: new Date().toISOString()
       }])

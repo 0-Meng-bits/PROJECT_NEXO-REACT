@@ -1366,6 +1366,44 @@ function CreateModal({ onClose, onCreated, userId }) {
   const [connections, setConnections] = useState([]);
   const [connectionsLoaded, setConnectionsLoaded] = useState(false);
   const [invitees, setInvitees] = useState([]);
+  const [logoMode, setLogoMode] = useState('icon'); // 'icon' | 'photo'
+  const [logoUrl, setLogoUrl] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef(null);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const compressed = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const SIZE = 200;
+          const canvas = document.createElement('canvas');
+          canvas.width = SIZE; canvas.height = SIZE;
+          const ctx = canvas.getContext('2d');
+          const scale = Math.max(SIZE / img.width, SIZE / img.height);
+          const sw = img.width * scale, sh = img.height * scale;
+          ctx.drawImage(img, (SIZE - sw) / 2, (SIZE - sh) / 2, sw, sh);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/upload'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'upload-avatar', userId, avatar: compressed }),
+      });
+      const data = await res.json();
+      if (data.url) setLogoUrl(data.url);
+    } catch { /* non-fatal */ }
+    setLogoUploading(false);
+  };
 
   const INTEREST_LABELS_MAP = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'E-Sports', dancing:'Dancing', bl_gl:'Watching BL/GL', sports:'Sports', travel:'Travel' };
   const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
@@ -1438,6 +1476,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           interest_tag: form.interest_tag,
           is_open: effectiveIsOpen,
           invitees,
+          logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
         }),
       });
       const data = await res.json();
@@ -1487,19 +1526,55 @@ function CreateModal({ onClose, onCreated, userId }) {
           </div>
         )}
 
-        {/* Icon picker */}
+        {/* Logo — Icon or Photo */}
         <div className="input-group">
-          <label>CIRCLE ICON</label>
-          <div className="icon-picker">
-            {icons.map(opt => (
-              <button key={opt.icon} type="button"
-                className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
-                <i className={opt.icon}></i>
-                <span>{opt.label}</span>
-              </button>
-            ))}
+          <label>CIRCLE LOGO</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <button type="button" onClick={() => setLogoMode('icon')}
+              style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'icon' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'icon' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
+              <i className="fa-solid fa-icons" style={{ marginRight: 6 }} />ICON
+            </button>
+            <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+              style={{ flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : '#333'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.1)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
+              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 6 }} />}PHOTO
+            </button>
+            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
           </div>
+          {/* Preview */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: 8, border: '1px solid #222', marginBottom: 10 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {logoMode === 'photo' && logoUrl
+                ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <i className={form.icon} style={{ fontSize: 20, color: 'var(--cyber-cyan)' }} />
+              }
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{form.name || 'Circle Name'}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                {logoMode === 'photo' && logoUrl ? 'Custom photo set' : 'Using category icon'}
+              </div>
+            </div>
+            {logoMode === 'photo' && logoUrl && (
+              <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 13 }}
+                title="Remove photo">
+                <i className="fa-solid fa-xmark" />
+              </button>
+            )}
+          </div>
+          {/* Icon grid — only when icon mode */}
+          {logoMode === 'icon' && (
+            <div className="icon-picker">
+              {icons.map(opt => (
+                <button key={opt.icon} type="button"
+                  className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
+                  onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
+                  <i className={opt.icon}></i>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="input-group">
