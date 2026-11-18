@@ -1494,9 +1494,9 @@ function CreateModal({ onClose, onCreated, userId }) {
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto', width: '100%', maxWidth: 480 }}>
         <h3 style={{ fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--cyber-cyan)', marginBottom: 20 }}>CREATE NEW CIRCLE</h3>
 
-        {/* 1. LOGO — top, sets visual identity first */}
+        {/* 1. LOGO + NAME + CATEGORY — all in one card */}
         <div className="input-group">
-          <label>CIRCLE LOGO</label>
+          <label>CIRCLE IDENTITY</label>
           {/* Pill toggle */}
           <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 3, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
             <button type="button" onClick={() => setLogoMode('icon')}
@@ -1510,30 +1510,40 @@ function CreateModal({ onClose, onCreated, userId }) {
             <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
           </div>
 
-          {/* Icon grid + live preview combined */}
           <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
-            {/* Preview */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: logoMode === 'icon' ? 14 : 0 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {/* Top row: logo + inline name + category inputs */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: logoMode === 'icon' ? 14 : 0 }}>
+              <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
                 {logoMode === 'photo' && logoUrl
                   ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <i className={form.icon} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />}
+                  : <i className={form.icon} style={{ fontSize: 24, color: 'var(--cyber-cyan)' }} />}
+                {logoMode === 'photo' && logoUrl && (
+                  <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                    style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="fa-solid fa-xmark" />
+                  </button>
+                )}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: form.name ? 'var(--text-primary)' : 'rgba(255,255,255,0.3)' }}>{form.name || 'Circle Name'}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {logoMode === 'photo' && logoUrl ? '✓ Custom photo' : 'Category icon'}
-                </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Inline circle name input */}
+                <input
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Circle Name"
+                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }}
+                />
+                {/* Inline category select */}
+                <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}
+                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit', cursor: 'pointer' }}>
+                  <option value="academic">Academic / Study Group</option>
+                  <option value="project">Special Project / Capstone</option>
+                  <option value="hobby">Hobby / Interest</option>
+                  <option value="social">Social / Hangout</option>
+                </select>
               </div>
-              {logoMode === 'photo' && logoUrl && (
-                <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14 }}>
-                  <i className="fa-solid fa-xmark" />
-                </button>
-              )}
               {logoMode === 'photo' && !logoUrl && (
                 <button type="button" onClick={() => logoInputRef.current?.click()}
-                  style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+                  style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', flexShrink: 0 }}>
                   Upload
                 </button>
               )}
@@ -1554,24 +1564,7 @@ function CreateModal({ onClose, onCreated, userId }) {
           </div>
         </div>
 
-        {/* 2. CIRCLE NAME */}
-        <div className="input-group">
-          <label>CIRCLE NAME</label>
-          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. BSIT 3A Team" />
-        </div>
-
-        {/* 3. CLASSIFICATION */}
-        <div className="input-group">
-          <label>CLASSIFICATION</label>
-          <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
-            <option value="academic">Academic / Study Group</option>
-            <option value="project">Special Project / Capstone</option>
-            <option value="hobby">Hobby / Interest</option>
-            <option value="social">Social / Hangout</option>
-          </select>
-        </div>
-
-        {/* 4. INTEREST TAG */}
+        {/* INTEREST TAG */}
         {interestOptions.length > 0 && (
           <div className="input-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2162,11 +2155,23 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                       : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
                     }
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{form.name || comm.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {logoMode === 'photo' && logoUrl ? '✓ Custom photo' : 'Category icon'}
-                    </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {/* Inline name */}
+                    <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }} />
+                    {/* Inline category */}
+                    <select value={form.category} onChange={e => {
+                      const newCat = e.target.value;
+                      const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
+                      const available = catInterests[newCat] || [];
+                      setForm(f => ({ ...f, category: newCat, interest_tags: f.interest_tags.filter(t => available.includes(t)) }));
+                    }}
+                      style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit', cursor: 'pointer' }}>
+                      <option value="academic">Academic / Study Group</option>
+                      <option value="project">Special Project / Capstone</option>
+                      <option value="hobby">Hobby / Interest</option>
+                      <option value="social">Social / Hangout</option>
+                    </select>
                   </div>
                   {logoMode === 'photo' && logoUrl && (
                     <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
@@ -2182,24 +2187,6 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                   )}
                 </div>
               </div>
-            </div>
-            <div className="input-group">
-              <label>CIRCLE NAME</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div className="input-group">
-              <label>CLASSIFICATION</label>
-              <select value={form.category} onChange={e => {
-                const newCat = e.target.value;
-                const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
-                const available = catInterests[newCat] || [];
-                setForm(f => ({ ...f, category: newCat, interest_tags: f.interest_tags.filter(t => available.includes(t)) }));
-              }}>
-                <option value="academic">Academic / Study Group</option>
-                <option value="project">Special Project / Capstone</option>
-                <option value="hobby">Hobby / Interest</option>
-                <option value="social">Social / Hangout</option>
-              </select>
             </div>
             <div className="input-group">
               <label>DESCRIPTION</label>
