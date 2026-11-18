@@ -84,9 +84,10 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
       {/* Full modal — hidden via CSS when minimized, NOT unmounted */}
       <div style={{
         position: 'fixed', inset: 0, zIndex: 9998,
-        background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
+        background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(6px)',
         display: minimized ? 'none' : 'flex',
         alignItems: 'center', justifyContent: 'center',
+        pointerEvents: minimized ? 'none' : 'all',
       }}>
         <div style={{
           width: '94%', maxWidth: 980,
@@ -110,7 +111,11 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           {/* VideoConference */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <VideoConference style={{ height: '100%', '--lk-bg': '#0d0d12' }} />
-            <style>{`.lk-chat-toggle, [data-lk-source="chat"], .lk-chat-container { display: none !important; }`}</style>
+            <style>{`
+              .lk-chat-toggle, [data-lk-source="chat"], .lk-chat-container { display: none !important; }
+              .lk-focus-toggle-button { display: none !important; }
+              .lk-participant-tile { border-radius: 10px; }
+            `}</style>
           </div>
         </div>
       </div>
