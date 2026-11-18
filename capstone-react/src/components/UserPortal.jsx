@@ -7590,8 +7590,9 @@ export default function UserPortal() {
                       </h2>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                         {activeCommId !== 'global' && (
-                          <div className="verified-badge" style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.3)' }}>
-                            CIRCLE: {(activeComm.category || 'General').toUpperCase()} | ROLE: {myRole}
+                          <div className="verified-badge" style={{ borderColor: tagColor, color: tagColor, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className={myRole === 'LEADER' ? 'fa-solid fa-crown' : myRole === 'CO-LEADER' ? 'fa-solid fa-star' : 'fa-solid fa-user'} style={{ fontSize: 10 }}></i>
+                            {myRole}
                           </div>
                         )}
                         {(() => {
