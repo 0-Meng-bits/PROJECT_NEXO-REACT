@@ -6,13 +6,12 @@ import {
   useParticipants,
   useTracks,
   ParticipantTile,
-  ControlBar,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import '@livekit/components-styles';
 
-// Minimized pip — stays connected, shows thumbnail
-function MinimizedPip({ circleName, onMaximize, onLeave }) {
+// Pip content — rendered inside the single LiveKitRoom
+function PipContent({ circleName, onMaximize, onLeave }) {
   const participants = useParticipants();
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: false }],
@@ -66,89 +65,64 @@ function MinimizedPip({ circleName, onMaximize, onLeave }) {
   );
 }
 
-function MinimizedWrapper({ circleName, onMaximize, onLeave }) {
-  return (
-    <>
-      <RoomAudioRenderer />
-      <MinimizedPip circleName={circleName} onMaximize={onMaximize} onLeave={onLeave} />
-    </>
-  );
-}
-
-// Main export
 export default function CallModal({ token, livekitUrl, circleName, onClose }) {
   const [minimized, setMinimized] = useState(false);
 
   return (
-    <>
-      {/* Full modal — uses VideoConference for device dropdowns */}
-      {!minimized && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9998,
-          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{
-            width: '94%', maxWidth: 980,
-            background: '#0d0d12',
-            border: '1px solid rgba(0,240,255,0.12)',
-            borderRadius: 16, overflow: 'hidden',
-            height: '86vh',
-            boxShadow: '0 0 60px rgba(0,0,0,0.7)',
-            display: 'flex', flexDirection: 'column',
-          }}>
-            {/* Custom header with minimize */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10 }}></div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', flex: 1 }}>{circleName} — Voice/Video Call</span>
-              <button onClick={() => setMinimized(true)}
-                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '5px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <i className="fa-solid fa-minus"></i> Minimize
-              </button>
-            </div>
+    // ONE single LiveKitRoom — never unmounts, keeps connection alive
+    <LiveKitRoom
+      token={token}
+      serverUrl={livekitUrl}
+      connect={true}
+      video={true}
+      audio={true}
+      onDisconnected={onClose}
+      style={{ display: 'contents' }}
+    >
+      <RoomAudioRenderer />
 
-            {/* LiveKit VideoConference — keeps device dropdowns + all controls */}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <LiveKitRoom
-                token={token}
-                serverUrl={livekitUrl}
-                connect={true}
-                video={true}
-                audio={true}
-                onDisconnected={onClose}
-                style={{ height: '100%' }}
-              >
-                <VideoConference
-                  chatMessageFormatter={undefined}
-                  style={{ height: '100%', '--lk-bg': '#0d0d12' }}
-                />
-                {/* Hide LiveKit's built-in chat button via CSS */}
-                <style>{`.lk-chat-toggle, [data-lk-source="chat"] { display: none !important; }`}</style>
-                <RoomAudioRenderer />
-              </LiveKitRoom>
-            </div>
+      {/* Full modal — hidden via CSS when minimized, NOT unmounted */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 9998,
+        background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
+        display: minimized ? 'none' : 'flex',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          width: '94%', maxWidth: 980,
+          background: '#0d0d12',
+          border: '1px solid rgba(0,240,255,0.12)',
+          borderRadius: 16, overflow: 'hidden',
+          height: '86vh',
+          boxShadow: '0 0 60px rgba(0,0,0,0.7)',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10 }}></div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', flex: 1 }}>{circleName} — Voice/Video Call</span>
+            <button onClick={() => setMinimized(true)}
+              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '5px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="fa-solid fa-minus"></i> Minimize
+            </button>
+          </div>
+
+          {/* VideoConference */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <VideoConference style={{ height: '100%', '--lk-bg': '#0d0d12' }} />
+            <style>{`.lk-chat-toggle, [data-lk-source="chat"], .lk-chat-container { display: none !important; }`}</style>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Minimized pip */}
+      {/* Minimized pip — only shown when minimized */}
       {minimized && (
-        <LiveKitRoom
-          token={token}
-          serverUrl={livekitUrl}
-          connect={true}
-          video={false}
-          audio={true}
-          onDisconnected={onClose}
-          style={{ display: 'none' }}
-        >
-          <MinimizedWrapper
-            circleName={circleName}
-            onMaximize={() => setMinimized(false)}
-            onLeave={onClose}
-          />
-        </LiveKitRoom>
+        <PipContent
+          circleName={circleName}
+          onMaximize={() => setMinimized(false)}
+          onLeave={onClose}
+        />
       )}
-    </>
+    </LiveKitRoom>
   );
 }
