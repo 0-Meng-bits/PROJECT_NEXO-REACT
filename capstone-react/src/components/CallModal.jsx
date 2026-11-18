@@ -12,7 +12,7 @@ import { Track } from 'livekit-client';
 import '@livekit/components-styles';
 
 // Raise hand button — overlays on top of the control bar
-function RaiseHandButton() {
+function RaiseHandButton({ isMobile = false }) {
   const { localParticipant } = useLocalParticipant();
   const [raised, setRaised] = useState(false);
 
@@ -33,16 +33,16 @@ function RaiseHandButton() {
         border: `1px solid ${raised ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)'}`,
         borderRadius: 8,
         color: raised ? '#fbbf24' : 'rgba(255,255,255,0.7)',
-        padding: '5px 12px',
+        padding: '6px 10px',
         cursor: 'pointer',
-        fontSize: 12,
+        fontSize: isMobile ? 15 : 12,
         fontFamily: 'inherit',
         fontWeight: raised ? 700 : 400,
-        display: 'flex', alignItems: 'center', gap: 6,
+        display: 'flex', alignItems: 'center', gap: 5,
         transition: '0.2s',
       }}>
-      <span style={{ fontSize: 16 }}>✋</span>
-      {raised ? 'Lower Hand' : 'Raise Hand'}
+      <span>✋</span>
+      {!isMobile && (raised ? 'Lower Hand' : 'Raise Hand')}
     </button>
   );
 }
@@ -210,14 +210,15 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           width: window.innerWidth < 640 ? '100%' : '94%',
         }}>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10 }}></div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', flex: 1 }}>{circleName} — Voice/Video Call</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <RaiseHandButton />
+          <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10, flexShrink: 0 }}></div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{circleName} — Voice/Video Call</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <RaiseHandButton isMobile={window.innerWidth < 640} />
               <button onClick={() => setMinimized(true)}
-                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '5px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <i className="fa-solid fa-minus"></i> Minimize
+                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <i className="fa-solid fa-minus"></i>
+                {window.innerWidth >= 640 && <span>Minimize</span>}
               </button>
             </div>
           </div>
