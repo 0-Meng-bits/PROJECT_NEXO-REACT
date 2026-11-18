@@ -412,6 +412,12 @@ input[type="password"]::-webkit-credentials-auto-fill-button { display: none; }
 }
 .input-group select option { background: var(--bg-black); color: var(--text-primary); }
 
+/* Global dark dropdown for ALL select elements */
+select option {
+  background: #0d0d12 !important;
+  color: #ffffff !important;
+}
+
 /* Dark themed select dropdowns */
 .dark-select option {
   background: #1a1a2e !important;
