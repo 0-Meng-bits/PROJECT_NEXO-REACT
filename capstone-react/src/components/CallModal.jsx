@@ -29,17 +29,13 @@ function RaiseHandButton() {
       onClick={toggleHand}
       title={raised ? 'Lower hand' : 'Raise hand'}
       style={{
-        position: 'absolute',
-        bottom: 70,
-        right: 16,
-        zIndex: 10,
-        background: raised ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
+        background: raised ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.08)',
         border: `1px solid ${raised ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)'}`,
         borderRadius: 8,
-        color: raised ? '#fbbf24' : 'rgba(255,255,255,0.8)',
-        padding: '7px 14px',
+        color: raised ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+        padding: '5px 12px',
         cursor: 'pointer',
-        fontSize: 13,
+        fontSize: 12,
         fontFamily: 'inherit',
         fontWeight: raised ? 700 : 400,
         display: 'flex', alignItems: 'center', gap: 6,
@@ -217,10 +213,13 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10 }}></div>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', flex: 1 }}>{circleName} — Voice/Video Call</span>
-            <button onClick={() => setMinimized(true)}
-              style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '5px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="fa-solid fa-minus"></i> Minimize
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <RaiseHandButton />
+              <button onClick={() => setMinimized(true)}
+                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '5px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="fa-solid fa-minus"></i> Minimize
+              </button>
+            </div>
           </div>
 
           {/* VideoConference */}
@@ -231,7 +230,6 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
               .lk-focus-toggle-button { display: none !important; }
               .lk-participant-tile { border-radius: 10px; }
             `}</style>
-            <RaiseHandButton />
             <HandRaisedWatcher />
           </div>
         </div>
