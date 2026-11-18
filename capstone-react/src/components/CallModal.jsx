@@ -31,8 +31,7 @@ function RaiseHandButton() {
       style={{
         position: 'absolute',
         bottom: 14,
-        left: '50%',
-        transform: 'translateX(calc(-50% + 110px))', // sits right of Leave button
+        right: 16,
         zIndex: 10,
         background: raised ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
         border: `1px solid ${raised ? 'rgba(251,191,36,0.6)' : 'rgba(255,255,255,0.15)'}`,
