@@ -4019,7 +4019,26 @@ function ReportModal({ data, user, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
-  const REASONS = [
+  // Context-aware title and reasons based on report type
+  const isPhoto = data.type === 'profile_photo' || data.type === 'circle_photo';
+  const isUser = data.type === 'user';
+  const isMessage = data.type === 'message';
+
+  const TITLE = isPhoto ? 'Report Photo' : isUser ? 'Report User' : isMessage ? 'Report Message' : 'Report Post';
+
+  const REASONS = isPhoto ? [
+    'Inappropriate or explicit content',
+    'Impersonation / fake identity',
+    'Offensive or disturbing imagery',
+    'Spam or fake profile photo',
+    'Other',
+  ] : isUser ? [
+    'Harassment or bullying',
+    'Fake or impersonation account',
+    'Spam behavior',
+    'Inappropriate conduct',
+    'Other',
+  ] : [
     'Inappropriate language / profanity',
     'Harassment or bullying',
     'Spam or irrelevant content',
@@ -4060,7 +4079,7 @@ function ReportModal({ data, user, onClose }) {
           <>
             <h3 style={{ marginBottom: 6 }}>
               <i className="fa-solid fa-flag" style={{ marginRight: 8, color: 'var(--red)' }}></i>
-              Report {data.type === 'message' ? 'Message' : 'Post'}
+              {TITLE}
             </h3>
             {data.preview && (
               <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, fontStyle: 'italic' }}>
