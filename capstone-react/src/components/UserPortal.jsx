@@ -2808,7 +2808,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
 
             {/* Left column — card box containing badges, description, interests, recently joined */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: 280 }}>
               {/* Badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
@@ -2820,7 +2820,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               {/* Description */}
               <div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
-                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', maxHeight: 80, overflowY: 'auto', paddingRight: 4 }}>
+                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
                   {circle.description || 'No description provided.'}
                 </p>
               </div>
