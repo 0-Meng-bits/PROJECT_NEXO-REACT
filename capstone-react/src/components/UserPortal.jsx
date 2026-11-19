@@ -1497,22 +1497,11 @@ function CreateModal({ onClose, onCreated, userId }) {
         {/* 1. LOGO + NAME + CATEGORY — all in one card */}
         <div className="input-group">
           <label>CIRCLE IDENTITY</label>
-          {/* Pill toggle */}
-          <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 3, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-            <button type="button" onClick={() => setLogoMode('icon')}
-              style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'icon' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
-              <i className="fa-solid fa-icons" style={{ marginRight: 5 }} />ICON
-            </button>
-            <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-              style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'photo' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
-              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 5 }} />}PHOTO
-            </button>
-            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-          </div>
+          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
 
           <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
             {/* Top row: logo + inline name + category inputs */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: logoMode === 'icon' ? 14 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
               <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
                 {logoMode === 'photo' && logoUrl
                   ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1525,14 +1514,9 @@ function CreateModal({ onClose, onCreated, userId }) {
                 )}
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {/* Inline circle name input */}
-                <input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Circle Name"
-                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }}
-                />
-                {/* Inline category select */}
+                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }} />
                 <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}
                   style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit', cursor: 'pointer' }}>
                   <option value="academic">Academic / Study Group</option>
@@ -1541,26 +1525,26 @@ function CreateModal({ onClose, onCreated, userId }) {
                   <option value="social">Social / Hangout</option>
                 </select>
               </div>
-              {logoMode === 'photo' && !logoUrl && (
-                <button type="button" onClick={() => logoInputRef.current?.click()}
-                  style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', flexShrink: 0 }}>
-                  Upload
-                </button>
-              )}
             </div>
-            {/* Icon grid */}
-            {logoMode === 'icon' && (
-              <div className="icon-picker" style={{ gap: 6 }}>
-                {icons.map(opt => (
-                  <button key={opt.icon} type="button"
-                    className={`icon-pick-btn ${form.icon === opt.icon ? 'selected' : ''}`}
-                    onClick={() => setForm(f => ({ ...f, icon: opt.icon }))} title={opt.label}>
-                    <i className={opt.icon}></i>
-                    <span>{opt.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Icon grid + Photo button as last item */}
+            <div className="icon-picker" style={{ gap: 6 }}>
+              {icons.map(opt => (
+                <button key={opt.icon} type="button"
+                  className={`icon-pick-btn ${logoMode === 'icon' && form.icon === opt.icon ? 'selected' : ''}`}
+                  onClick={() => { setLogoMode('icon'); setLogoUrl(null); setForm(f => ({ ...f, icon: opt.icon })); }} title={opt.label}>
+                  <i className={opt.icon}></i>
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+              {/* Photo as last icon slot */}
+              <button type="button"
+                className={`icon-pick-btn ${logoMode === 'photo' ? 'selected' : ''}`}
+                onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+                title="Upload Photo">
+                {logoUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
+                <span>{logoUrl ? '✓ Photo' : 'Photo'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2133,33 +2117,25 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
           <div className="manage-tab-content">
             {/* CIRCLE LOGO */}
             <div className="input-group">
-              <label>CIRCLE LOGO</label>
-              {/* Pill toggle */}
-              <div style={{ display: 'inline-flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 3, marginBottom: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-                <button type="button" onClick={() => setLogoMode('icon')}
-                  style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'icon' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'icon' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
-                  <i className="fa-solid fa-icons" style={{ marginRight: 5 }} />ICON
-                </button>
-                <button type="button" onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-                  style={{ padding: '5px 16px', borderRadius: 6, border: 'none', background: logoMode === 'photo' ? 'rgba(0,240,255,0.15)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: '0.15s' }}>
-                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} /> : <i className="fa-solid fa-image" style={{ marginRight: 5 }} />}PHOTO
-                </button>
-                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-              </div>
-              {/* Preview card */}
+              <label>CIRCLE IDENTITY</label>
+              <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
               <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {/* Top row: logo + inline name + category */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
                     {logoMode === 'photo' && logoUrl
                       ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />
-                    }
+                      : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />}
+                    {logoMode === 'photo' && logoUrl && (
+                      <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
+                        style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <i className="fa-solid fa-xmark" />
+                      </button>
+                    )}
                   </div>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {/* Inline name */}
                     <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                       style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }} />
-                    {/* Inline category */}
                     <select value={form.category} onChange={e => {
                       const newCat = e.target.value;
                       const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
@@ -2173,18 +2149,25 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                       <option value="social">Social / Hangout</option>
                     </select>
                   </div>
-                  {logoMode === 'photo' && logoUrl && (
-                    <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 14 }}>
-                      <i className="fa-solid fa-xmark" />
+                </div>
+                {/* Icon grid + Photo as last slot */}
+                <div className="icon-picker" style={{ gap: 6 }}>
+                  {(CATEGORY_ICONS[form.category] || CATEGORY_ICONS.academic || []).map(opt => (
+                    <button key={opt.icon} type="button"
+                      className={`icon-pick-btn ${logoMode === 'icon' && (comm.icon === opt.icon || form.icon === opt.icon) ? 'selected' : ''}`}
+                      onClick={() => { setLogoMode('icon'); setLogoUrl(null); }}
+                      title={opt.label}>
+                      <i className={opt.icon}></i>
+                      <span>{opt.label}</span>
                     </button>
-                  )}
-                  {logoMode === 'photo' && !logoUrl && (
-                    <button type="button" onClick={() => logoInputRef.current?.click()}
-                      style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
-                      Upload
-                    </button>
-                  )}
+                  ))}
+                  <button type="button"
+                    className={`icon-pick-btn ${logoMode === 'photo' ? 'selected' : ''}`}
+                    onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+                    title="Upload Photo">
+                    {logoUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
+                    <span>{logoUrl ? '✓ Photo' : 'Photo'}</span>
+                  </button>
                 </div>
               </div>
             </div>
