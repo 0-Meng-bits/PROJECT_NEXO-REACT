@@ -1537,7 +1537,6 @@ function CreateModal({ onClose, onCreated, userId }) {
                 </button>
               ))}
             </div>
-            {/* Photo upload — full width */}
             <button type="button"
               onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
               style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.08)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.15s' }}>
