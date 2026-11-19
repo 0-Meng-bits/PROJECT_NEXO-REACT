@@ -1526,8 +1526,8 @@ function CreateModal({ onClose, onCreated, userId }) {
                 </select>
               </div>
             </div>
-            {/* Icon grid + Photo button as last item */}
-            <div className="icon-picker" style={{ gap: 6 }}>
+            {/* Icon grid + Photo as full-width button below */}
+            <div className="icon-picker" style={{ gap: 6, marginBottom: 8 }}>
               {icons.map(opt => (
                 <button key={opt.icon} type="button"
                   className={`icon-pick-btn ${logoMode === 'icon' && form.icon === opt.icon ? 'selected' : ''}`}
@@ -1536,15 +1536,14 @@ function CreateModal({ onClose, onCreated, userId }) {
                   <span>{opt.label}</span>
                 </button>
               ))}
-              {/* Photo as last icon slot */}
-              <button type="button"
-                className={`icon-pick-btn ${logoMode === 'photo' ? 'selected' : ''}`}
-                onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-                title="Upload Photo">
-                {logoUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
-                <span>{logoUrl ? '✓ Photo' : 'Photo'}</span>
-              </button>
             </div>
+            {/* Photo upload — full width */}
+            <button type="button"
+              onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+              style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.08)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.15s' }}>
+              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-image" />}
+              {logoMode === 'photo' && logoUrl ? '✓ Photo uploaded — click to change' : 'Upload a Photo'}
+            </button>
           </div>
         </div>
 
@@ -2150,8 +2149,8 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                     </select>
                   </div>
                 </div>
-                {/* Icon grid + Photo as last slot */}
-                <div className="icon-picker" style={{ gap: 6 }}>
+                {/* Icon grid + Photo as full-width button below */}
+                <div className="icon-picker" style={{ gap: 6, marginBottom: 8 }}>
                   {(CATEGORY_ICONS[form.category] || CATEGORY_ICONS.academic || []).map(opt => (
                     <button key={opt.icon} type="button"
                       className={`icon-pick-btn ${logoMode === 'icon' && (comm.icon === opt.icon || form.icon === opt.icon) ? 'selected' : ''}`}
@@ -2161,14 +2160,13 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
                       <span>{opt.label}</span>
                     </button>
                   ))}
-                  <button type="button"
-                    className={`icon-pick-btn ${logoMode === 'photo' ? 'selected' : ''}`}
-                    onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-                    title="Upload Photo">
-                    {logoUploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-image"></i>}
-                    <span>{logoUrl ? '✓ Photo' : 'Photo'}</span>
-                  </button>
                 </div>
+                <button type="button"
+                  onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
+                  style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.08)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.15s' }}>
+                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-image" />}
+                  {logoMode === 'photo' && logoUrl ? '✓ Photo uploaded — click to change' : 'Upload a Photo'}
+                </button>
               </div>
             </div>
             <div className="input-group">
