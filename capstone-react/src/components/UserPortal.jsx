@@ -2817,14 +2817,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                 {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
                 {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
               </div>
-              {/* Description */}
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
-                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
-                  {circle.description || 'No description provided.'}
-                </p>
-              </div>
-              {/* Interests — inside the card */}
+              {/* Interests — shown first so always visible */}
               {tags.length > 0 && (
                 <div>
                   <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
@@ -2835,6 +2828,13 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                   </div>
                 </div>
               )}
+              {/* Description */}
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
+                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
+                  {circle.description || 'No description provided.'}
+                </p>
+              </div>
               {/* Recently Joined */}
               {recentMembers.length > 0 && (
                 <div>
