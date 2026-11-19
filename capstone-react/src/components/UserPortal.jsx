@@ -2610,7 +2610,7 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
 function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile }) {
   const [leaderProfile, setLeaderProfile] = useState(null);
   const [recentMembers, setRecentMembers] = useState([]);
-  const [stats, setStats] = useState({ postsThisMonth: 0, activeThisWeek: 0, daysSinceCreated: 0 });
+  const [stats, setStats] = useState({ postsThisMonth: 0, daysSinceCreated: 0 });
   const [reviews, setReviews] = useState([]);
   const [avgRating, setAvgRating] = useState(0);
   const [myReview, setMyReview] = useState(null);
@@ -2632,29 +2632,30 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
       .eq('id', circle.creator_id).maybeSingle()
       .then(({ data }) => { if (data) setLeaderProfile({ id: data.id, full_name: data.full_name, ctu_id: data.ctu_id, avatar_url: data.account_details?.avatar_url || null }); });
     // Recently joined — two-step to avoid RLS join issues
-    supabase.from('memberships').select('user_id, created_at')
-      .eq('community_id', circle.id).eq('status', 'active')
-      .order('created_at', { ascending: false }).limit(5)
-      .then(async ({ data: mData }) => {
-        if (!mData?.length) return;
-        const ids = mData.map(m => m.user_id);
-        const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
-        if (accs) {
-          const map = {};
-          accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
-          setRecentMembers(mData.map(m => ({ ...m, _acc: map[m.user_id] || {} })));
-        }
-      });
-    // Stats — use announcements count + simple membership count (no gte on created_at to avoid RLS issues)
+    // Recently joined — only fetch if user is a member (RLS blocks non-members)
+    const isUserMember = myMemberships?.some(m => m.community_id === circle.id && m.status === 'active');
+    if (isUserMember) {
+      supabase.from('memberships').select('user_id, created_at')
+        .eq('community_id', circle.id).eq('status', 'active')
+        .order('created_at', { ascending: false }).limit(5)
+        .then(async ({ data: mData, error }) => {
+          if (error || !mData?.length) return;
+          const ids = mData.map(m => m.user_id);
+          const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
+          if (accs) {
+            const map = {};
+            accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
+            setRecentMembers(mData.map(m => ({ ...m, _acc: map[m.user_id] || {} })));
+          }
+        });
+    }
+    // Stats
     const now = new Date();
     const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30);
     const daysSince = circle.created_at ? Math.floor((now - new Date(circle.created_at)) / (1000 * 60 * 60 * 24)) : 0;
-    Promise.all([
-      supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).gte('created_at', monthAgo.toISOString()),
-      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active'),
-    ]).then(([postsRes, activeRes]) => {
-      setStats({ postsThisMonth: postsRes.count || 0, activeThisWeek: activeRes.count || 0, daysSinceCreated: daysSince });
-    });
+    supabase.from('announcements').select('id', { count: 'exact', head: true })
+      .eq('community_id', circle.id).gte('created_at', monthAgo.toISOString())
+      .then(({ count }) => setStats(prev => ({ ...prev, postsThisMonth: count || 0, daysSinceCreated: daysSince })));
     // Reviews — two-step to avoid RLS join issues
     supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id')
       .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3)
@@ -2853,12 +2854,11 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               )}
             </div>
 
-            {/* Right column — 2x2 stats grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {/* Right column — stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
               {[
                 { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
                 { label: 'Posts this month', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
-                { label: 'Active this week', value: stats.activeThisWeek, icon: 'fa-solid fa-fire', color: '#f43f5e' },
                 { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
               ].map((s, i) => (
                 <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
