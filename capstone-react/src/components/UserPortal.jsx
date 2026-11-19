@@ -2804,8 +2804,8 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
         {/* Body */}
         <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)', height: 380 }}>
 
-          {/* Two-column layout — left wider, right narrower */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 10, marginBottom: 10 }}>
+          {/* Two-column layout — left wider, right narrower. On mobile: single column */}
+          <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 480 ? '1fr' : '1fr 160px', gap: 10, marginBottom: 10 }}>
 
             {/* Left column — two separate cards stacked */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -2858,7 +2858,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
             </div>
 
             {/* Right column — 3 stat cards, stretch to fill total left height */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: window.innerWidth < 480 ? 'row' : 'column', gap: 8 }}>
               {[
                 { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
                 { label: 'Posts/mo', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
