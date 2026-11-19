@@ -18,6 +18,7 @@ export default function Auth() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [pendingRoute, setPendingRoute] = useState('/portal');
   const [suspendedUntil, setSuspendedUntil] = useState(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [form, setForm] = useState({
     ctuId: '', password: '', fullName: '', email: '', userType: 'Student', gender: ''
   });
@@ -188,7 +189,17 @@ export default function Auth() {
         } else if (data.message?.includes('CTU_ID not found')) {
           alert('SYSTEM_ALERT: This CTU ID is not registered. Please sign up first.');
         } else {
-          alert('SYSTEM_ALERT: ' + data.message);
+          const newAttempts = failedAttempts + 1;
+          setFailedAttempts(newAttempts);
+          if (newAttempts >= 5) {
+            // Lock them to forgot password
+            setMode('forgot');
+            alert('Too many failed attempts. Forgot your password? Reset your password to continue.');
+          } else if (newAttempts >= 3) {
+            alert(`SYSTEM_ALERT: ${data.message}\n\n⚠️ ${newAttempts} failed attempts. Forgot your password?`);
+          } else {
+            alert('SYSTEM_ALERT: ' + data.message);
+          }
         }
       }
     } catch (err) {
