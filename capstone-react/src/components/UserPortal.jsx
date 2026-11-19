@@ -2658,7 +2658,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
       .then(({ count }) => setStats(prev => ({ ...prev, postsThisMonth: count || 0, daysSinceCreated: daysSince })));
     // Reviews — two-step to avoid RLS join issues
     supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id')
-      .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3)
+      .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(20)
       .then(async ({ data }) => {
         if (!data?.length) return;
         setReviews(data);
@@ -2757,7 +2757,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
       await supabase.from('circle_reviews').insert([{ community_id: circle.id, reviewer_id: currentUser.id, rating: reviewRating, comment: reviewComment.trim() }]);
     }
     // Refresh reviews
-    const { data } = await supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id, accounts:reviewer_id(full_name, account_details(avatar_url))').eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3);
+    const { data } = await supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id').eq('community_id', circle.id).order('created_at', { ascending: false }).limit(20);
     if (data) { setReviews(data); const avg = data.length ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0; setAvgRating(Math.round(avg * 10) / 10); }
     const { data: mine } = await supabase.from('circle_reviews').select('id, rating, comment').eq('community_id', circle.id).eq('reviewer_id', currentUser.id).maybeSingle();
     if (mine) setMyReview(mine);
@@ -2920,19 +2920,22 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               </div>
             )}
 
-            {/* Recent reviews list */}
+            {/* Recent reviews list — scrollable */}
             {reviews.length === 0 ? (
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>No reviews yet. Be the first!</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', paddingRight: 4 }}>
                 {reviews.map(r => (
-                  <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px' }}>
+                  <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
                         {r._reviewer?.avatar_url ? <img src={r._reviewer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (r._reviewer?.full_name || '?')[0].toUpperCase()}
                       </div>
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{r._reviewer?.full_name || 'Member'}</span>
-                      <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                        {new Date(r.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                      </span>
+                      <div style={{ display: 'flex', gap: 2 }}>
                         {[1,2,3,4,5].map(s => <i key={s} className={s <= r.rating ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 9, color: '#f59e0b' }} />)}
                       </div>
                     </div>
