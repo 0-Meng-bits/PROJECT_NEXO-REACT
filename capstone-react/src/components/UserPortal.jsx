@@ -2807,61 +2807,64 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
           {/* Two-column layout — left wider, right narrower */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 10, marginBottom: 10 }}>
 
-            {/* Left column — scrollable card: badges + description + interests + recently joined */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: 240 }}>
-              {/* Badges */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
-                {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-                {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-                {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
-                {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-              </div>
-              {/* Interests — shown first so always visible */}
-              {tags.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {tags.map((tag, i) => (
-                      <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
-                    ))}
-                  </div>
+            {/* Left column — two separate cards stacked */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Top card — badges + interests */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
+                  {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
+                  {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
+                  {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
+                  {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
                 </div>
-              )}
-              {/* Description */}
-              <div>
+                {/* Interests */}
+                {tags.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {tags.map((tag, i) => (
+                        <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Recently Joined */}
+                {recentMembers.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
+                    <div style={{ display: 'flex' }}>
+                      {recentMembers.map((m, i) => {
+                        const avatarUrl = m._acc?.avatar_url;
+                        const name = m._acc?.full_name || '?';
+                        return (
+                          <div key={i} title={name} style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--cyber-cyan)', marginLeft: i > 0 ? -8 : 0, zIndex: recentMembers.length - i }}>
+                            {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name[0].toUpperCase()}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Bottom card — description only, scrollable */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
-                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto', paddingRight: 4 }}>
                   {circle.description || 'No description provided.'}
                 </p>
               </div>
-              {/* Recently Joined */}
-              {recentMembers.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
-                  <div style={{ display: 'flex' }}>
-                    {recentMembers.map((m, i) => {
-                      const avatarUrl = m._acc?.avatar_url;
-                      const name = m._acc?.full_name || '?';
-                      return (
-                        <div key={i} title={name} style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--cyber-cyan)', marginLeft: i > 0 ? -8 : 0, zIndex: recentMembers.length - i }}>
-                          {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name[0].toUpperCase()}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Right column — compact stats, fixed 160px width */}
+            {/* Right column — 3 stat cards, stretch to fill total left height */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
                 { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
                 { label: 'Posts/mo', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
                 { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
               ].map((s, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, height: '40%' }}>
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
                   <i className={s.icon} style={{ fontSize: 14, color: s.color, flexShrink: 0 }}></i>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
