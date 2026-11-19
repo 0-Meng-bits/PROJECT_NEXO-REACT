@@ -2861,7 +2861,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                 { label: 'Posts/mo', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
                 { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
               ].map((s, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, height: '40%' }}>
                   <i className={s.icon} style={{ fontSize: 14, color: s.color, flexShrink: 0 }}></i>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
