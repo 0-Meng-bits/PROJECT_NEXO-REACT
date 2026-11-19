@@ -61,7 +61,7 @@ function ParticipantEventLogger({ communityId, supabase }) {
 }
 
 // Raise hand button — overlays on top of the control bar
-function RaiseHandButton({ isMobile = false }) {
+function RaiseHandButton({ isMobile = false, communityId, supabase, currentUser }) {
   const { localParticipant } = useLocalParticipant();
   const [raised, setRaised] = useState(false);
 
@@ -70,8 +70,20 @@ function RaiseHandButton({ isMobile = false }) {
     setRaised(next);
     try {
       await localParticipant.setMetadata(JSON.stringify({ handRaised: next }));
+      // Post system message when raising hand
+      if (next && supabase && communityId) {
+        const name = currentUser?.full_name || localParticipant.name || 'Someone';
+        await supabase.from('messages').insert([{
+          full_name: 'System',
+          content: `NEXOSYS:✋ ${name} raised their hand`,
+          message_type: 'text',
+          community_id: communityId,
+          channel_id: null,
+          sender_id: null,
+        }]);
+      }
     } catch { /* non-fatal */ }
-  }, [raised, localParticipant]);
+  }, [raised, localParticipant, supabase, communityId, currentUser]);
 
   return (
     <button
@@ -264,7 +276,7 @@ export default function CallModal({ token, livekitUrl, circleName, currentUser, 
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', marginRight: 10, flexShrink: 0 }}></div>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{circleName} — Voice/Video Call</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <RaiseHandButton isMobile={window.innerWidth < 640} />
+              <RaiseHandButton isMobile={window.innerWidth < 640} communityId={communityId} supabase={supabase} currentUser={currentUser} />
               <button onClick={() => setMinimized(true)}
                 style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.7)', padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <i className="fa-solid fa-minus"></i>

@@ -6455,6 +6455,17 @@ export default function UserPortal() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.message || 'Failed to start call.'); setStartingCall(false); return; }
+      // Post system message when a new call is started (not when joining existing)
+      if (!data.existing) {
+        await supabase.from('messages').insert([{
+          full_name: 'System',
+          content: `NEXOSYS:📞 ${user.full_name} started a call`,
+          message_type: 'text',
+          community_id: commId,
+          channel_id: null,
+          sender_id: user.student_id,
+        }]);
+      }
       setActiveCall({ token: data.token, livekit_url: data.livekit_url, room_name: data.room_name, comm_id: commId });
     } catch { showToast('Failed to start call.'); }
     setStartingCall(false);
