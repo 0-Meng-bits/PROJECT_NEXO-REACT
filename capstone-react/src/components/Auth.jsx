@@ -413,11 +413,16 @@ export default function Auth() {
                     title="Please enter a valid email address (e.g. name@gmail.com)" />
                 </div>
                 <div className="input-group">
-                  <label>USER_TYPE</label>
-                  <select name="userType" value={form.userType} onChange={update} disabled={loading}>
-                    <option value="Student">STUDENT</option>
-                    <option value="Faculty">FACULTY</option>
-                  </select>
+                  <label>ACCOUNT TYPE</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, border: '1px solid var(--cyber-cyan)', background: 'rgba(0,240,255,0.08)', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700 }}>
+                      <i className="fa-solid fa-graduation-cap" style={{ fontSize: 14 }}></i>
+                      Student
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      CTU Daanbantayan students only
+                    </div>
+                  </div>
                 </div>
                 <div className="input-group">
                   <label>GENDER</label>
@@ -568,7 +573,7 @@ export default function Auth() {
               <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>1. Responsible Use</p>
               <p style={{ marginBottom: 12 }}>You agree to use NEXO Connect responsibly and in accordance with CTU's student conduct policies. Any misuse of the platform may result in account suspension.</p>
               <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>2. Respect for Others</p>
-              <p style={{ marginBottom: 12 }}>You agree to treat all students and faculty with respect. Harassment, bullying, hate speech, or any form of discrimination is strictly prohibited.</p>
+              <p style={{ marginBottom: 12 }}>You agree to treat all students with respect. Harassment, bullying, hate speech, or any form of discrimination is strictly prohibited.</p>
               <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>3. Personal Information</p>
               <p style={{ marginBottom: 12 }}>Do not share sensitive personal information (home address, financial details, passwords) of yourself or others on the platform.</p>
               <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>4. Content Policy</p>

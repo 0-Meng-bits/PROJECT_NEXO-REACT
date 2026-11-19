@@ -341,7 +341,7 @@ export default function Landing({ onEnter }) {
                 icon: 'fa-solid fa-users',
                 color: 'var(--cyber-cyan)',
                 title: 'For Users',
-                desc: 'Whether you\'re a student or faculty, discover groups, chat with peers, join organizations, and stay updated with everything happening on campus.',
+                desc: 'As a CTU student, discover groups, chat with peers, join organizations, and stay updated with everything happening on campus.',
                 highlights: ['Join academic and hobby circles', 'Start or join voice/video calls', 'Post threads & connect with peers', 'View bulletin & campus events', 'Apply to organizations', 'Review circles you\'ve joined'],
               },
               {
