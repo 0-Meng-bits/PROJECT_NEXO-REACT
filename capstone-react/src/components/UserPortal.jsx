@@ -6050,7 +6050,13 @@ export default function UserPortal() {
         showToast(data.activated ? 'Circle is now active! Chat unlocked.' : 'You joined the circle!');
         navTo('circles', commId);
       } else {
-        showToast(data.message || 'Failed to accept invite.');
+        // If already a member, just navigate to the circle
+        if (data.message?.toLowerCase().includes('already') || data.message?.toLowerCase().includes('active')) {
+          showToast('You\'re already a member of this circle!');
+          navTo('circles', commId);
+        } else {
+          showToast(data.message || 'Failed to accept invite.');
+        }
       }
     } catch {
       showToast('Failed to accept invite.');
@@ -6661,14 +6667,19 @@ export default function UserPortal() {
                             navTo('global', 'global');
                           }
                         } else if (n.type === 'circle_invite' && n.link_comm_id) {
-                          // Open the Circle Info Card for the invited circle directly
-                          const invitedCircle = communities.find(c => c.id === n.link_comm_id);
-                          if (invitedCircle) {
-                            setShowCircleInfo(invitedCircle);
+                          // If already a member, go directly to the circle
+                          const existingMembership = myMemberships.find(m => m.community_id === n.link_comm_id && m.status === 'active');
+                          if (existingMembership) {
+                            navTo('circles', n.link_comm_id);
                           } else {
-                            // Circle not yet in local state — navigate to Explore and filter
-                            setActiveCategory('all');
-                            navTo('activity', 'global');
+                            // Open the Circle Info Card for the invited circle
+                            const invitedCircle = communities.find(c => c.id === n.link_comm_id);
+                            if (invitedCircle) {
+                              setShowCircleInfo(invitedCircle);
+                            } else {
+                              setActiveCategory('all');
+                              navTo('activity', 'global');
+                            }
                           }
                         } else if (n.link_comm_id) {
                           setActiveChannelId(null);
