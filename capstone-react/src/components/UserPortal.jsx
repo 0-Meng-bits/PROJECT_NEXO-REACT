@@ -2645,25 +2645,33 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
           setRecentMembers(mData.map(m => ({ ...m, _acc: map[m.user_id] || {} })));
         }
       });
-    // Stats
+    // Stats — use announcements count + simple membership count (no gte on created_at to avoid RLS issues)
     const now = new Date();
     const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30);
-    const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
     const daysSince = circle.created_at ? Math.floor((now - new Date(circle.created_at)) / (1000 * 60 * 60 * 24)) : 0;
     Promise.all([
       supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).gte('created_at', monthAgo.toISOString()),
-      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active').gte('created_at', weekAgo.toISOString()),
+      supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('community_id', circle.id).eq('status', 'active'),
     ]).then(([postsRes, activeRes]) => {
       setStats({ postsThisMonth: postsRes.count || 0, activeThisWeek: activeRes.count || 0, daysSinceCreated: daysSince });
     });
-    // Reviews
-    supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id, accounts:reviewer_id(full_name, account_details(avatar_url))')
+    // Reviews — two-step to avoid RLS join issues
+    supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id')
       .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(3)
-      .then(({ data }) => {
-        if (data) {
-          setReviews(data);
-          const avg = data.length ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0;
-          setAvgRating(Math.round(avg * 10) / 10);
+      .then(async ({ data }) => {
+        if (!data?.length) return;
+        setReviews(data);
+        const avg = data.reduce((s, r) => s + r.rating, 0) / data.length;
+        setAvgRating(Math.round(avg * 10) / 10);
+        // Fetch reviewer accounts separately
+        const ids = data.map(r => r.reviewer_id).filter(Boolean);
+        if (ids.length) {
+          const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
+          if (accs) {
+            const map = {};
+            accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
+            setReviews(prev => prev.map(r => ({ ...r, _reviewer: map[r.reviewer_id] || {} })));
+          }
         }
       });
     if (currentUser?.id) {
@@ -2921,9 +2929,9 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                   <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                        {r.accounts?.account_details?.avatar_url ? <img src={r.accounts.account_details.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (r.accounts?.full_name || '?')[0].toUpperCase()}
+                        {r._reviewer?.avatar_url ? <img src={r._reviewer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (r._reviewer?.full_name || '?')[0].toUpperCase()}
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{r.accounts?.full_name || 'Member'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{r._reviewer?.full_name || 'Member'}</span>
                       <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
                         {[1,2,3,4,5].map(s => <i key={s} className={s <= r.rating ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 9, color: '#f59e0b' }} />)}
                       </div>
