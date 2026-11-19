@@ -7,9 +7,58 @@ import {
   useTracks,
   ParticipantTile,
   useLocalParticipant,
+  useRoomContext,
 } from '@livekit/components-react';
-import { Track } from 'livekit-client';
+import { Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
+
+// Logs join/leave events as system messages in circle chat
+function ParticipantEventLogger({ communityId, supabase }) {
+  const room = useRoomContext();
+  const loggedRef = React.useRef(new Set());
+
+  React.useEffect(() => {
+    if (!room || !supabase || !communityId) return;
+
+    const onJoin = (participant) => {
+      if (participant.isLocal) return; // don't log yourself
+      const name = participant.name || participant.identity || 'Someone';
+      const key = `join-${participant.sid}`;
+      if (loggedRef.current.has(key)) return;
+      loggedRef.current.add(key);
+      supabase.from('messages').insert([{
+        full_name: 'System',
+        content: `NEXOSYS:📞 ${name} joined the call`,
+        message_type: 'text',
+        community_id: communityId,
+        channel_id: null,
+        sender_id: null,
+      }]).then(() => {});
+    };
+
+    const onLeave = (participant) => {
+      if (participant.isLocal) return;
+      const name = participant.name || participant.identity || 'Someone';
+      supabase.from('messages').insert([{
+        full_name: 'System',
+        content: `NEXOSYS:📞 ${name} left the call`,
+        message_type: 'text',
+        community_id: communityId,
+        channel_id: null,
+        sender_id: null,
+      }]).then(() => {});
+    };
+
+    room.on(RoomEvent.ParticipantConnected, onJoin);
+    room.on(RoomEvent.ParticipantDisconnected, onLeave);
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, onJoin);
+      room.off(RoomEvent.ParticipantDisconnected, onLeave);
+    };
+  }, [room, supabase, communityId]);
+
+  return null;
+}
 
 // Raise hand button — overlays on top of the control bar
 function RaiseHandButton({ isMobile = false }) {
@@ -174,7 +223,7 @@ function PipContent({ circleName, onMaximize, onLeave }) {
   );
 }
 
-export default function CallModal({ token, livekitUrl, circleName, onClose }) {
+export default function CallModal({ token, livekitUrl, circleName, currentUser, communityId, supabase, onClose }) {
   const [minimized, setMinimized] = useState(false);
 
   return (
@@ -189,6 +238,7 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
       style={{ display: 'contents' }}
     >
       <RoomAudioRenderer />
+      <ParticipantEventLogger communityId={communityId} supabase={supabase} />
 
       {/* Full modal — hidden via CSS when minimized, NOT unmounted */}
       <div style={{
@@ -204,7 +254,7 @@ export default function CallModal({ token, livekitUrl, circleName, onClose }) {
           border: '1px solid rgba(0,240,255,0.12)',
           borderRadius: window.innerWidth < 640 ? 0 : 16,
           overflow: 'hidden',
-          height: window.innerWidth < 640 ? '100dvh' : '86vh',
+          height: window.innerWidth < 640 ? '100dvh' : window.innerHeight < 700 ? '95vh' : '86vh',
           boxShadow: '0 0 60px rgba(0,0,0,0.7)',
           display: 'flex', flexDirection: 'column',
           width: window.innerWidth < 640 ? '100%' : '94%',

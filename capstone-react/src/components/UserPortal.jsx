@@ -8683,6 +8683,8 @@ export default function UserPortal() {
           livekitUrl={activeCall.livekit_url}
           circleName={communities.find(c => c.id === activeCall.comm_id)?.name || 'Circle'}
           currentUser={user}
+          communityId={activeCall.comm_id}
+          supabase={supabase}
           onClose={() => { endCall(); }}
         />
       )}
