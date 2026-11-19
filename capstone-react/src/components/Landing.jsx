@@ -77,14 +77,17 @@ export default function Landing({ onEnter }) {
 
   const features = [
     { icon: 'fa-solid fa-users',          title: 'Campus Circles',      desc: 'Join or create your own group — whether it\'s for your program, a hobby, a project, or just hanging out with classmates.' },
-    { icon: 'fa-solid fa-bullhorn',        title: 'Live Announcements',  desc: 'Stay updated with real-time posts from faculty, organizations, and fellow students. Never miss an important update.' },
-    { icon: 'fa-solid fa-comments',        title: 'Group Messaging',     desc: 'Chat inside your circle in real time. Each group has its own channels so conversations stay organized.' },
-    { icon: 'fa-solid fa-microphone',      title: 'Application System',  desc: 'Organizations can open applications with custom questions. Students apply directly — no need for separate forms.' },
+    { icon: 'fa-solid fa-thumbtack',       title: 'Bulletin Board',      desc: 'Official announcements, events, shoutouts, and polls from Admin and verified circle leaders — all in one dedicated board.' },
+    { icon: 'fa-solid fa-comments',        title: 'Threads',             desc: 'Post your thoughts, share ideas, or invite others to your circle in the Home Feed. Set posts to Public or Connections Only.' },
+    { icon: 'fa-solid fa-phone',           title: 'Voice & Video Calls', desc: 'Every circle has a dedicated call channel. Start or join a live call, raise your hand, share your screen, and minimize to keep chatting.' },
+    { icon: 'fa-solid fa-message',         title: 'Real-Time Chat',      desc: 'Chat inside your circle in real time. Each group has its own channels so conversations stay organized.' },
+    { icon: 'fa-solid fa-microphone',      title: 'Application System',  desc: 'Organizations can open applications with custom questions and deadlines. Students apply directly — no need for separate forms.' },
     { icon: 'fa-solid fa-id-card',         title: 'Verified Identity',   desc: 'Every account is verified using your CTU school ID. This keeps the platform safe and school-members only.' },
+    { icon: 'fa-solid fa-people-group',    title: 'Discover People',     desc: 'Find students who share your interests. Send connection requests and unlock connections-only threads from your network.' },
+    { icon: 'fa-solid fa-star',            title: 'Circle Reviews',      desc: 'Rate and review circles you\'ve been part of. See average ratings and member feedback before deciding to join.' },
     { icon: 'fa-solid fa-shield',          title: 'Trust & Moderation',  desc: 'A built-in reputation system keeps the community respectful. Admins can flag, review, and manage any content.' },
-    { icon: 'fa-solid fa-people-group',    title: 'Discover People',     desc: 'Find students who share your interests. Browse peers by interest and build your network before joining circles.' },
-    { icon: 'fa-solid fa-link',            title: 'Connection System',   desc: 'Send and accept connection requests to build a trusted network. Connections are the foundation of every new circle.' },
-    { icon: 'fa-solid fa-fire',            title: 'Daily Login Streak',  desc: 'Log in daily to earn trust points. Maintain your streak and recover points — the longer you stay active, the more you earn.' },
+    { icon: 'fa-solid fa-fire',            title: 'Trust Points',        desc: 'Earn Trust Points through participation and appreciation. Spend them in the shop for profile customizations.' },
+    { icon: 'fa-solid fa-calendar-days',   title: 'Campus Events',       desc: 'View all upcoming campus-wide and circle events in one place. Never miss a deadline, activity, or org event again.' },
   ];
 
   const steps = [
@@ -139,7 +142,7 @@ export default function Landing({ onEnter }) {
           </Reveal>
           <Reveal delay={280}>
             <p className="lnd-hero-sub">
-              NEXO Connect is CTU's private online community, a safe space where verified users and organizations can meet, chat, share, and grow together.
+              NEXO Connect is CTU's private online community — chat in circles, start voice and video calls, post threads, stay updated with the Bulletin, and grow your campus network. Verified, safe, and built for CTU.
             </p>
           </Reveal>
           <Reveal delay={400}>
@@ -171,8 +174,8 @@ export default function Landing({ onEnter }) {
               <img src="/logoo.png" alt="NEXO" className="lnd-visual-logo" />
             </div>
             <div className="lnd-orbit-card lnd-orbit-1"><i className="fa-solid fa-users" /><span>Circles</span></div>
-            <div className="lnd-orbit-card lnd-orbit-2"><i className="fa-solid fa-comments" /><span>Chat</span></div>
-            <div className="lnd-orbit-card lnd-orbit-3"><i className="fa-solid fa-microphone" /><span>Applications</span></div>
+            <div className="lnd-orbit-card lnd-orbit-2"><i className="fa-solid fa-phone" /><span>Calls</span></div>
+            <div className="lnd-orbit-card lnd-orbit-3"><i className="fa-solid fa-thumbtack" /><span>Bulletin</span></div>
             <div className="lnd-orbit-card lnd-orbit-4"><i className="fa-solid fa-id-card" /><span>Verified</span></div>
           </div>
         </div>
@@ -339,14 +342,14 @@ export default function Landing({ onEnter }) {
                 color: 'var(--cyber-cyan)',
                 title: 'For Users',
                 desc: 'Whether you\'re a student or faculty, discover groups, chat with peers, join organizations, and stay updated with everything happening on campus.',
-                highlights: ['Join academic and hobby circles', 'Chat with classmates', 'Apply to organizations', 'Post and share with campus'],
+                highlights: ['Join academic and hobby circles', 'Start or join voice/video calls', 'Post threads & connect with peers', 'View bulletin & campus events', 'Apply to organizations', 'Review circles you\'ve joined'],
               },
               {
                 icon: 'fa-solid fa-sitemap',
                 color: 'var(--green)',
                 title: 'For Organizations',
                 desc: 'Run your org online. Accept applications, manage members, create channels, and grow your presence on campus.',
-                highlights: ['Open applications', 'Manage your members', 'Create dedicated channels'],
+                highlights: ['Open applications with deadlines', 'Manage your members & ranks', 'Create dedicated channels & calls', 'Cross-post to the Bulletin'],
               },
             ].map((card, i) => (
               <Reveal key={i} delay={i * 140}>
