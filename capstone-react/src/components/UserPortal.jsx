@@ -2804,10 +2804,10 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
         {/* Body */}
         <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)', height: 380 }}>
 
-          {/* Two-column layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          {/* Two-column layout — left wider, right narrower */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 10, marginBottom: 10 }}>
 
-            {/* Left column — scrollable card: badges + description + recently joined */}
+            {/* Left column — scrollable card: badges + description + interests + recently joined */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', maxHeight: 240 }}>
               {/* Badges */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -2824,6 +2824,17 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                   {circle.description || 'No description provided.'}
                 </p>
               </div>
+              {/* Interests — inside the card */}
+              {tags.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {tags.map((tag, i) => (
+                      <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Recently Joined */}
               {recentMembers.length > 0 && (
                 <div>
@@ -2843,35 +2854,23 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               )}
             </div>
 
-            {/* Right column — compact stats */}
+            {/* Right column — compact stats, fixed 160px width */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
                 { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
-                { label: 'Posts this month', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
+                { label: 'Posts/mo', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
                 { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
               ].map((s, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <i className={s.icon} style={{ fontSize: 16, color: s.color, width: 18, textAlign: 'center', flexShrink: 0 }}></i>
+                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <i className={s.icon} style={{ fontSize: 14, color: s.color, flexShrink: 0 }}></i>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{s.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap' }}>{s.label}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Interests — full width row below the grid */}
-          {tags.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {tags.map((tag, i) => (
-                  <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Review section */}
           <div style={{ marginBottom: 14 }}>
