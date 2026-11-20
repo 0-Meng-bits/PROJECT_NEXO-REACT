@@ -1372,16 +1372,21 @@ export default function AdminDashboard() {
             : communities.length === 0 ? <div className="adm-empty">No circles found.</div>
             : (
               <table className="adm-table">
-                <thead><tr><th>Name</th><th>Category</th><th>Verified</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Verified</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
                 <tbody>
                   {communities.map(c => (
-                    <tr key={c.id}>
+                    <tr key={c.id} style={{ opacity: c.status === 'pending' ? 0.7 : 1 }}>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
                         onClick={() => viewCircleMembers(c)}>
                         {c.name}
                         <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
                       </td>
                       <td><span className="adm-tag">{c.category}</span></td>
+                      <td>
+                        {c.status === 'pending'
+                          ? <span style={{ fontSize: 11, color: 'var(--orange)', border: '1px solid rgba(247,169,79,0.4)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>
+                          : <span style={{ fontSize: 11, color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Active</span>}
+                      </td>
                       <td>
                         <button onClick={() => toggleOfficialCircle(c.id, c.is_official, c.name)}
                           style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit',
