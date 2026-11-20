@@ -570,16 +570,31 @@ export default function Auth() {
               Please read and accept before continuing
             </p>
             <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.8 }}>
-              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>1. Responsible Use</p>
-              <p style={{ marginBottom: 12 }}>You agree to use NEXO Connect responsibly and in accordance with CTU's student conduct policies. Any misuse of the platform may result in account suspension.</p>
-              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>2. Respect for Others</p>
-              <p style={{ marginBottom: 12 }}>You agree to treat all students with respect. Harassment, bullying, hate speech, or any form of discrimination is strictly prohibited.</p>
-              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>3. Personal Information</p>
-              <p style={{ marginBottom: 12 }}>Do not share sensitive personal information (home address, financial details, passwords) of yourself or others on the platform.</p>
-              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>4. Content Policy</p>
-              <p style={{ marginBottom: 12 }}>All content posted must be relevant to academic or campus life. Spam, explicit content, or off-topic material will be removed.</p>
-              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>5. Privacy</p>
-              <p>Your data is stored securely and used only to provide the NEXO Connect service. We do not sell or share your information with third parties.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>1. Eligibility</p>
+              <p style={{ marginBottom: 12 }}>NEXO Connect is exclusively for currently enrolled students of Cebu Technological University — Daanbantayan Campus. By registering, you confirm that you are an active CTU Daanbantayan student. Your account may be suspended or removed if your enrollment status changes.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>2. ID Verification</p>
+              <p style={{ marginBottom: 12 }}>You are required to submit a valid CTU school ID photo during registration. Submitting a fake, altered, or borrowed ID is a serious violation and will result in permanent account removal. Your ID photo is used solely for identity verification and is not shared publicly.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>3. Responsible Use</p>
+              <p style={{ marginBottom: 12 }}>You agree to use NEXO Connect in accordance with CTU Daanbantayan's student conduct policies. Harassment, bullying, hate speech, impersonation, spam, explicit content, and any form of discrimination are strictly prohibited and may result in warnings, suspension, or permanent removal.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>4. Content Ownership</p>
+              <p style={{ marginBottom: 12 }}>All posts, photos, and uploads you share on NEXO Connect remain your own. The platform is a tool for you to share content — we do not claim ownership over anything you post. You are solely responsible for the content you publish and must ensure it does not violate the rights of others.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>5. Circles & Leadership</p>
+              <p style={{ marginBottom: 12 }}>When a circle leader graduates, is expelled, or leaves the platform, circle leadership is automatically transferred to the next highest-ranking active member (Co-Leader). If no active members remain, the circle becomes inactive and may be reviewed or dissolved by the admin. You may not create a circle on behalf of another person or organization without authorization.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>6. Trust Points & Moderation</p>
+              <p style={{ marginBottom: 12 }}>Your account carries a Trust Points score that reflects your standing in the community. Violations of these terms will result in point deductions, warnings, or suspension. You have the right to appeal any moderation action through the Support Ticket system within the platform.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>7. Personal Information</p>
+              <p style={{ marginBottom: 12 }}>Do not share sensitive personal information — such as home addresses, financial details, or passwords — of yourself or others on the platform. NEXO Connect is not responsible for information you voluntarily disclose to other users.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>8. Account Termination</p>
+              <p>Accounts that violate these terms may be flagged for deletion. You will be notified with a reason and given 7 days to appeal before any permanent action is taken. CTU Daanbantayan administration reserves the right to remove accounts or circles that pose a risk to the safety and integrity of the campus community.</p>
+
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="cyber-btn" style={{ flex: 1 }} onClick={() => {

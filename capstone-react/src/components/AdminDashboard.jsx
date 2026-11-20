@@ -424,6 +424,9 @@ function SupportTicketsSection() {
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const admin = JSON.parse(localStorage.getItem('currentUser'));
+  const [adminTermsAccepted, setAdminTermsAccepted] = useState(
+    () => !!localStorage.getItem('nexo-admin-terms-accepted')
+  );
   const [section, setSection] = useState('analytics');
   const [students, setStudents] = useState([]);
   const [communities, setCommunities] = useState([]);
@@ -986,6 +989,60 @@ export default function AdminDashboard() {
 
   return (
     <div className="adm-layout">
+
+      {/* ── ADMIN RESPONSIBILITY AGREEMENT ── shown once per device until accepted ── */}
+      {!adminTermsAccepted && (
+        <div className="modal-overlay" style={{ zIndex: 9999, background: 'rgba(0,0,0,0.92)' }}>
+          <div className="auth-card fade-in" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <i className="fa-solid fa-shield-halved" style={{ fontSize: 36, color: 'var(--cyber-cyan)', marginBottom: 12, display: 'block' }}></i>
+              <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 6 }}>ADMIN RESPONSIBILITY AGREEMENT</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: 11, letterSpacing: 1 }}>
+                Read and accept before accessing the admin panel
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>1. Confidentiality</p>
+              <p style={{ marginBottom: 12 }}>As an admin, you have access to sensitive information including student ID photos, personal details, support tickets, and moderation records. You agree to keep all such information strictly confidential and not share, distribute, or use it outside of your administrative duties on NEXO Connect.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>2. Impartiality</p>
+              <p style={{ marginBottom: 12 }}>All moderation actions — warnings, suspensions, bans, circle approvals or rejections, and account deletions — must be based solely on actual violations of platform policies. You must not use admin powers to favor, target, or retaliate against any student based on personal relationships, bias, or outside influence.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>3. Responsible Use of Deletion Powers</p>
+              <p style={{ marginBottom: 12 }}>The platform's deletion warning system exists to protect students from unfair removal. You are required to use it properly — issuing a warning with a valid reason and allowing the 7-day appeal period before confirming any permanent deletion. Bypassing this process without just cause is a violation of this agreement.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>4. Credential Security</p>
+              <p style={{ marginBottom: 12 }}>Your admin credentials must not be shared with anyone. You are solely responsible for all actions performed under your admin account. If you suspect your account has been compromised, report it immediately to CTU Daanbantayan administration.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>5. Action Accountability</p>
+              <p style={{ marginBottom: 12 }}>All admin actions are logged and may be reviewed by CTU Daanbantayan administration at any time. You acknowledge that misuse of admin privileges — including unauthorized data access, abuse of moderation tools, or any action that harms students — is subject to disciplinary action under CTU's student or staff conduct policies.</p>
+
+              <p style={{ marginBottom: 10, color: 'var(--cyber-cyan)', fontWeight: 700 }}>6. Scope of Authority</p>
+              <p>Your admin role is scoped to NEXO Connect — the campus social platform of CTU Daanbantayan. This agreement does not grant you any authority outside of the platform. You are acting as a trusted representative of the campus community and are expected to uphold the trust placed in you.</p>
+
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="cyber-btn" style={{ flex: 1 }} onClick={() => {
+                localStorage.setItem('nexo-admin-terms-accepted', 'true');
+                setAdminTermsAccepted(true);
+              }}>
+                <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>I ACCEPT & UNDERSTAND
+              </button>
+              <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={() => {
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                navigate('/');
+              }}>
+                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* SIDEBAR */}
       <div className="adm-sidebar">
         <div className="adm-brand">
