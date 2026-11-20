@@ -161,6 +161,16 @@ export default async function handler(req, res) {
 
     return res.json({ message: 'Circle request rejected.' });
 
+  } else if (action === 'delete') {
+    // Admin-only: delete a circle request record (approved/rejected entries only)
+    const { error } = await supabaseAdmin
+      .from('circle_requests')
+      .delete()
+      .eq('id', requestId);
+
+    if (error) return res.status(500).json({ message: error.message });
+    return res.json({ message: 'Record deleted.' });
+
   } else {
     return res.status(400).json({ message: 'Invalid action.' });
   }

@@ -548,6 +548,20 @@ export default function AdminDashboard() {
     fetchCircleRequests();
   };
 
+  const deleteCircleRequest = async (id) => {
+    if (!confirm('Delete this circle request record? This only removes the log entry — it won\'t affect any approved circle.')) return;
+    try {
+      const res = await fetch(getApiUrl('/api/circle-requests/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, adminId: admin?.id }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); showToast(d.message || 'Delete failed.'); return; }
+      showToast('Record deleted.');
+      fetchCircleRequests();
+    } catch (err) { showToast('Error: ' + err.message); }
+  };
+
   useEffect(() => { fetchData(); loadCampusEvents(); fetchCircleRequests(); }, [fetchData, fetchCircleRequests]);
 
   // Real-time: new reports appear instantly in admin panel
@@ -985,6 +999,15 @@ export default function AdminDashboard() {
                           <i className="fa-solid fa-xmark" style={{ marginRight: 4 }}></i>Reject
                         </button>
                       </div>
+                    )}
+                    {req.status !== 'pending' && (
+                      <button onClick={() => deleteCircleRequest(req.id)}
+                        title="Delete this record"
+                        style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid #333', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', flexShrink: 0, transition: '0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.borderColor = 'var(--red)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = '#333'; }}>
+                        <i className="fa-solid fa-trash"></i>
+                      </button>
                     )}
                   </div>
                 ))}
