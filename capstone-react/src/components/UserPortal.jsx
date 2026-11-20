@@ -1393,14 +1393,11 @@ function CreateModal({ onClose, onCreated, userId }) {
         img.onerror = reject;
         img.src = objectUrl;
       });
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/upload'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'upload-avatar', userId, avatar: compressed }),
-      });
-      const data = await res.json();
-      if (data.url) setLogoUrl(data.url);
+      // Store base64 in state — same approach as circle settings.
+      // The admin API (upload-cover) writes the base64 directly into communities.logo_url
+      // when the circle is approved, via circle-requests.js → communities insert.
+      setLogoUrl(compressed);
+      setLogoMode('photo');
     } catch { /* non-fatal */ }
     setLogoUploading(false);
   };
