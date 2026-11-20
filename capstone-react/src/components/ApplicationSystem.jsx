@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+﻿﻿import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 export function ApplicationStatusLabel(status, phase2Result) {
@@ -82,12 +82,12 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
             author_type: 'Leader',
             title: 'Application Open - ' + data.title + ' (' + comm.name + ')',
             content: comm.name + ' is now accepting applications for: ' + data.title + '. Visit the circle to apply.',
-            post_type: 'announcement',
+            post_type: 'thread',
             community_id: null,
           }]);
         }
       } else {
-        // Internal � post only to circle announcements
+        // Internal — post only to circle announcements
         await supabase.from('announcements').insert([{
           author_id: comm.creator_id,
           author_name: 'Circle Leader',
@@ -335,7 +335,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
                 <i className="fa-solid fa-bullhorn" style={{ marginRight: 6 }}></i>Post to Campus Home Feed
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                Announce this Application to all students on the home feed
+                Announce this application in the Threads section of the campus home feed so all students can discover and apply
               </div>
             </div>
           </div>
@@ -354,14 +354,14 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
 
           {newQuestions.length === 0 && (
             <p style={{ fontSize: 11, color: 'var(--text-muted)', padding: '8px 0' }}>
-              No questions yet � applicants can still submit. Add questions to collect specific info.
+              No questions yet — applicants can still submit. Add questions to collect specific info.
             </p>
           )}
 
           {newQuestions.map((q, idx) => (
             <div key={q.id} className="question-card">
               <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input className="question-input" placeholder={'Question ' + (idx + 1) + ' � e.g. What is your name?'}
+                <input className="question-input" placeholder={'Question ' + (idx + 1) + ' — e.g. What is your name?'}
                   value={q.question}
                   onChange={e => updateNewQuestion(idx, 'question', e.target.value)}
                   style={{ flex: 1 }} />
@@ -439,7 +439,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{aud.title}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {aud.type === 'internal' ? 'Internal' : 'External'} � {count} applicant{count !== 1 ? 's' : ''}
+                  {aud.type === 'internal' ? 'Internal' : 'External'} · {count} applicant{count !== 1 ? 's' : ''}
                   {aud.type === 'external' && aud.post_to_feed && <span style={{ marginLeft: 8, color: 'var(--green)' }}><i className="fa-solid fa-bullhorn" style={{ marginRight: 3 }}></i>On feed</span>}
                 </div>
               </div>
@@ -457,19 +457,54 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
 
 // -- Application APPLICATION FORM (applicant side) --------------------------------
 // Now accepts an Application object with application_id
-export function ApplicationApplicationForm({ comm, Application, applicantId, onSubmitted, onCancel }) {
+export function ApplicationApplicationForm({ comm, Application, appTitle, applicantId, onSubmitted, onCancel }) {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [availableApps, setAvailableApps] = useState([]);
+  const [selectedApp, setSelectedApp] = useState(Application || null);
+
+  // activeApp = the specific application passed in (e.g. from an announcement),
+  // or the one the applicant picks from the list below
+  const activeApp = Application || selectedApp;
 
   useEffect(() => {
-    // Load questions for this specific Application if application_id exists, else fall back to community
-    const query = Application?.id
-      ? supabase.from('application_questions').select('*').eq('application_id', Application.id).order('order_index')
-      : supabase.from('application_questions').select('*').eq('community_id', comm.id).order('order_index');
-    query.then(({ data }) => { setQuestions(data || []); setLoading(false); });
-  }, [comm.id, Application]);
+    if (Application?.id) {
+      // A specific application was provided — load its questions directly
+      supabase.from('application_questions').select('*').eq('application_id', Application.id).order('order_index')
+        .then(({ data }) => { setQuestions(data || []); setLoading(false); });
+      return;
+    }
+    // No specific application — fetch the open ones for this circle so the applicant can choose
+    supabase.from('applications')
+      .select('*').eq('community_id', comm.id).eq('is_open', true)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        // Only offer applications whose deadline hasn't passed (or has no deadline)
+        const open = (data || []).filter(a => !a.deadline || new Date(a.deadline) >= new Date());
+        setAvailableApps(open);
+        // Pre-select by title if provided (user clicked APPLY NOW on a specific announcement)
+        const byTitle = appTitle ? open.find(a => a.title === appTitle) : null;
+        const target = byTitle || (open.length === 1 ? open[0] : null);
+        if (target) {
+          setSelectedApp(target);
+          supabase.from('application_questions').select('*').eq('application_id', target.id).order('order_index')
+            .then(({ data: qData }) => { setQuestions(qData || []); setLoading(false); });
+        } else {
+          setLoading(false);
+        }
+      });
+  }, [comm.id, Application, appTitle]);
+
+  const pickApp = (app) => {
+    setSelectedApp(app);
+    setAnswers({});
+    setQuestions([]);
+    setLoading(true);
+    supabase.from('application_questions').select('*').eq('application_id', app.id).order('order_index')
+      .then(({ data }) => { setQuestions(data || []); setLoading(false); });
+  };
 
   const handleFileUpload = async (questionId, file) => {
     const ext = file.name.split('.').pop();
@@ -487,7 +522,7 @@ export function ApplicationApplicationForm({ comm, Application, applicantId, onS
     setSubmitting(true);
     const { error } = await supabase.from('application_submissions').insert([{
       community_id: comm.id,
-      application_id: Application?.id || null,
+      application_id: activeApp?.id || null,
       applicant_id: applicantId,
       answers,
       status: 'pending',
@@ -497,79 +532,128 @@ export function ApplicationApplicationForm({ comm, Application, applicantId, onS
     else alert('Failed to submit. Please try again.');
   };
 
-  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>Loading form...</div>;
+  if (loading && !activeApp) return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: 24, color: 'var(--text-muted)' }}>Loading form...</div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-box" style={{ maxWidth: 520, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>
-          {Application ? Application.title : 'Apply to ' + comm.name}
+          {activeApp ? activeApp.title : 'Apply to ' + comm.name}
         </h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 20, marginTop: -10 }}>
-          {Application?.description || 'Fill out the form below. The circle leader will review your application.'}
+          {activeApp?.description || 'Fill out the form below. The circle leader will review your application.'}
         </p>
-        {Application?.deadline && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, marginBottom: 16,
-            background: new Date(Application.deadline) < new Date() ? 'rgba(247,95,95,0.08)' : 'rgba(252,238,10,0.07)',
-            border: '1px solid ' + (new Date(Application.deadline) < new Date() ? 'rgba(247,95,95,0.3)' : 'rgba(252,238,10,0.3)') }}>
-            <i className="fa-solid fa-clock" style={{ color: new Date(Application.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)', fontSize: 13 }}></i>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: new Date(Application.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)' }}>
-                {new Date(Application.deadline) < new Date() ? 'Application Closed' : 'Deadline'}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                {new Date(Application.deadline).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
-                {' at '}
-                {new Date(Application.deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </div>
+
+        {/* Application picker — only when no specific application was passed in and there are several open ones */}
+        {!Application && availableApps.length > 1 && !selectedApp && (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>
+              Choose which application to submit
             </div>
+            {availableApps.map(app => (
+              <div key={app.id} className="Application-response-row" onClick={() => pickApp(app)} style={{ cursor: 'pointer' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: app.type === 'internal' ? 'rgba(252,238,10,0.15)' : 'rgba(0,240,255,0.15)', border: '1px solid ' + (app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)', flexShrink: 0 }}>
+                  <i className={app.type === 'internal' ? 'fa-solid fa-lock' : 'fa-solid fa-globe'}></i>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{app.title}</div>
+                  {app.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>}
+                </div>
+                <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8 }}></i>
+              </div>
+            ))}
+            <button className="cyber-btn secondary" onClick={onCancel} style={{ width: '100%', marginTop: 16 }}>Cancel</button>
+          </>
+        )}
+
+        {/* No open applications */}
+        {!Application && availableApps.length === 0 && !selectedApp && (
+          <div style={{ textAlign: 'center', padding: 16 }}>
+            <i className="fa-solid fa-circle-info" style={{ fontSize: 26, color: 'var(--text-muted)', marginBottom: 10, display: 'block' }}></i>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>There are no open applications for {comm.name} right now. Check back later.</p>
+            <button className="cyber-btn secondary" onClick={onCancel} style={{ marginTop: 16 }}>Close</button>
           </div>
         )}
-        {questions.length === 0 && (
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-            No questions set yet. You can still submit your application.
-          </p>
-        )}
-        {questions.map(q => (
-          <div key={q.id} className="input-group">
-            <label>{q.question}</label>
-            {q.type === 'text' && (
-              <textarea style={{ width: '100%', background: '#000', border: '1px solid #333', padding: 12, color: 'white', borderRadius: 6, fontFamily: 'inherit', fontSize: 13, outline: 'none', height: 80, resize: 'none' }}
-                placeholder="Your answer..."
-                value={answers[q.id] || ''}
-                onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))} />
-            )}
-            {q.type === 'choice' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                {(q.options || []).map((opt, i) => (
-                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'white' }}>
-                    <input type="radio" name={q.id} value={opt}
-                      checked={answers[q.id] === opt}
-                      onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} />
-                    {opt}
-                  </label>
-                ))}
+
+        {/* Question form — shown once an application is resolved (passed in or picked) */}
+        {activeApp && (
+          <>
+            {activeApp.deadline && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+                background: new Date(activeApp.deadline) < new Date() ? 'rgba(247,95,95,0.08)' : 'rgba(252,238,10,0.07)',
+                border: '1px solid ' + (new Date(activeApp.deadline) < new Date() ? 'rgba(247,95,95,0.3)' : 'rgba(252,238,10,0.3)') }}>
+                <i className="fa-solid fa-clock" style={{ color: new Date(activeApp.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)', fontSize: 13 }}></i>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: new Date(activeApp.deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)' }}>
+                    {new Date(activeApp.deadline) < new Date() ? 'Application Closed' : 'Deadline'}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                    {new Date(activeApp.deadline).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {' at '}
+                    {new Date(activeApp.deadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
               </div>
             )}
-            {q.type === 'file' && (
-              <div>
-                <input type="file" style={{ color: 'var(--text-muted)', fontSize: 12 }}
-                  onChange={e => e.target.files[0] && handleFileUpload(q.id, e.target.files[0])} />
-                {answers[q.id] && (
-                  <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>
-                    <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>File uploaded
+            {loading ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading questions...</p>
+            ) : (
+              <>
+                {questions.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
+                    No questions set yet. You can still submit your application.
                   </p>
                 )}
-              </div>
+                {questions.map(q => (
+                  <div key={q.id} className="input-group">
+                    <label>{q.question}</label>
+                    {q.type === 'text' && (
+                      <textarea style={{ width: '100%', background: '#000', border: '1px solid #333', padding: 12, color: 'white', borderRadius: 6, fontFamily: 'inherit', fontSize: 13, outline: 'none', height: 80, resize: 'none' }}
+                        placeholder="Your answer..."
+                        value={answers[q.id] || ''}
+                        onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))} />
+                    )}
+                    {q.type === 'choice' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                        {(q.options || []).map((opt, i) => (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'white' }}>
+                            <input type="radio" name={q.id} value={opt}
+                              checked={answers[q.id] === opt}
+                              onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {q.type === 'file' && (
+                      <div>
+                        <input type="file" style={{ color: 'var(--text-muted)', fontSize: 12 }}
+                          onChange={e => e.target.files[0] && handleFileUpload(q.id, e.target.files[0])} />
+                        {answers[q.id] && (
+                          <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>
+                            <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>File uploaded
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="modal-actions">
+                  <button className="cyber-btn" onClick={submit} disabled={submitting} style={{ flex: 1 }}>
+                    {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Application</>}
+                  </button>
+                  <button className="cyber-btn secondary" onClick={onCancel} style={{ flex: 1 }}>Cancel</button>
+                </div>
+              </>
             )}
-          </div>
-        ))}
-        <div className="modal-actions">
-          <button className="cyber-btn" onClick={submit} disabled={submitting} style={{ flex: 1 }}>
-            {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Application</>}
-          </button>
-          <button className="cyber-btn secondary" onClick={onCancel} style={{ flex: 1 }}>Cancel</button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -588,13 +672,33 @@ export function ApplicationReviewPanel({ comm }) {
   const load = useCallback(async () => {
     const [rRes, qRes] = await Promise.all([
       supabase.from('application_submissions')
-        .select('*, accounts!applicant_id(full_name, ctu_id), Applications(title)')
+        .select('*, application_id, applicant_id, status, submitted_at, answers, feedback, phase2_details, phase2_result, reviewed_at')
         .eq('community_id', comm.id)
         .order('submitted_at', { ascending: false }),
       supabase.from('application_questions')
         .select('*').eq('community_id', comm.id).order('order_index')
     ]);
-    setResponses(rRes.data || []);
+    const subs = rRes.data || [];
+    // Two-step: fetch applicant accounts and application titles separately
+    if (subs.length > 0) {
+      const applicantIds = [...new Set(subs.map(s => s.applicant_id).filter(Boolean))];
+      const appIds = [...new Set(subs.map(s => s.application_id).filter(Boolean))];
+      const [accsRes, appsRes] = await Promise.all([
+        applicantIds.length ? supabase.from('accounts').select('id, full_name, ctu_id').in('id', applicantIds) : { data: [] },
+        appIds.length ? supabase.from('applications').select('id, title').in('id', appIds) : { data: [] },
+      ]);
+      const accMap = {};
+      (accsRes.data || []).forEach(a => { accMap[a.id] = a; });
+      const appMap = {};
+      (appsRes.data || []).forEach(a => { appMap[a.id] = a; });
+      setResponses(subs.map(s => ({
+        ...s,
+        accounts: accMap[s.applicant_id] || null,
+        Applications: appMap[s.application_id] || null,
+      })));
+    } else {
+      setResponses([]);
+    }
     setQuestions(qRes.data || []);
     setLoading(false);
   }, [comm.id]);
@@ -619,7 +723,7 @@ export function ApplicationReviewPanel({ comm }) {
         const audTitle = resp.Applications?.title || comm.name;
         if (status === 'phase2') message = 'Your Application for "' + audTitle + '" passed Phase 1! Check your application for live screening details.';
         else if (status === 'accepted') message = 'Congratulations! Your Application for "' + audTitle + '" has been accepted.';
-        else if (status === 'rejected') message = 'Your Application application for "' + audTitle + '" was not accepted this time.';
+        else if (status === 'rejected') message = 'Your application for "' + audTitle + '" was not accepted this time.';
         else if (extra.phase2_result === 'accepted') message = 'Congratulations! You passed the live screening for "' + audTitle + '" and are now a member.';
         else if (extra.phase2_result === 'rejected') message = 'Your live screening for "' + audTitle + '" was not successful this time.';
         if (message) {
@@ -637,7 +741,7 @@ export function ApplicationReviewPanel({ comm }) {
   };
 
   if (loading) return <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>Loading applications...</p>;
-  if (responses.length === 0) return <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>No Application applications yet.</p>;
+  if (responses.length === 0) return <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>No submissions yet.</p>;
 
   return (
     <div>
@@ -649,7 +753,7 @@ export function ApplicationReviewPanel({ comm }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{r.accounts?.full_name}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {r.accounts?.ctu_id} � {r.Applications?.title || 'General'} � {new Date(r.submitted_at).toLocaleDateString()}
+              {r.accounts?.ctu_id} · {r.Applications?.title || 'General'} · {new Date(r.submitted_at).toLocaleDateString()}
             </div>
           </div>
           <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
@@ -669,7 +773,7 @@ export function ApplicationReviewPanel({ comm }) {
           </button>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>{selected.accounts?.full_name}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selected.accounts?.ctu_id} � {selected.Applications?.title || 'General Application'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selected.accounts?.ctu_id} · {selected.Applications?.title || 'General Application'}</div>
           </div>
           <div className="Application-section-label" style={{ marginBottom: 12 }}><span>Submitted Answers</span></div>
           {questions.filter(q => !q.application_id || q.application_id === selected.application_id).map(q => (
@@ -683,7 +787,7 @@ export function ApplicationReviewPanel({ comm }) {
                   : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)' }}>
-                  {selected.answers?.[q.id] || '�'}
+                  {selected.answers?.[q.id] || '—'}
                 </div>
               )}
             </div>

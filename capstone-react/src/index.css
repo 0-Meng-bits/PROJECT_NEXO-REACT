@@ -2791,6 +2791,38 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   border-color: rgba(0,240,255,0.15);
 }
 
+/* APPLICATION SYSTEM (mirrors audition- classes for renamed components) */
+.Application-builder { padding: 4px 0; }
+
+.Application-section-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.Application-response-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.Application-response-row:hover {
+  background: rgba(0,240,255,0.04);
+  border-color: rgba(0,240,255,0.15);
+}
+
 /* HOME FEED â€” hero, featured, popular */
 .home-hero {
   border-radius: 14px;

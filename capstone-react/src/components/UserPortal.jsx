@@ -2334,7 +2334,7 @@ function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLev
             />
             {comm.application_enabled && (
               <>
-                <div className="Application-section-label" style={{ marginTop: 24 }}>
+                <div className="Application-section-label" style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                   <span>Applications Received</span>
                 </div>
                 <ApplicationReviewPanel comm={comm} />
@@ -7268,8 +7268,10 @@ export default function UserPortal() {
                           const comm = commName
                             ? communities.find(c => c.name === commName)
                             : communities.find(c => ann.title?.includes(c.name));
-                          if (comm) setShowApplicationForm({ comm });
-                          else alert('Could not find the circle. Try visiting the circle directly.');
+                          if (comm) {
+                            const appTitle = ann.title?.replace(/^Application Open - /, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+                            setShowApplicationForm({ comm, appTitle });
+                          } else alert('Could not find the circle. Try visiting the circle directly.');
                         }}
                         onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                     ))}
@@ -7346,7 +7348,7 @@ export default function UserPortal() {
                           onPin={togglePin} onDelete={deleteAnnouncement} onVote={handleVote}
                           onReport={(data) => setShowReport(data)} onViewProfile={viewUserProfile}
                           onViewProfileById={viewUserProfileById}
-                          onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) setShowApplicationForm({ comm }); }}
+                          onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) { const appTitle = ann.title?.replace(/^Application Open - /, '').replace(/\s*\([^)]*\)\s*$/, '').trim(); setShowApplicationForm({ comm, appTitle }); } }}
                           onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                       ))}
                     </div>
@@ -7372,7 +7374,7 @@ export default function UserPortal() {
                         onPin={togglePin} onDelete={deleteAnnouncement} onVote={handleVote}
                         onReport={(data) => setShowReport(data)} onViewProfile={viewUserProfile}
                         onViewProfileById={viewUserProfileById}
-                        onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) setShowApplicationForm({ comm }); else alert('Could not find the circle. Try visiting the circle directly.'); }}
+                        onApply={(ann) => { const match = ann.title?.match(/\(([^)]+)\)$/); const commName = match?.[1]; const comm = commName ? communities.find(c => c.name === commName) : communities.find(c => ann.title?.includes(c.name)); if (comm) { const appTitle = ann.title?.replace(/^Application Open - /, '').replace(/\s*\([^)]*\)\s*$/, '').trim(); setShowApplicationForm({ comm, appTitle }); } else alert('Could not find the circle. Try visiting the circle directly.'); }}
                         onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
                     ))}
                   </div>
@@ -8050,7 +8052,7 @@ export default function UserPortal() {
                             onReport={(data) => setShowReport(data)}
                             onViewProfile={viewUserProfile}
                             onViewProfileById={viewUserProfileById}
-                            onApply={() => setShowApplicationForm({ comm: activeComm })}
+                            onApply={(ann) => { const appTitle = ann.title?.replace(/^(Internal )?Application Open - /, '').trim(); setShowApplicationForm({ comm: activeComm, appTitle }); }}
                             communityCreatorId={activeComm?.creator_id}
                             onReload={() => loadCircleAnnouncements(activeCommId)}
                             onViewEvents={() => { setShowEventsModal(true); loadEvents(); }} />
@@ -8534,6 +8536,7 @@ export default function UserPortal() {
         <ApplicationApplicationForm
           comm={showApplicationForm.comm}
           Application={showApplicationForm.Application || null}
+          appTitle={showApplicationForm.appTitle || null}
           applicantId={user?.id}
           onSubmitted={() => { setShowApplicationForm(null); showToast('Application submitted!'); loadMyMemberships(); loadMyApplications(); }}
           onCancel={() => setShowApplicationForm(null)}
