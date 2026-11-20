@@ -267,7 +267,7 @@ export default async function handler(req, res) {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-      supabaseAdmin.from('application_submissions').select('*, accounts!applicant_id(full_name, ctu_id), communities(name)').order('submitted_at', { ascending: false }),
+      supabaseAdmin.from('application_submissions').select('*, application_id, applicant_id, community_id, status, submitted_at, answers, feedback, phase2_details, phase2_result, reviewed_at').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('memberships').select('community_id, status, created_at'),
       supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, ctu_id), reported:reported_user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
@@ -276,10 +276,33 @@ export default async function handler(req, res) {
       supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
       supabaseAdmin.from('support_tickets').select('*, accounts:user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
     ]);
+
+    // Two-step join for application_submissions — avoids RLS nested join issues
+    let auditions = audRes.data || [];
+    if (auditions.length > 0) {
+      const applicantIds = [...new Set(auditions.map(s => s.applicant_id).filter(Boolean))];
+      const communityIds = [...new Set(auditions.map(s => s.community_id).filter(Boolean))];
+      const appIds       = [...new Set(auditions.map(s => s.application_id).filter(Boolean))];
+      const [accsRes, commsRes, appsRes] = await Promise.all([
+        applicantIds.length ? supabaseAdmin.from('accounts').select('id, full_name, ctu_id').in('id', applicantIds) : { data: [] },
+        communityIds.length ? supabaseAdmin.from('communities').select('id, name').in('id', communityIds)           : { data: [] },
+        appIds.length       ? supabaseAdmin.from('applications').select('id, title').in('id', appIds)              : { data: [] },
+      ]);
+      const accMap  = Object.fromEntries((accsRes.data  || []).map(a => [a.id, a]));
+      const commMap = Object.fromEntries((commsRes.data || []).map(c => [c.id, c]));
+      const appMap  = Object.fromEntries((appsRes.data  || []).map(a => [a.id, a]));
+      auditions = auditions.map(s => ({
+        ...s,
+        accounts:     accMap[s.applicant_id]  || null,
+        communities:  commMap[s.community_id] || null,
+        Applications: appMap[s.application_id] || null,
+      }));
+    }
+
     res.json({
       students: studRes.data || [],
       announcements: annRes.data || [],
-      applications: audRes.data || [],
+      auditions,
       messages: msgRes.data || [],
       memberships: membRes.data || [],
       reports: repRes.data || [],

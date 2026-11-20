@@ -884,7 +884,17 @@ export default function AdminDashboard() {
 
         <div style={{ marginTop: 'auto' }}>
           <div className="adm-sidebar-label">ACCOUNT</div>
-          <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--text-muted)' }}>{admin?.full_name}</div>
+          <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+              {admin?.avatar_url
+                ? <img src={admin.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : (admin?.full_name?.[0] || 'A')}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{admin?.full_name}</div>
+              <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1 }}>ADMIN</div>
+            </div>
+          </div>
           <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/'); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
@@ -1603,13 +1613,14 @@ export default function AdminDashboard() {
             : auditions.length === 0 ? <div className="adm-empty">No audition applications yet.</div>
             : (
               <table className="adm-table">
-                <thead><tr><th>Applicant</th><th>Student ID</th><th>Circle</th><th>Status</th><th>Submitted</th></tr></thead>
+                <thead><tr><th>Applicant</th><th>Student ID</th><th>Circle</th><th>Application</th><th>Status</th><th>Submitted</th></tr></thead>
                 <tbody>
                   {auditions.map(a => (
                     <tr key={a.id}>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.accounts?.full_name || '—'}</td>
                       <td><span className="adm-mono">{a.accounts?.ctu_id || '—'}</span></td>
                       <td style={{ color: 'var(--text-muted)' }}>{a.communities?.name || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{a.Applications?.title || 'General'}</td>
                       <td>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
