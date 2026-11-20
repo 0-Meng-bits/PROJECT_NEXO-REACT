@@ -198,7 +198,7 @@ function categoryGradient(category) {
 
 const GLOBAL_COMM = {
   id: 'global', name: 'NEXO Hub',
-  description: 'The central gathering space for all CTU students and faculty.',
+  description: 'The central gathering space for all CTU students.',
   icon: null, faIcon: 'fa-solid fa-earth-asia', category: 'system', creator_id: 'SYSTEM',
 };
 
@@ -3564,8 +3564,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '·'}</div>
                 {editing && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>Contact admin to change your program.</div>}
               </div>
-              {/* Year · editable inline, students only */}
-              {user.user_type !== 'Faculty' && (
+              {/* Year · editable inline */}
+              {true && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>YEAR</div>
                 {editing ? (
