@@ -427,6 +427,7 @@ export default function AdminDashboard() {
   const [adminTermsAccepted, setAdminTermsAccepted] = useState(
     () => !!localStorage.getItem('nexo-admin-terms-accepted')
   );
+  const [showAdminAgreement, setShowAdminAgreement] = useState(false);
   const [section, setSection] = useState('analytics');
   const [students, setStudents] = useState([]);
   const [communities, setCommunities] = useState([]);
@@ -990,15 +991,15 @@ export default function AdminDashboard() {
   return (
     <div className="adm-layout">
 
-      {/* ── ADMIN RESPONSIBILITY AGREEMENT ── shown once per device until accepted ── */}
-      {!adminTermsAccepted && (
+      {/* ── ADMIN RESPONSIBILITY AGREEMENT ── shown on first login OR when viewing again ── */}
+      {(!adminTermsAccepted || showAdminAgreement) && (
         <div className="modal-overlay" style={{ zIndex: 9999, background: 'rgba(0,0,0,0.92)' }}>
           <div className="auth-card fade-in" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', textAlign: 'left' }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <i className="fa-solid fa-shield-halved" style={{ fontSize: 36, color: 'var(--cyber-cyan)', marginBottom: 12, display: 'block' }}></i>
               <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 6 }}>ADMIN RESPONSIBILITY AGREEMENT</h2>
               <p style={{ color: 'var(--text-muted)', fontSize: 11, letterSpacing: 1 }}>
-                Read and accept before accessing the admin panel
+                {showAdminAgreement ? 'Your accepted agreement — for reference' : 'Read and accept before accessing the admin panel'}
               </p>
             </div>
 
@@ -1024,6 +1025,7 @@ export default function AdminDashboard() {
 
             </div>
 
+            {!showAdminAgreement ? (
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="cyber-btn" style={{ flex: 1 }} onClick={() => {
                 localStorage.setItem('nexo-admin-terms-accepted', 'true');
@@ -1040,6 +1042,11 @@ export default function AdminDashboard() {
                 <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
               </button>
             </div>
+          ) : (
+            <button className="cyber-btn" style={{ width: '100%' }} onClick={() => setShowAdminAgreement(false)}>
+              <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>Close
+            </button>
+          )}
           </div>
         </div>
       )}
@@ -1095,6 +1102,10 @@ export default function AdminDashboard() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{admin?.full_name}</div>
               <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1 }}>ADMIN</div>
             </div>
+          </div>
+          <div className="adm-nav-item" onClick={() => setShowAdminAgreement(true)} style={{ opacity: 0.6, fontSize: 11 }}>
+            <i className="fa-solid fa-file-shield"></i>
+            <span>View Agreement</span>
           </div>
           <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/'); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>

@@ -493,21 +493,18 @@ export default function Auth() {
               </div>
 
               {/* Terms agreement checkbox */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 12 }}>
-                <input
-                  type="checkbox"
-                  id="terms-agree"
-                  checked={form.agreedToTerms || false}
-                  onChange={e => setForm(f => ({ ...f, agreedToTerms: e.target.checked }))}
-                  style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 14, height: 14, flexShrink: 0, cursor: 'pointer' }}
-                />
-                <label htmlFor="terms-agree" style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', lineHeight: 1.5 }}>
-                  I have read and agree to the{' '}
+              {/* Terms agreement — checkbox moved inside the T&C modal */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '10px 12px', background: 'rgba(0,240,255,0.04)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8 }}>
+                <i className="fa-solid fa-shield-halved" style={{ color: 'var(--cyber-cyan)', fontSize: 14, flexShrink: 0 }}></i>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>
+                  You must read and accept the{' '}
                   <a href="#" onClick={e => { e.preventDefault(); setShowTermsModal(true); }}
-                    style={{ color: 'var(--cyber-cyan)', textDecoration: 'underline' }}>
+                    style={{ color: 'var(--cyber-cyan)', textDecoration: 'underline', fontWeight: 700 }}>
                     Terms &amp; Conditions
-                  </a>
-                </label>
+                  </a>{' '}
+                  to continue.
+                </span>
+                {form.agreedToTerms && <i className="fa-solid fa-circle-check" style={{ color: 'var(--green)', fontSize: 16, flexShrink: 0 }}></i>}
               </div>
             </>
           )}
@@ -596,12 +593,30 @@ export default function Auth() {
               <p>Accounts that violate these terms may be flagged for deletion. You will be notified with a reason and given 7 days to appeal before any permanent action is taken. CTU Daanbantayan administration reserves the right to remove accounts or circles that pose a risk to the safety and integrity of the campus community.</p>
 
             </div>
+
+            {/* Checkbox inside modal — must check before accepting */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 16px', padding: '12px 14px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8 }}>
+              <input
+                type="checkbox"
+                id="terms-agree-modal"
+                checked={form.agreedToTerms || false}
+                onChange={e => setForm(f => ({ ...f, agreedToTerms: e.target.checked }))}
+                style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
+              />
+              <label htmlFor="terms-agree-modal" style={{ fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.6 }}>
+                I have read and understood all the Terms &amp; Conditions above and agree to comply with them.
+              </label>
+            </div>
+
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="cyber-btn" style={{ flex: 1 }} onClick={() => {
-                localStorage.setItem('nexo-terms-accepted', 'true');
-                setShowTermsModal(false);
-                navigate(pendingRoute);
-              }}>
+              <button className="cyber-btn" style={{ flex: 1, opacity: form.agreedToTerms ? 1 : 0.4, cursor: form.agreedToTerms ? 'pointer' : 'not-allowed' }}
+                disabled={!form.agreedToTerms}
+                onClick={() => {
+                  if (!form.agreedToTerms) return;
+                  localStorage.setItem('nexo-terms-accepted', 'true');
+                  setShowTermsModal(false);
+                  navigate(pendingRoute);
+                }}>
                 <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>I ACCEPT
               </button>
               <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={() => {
