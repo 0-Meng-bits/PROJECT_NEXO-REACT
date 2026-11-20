@@ -165,6 +165,9 @@ export default async function handler(req, res) {
     suspended_until: status.suspended_until,
     warning_count: status.warning_count,
     trust_points: freshStatus?.trust_points ?? status.trust_points ?? 10,
+    deletion_pending: status.deletion_pending ?? false,
+    deletion_reason: status.deletion_reason ?? null,
+    deletion_deadline: status.deletion_deadline ?? null,
     ...details,
   };
   delete user.account_status;

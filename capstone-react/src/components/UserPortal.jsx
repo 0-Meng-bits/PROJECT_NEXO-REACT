@@ -7112,7 +7112,34 @@ export default function UserPortal() {
           {section === 'home' && (
             <div className="c-feed fade-in">
 
-              {/* Hero banner */}
+              {/* Deletion Warning Banner */}
+              {user?.deletion_pending && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 16px', background: 'rgba(168,85,247,0.1)', border: '2px solid rgba(168,85,247,0.5)', borderRadius: 12, marginBottom: 14 }}>
+                  <i className="fa-solid fa-triangle-exclamation" style={{ color: '#a855f7', fontSize: 22, marginTop: 2, flexShrink: 0 }}></i>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#a855f7', marginBottom: 4 }}>⚠️ Your account has been flagged for deletion</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>
+                      Reason: <strong>{user.deletion_reason}</strong>
+                    </div>
+                    {user.deletion_deadline && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                        Deadline to appeal: <strong style={{ color: new Date(user.deletion_deadline) < new Date() ? 'var(--red)' : 'var(--cyber-yellow)' }}>
+                          {new Date(user.deletion_deadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </strong>
+                        {new Date(user.deletion_deadline) < new Date() && <span style={{ color: 'var(--red)', marginLeft: 8 }}>(Deadline passed)</span>}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                      If you believe this is a mistake, submit a Deletion Appeal through the Help Center (Support tab) while your account is still active.
+                    </div>
+                    <button
+                      onClick={() => setShowHelp(true)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', background: 'rgba(168,85,247,0.2)', border: '1px solid rgba(168,85,247,0.5)', borderRadius: 8, color: '#a855f7', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <i className="fa-solid fa-headset"></i> Open Support Ticket
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Slim greeting */}
               <div style={{ padding: '16px 4px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 14, background: 'linear-gradient(135deg, rgba(0,240,255,0.06), rgba(168,85,247,0.06))', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Welcome back</div>

@@ -4,20 +4,21 @@ import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 
 const SECTIONS = [
-  { key: 'verification',  label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
-  { key: 'circle_requests', label: 'Circle Requests',     icon: 'fa-solid fa-paper-plane' },
-  { key: 'reports',       label: 'Reports',               icon: 'fa-solid fa-triangle-exclamation' },
-  { key: 'support',       label: 'Support Tickets',       icon: 'fa-solid fa-headset' },
-  { key: 'users',         label: 'All Users',             icon: 'fa-solid fa-users' },
-  { key: 'communities',   label: 'Circles',               icon: 'fa-solid fa-network-wired' },
-  { key: 'analytics',     label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
-  { key: 'events',        label: 'Campus Events',         icon: 'fa-solid fa-calendar-days' },
-  { key: 'announcements', label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
-  { key: 'globalfeed',    label: 'Global Feed',           icon: 'fa-solid fa-message' },
-  { key: 'auditions',     label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
-  { key: 'user_flags',    label: 'User Flags',            icon: 'fa-solid fa-flag' },
-  { key: 'moderation',    label: 'Content Monitor',       icon: 'fa-solid fa-shield' },
-  { key: 'appeals',       label: 'Warning Appeals',       icon: 'fa-solid fa-gavel' },
+  { key: 'verification',    label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
+  { key: 'circle_requests', label: 'Circle Requests',       icon: 'fa-solid fa-paper-plane' },
+  { key: 'reports',         label: 'Reports',               icon: 'fa-solid fa-triangle-exclamation' },
+  { key: 'support',         label: 'Support Tickets',       icon: 'fa-solid fa-headset' },
+  { key: 'pending_deletions', label: 'Pending Deletions',   icon: 'fa-solid fa-clock-rotate-left' },
+  { key: 'users',           label: 'All Users',             icon: 'fa-solid fa-users' },
+  { key: 'communities',     label: 'Circles',               icon: 'fa-solid fa-network-wired' },
+  { key: 'analytics',       label: 'Analytics',             icon: 'fa-solid fa-chart-line' },
+  { key: 'events',          label: 'Campus Events',         icon: 'fa-solid fa-calendar-days' },
+  { key: 'announcements',   label: 'Campus Feed Posts',     icon: 'fa-solid fa-bullhorn' },
+  { key: 'globalfeed',      label: 'Global Feed',           icon: 'fa-solid fa-message' },
+  { key: 'auditions',       label: 'Audition Applications', icon: 'fa-solid fa-microphone' },
+  { key: 'user_flags',      label: 'User Flags',            icon: 'fa-solid fa-flag' },
+  { key: 'moderation',      label: 'Content Monitor',       icon: 'fa-solid fa-shield' },
+  { key: 'appeals',         label: 'Warning Appeals',       icon: 'fa-solid fa-gavel' },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -241,6 +242,81 @@ function UserFlagsSection({ admin }) {
   );
 }
 
+// ── FLAG FOR DELETION MODAL ──────────────────────────────────────────────────
+const USER_DELETION_REASONS = [
+  'Fake or fraudulent identity',
+  'Repeated harassment',
+  'Spam or bot account',
+  'Severe community guideline violation',
+  'Requested by user',
+  'Other',
+];
+const CIRCLE_DELETION_REASONS = [
+  'Inactive or abandoned circle',
+  'Circle used for harmful content',
+  'Severe community guideline violation',
+  'Circle created for spam/misinformation',
+  'Duplicate or test circle',
+  'Other',
+];
+
+function FlagForDeletionModal({ target, onConfirm, onCancel }) {
+  const reasons = target.type === 'user' ? USER_DELETION_REASONS : CIRCLE_DELETION_REASONS;
+  const [reason, setReason] = useState(reasons[0]);
+  const [customReason, setCustomReason] = useState('');
+
+  const finalReason = reason === 'Other' ? customReason.trim() : reason;
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ color: '#a855f7', marginBottom: 6 }}>
+          <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 8 }}></i>
+          Flag for Deletion
+        </h3>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+          <strong style={{ color: 'var(--text-primary)' }}>{target.name}</strong> will be notified and given <strong>7 days</strong> to appeal via Support Ticket. The {target.type === 'user' ? 'account' : 'circle'} will NOT be deleted yet.
+        </p>
+
+        <div className="input-group">
+          <label>REASON FOR FLAGGING</label>
+          {reasons.map(r => (
+            <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer', fontSize: 13, color: reason === r ? 'var(--text-primary)' : 'var(--text-muted)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)}
+                style={{ accentColor: '#a855f7', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }} />
+              {r}
+            </label>
+          ))}
+        </div>
+
+        {reason === 'Other' && (
+          <div className="input-group" style={{ marginTop: 10 }}>
+            <label>SPECIFY REASON</label>
+            <textarea
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+              placeholder="Describe the reason..."
+              rows={3}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'none' }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button
+            className="cyber-btn"
+            style={{ flex: 1, background: 'rgba(168,85,247,0.15)', borderColor: '#a855f7', color: '#a855f7' }}
+            disabled={!finalReason}
+            onClick={() => onConfirm(finalReason)}>
+            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>Send Warning
+          </button>
+          <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── SUPPORT TICKETS SECTION (extracted to avoid hooks-in-IIFE) ───────────────
 function SupportTicketsSection() {
   const [tickets, setTickets] = useState([]);
@@ -276,6 +352,7 @@ function SupportTicketsSection() {
     'Other':              { color: 'var(--text-muted)',   bg: 'rgba(255,255,255,0.05)',   border: 'rgba(255,255,255,0.1)' },
     'Ban Appeal':         { color: '#ff4444',             bg: 'rgba(255,68,68,0.12)',     border: 'rgba(255,68,68,0.4)' },
     'Suspension Appeal':  { color: 'var(--orange)',       bg: 'rgba(247,169,79,0.12)',    border: 'rgba(247,169,79,0.4)' },
+    'Deletion Appeal':    { color: '#a855f7',             bg: 'rgba(168,85,247,0.12)',    border: 'rgba(168,85,247,0.4)' },
   };
 
   const supportTickets = tickets.filter(t => t.category !== 'Ban Appeal' && t.category !== 'Suspension Appeal');
@@ -359,6 +436,7 @@ export default function AdminDashboard() {
   const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [circleRequests, setCircleRequests] = useState([]);
+  const [showFlagModal, setShowFlagModal] = useState(null); // { type: 'user'|'circle', id, name, leaderId? }
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -596,7 +674,6 @@ export default function AdminDashboard() {
   };
 
   const rejectStudent = async (id, name) => {
-    if (!confirm(`Reject and remove ${name}?`)) return;
     const res = await fetch(getApiUrl('/api/delete'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -621,12 +698,11 @@ export default function AdminDashboard() {
   };
 
   const deleteCommunity = async (id, name) => {
-    if (!confirm(`Delete circle "${name}"? This cannot be undone.`)) return;
     const token = localStorage.getItem('accessToken');
-    const res = await fetch(getApiUrl('/api/admin-data'), {
+    const res = await fetch(getApiUrl('/api/delete'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'delete_community', id }),
+      body: JSON.stringify({ action: 'delete-community', id }),
     });
     if (res.ok) { showToast('Circle deleted.'); fetchData(); setSelectedCircle(null); }
     else showToast('Failed to delete.');
@@ -713,7 +789,6 @@ export default function AdminDashboard() {
   };
 
   const deleteUser = async (userId, userName) => {
-    if (!confirm(`Permanently delete ${userName}? This cannot be undone.`)) return;
     // Delete via server (needs service role)
     const token = localStorage.getItem('accessToken');
     try {
@@ -736,6 +811,42 @@ export default function AdminDashboard() {
     } catch {
       showToast('Network error. Failed to delete user.');
     }
+  };
+
+  const flagForDeletion = async (type, id, reason, leaderId) => {
+    const token = localStorage.getItem('accessToken');
+    const action = type === 'user' ? 'flag-deletion-user' : 'flag-deletion-circle';
+    const body = type === 'user'
+      ? { action, id, reason, adminId: admin?.id }
+      : { action, id, reason, leaderId, adminId: admin?.id };
+    try {
+      const res = await fetch(getApiUrl('/api/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const dl = new Date(d.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        showToast(`Flagged for deletion. Deadline: ${dl}`);
+        fetchData();
+      } else showToast('Failed to flag for deletion.');
+    } catch { showToast('Network error.'); }
+  };
+
+  const dismissDeletion = async (type, id, leaderId) => {
+    const token = localStorage.getItem('accessToken');
+    const action = type === 'user' ? 'dismiss-deletion-user' : 'dismiss-deletion-circle';
+    const body = type === 'user' ? { action, id } : { action, id, leaderId };
+    try {
+      const res = await fetch(getApiUrl('/api/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) { showToast('Deletion flag dismissed.'); fetchData(); }
+      else showToast('Failed to dismiss.');
+    } catch { showToast('Network error.'); }
   };
 
   const forceVerifyEmail = async (userId, userName) => {
@@ -893,6 +1004,12 @@ export default function AdminDashboard() {
             {s.key === 'communities' && communities.filter(c => c.status === 'pending').length > 0 && (
               <span className="adm-badge">{communities.filter(c => c.status === 'pending').length}</span>
             )}
+            {s.key === 'pending_deletions' && (() => {
+              const flaggedUsers = students.filter(st => st.deletion_pending).length;
+              const flaggedCircles = communities.filter(c => c.deletion_pending).length;
+              const total = flaggedUsers + flaggedCircles;
+              return total > 0 ? <span className="adm-badge" style={{ background: '#a855f7' }}>{total}</span> : null;
+            })()}
           </div>
         ))}
 
@@ -944,6 +1061,105 @@ export default function AdminDashboard() {
           <StatCard label="Pending"        value={pending.length}     color="var(--orange)"       icon="fa-solid fa-clock" />
           <StatCard label="Circles"        value={communities.length} color="var(--cyber-yellow)" icon="fa-solid fa-network-wired" />
         </div>
+
+        {/* ── PENDING DELETIONS ── */}
+        {section === 'pending_deletions' && (() => {
+          const flaggedUsers = students.filter(s => s.deletion_pending);
+          const flaggedCircles = communities.filter(c => c.deletion_pending);
+          const daysLeft = (deadline) => {
+            if (!deadline) return '?';
+            const d = Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24));
+            return d <= 0 ? 'Expired' : `${d}d left`;
+          };
+          return (
+            <div>
+              <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 10, fontSize: 13, color: '#a855f7' }}>
+                <i className="fa-solid fa-circle-info" style={{ marginRight: 8 }}></i>
+                These accounts and circles have been flagged for deletion. Users have 7 days to appeal via Support Ticket. After the deadline, you can confirm permanent deletion.
+              </div>
+
+              {/* Flagged Users */}
+              <div className="adm-card" style={{ marginBottom: 16 }}>
+                <div className="adm-card-head">
+                  <span><i className="fa-solid fa-user" style={{ marginRight: 8 }}></i>Flagged Accounts</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{flaggedUsers.length} pending</span>
+                </div>
+                {flaggedUsers.length === 0
+                  ? <div className="adm-empty">No accounts flagged for deletion.</div>
+                  : (
+                    <table className="adm-table">
+                      <thead><tr><th>Name</th><th>CTU ID</th><th>Reason</th><th>Flagged</th><th>Deadline</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        {flaggedUsers.map(s => (
+                          <tr key={s.id}>
+                            <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.full_name}</td>
+                            <td><span className="adm-mono">{s.student_id}</span></td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{s.deletion_reason}</td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.deletion_flagged_at).toLocaleDateString()}</td>
+                            <td>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: daysLeft(s.deletion_deadline) === 'Expired' ? 'var(--red)' : 'var(--cyber-yellow)' }}>
+                                {daysLeft(s.deletion_deadline)}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="adm-btn reject" style={{ fontSize: 11 }} onClick={() => deleteUser(s.id, s.full_name)}>
+                                  <i className="fa-solid fa-trash"></i> Confirm Delete
+                                </button>
+                                <button className="adm-btn approve" style={{ fontSize: 11 }} onClick={() => dismissDeletion('user', s.id)}>
+                                  <i className="fa-solid fa-rotate-left"></i> Dismiss
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+              </div>
+
+              {/* Flagged Circles */}
+              <div className="adm-card">
+                <div className="adm-card-head">
+                  <span><i className="fa-solid fa-circle-nodes" style={{ marginRight: 8 }}></i>Flagged Circles</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{flaggedCircles.length} pending</span>
+                </div>
+                {flaggedCircles.length === 0
+                  ? <div className="adm-empty">No circles flagged for deletion.</div>
+                  : (
+                    <table className="adm-table">
+                      <thead><tr><th>Circle</th><th>Category</th><th>Reason</th><th>Flagged</th><th>Deadline</th><th>Actions</th></tr></thead>
+                      <tbody>
+                        {flaggedCircles.map(c => (
+                          <tr key={c.id}>
+                            <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</td>
+                            <td><span className="adm-tag">{c.category}</span></td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{c.deletion_reason}</td>
+                            <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.deletion_flagged_at).toLocaleDateString()}</td>
+                            <td>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: daysLeft(c.deletion_deadline) === 'Expired' ? 'var(--red)' : 'var(--cyber-yellow)' }}>
+                                {daysLeft(c.deletion_deadline)}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="adm-btn reject" style={{ fontSize: 11 }} onClick={() => deleteCommunity(c.id, c.name)}>
+                                  <i className="fa-solid fa-trash"></i> Confirm Delete
+                                </button>
+                                <button className="adm-btn approve" style={{ fontSize: 11 }} onClick={() => dismissDeletion('circle', c.id, c.creator_id)}>
+                                  <i className="fa-solid fa-rotate-left"></i> Dismiss
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── ANALYTICS ── */}
         {/* Circle Requests */}
@@ -1269,8 +1485,9 @@ export default function AdminDashboard() {
                       <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString()}</td>
                       <td onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteUser(s.id, s.full_name)}>
-                            <i className="fa-solid fa-trash"></i>
+                          <button className="adm-btn reject" style={{ fontSize: 10 }}
+                            onClick={() => setShowFlagModal({ type: 'user', id: s.id, name: s.full_name })}>
+                            <i className="fa-solid fa-triangle-exclamation"></i>
                           </button>
                         </div>
                       </td>
@@ -1296,8 +1513,8 @@ export default function AdminDashboard() {
                       <i className="fa-solid fa-shield-check"></i> Force Verify Email
                     </button>
                   )}
-                  <button className="adm-btn reject" onClick={() => deleteUser(selectedUser.id, selectedUser.full_name)}>
-                    <i className="fa-solid fa-trash"></i> Delete User
+                  <button className="adm-btn reject" onClick={() => setShowFlagModal({ type: 'user', id: selectedUser.id, name: selectedUser.full_name })}>
+                    <i className="fa-solid fa-triangle-exclamation"></i> Flag for Deletion
                   </button>
                 </div>
               </div>
@@ -1409,8 +1626,8 @@ export default function AdminDashboard() {
                           <button className="adm-btn approve" onClick={() => viewCircleMembers(c)}>
                             <i className="fa-solid fa-users"></i> Members
                           </button>
-                          <button className="adm-btn reject" onClick={() => deleteCommunity(c.id, c.name)}>
-                            <i className="fa-solid fa-trash-can"></i>
+                          <button className="adm-btn reject" onClick={() => setShowFlagModal({ type: 'circle', id: c.id, name: c.name, leaderId: c.creator_id })}>
+                            <i className="fa-solid fa-triangle-exclamation"></i>
                           </button>
                         </div>
                       </td>
@@ -1894,6 +2111,18 @@ export default function AdminDashboard() {
       </div>
 
       <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
+
+      {/* ── FLAG FOR DELETION MODAL ── */}
+      {showFlagModal && (
+        <FlagForDeletionModal
+          target={showFlagModal}
+          onConfirm={(reason) => {
+            flagForDeletion(showFlagModal.type, showFlagModal.id, reason, showFlagModal.leaderId);
+            setShowFlagModal(null);
+          }}
+          onCancel={() => setShowFlagModal(null)}
+        />
+      )}
     </div>
   );
 }

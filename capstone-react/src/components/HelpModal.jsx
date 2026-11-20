@@ -373,6 +373,7 @@ export default function HelpModal({ user, onClose }) {
                       <option>Account Issue</option>
                       <option>Bug Report</option>
                       <option>Circle Problem</option>
+                      <option>Deletion Appeal</option>
                       <option>Other</option>
                     </select>
                   </div>
