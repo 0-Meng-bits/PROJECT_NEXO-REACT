@@ -20,7 +20,8 @@ export default function Auth() {
   const [suspendedUntil, setSuspendedUntil] = useState(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [form, setForm] = useState({
-    ctuId: '', password: '', fullName: '', email: '', userType: 'Student', gender: ''
+    ctuId: '', password: '', fullName: '', email: '', userType: 'Student', gender: '',
+    agreedToTerms: !!localStorage.getItem('nexo-terms-accepted'),
   });
   const navigate = useNavigate();
 
@@ -600,7 +601,11 @@ export default function Auth() {
                 type="checkbox"
                 id="terms-agree-modal"
                 checked={form.agreedToTerms || false}
-                onChange={e => setForm(f => ({ ...f, agreedToTerms: e.target.checked }))}
+                onChange={e => {
+                  setForm(f => ({ ...f, agreedToTerms: e.target.checked }));
+                  if (e.target.checked) localStorage.setItem('nexo-terms-accepted', 'true');
+                  else localStorage.removeItem('nexo-terms-accepted');
+                }}
                 style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
               />
               <label htmlFor="terms-agree-modal" style={{ fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.6 }}>
