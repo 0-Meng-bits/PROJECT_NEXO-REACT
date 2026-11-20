@@ -267,7 +267,7 @@ export default async function handler(req, res) {
     const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
-      supabaseAdmin.from('application_submissions').select('*, application_id, applicant_id, community_id, status, submitted_at, answers, feedback, phase2_details, phase2_result, reviewed_at').order('submitted_at', { ascending: false }),
+      supabaseAdmin.from('application_submissions').select('*').order('submitted_at', { ascending: false }),
       supabaseAdmin.from('messages').select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50),
       supabaseAdmin.from('memberships').select('community_id, status, created_at'),
       supabaseAdmin.from('reports').select('*, reporter:reporter_id(full_name, ctu_id), reported:reported_user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
@@ -278,6 +278,9 @@ export default async function handler(req, res) {
     ]);
 
     // Two-step join for application_submissions — avoids RLS nested join issues
+    // Log query error so we can diagnose empty results
+    if (audRes.error) console.error('[ADMIN] application_submissions error:', JSON.stringify(audRes.error));
+    console.log('[ADMIN] application_submissions count:', audRes.data?.length ?? 'null', 'error:', audRes.error?.message ?? 'none');
     let auditions = audRes.data || [];
     if (auditions.length > 0) {
       const applicantIds = [...new Set(auditions.map(s => s.applicant_id).filter(Boolean))];

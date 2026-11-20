@@ -944,8 +944,10 @@ export default function AdminDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {circleRequests.map(req => (
                   <div key={req.id} className="adm-card" style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                      <i className={req.icon}></i>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
+                      {req.logo_url
+                        ? <img src={req.logo_url} alt={req.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <i className={req.icon}></i>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
