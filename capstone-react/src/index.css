@@ -750,6 +750,9 @@ select option {
 /* CIRCLE DOCK */
 .circle-dock {
   width: 70px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
   background: rgba(5, 5, 7, 0.8);
   border-right: 1px solid var(--border);
   display: flex;
@@ -762,9 +765,9 @@ select option {
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: none;
 }
-.circle-dock::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+.circle-dock::-webkit-scrollbar { display: none; }
 
 .dock-branding {
   padding: 18px 0;
@@ -824,6 +827,7 @@ select option {
   font-size: 22px;
   transition: 0.2s;
   flex-shrink: 0;
+  margin-top: auto;
 }
 .dock-add-btn:hover { border-color: var(--cyber-cyan); color: var(--cyber-cyan); }
 
