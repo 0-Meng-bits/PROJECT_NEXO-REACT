@@ -520,6 +520,22 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
     const unanswered = questions.filter(q => q.type !== 'file' && !answers[q.id]?.trim());
     if (unanswered.length > 0) { alert('Please answer all questions.'); return; }
     setSubmitting(true);
+
+    // Server-side duplicate check — prevent spam even if frontend state is stale
+    const dupQuery = supabase
+      .from('application_submissions')
+      .select('id, status')
+      .eq('applicant_id', applicantId)
+      .eq('community_id', comm.id)
+      .in('status', ['pending', 'phase2', 'accepted']);
+    if (activeApp?.id) dupQuery.eq('application_id', activeApp.id);
+    const { data: existing } = await dupQuery.maybeSingle();
+    if (existing) {
+      const label = { pending: 'Under Review', phase2: 'in Phase 2 screening', accepted: 'already accepted' }[existing.status] || existing.status;
+      alert(`You already have an application for this circle that is currently ${label}. You cannot apply again.`);
+      setSubmitting(false);
+      return;
+    }
     const { error } = await supabase.from('application_submissions').insert([{
       community_id: comm.id,
       application_id: activeApp?.id || null,

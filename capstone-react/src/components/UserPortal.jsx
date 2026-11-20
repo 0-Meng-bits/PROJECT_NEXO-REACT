@@ -5271,7 +5271,7 @@ export default function UserPortal() {
     if (!user?.id) return;
     const { data } = await supabase
       .from('application_submissions')
-      .select('community_id, status, phase2_result, id')
+      .select('community_id, application_id, status, phase2_result, id')
       .eq('applicant_id', user.id);
     setMyApplications(data || []);
   }, [user?.id]);
@@ -7837,11 +7837,23 @@ export default function UserPortal() {
                           <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
                             <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
                           </button>
-                        ) : (
-                          <button className="group-action-btn manage" onClick={() => setShowApplicationForm({ comm: activeComm })}>
-                            <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
-                          </button>
-                        )
+                        ) : (() => {
+                          const myApp = getMyApplication(activeCommId);
+                          if (myApp) {
+                            const appColor = { pending: 'var(--cyber-yellow)', accepted: 'var(--green)', rejected: 'var(--red)' }[myApp.status] || 'var(--cyber-cyan)';
+                            return (
+                              <span style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}` }}>
+                                <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>
+                                APPLICATION {(myApp.status || '').toUpperCase()}
+                              </span>
+                            );
+                          }
+                          return (
+                            <button className="group-action-btn manage" onClick={() => setShowApplicationForm({ comm: activeComm })}>
+                              <i className="fa-solid fa-microphone"></i> APPLY TO JOIN
+                            </button>
+                          );
+                        })()
                       ) : (
                         <button className="group-action-btn manage" onClick={() => requestJoin(activeCommId)}>
                           <i className="fa-solid fa-paper-plane"></i> REQUEST TO JOIN
