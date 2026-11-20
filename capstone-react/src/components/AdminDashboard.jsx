@@ -113,11 +113,16 @@ function UserFlagsSection({ admin }) {
   useEffect(() => {
     const loadFlags = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('user_flags')
-        .select(`*, flagged_user:accounts!flagged_user_id(full_name, ctu_id, avatar_url), flagger:accounts!flagger_id(full_name, ctu_id), community:communities(name)`)
-        .order('created_at', { ascending: false });
-      if (!error && data) setFlags(data);
+      const token = localStorage.getItem('accessToken');
+      try {
+        const res = await fetch(getApiUrl('/api/admin-data?type=flags'), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const d = await res.json();
+          setFlags(d.userFlags || []);
+        }
+      } catch { /* silent */ }
       setLoading(false);
     };
     loadFlags();
@@ -2027,10 +2032,27 @@ export default function AdminDashboard() {
                         </td>
                         <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {r.status === 'pending' && (
                               <button className="adm-btn approve" style={{ fontSize: 10 }} onClick={() => resolveReport(r.id, 'reviewed', 'Reviewed by admin')}>
                                 <i className="fa-solid fa-check"></i>
+                              </button>
+                            )}
+                            {r.content_type === 'user' && r.reported_user_id && (
+                              <button className="adm-btn" style={{ fontSize: 10, color: '#a855f7', borderColor: '#a855f7', background: 'rgba(168,85,247,0.08)' }}
+                                title="Escalate: Flag this user for deletion"
+                                onClick={() => setShowFlagModal({ type: 'user', id: r.reported_user_id, name: r.reported?.full_name || r.reported_user_id })}>
+                                <i className="fa-solid fa-triangle-exclamation"></i>
+                              </button>
+                            )}
+                            {r.content_type === 'circle' && r.content_id && (
+                              <button className="adm-btn" style={{ fontSize: 10, color: '#a855f7', borderColor: '#a855f7', background: 'rgba(168,85,247,0.08)' }}
+                                title="Escalate: Flag this circle for deletion"
+                                onClick={() => {
+                                  const circle = communities.find(c => c.id === r.content_id);
+                                  setShowFlagModal({ type: 'circle', id: r.content_id, name: circle?.name || r.content_id, leaderId: circle?.creator_id });
+                                }}>
+                                <i className="fa-solid fa-triangle-exclamation"></i>
                               </button>
                             )}
                             <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id)}>

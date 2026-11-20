@@ -264,7 +264,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes, delWarnRes] = await Promise.all([
+    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes, delWarnRes, flagsRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
       supabaseAdmin.from('application_submissions').select('*').order('submitted_at', { ascending: false }),
@@ -276,6 +276,7 @@ export default async function handler(req, res) {
       supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
       supabaseAdmin.from('support_tickets').select('*, accounts:user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
       supabaseAdmin.from('deletion_warnings').select('*').eq('status', 'pending').order('flagged_at', { ascending: false }),
+      supabaseAdmin.from('user_flags').select('*, flagged_user:accounts!flagged_user_id(full_name, ctu_id, account_details(avatar_url)), flagger:accounts!flagger_id(full_name, ctu_id), community:communities(name)').order('created_at', { ascending: false }),
     ]);
 
     // Build lookup map: target_id → warning
@@ -324,6 +325,15 @@ export default async function handler(req, res) {
       circleAnnouncements: circAnnRes.data || [],
       campusEvents: eventsRes.data || [],
       tickets: ticketsRes.data || [],
+      userFlags: (flagsRes.data || []).map(f => ({
+        ...f,
+        flagged_user: f.flagged_user ? {
+          ...f.flagged_user,
+          avatar_url: Array.isArray(f.flagged_user.account_details)
+            ? f.flagged_user.account_details[0]?.avatar_url
+            : f.flagged_user.account_details?.avatar_url,
+        } : null,
+      })),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

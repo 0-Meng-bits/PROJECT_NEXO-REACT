@@ -1729,6 +1729,16 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
         )}
       </div>
       <div className="member-card-actions" ref={menuRef}>
+        {canManage && onFlagUser && (
+          <button
+            title="Flag for admin review"
+            onClick={() => onFlagUser(m)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '4px 6px', opacity: 0.5, transition: 'opacity 0.2s, color 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--cyber-yellow)'; e.currentTarget.style.opacity = 1; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.opacity = 0.5; }}>
+            <i className="fa-solid fa-flag"></i>
+          </button>
+        )}
         <button className="member-card-menu-btn" onClick={() => setMenuOpen(o => !o)}>
           <i className="fa-solid fa-ellipsis-vertical"></i>
         </button>
@@ -2607,7 +2617,7 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
 }
 
 // -- CIRCLE INFO CARD MODAL --------------------------------------------------
-function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile }) {
+function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile, onReport }) {
   const [leaderProfile, setLeaderProfile] = useState(null);
   const [recentMembers, setRecentMembers] = useState([]);
   const [stats, setStats] = useState({ postsThisMonth: 0, daysSinceCreated: 0 });
@@ -2952,8 +2962,16 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
           </div>
 
           {/* Action button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
-            {actionBtn}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
+            {onReport && currentUser?.user_type !== 'Admin' && (
+              <button onClick={() => { onClose(); onReport({ type: 'circle', id: circle.id, preview: `Circle: ${circle.name}`, reportedUserId: circle.creator_id }); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 0', opacity: 0.6, transition: 'opacity 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                onMouseLeave={e => e.currentTarget.style.opacity = 0.6}>
+                <i className="fa-solid fa-flag" style={{ fontSize: 10 }}></i> Report Circle
+              </button>
+            )}
+            <div style={{ marginLeft: 'auto' }}>{actionBtn}</div>
           </div>
         </div>
       </div>
@@ -3836,6 +3854,12 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
                   <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
                 </button>
               )}
+              {readOnly && onReport && (
+                <button onClick={() => onReport({ type: 'user', id: user.id, preview: `User: ${user.full_name} (${user.student_id})`, reportedUserId: user.id })}
+                  style={{ width: '100%', fontSize: 11, padding: '9px 0', background: 'rgba(247,95,95,0.08)', border: '1px solid rgba(247,95,95,0.3)', borderRadius: 8, color: 'var(--red)', cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <i className="fa-solid fa-flag"></i> Report User
+                </button>
+              )}
               <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.5)', color: 'var(--cyber-cyan)', fontWeight: 700 }}>CLOSE</button>
             </div>
           </div>
@@ -4023,8 +4047,9 @@ function ReportModal({ data, user, onClose }) {
   const isPhoto = data.type === 'profile_photo' || data.type === 'circle_photo';
   const isUser = data.type === 'user';
   const isMessage = data.type === 'message';
+  const isCircle = data.type === 'circle';
 
-  const TITLE = isPhoto ? 'Report Photo' : isUser ? 'Report User' : isMessage ? 'Report Message' : 'Report Post';
+  const TITLE = isPhoto ? 'Report Photo' : isUser ? 'Report User' : isCircle ? 'Report Circle' : isMessage ? 'Report Message' : 'Report Post';
 
   const REASONS = isPhoto ? [
     'Inappropriate or explicit content',
@@ -4037,6 +4062,13 @@ function ReportModal({ data, user, onClose }) {
     'Fake or impersonation account',
     'Spam behavior',
     'Inappropriate conduct',
+    'Other',
+  ] : isCircle ? [
+    'Harmful or dangerous content',
+    'Spam or misleading circle',
+    'Hate speech or discrimination',
+    'Impersonation of a real organization',
+    'Inappropriate circle name or description',
     'Other',
   ] : [
     'Inappropriate language / profanity',
@@ -8717,6 +8749,7 @@ export default function UserPortal() {
             setViewingApplication({ response: rRes.data, community: circle, questions: qRes.data || [] });
           }}
           onViewLeaderProfile={viewUserProfile}
+          onReport={(data) => setShowReport(data)}
         />
       )}
 
