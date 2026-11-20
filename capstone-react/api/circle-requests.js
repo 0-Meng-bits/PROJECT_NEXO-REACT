@@ -128,10 +128,10 @@ export default async function handler(req, res) {
     // 5. Notify the creator
     await supabaseAdmin.from('notifications').insert([{
       user_id: request.creator_id,
-      title: 'Circle Approved',
-      message: `Your circle "${request.name}" has been approved! You can now invite members.`,
       type: 'circle_approved',
-      reference_id: newCommunity.id
+      message: `Your circle "${request.name}" has been approved! You can now invite members.`,
+      category: 'Circles',
+      link_comm_id: newCommunity.id,
     }]);
 
     return res.json({ 
@@ -154,9 +154,9 @@ export default async function handler(req, res) {
     // Notify the creator
     await supabaseAdmin.from('notifications').insert([{
       user_id: request.creator_id,
-      title: 'Circle Request Rejected',
-      message: `Your circle request "${request.name}" was not approved.${note ? ` Reason: ${note}` : ''}`,
-      type: 'circle_rejected'
+      type: 'circle_rejected',
+      message: `Your circle request "${request.name}" was not approved.${note ? ` Reason: ${note}` : ' No reason was provided.'}`,
+      category: 'Circles',
     }]);
 
     return res.json({ message: 'Circle request rejected.' });

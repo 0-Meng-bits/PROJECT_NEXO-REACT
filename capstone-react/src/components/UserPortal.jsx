@@ -172,6 +172,9 @@ function notifIcon(type) {
     shoutout:         'fa-solid fa-star',
     invite_accepted:  'fa-solid fa-envelope-open-text',
     circle_invite:    'fa-solid fa-envelope',
+    circle_approved:  'fa-solid fa-circle-check',
+    circle_rejected:  'fa-solid fa-circle-xmark',
+    system:           'fa-solid fa-triangle-exclamation',
   };
   return map[type] || 'fa-solid fa-bell';
 }
