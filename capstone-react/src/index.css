@@ -2149,13 +2149,12 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .adm-card table,
 .adm-card .adm-table {
   min-width: 600px;
+  width: 100%;
 }
 
 .adm-card > table,
 .adm-card > .adm-table {
-  display: block;
   overflow-x: auto;
-  width: 100%;
 }
 
 .adm-card-head {
