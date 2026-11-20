@@ -122,6 +122,10 @@ CREATE TABLE IF NOT EXISTS circle_requests (
   creator_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   admin_note text DEFAULT '',
+  interest_tag text,
+  is_open boolean NOT NULL DEFAULT false,
+  invitees uuid[] DEFAULT '{}',
+  logo_url text,
   created_at timestamptz DEFAULT now(),
   reviewed_at timestamptz,
   reviewed_by uuid REFERENCES profiles(id)

@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS circle_requests (
   interest_tag text,
   is_open boolean NOT NULL DEFAULT false,
   invitees uuid[] NOT NULL DEFAULT '{}',
+  logo_url text,
   created_at timestamptz DEFAULT now(),
   reviewed_at timestamptz
 );
