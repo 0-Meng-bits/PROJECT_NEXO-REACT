@@ -44,6 +44,24 @@ export default async function handler(req, res) {
   }
 
   if (action === 'approve') {
+    // If logo_url is base64, upload to storage first
+    let finalLogoUrl = request.logo_url || null;
+    if (finalLogoUrl && finalLogoUrl.startsWith('data:')) {
+      const matches = finalLogoUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (matches) {
+        const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+        const buffer = Buffer.from(matches[2], 'base64');
+        const storagePath = `communities/pending-${requestId}/logo.${ext}`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from('avatars')
+          .upload(storagePath, buffer, { contentType: `image/${matches[1]}`, upsert: true });
+        if (!upErr) {
+          const { data: urlData } = supabaseAdmin.storage.from('avatars').getPublicUrl(storagePath);
+          finalLogoUrl = urlData.publicUrl;
+        }
+      }
+    }
+
     // 1. Create the community as pending (needs 3 members to activate)
     const { data: newCommunity, error: createError } = await supabaseAdmin
       .from('communities')
@@ -55,7 +73,7 @@ export default async function handler(req, res) {
         creator_id: request.creator_id,
         interest_tag: request.interest_tag || null,
         is_open: request.is_open || false,
-        logo_url: request.logo_url || null,
+        logo_url: finalLogoUrl,
         status: 'pending',
         created_at: new Date().toISOString()
       }])
