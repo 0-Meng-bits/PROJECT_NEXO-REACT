@@ -264,7 +264,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes] = await Promise.all([
+    const [studRes, annRes, audRes, msgRes, membRes, repRes, allMsgRes, circAnnRes, eventsRes, ticketsRes, delWarnRes] = await Promise.all([
       supabaseAdmin.from('accounts').select('*, account_status(*), account_details(*)').order('created_at', { ascending: false }),
       supabaseAdmin.from('announcements').select('*').is('community_id', null).order('created_at', { ascending: false }),
       supabaseAdmin.from('application_submissions').select('*').order('submitted_at', { ascending: false }),
@@ -275,7 +275,12 @@ export default async function handler(req, res) {
       supabaseAdmin.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
       supabaseAdmin.from('support_tickets').select('*, accounts:user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
+      supabaseAdmin.from('deletion_warnings').select('*').eq('status', 'pending').order('flagged_at', { ascending: false }),
     ]);
+
+    // Build lookup map: target_id → warning
+    const delWarnMap = {};
+    (delWarnRes.data || []).forEach(w => { delWarnMap[w.target_id] = w; });
 
     // Two-step join for application_submissions — avoids RLS nested join issues
     // Log query error so we can diagnose empty results
@@ -303,7 +308,13 @@ export default async function handler(req, res) {
     }
 
     res.json({
-      students: studRes.data || [],
+      students: (studRes.data || []).map(s => ({
+        ...s,
+        deletion_pending:  !!delWarnMap[s.id],
+        deletion_reason:   delWarnMap[s.id]?.reason    ?? null,
+        deletion_flagged_at: delWarnMap[s.id]?.flagged_at ?? null,
+        deletion_deadline: delWarnMap[s.id]?.deadline  ?? null,
+      })),
       announcements: annRes.data || [],
       auditions,
       messages: msgRes.data || [],

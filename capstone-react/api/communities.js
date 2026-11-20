@@ -4,11 +4,20 @@ import { insertNotification } from './_notifications.js';
 export default async function handler(req, res) {
   // GET — fetch all communities
   if (req.method === 'GET') {
-    const { data, error } = await supabaseAdmin
-      .from('communities')
-      .select('*, accounts!creator_id(full_name)')
-      .order('created_at', { ascending: false });
-    if (error) return res.status(400).json({ message: error.message });
+    const [commRes, warnRes] = await Promise.all([
+      supabaseAdmin.from('communities').select('*, accounts!creator_id(full_name)').order('created_at', { ascending: false }),
+      supabaseAdmin.from('deletion_warnings').select('target_id, reason, flagged_at, deadline').eq('target_type', 'community').eq('status', 'pending'),
+    ]);
+    if (commRes.error) return res.status(400).json({ message: commRes.error.message });
+    const warnMap = {};
+    (warnRes.data || []).forEach(w => { warnMap[w.target_id] = w; });
+    const data = (commRes.data || []).map(c => ({
+      ...c,
+      deletion_pending:    !!warnMap[c.id],
+      deletion_reason:     warnMap[c.id]?.reason     ?? null,
+      deletion_flagged_at: warnMap[c.id]?.flagged_at ?? null,
+      deletion_deadline:   warnMap[c.id]?.deadline   ?? null,
+    }));
     return res.json(data);
   }
 

@@ -1173,8 +1173,44 @@ CREATE POLICY "Users can view own tickets" ON support_tickets FOR SELECT TO auth
 CREATE POLICY "Service role full access support_tickets" ON support_tickets TO service_role USING (true) WITH CHECK (true);
 
 -- ============================================================
--- Total: 35 tables
+-- Total: 36 tables (+1 deletion_warnings normalized from columns)
 -- ============================================================
+
+-- 36. DELETION_WARNINGS
+-- Normalized replacement for 8 columns previously spread across
+-- account_status and communities. Tracks the full lifecycle of a
+-- deletion warning: pending → confirmed (hard delete) or dismissed.
+CREATE TABLE IF NOT EXISTS deletion_warnings (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_type   text        NOT NULL CHECK (target_type IN ('account', 'community')),
+  target_id     uuid        NOT NULL,
+  reason        text        NOT NULL,
+  flagged_by    uuid        REFERENCES accounts(id) ON DELETE SET NULL,
+  flagged_at    timestamptz NOT NULL DEFAULT now(),
+  deadline      timestamptz NOT NULL,
+  status        text        NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'confirmed', 'dismissed')),
+  resolved_at   timestamptz,
+  UNIQUE (target_type, target_id, status)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deletion_warnings_target ON deletion_warnings(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_warnings_status ON deletion_warnings(status);
+
+ALTER TABLE deletion_warnings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access deletion_warnings"
+  ON deletion_warnings TO service_role USING (true) WITH CHECK (true);
+
+-- support_tickets category CHECK extended to include new appeal types
+ALTER TABLE support_tickets
+  DROP CONSTRAINT IF EXISTS support_tickets_category_check;
+ALTER TABLE support_tickets
+  ADD CONSTRAINT support_tickets_category_check
+    CHECK (category IN (
+      'Bug Report','Account Issue','General Question',
+      'Circle Problem','Other','Ban Appeal','Suspension Appeal','Deletion Appeal'
+    ));
+
 -- ============================================================
 -- 1NF (First Normal Form) — ALL TABLES PASS
 --   - Every column holds atomic (single) values

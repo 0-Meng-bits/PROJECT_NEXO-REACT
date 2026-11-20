@@ -1,27 +1,57 @@
--- Deletion warning system
--- Adds soft-delete / warning-before-delete state to accounts and communities.
--- When admin flags an account/circle for deletion:
---   1. deletion_pending = true, reason + deadline stored
---   2. User gets notified and has 7 days to appeal via support ticket
---   3. Admin can confirm (hard delete) or dismiss (clear the flag)
+-- ── DELETION WARNINGS TABLE ──────────────────────────────────────────────────
+-- Normalized replacement for the 8 columns that were previously spread across
+-- account_status (deletion_pending, deletion_reason, deletion_flagged_at,
+-- deletion_deadline) and communities (same 4 columns).
+--
+-- A single deletion_warnings table owns all deletion warning data.
+-- target_type + target_id form a polymorphic reference:
+--   target_type = 'account'   → target_id references accounts.id
+--   target_type = 'community' → target_id references communities.id
+--
+-- Relationships:
+--   deletion_warnings.flagged_by → accounts.id  (Many:1)
+--   deletion_warnings.target_id  → accounts.id OR communities.id  (Many:1, polymorphic)
+-- ─────────────────────────────────────────────────────────────────────────────
 
--- ── accounts / account_status ────────────────────────────────────────────────
+-- Drop the 8 columns added in a prior step (safe with IF EXISTS)
 ALTER TABLE account_status
-  ADD COLUMN IF NOT EXISTS deletion_pending     boolean   DEFAULT false,
-  ADD COLUMN IF NOT EXISTS deletion_reason      text,
-  ADD COLUMN IF NOT EXISTS deletion_flagged_at  timestamptz,
-  ADD COLUMN IF NOT EXISTS deletion_deadline    timestamptz;
+  DROP COLUMN IF EXISTS deletion_pending,
+  DROP COLUMN IF EXISTS deletion_reason,
+  DROP COLUMN IF EXISTS deletion_flagged_at,
+  DROP COLUMN IF EXISTS deletion_deadline;
 
--- ── communities ───────────────────────────────────────────────────────────────
 ALTER TABLE communities
-  ADD COLUMN IF NOT EXISTS deletion_pending     boolean   DEFAULT false,
-  ADD COLUMN IF NOT EXISTS deletion_reason      text,
-  ADD COLUMN IF NOT EXISTS deletion_flagged_at  timestamptz,
-  ADD COLUMN IF NOT EXISTS deletion_deadline    timestamptz;
+  DROP COLUMN IF EXISTS deletion_pending,
+  DROP COLUMN IF EXISTS deletion_reason,
+  DROP COLUMN IF EXISTS deletion_flagged_at,
+  DROP COLUMN IF EXISTS deletion_deadline;
 
--- ── support_tickets — add Deletion Appeal category ────────────────────────────
--- The existing CHECK only allows 5 categories; drop and recreate it to include
--- 'Deletion Appeal' so users can appeal their flagged account/circle.
+-- Create the normalized table
+CREATE TABLE IF NOT EXISTS deletion_warnings (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_type   text        NOT NULL CHECK (target_type IN ('account', 'community')),
+  target_id     uuid        NOT NULL,
+  reason        text        NOT NULL,
+  flagged_by    uuid        REFERENCES accounts(id) ON DELETE SET NULL,
+  flagged_at    timestamptz NOT NULL DEFAULT now(),
+  deadline      timestamptz NOT NULL,
+  status        text        NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'confirmed', 'dismissed')),
+  resolved_at   timestamptz,
+  UNIQUE (target_type, target_id, status)   -- only one active warning per target
+);
+
+CREATE INDEX IF NOT EXISTS idx_deletion_warnings_target ON deletion_warnings(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_deletion_warnings_status ON deletion_warnings(status);
+
+ALTER TABLE deletion_warnings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access deletion_warnings"
+  ON deletion_warnings TO service_role USING (true) WITH CHECK (true);
+
+-- ── support_tickets — add Deletion Appeal category ───────────────────────────
+-- Drop and recreate CHECK to include 'Deletion Appeal' and also 'Ban Appeal' /
+-- 'Suspension Appeal' which were already being inserted by the backend.
 ALTER TABLE support_tickets
   DROP CONSTRAINT IF EXISTS support_tickets_category_check;
 
