@@ -16,6 +16,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsReadOnly, setTermsReadOnly] = useState(false);
   const [pendingRoute, setPendingRoute] = useState('/portal');
   const [suspendedUntil, setSuspendedUntil] = useState(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -177,6 +178,7 @@ export default function Auth() {
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {
           setPendingRoute(targetRoute);
+          setTermsReadOnly(false);
           setShowTermsModal(true);
         } else {
           navigate(targetRoute);
@@ -499,7 +501,7 @@ export default function Auth() {
                 <i className="fa-solid fa-shield-halved" style={{ color: 'var(--cyber-cyan)', fontSize: 14, flexShrink: 0 }}></i>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>
                   You must read and accept the{' '}
-                  <a href="#" onClick={e => { e.preventDefault(); setShowTermsModal(true); }}
+                  <a href="#" onClick={e => { e.preventDefault(); setTermsReadOnly(false); setShowTermsModal(true); }}
                     style={{ color: 'var(--cyber-cyan)', textDecoration: 'underline', fontWeight: 700 }}>
                     Terms &amp; Conditions
                   </a>{' '}
@@ -550,7 +552,7 @@ export default function Auth() {
           <a href="#" style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'underline', transition: 'color 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}>
+            onClick={(e) => { e.preventDefault(); setTermsReadOnly(true); setShowTermsModal(true); }}>
             Terms &amp; Conditions
           </a>
         </div>
@@ -565,7 +567,7 @@ export default function Auth() {
               <i className="fa-solid fa-shield-halved" style={{ marginRight: 8 }}></i>TERMS &amp; CONDITIONS
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: 11, letterSpacing: 1, marginBottom: 16, textAlign: 'center' }}>
-              Please read and accept before continuing
+              {termsReadOnly ? 'NEXO Connect — CTU Daanbantayan Campus' : 'Please read and check the box below to continue'}
             </p>
             <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 16, marginBottom: 20, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.8 }}>
 
@@ -595,45 +597,47 @@ export default function Auth() {
 
             </div>
 
-            {/* Checkbox inside modal — must check before accepting */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 16px', padding: '12px 14px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8 }}>
-              <input
-                type="checkbox"
-                id="terms-agree-modal"
-                checked={form.agreedToTerms || false}
-                onChange={e => {
-                  setForm(f => ({ ...f, agreedToTerms: e.target.checked }));
-                  if (e.target.checked) localStorage.setItem('nexo-terms-accepted', 'true');
-                  else localStorage.removeItem('nexo-terms-accepted');
-                }}
-                style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
-              />
-              <label htmlFor="terms-agree-modal" style={{ fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.6 }}>
-                I have read and understood all the Terms &amp; Conditions above and agree to comply with them.
-              </label>
-            </div>
+            {/* Checkbox — only shown when signup context (not read-only) */}
+            {!termsReadOnly && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 16px', padding: '12px 14px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8 }}>
+                <input
+                  type="checkbox"
+                  id="terms-agree-modal"
+                  checked={form.agreedToTerms || false}
+                  onChange={e => {
+                    setForm(f => ({ ...f, agreedToTerms: e.target.checked }));
+                    if (e.target.checked) localStorage.setItem('nexo-terms-accepted', 'true');
+                    else localStorage.removeItem('nexo-terms-accepted');
+                  }}
+                  style={{ marginTop: 2, accentColor: 'var(--cyber-cyan)', width: 15, height: 15, flexShrink: 0, cursor: 'pointer' }}
+                />
+                <label htmlFor="terms-agree-modal" style={{ fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.6 }}>
+                  I have read and understood all the Terms &amp; Conditions above and agree to comply with them.
+                </label>
+              </div>
+            )}
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="cyber-btn" style={{ flex: 1, opacity: form.agreedToTerms ? 1 : 0.4, cursor: form.agreedToTerms ? 'pointer' : 'not-allowed' }}
+            {/* Buttons — context aware */}
+            {termsReadOnly ? (
+              // Read-only (login page link / landing page) — just Close
+              <button className="cyber-btn secondary" style={{ width: '100%' }}
+                onClick={() => { setShowTermsModal(false); setTermsReadOnly(false); }}>
+                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>Close
+              </button>
+            ) : (
+              // Signup / post-login — checkbox must be checked, then Continue
+              <button className="cyber-btn"
+                style={{ width: '100%', opacity: form.agreedToTerms ? 1 : 0.4, cursor: form.agreedToTerms ? 'pointer' : 'not-allowed' }}
                 disabled={!form.agreedToTerms}
                 onClick={() => {
                   if (!form.agreedToTerms) return;
                   localStorage.setItem('nexo-terms-accepted', 'true');
                   setShowTermsModal(false);
-                  navigate(pendingRoute);
+                  if (pendingRoute && pendingRoute !== '/portal' || !isLogin) navigate(pendingRoute);
                 }}>
-                <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>I ACCEPT
+                <i className="fa-solid fa-arrow-right" style={{ marginRight: 6 }}></i>Continue
               </button>
-              <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={() => {
-                setShowTermsModal(false);
-                localStorage.removeItem('currentUser');
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-                setMode('login');
-              }}>
-                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
