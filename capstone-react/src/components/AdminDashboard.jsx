@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
+import { applyTheme } from '../lib/theme';
 
 const SECTIONS = [
   { key: 'verification',    label: 'Verification Queue',    icon: 'fa-solid fa-user-check' },
@@ -646,6 +647,13 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => { fetchData(); loadCampusEvents(); fetchCircleRequests(); }, [fetchData, fetchCircleRequests]);
+
+  // Force cyber-dark theme in admin — restore user's theme on leaving
+  useEffect(() => {
+    const userTheme = localStorage.getItem('nexo-theme') || 'cyber-dark';
+    applyTheme('cyber-dark');
+    return () => applyTheme(userTheme); // restore when admin unmounts
+  }, []);
 
   // Real-time: new reports appear instantly in admin panel
   useEffect(() => {
