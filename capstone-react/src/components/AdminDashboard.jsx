@@ -889,6 +889,8 @@ export default function AdminDashboard() {
 
   const deleteContent = async (type, contentId, reportId) => {
     const token = localStorage.getItem('accessToken');
+    // Optimistically remove from UI immediately — no waiting for full reload
+    if (reportId) setReports(prev => prev.filter(r => r.id !== reportId));
     const res = await fetch(getApiUrl('/api/admin-data'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -901,9 +903,10 @@ export default function AdminDashboard() {
     });
     if (res.ok) {
       showToast('Content removed.');
-      fetchData();
     } else {
+      // Restore on failure
       showToast('Failed to remove content.');
+      fetchData();
     }
   };
 
