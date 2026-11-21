@@ -239,6 +239,12 @@ export default async function handler(req, res) {
           await supabaseAdmin.from('account_details').update({ avatar_url: null, cover_url: null }).eq('id', id);
         } else if (content_type === 'circle_photo') {
           await supabaseAdmin.from('communities').update({ cover_url: null }).eq('id', id);
+        } else if (content_type === 'user') {
+          // Delete account + auth user so email/ID can be reused
+          await supabaseAdmin.from('accounts').delete().eq('id', id);
+          await supabaseAdmin.auth.admin.deleteUser(id).catch(() => {});
+        } else if (content_type === 'circle') {
+          await supabaseAdmin.from('communities').delete().eq('id', id);
         }
         return res.json({ ok: true });
       }

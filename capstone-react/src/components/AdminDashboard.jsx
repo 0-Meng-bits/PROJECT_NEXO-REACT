@@ -887,16 +887,27 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  const deleteContent = async (type, id) => {
-    if (!confirm('Delete this content?')) return;
+  const deleteContent = async (type, contentId, reportId) => {
     const token = localStorage.getItem('accessToken');
-    await fetch(getApiUrl('/api/admin-data'), {
+    const res = await fetch(getApiUrl('/api/admin-data'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'delete_content', id, content_type: type }),
+      body: JSON.stringify({ action: 'delete_content', id: contentId, content_type: type }),
     });
-    showToast('Content removed.');
-    fetchData();
+    if (res.ok) {
+      // Also mark the report as reviewed so it reflects the action taken
+      if (reportId) {
+        await fetch(getApiUrl('/api/admin-data'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ action: 'resolve_report', id: reportId, status: 'reviewed', note: 'Content removed by admin.', admin_id: admin?.id }),
+        });
+      }
+      showToast('Content removed.');
+      fetchData();
+    } else {
+      showToast('Failed to remove content.');
+    }
   };
 
   const rankLabel = (level) => ['Member', 'Moderator', 'Co-Leader', 'Leader'][level ?? 0] || 'Member';
@@ -2163,7 +2174,7 @@ export default function AdminDashboard() {
                                 <i className="fa-solid fa-triangle-exclamation"></i>
                               </button>
                             )}
-                            <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id)}>
+                            <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id, r.id)}>
                               <i className="fa-solid fa-trash"></i>
                             </button>
                           </div>
