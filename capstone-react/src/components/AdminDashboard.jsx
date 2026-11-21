@@ -1093,10 +1093,8 @@ export default function AdminDashboard() {
         <div style={{ marginTop: 'auto' }}>
           <div className="adm-sidebar-label">ACCOUNT</div>
           <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-              {admin?.avatar_url
-                ? <img src={admin.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : (admin?.full_name?.[0] || 'A')}
+            <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <img src="/logoo.png" alt="NEXO" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{admin?.full_name}</div>
