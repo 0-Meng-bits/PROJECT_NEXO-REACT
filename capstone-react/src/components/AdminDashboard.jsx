@@ -1929,19 +1929,52 @@ export default function AdminDashboard() {
         )}
 
         {/* ── AUDITION APPLICATIONS ── */}
-        {section === 'auditions' && (
+        {section === 'auditions' && (() => {
+          const [audFilter, setAudFilter] = React.useState('all');
+          const filtered = auditions.filter(a => {
+            if (audFilter === 'all') return true;
+            if (audFilter === 'pending') return a.status === 'pending' || a.status === 'phase2';
+            if (audFilter === 'accepted') return a.status === 'accepted' || a.phase2_result === 'accepted';
+            if (audFilter === 'rejected') return a.status === 'rejected' || a.phase2_result === 'rejected';
+            return true;
+          });
+          const filterBtns = [
+            { key: 'all',      label: 'All',           count: auditions.length },
+            { key: 'pending',  label: 'Under Review',  count: auditions.filter(a => a.status === 'pending' || a.status === 'phase2').length },
+            { key: 'accepted', label: 'Accepted',      count: auditions.filter(a => a.status === 'accepted' || a.phase2_result === 'accepted').length },
+            { key: 'rejected', label: 'Rejected',      count: auditions.filter(a => a.status === 'rejected' || a.phase2_result === 'rejected').length },
+          ];
+          return (
           <div className="adm-card">
             <div className="adm-card-head">
               <span>All Audition Applications</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{auditions.length} total</span>
             </div>
+
+            {/* Filter bar */}
+            <div style={{ display: 'flex', gap: 8, padding: '0 20px 14px', flexWrap: 'wrap' }}>
+              {filterBtns.map(f => (
+                <button key={f.key} onClick={() => setAudFilter(f.key)}
+                  style={{
+                    padding: '5px 14px', borderRadius: 20, border: '1px solid',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    transition: '0.15s',
+                    background: audFilter === f.key ? 'rgba(0,240,255,0.12)' : 'transparent',
+                    borderColor: audFilter === f.key ? 'var(--cyber-cyan)' : '#333',
+                    color: audFilter === f.key ? 'var(--cyber-cyan)' : 'var(--text-muted)',
+                  }}>
+                  {f.label} <span style={{ opacity: 0.7 }}>({f.count})</span>
+                </button>
+              ))}
+            </div>
+
             {loading ? <div className="adm-empty">Loading...</div>
-            : auditions.length === 0 ? <div className="adm-empty">No audition applications yet.</div>
+            : filtered.length === 0 ? <div className="adm-empty">No {audFilter === 'all' ? '' : filterBtns.find(f=>f.key===audFilter)?.label.toLowerCase() + ' '}applications yet.</div>
             : (
               <table className="adm-table">
                 <thead><tr><th>Applicant</th><th>Student ID</th><th>Circle</th><th>Application</th><th>Status</th><th>Submitted</th></tr></thead>
                 <tbody>
-                  {auditions.map(a => (
+                  {filtered.map(a => (
                     <tr key={a.id}>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{a.accounts?.full_name || '—'}</td>
                       <td><span className="adm-mono">{a.accounts?.ctu_id || '—'}</span></td>
@@ -1964,7 +1997,8 @@ export default function AdminDashboard() {
               </table>
             )}
           </div>
-        )}
+          );
+        })()}
 
         
         {/* -- CAMPUS EVENTS -- */}
