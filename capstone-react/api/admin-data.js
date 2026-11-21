@@ -246,6 +246,10 @@ export default async function handler(req, res) {
         } else if (content_type === 'circle') {
           await supabaseAdmin.from('communities').delete().eq('id', id);
         }
+        // Also delete the report row itself so it disappears from the list
+        if (payload.report_id) {
+          await supabaseAdmin.from('reports').delete().eq('id', payload.report_id);
+        }
         return res.json({ ok: true });
       }
       return res.status(400).json({ message: 'Unknown action.' });

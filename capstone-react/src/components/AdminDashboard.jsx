@@ -892,17 +892,14 @@ export default function AdminDashboard() {
     const res = await fetch(getApiUrl('/api/admin-data'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'delete_content', id: contentId, content_type: type }),
+      body: JSON.stringify({
+        action: 'delete_content',
+        id: contentId,
+        content_type: type,
+        report_id: reportId,
+      }),
     });
     if (res.ok) {
-      // Also mark the report as reviewed so it reflects the action taken
-      if (reportId) {
-        await fetch(getApiUrl('/api/admin-data'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ action: 'resolve_report', id: reportId, status: 'reviewed', note: 'Content removed by admin.', admin_id: admin?.id }),
-        });
-      }
       showToast('Content removed.');
       fetchData();
     } else {

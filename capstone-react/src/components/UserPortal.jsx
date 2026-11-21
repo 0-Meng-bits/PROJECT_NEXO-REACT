@@ -6181,7 +6181,7 @@ export default function UserPortal() {
     if (msgInput.trim() && containsBadWord(msgInput)) {
       setSendError('Ã¢Å¡Â Ã¯Â¸Â Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
-      await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: msgInput });
+      await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: null, contentPreview: msgInput });
       return;
     }
     setSendError('');
@@ -6288,7 +6288,7 @@ export default function UserPortal() {
     if (circleChatInput.trim() && containsBadWord(circleChatInput)) {
       setSendError('Ã¢Å¡Â Ã¯Â¸Â Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
-      await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: 'blocked', contentPreview: circleChatInput });
+      await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: null, contentPreview: circleChatInput });
       return;
     }
     setSendError('');
