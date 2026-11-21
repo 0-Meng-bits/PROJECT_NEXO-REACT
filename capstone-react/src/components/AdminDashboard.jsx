@@ -904,9 +904,10 @@ export default function AdminDashboard() {
     if (res.ok) {
       showToast('Content removed.');
     } else {
-      // Restore on failure
-      showToast('Failed to remove content.');
-      fetchData();
+      const err = await res.json().catch(() => ({}));
+      console.error('[DELETE CONTENT]', res.status, err);
+      showToast('Failed: ' + (err.message || res.status));
+      fetchData(); // restore
     }
   };
 
