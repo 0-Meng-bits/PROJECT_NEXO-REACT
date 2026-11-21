@@ -447,6 +447,7 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [circleRequests, setCircleRequests] = useState([]);
   const [showFlagModal, setShowFlagModal] = useState(null); // { type: 'user'|'circle', id, name, leaderId? }
+  const [audFilter, setAudFilter] = useState('all');
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -1930,7 +1931,6 @@ export default function AdminDashboard() {
 
         {/* ── AUDITION APPLICATIONS ── */}
         {section === 'auditions' && (() => {
-          const [audFilter, setAudFilter] = React.useState('all');
           const filtered = auditions.filter(a => {
             if (audFilter === 'all') return true;
             if (audFilter === 'pending') return a.status === 'pending' || a.status === 'phase2';
