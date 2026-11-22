@@ -2175,9 +2175,12 @@ export default function AdminDashboard() {
                                 <i className="fa-solid fa-triangle-exclamation"></i>
                               </button>
                             )}
-                            <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id, r.id)}>
-                              <i className="fa-solid fa-trash"></i>
-                            </button>
+                            {/* Trash — only for content types, NOT for user/circle (use escalate instead) */}
+                            {r.content_type !== 'user' && r.content_type !== 'circle' && (
+                              <button className="adm-btn reject" style={{ fontSize: 10 }} onClick={() => deleteContent(r.content_type, r.content_id, r.id)}>
+                                <i className="fa-solid fa-trash"></i>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
