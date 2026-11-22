@@ -4890,6 +4890,7 @@ export default function UserPortal() {
   const sectionRef = useRef(section); // track current section for popstate handler
   const openAnnouncementsOnEnter = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('nexo-sidebar-collapsed') === 'true');
   const [showDock, setShowDock] = useState(false);
   const [memberCounts, setMemberCounts] = useState({});
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -6906,16 +6907,22 @@ export default function UserPortal() {
           <div className="sidebar-backdrop show" onClick={() => { setShowDock(false); setMobileSidebarOpen(false); }} />
         )}
 
-        {/* SIDEBAR "? context aware */}
-        <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
+        {/* SIDEBAR — context aware */}
+        <div className={`sidebar${mobileSidebarOpen ? ' mobile-open' : ''}${sidebarCollapsed ? ' collapsed' : ''}`}>
           {activeCommId === 'global' ? (
             /* -- GLOBAL / HOME sidebar -- */
             <>
               <div className="sidebar-brand-area">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                  onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <img src="/logoo.png" alt="Nexo" className="sidebar-logo-icon" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} />
-                  <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, minWidth: 0 }}
+                    onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                    <img src="/logoo.png" alt="Nexo" className="sidebar-logo-icon" style={{ width: 32, height: 32, objectFit: 'contain', flexShrink: 0 }} />
+                    <h2 className="sidebar-title">NEXO <span className="cyan-text">CONNECT</span></h2>
+                  </div>
+                  <button className="sidebar-collapse-btn" title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    onClick={() => { const next = !sidebarCollapsed; setSidebarCollapsed(next); localStorage.setItem('nexo-sidebar-collapsed', next); }}>
+                    <i className={`fa-solid ${sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
+                  </button>
                 </div>
               </div>
               <div className="sidebar-scroll">
@@ -6953,7 +6960,7 @@ export default function UserPortal() {
             <>
               <div className="sidebar-brand-area" style={{ paddingBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
                       <i className={activeComm.icon || activeComm.faIcon || getCategoryIcon(activeComm.category)} style={{ color: 'var(--cyber-cyan)' }}></i>
                     </div>
@@ -6962,6 +6969,10 @@ export default function UserPortal() {
                       <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>{activeComm.category || 'circle'}</div>
                     </div>
                   </div>
+                  <button className="sidebar-collapse-btn" title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    onClick={() => { const next = !sidebarCollapsed; setSidebarCollapsed(next); localStorage.setItem('nexo-sidebar-collapsed', next); }}>
+                    <i className={`fa-solid ${sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
+                  </button>
                 </div>
               </div>
 

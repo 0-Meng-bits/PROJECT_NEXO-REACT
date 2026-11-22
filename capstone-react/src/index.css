@@ -847,6 +847,63 @@ select option {
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
   overflow: hidden;
   justify-content: flex-start;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed sidebar — icons only */
+.sidebar.collapsed {
+  width: 64px;
+}
+.sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .cyan-text,
+.sidebar.collapsed .sidebar-label,
+.sidebar.collapsed .node-name,
+.sidebar.collapsed .channel-hash + .node-name {
+  display: none;
+}
+.sidebar.collapsed .sidebar-brand-area {
+  padding: 20px 0;
+  display: flex;
+  justify-content: center;
+}
+.sidebar.collapsed .ls-item {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+.sidebar.collapsed .nav-links {
+  padding: 0 6px;
+}
+.sidebar.collapsed .nav-icon,
+.sidebar.collapsed .channel-hash {
+  margin: 0;
+  font-size: 16px;
+}
+.sidebar.collapsed .sidebar-scroll {
+  overflow-x: hidden;
+}
+.sidebar-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.sidebar-collapse-btn:hover {
+  color: var(--cyber-cyan);
+  background: rgba(0,240,255,0.08);
+}
+@media (max-width: 900px) {
+  .sidebar-collapse-btn { display: none; }
+  .sidebar.collapsed { width: 260px; }
+  .sidebar.collapsed .sidebar-title,
+  .sidebar.collapsed .cyan-text,
+  .sidebar.collapsed .sidebar-label,
+  .sidebar.collapsed .node-name { display: unset; }
 }
 
 /* Scrollable inner area â€” everything below the brand header */
