@@ -1854,7 +1854,7 @@ export default function AdminDashboard() {
                 />
                 <textarea
                   style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 6, padding: '8px 12px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', minHeight: 80 }}
-                  placeholder="Write your announcement, event, or shoutout..."
+                  placeholder="Write your announcement, event, or poll..."
                   value={newAdminPost.content}
                   onChange={e => setNewAdminPost(p => ({ ...p, content: e.target.value }))}
                 />
@@ -1863,8 +1863,7 @@ export default function AdminDashboard() {
                     {[
                       { key: 'announcement', label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
                       { key: 'event',        label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
-                      { key: 'shoutout',     label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
-                      { key: 'general',      label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
+                      { key: 'poll',         label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
                     ].map(t => (
                       <button key={t.key}
                         onClick={() => setNewAdminPost(p => ({ ...p, post_type: t.key }))}
