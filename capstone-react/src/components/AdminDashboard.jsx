@@ -110,6 +110,7 @@ function UserFlagsSection({ admin }) {
   const [loading, setLoading] = useState(true);
   const [selectedFlag, setSelectedFlag] = useState(null);
   const [issuing, setIssuing] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     const loadFlags = async () => {
@@ -176,7 +177,10 @@ function UserFlagsSection({ admin }) {
   return (
     <div className="adm-card">
       <div className="adm-card-head">
-        <span>User Flags</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span>User Flags</span>
+          <SectionInfoPanel sectionKey="user_flags" show={showInfo} onToggle={() => setShowInfo(v => !v)} />
+        </div>
         <span style={{ fontSize: 12, color: 'var(--cyber-yellow)' }}>{pendingFlags.length} pending</span>
       </div>
       {loading ? <div className="adm-empty"><i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24 }}></i><div style={{ marginTop: 10 }}>Loading flags...</div></div>
@@ -245,6 +249,41 @@ function UserFlagsSection({ admin }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── SECTION INFO PANEL ───────────────────────────────────────────────────────
+const SECTION_INFO = {
+  verification:       'New students waiting for their CTU ID to be verified by admin. Approve to grant platform access or reject to remove their registration.',
+  circle_requests:    'Circle creation requests submitted by students. Approve to create the circle on the platform or reject with a reason.',
+  reports:            'Content reports submitted by users. Pending = waiting for admin action. Use ✓ to mark reviewed, ⚠ to escalate to deletion warning, or 🗑 to remove the content.',
+  support:            'Support tickets submitted by students through the Help Center. Resolve when the issue is addressed, Close to dismiss without action.',
+  pending_deletions:  'Accounts and circles flagged for deletion with a 7-day appeal window. Confirm Delete for permanent removal or Dismiss to clear the flag.',
+  users:              'All registered student accounts. Click a row to view full profile, ID photo, and take moderation actions (warn, ban, flag for deletion).',
+  communities:        'All circles on the platform. Verify to mark official, toggle Audition on/off, or flag for deletion. Forming = circle has not yet reached 3 members.',
+  auditions:          'Read-only overview of all circle applications across the platform. Use the filter to view by status. Acceptance and rejection are handled by circle leaders.',
+  user_flags:         'Flags submitted by circle leaders to report problematic members. Admin can issue a formal warning or dismiss the flag.',
+  moderation:         'Auto-detected posts and messages containing inappropriate language. These were flagged automatically by the bad word filter.',
+  appeals:            'Warning appeals submitted by students who believe a warning was issued incorrectly. Approve to overturn the warning and restore trust points.',
+};
+
+function SectionInfoPanel({ sectionKey, show, onToggle }) {
+  const text = SECTION_INFO[sectionKey];
+  if (!text) return null;
+  return (
+    <>
+      <button onClick={onToggle}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 0, marginLeft: 6,
+          color: show ? 'var(--cyber-cyan)' : 'var(--text-muted)', transition: 'color 0.15s' }}
+        title="What is this section?">
+        <i className="fa-solid fa-circle-info"></i>
+      </button>
+      {show && (
+        <div style={{ gridColumn: '1/-1', margin: '0 20px 12px', padding: '12px 16px', background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          <i className="fa-solid fa-circle-info" style={{ marginRight: 8, color: 'var(--cyber-cyan)' }}></i>{text}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -448,6 +487,7 @@ export default function AdminDashboard() {
   const [circleRequests, setCircleRequests] = useState([]);
   const [showFlagModal, setShowFlagModal] = useState(null); // { type: 'user'|'circle', id, name, leaderId? }
   const [audFilter, setAudFilter] = useState('all');
+  const [showSectionInfo, setShowSectionInfo] = useState(false);
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -1076,7 +1116,7 @@ export default function AdminDashboard() {
         <div className="adm-sidebar-label">NAVIGATION</div>
         {SECTIONS.map(s => (
           <div key={s.key} className={`adm-nav-item ${section === s.key ? 'active' : ''}`}
-            onClick={() => { setSection(s.key); setSelectedCircle(null); }}>
+            onClick={() => { setSection(s.key); setSelectedCircle(null); setShowSectionInfo(false); }}>
             <i className={s.icon}></i>
             <span>{s.label}</span>
             {s.key === 'circle_requests' && circleRequests.filter(r => r.status === 'pending').length > 0 && (
@@ -1084,9 +1124,6 @@ export default function AdminDashboard() {
             )}
             {s.key === 'verification' && pending.length > 0 && (
               <span className="adm-badge">{pending.length}</span>
-            )}
-            {s.key === 'auditions' && auditions.filter(a => a.status === 'pending').length > 0 && (
-              <span className="adm-badge">{auditions.filter(a => a.status === 'pending').length}</span>
             )}
             {s.key === 'reports' && reports.filter(r => r.status === 'pending').length > 0 && (
               <span className="adm-badge">{reports.filter(r => r.status === 'pending').length}</span>
@@ -1467,7 +1504,10 @@ export default function AdminDashboard() {
         {section === 'verification' && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>Pending Enrollments</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span>Pending Enrollments</span>
+                <SectionInfoPanel sectionKey="verification" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+              </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pending.length} awaiting review</span>
             </div>
             {loading ? <div className="adm-empty">Loading...</div>
@@ -1541,7 +1581,10 @@ export default function AdminDashboard() {
         {section === 'users' && !selectedUser && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>All Registered Users</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span>All Registered Users</span>
+                <SectionInfoPanel sectionKey="users" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+              </div>
               <input className="adm-search" placeholder="Search by name or ID..."
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
@@ -1674,7 +1717,10 @@ export default function AdminDashboard() {
         {section === 'communities' && !selectedCircle && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>All Circles</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span>All Circles</span>
+                <SectionInfoPanel sectionKey="communities" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+              </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{communities.length} total</span>
             </div>
             {loading ? <div className="adm-empty">Loading...</div>
@@ -1959,7 +2005,10 @@ export default function AdminDashboard() {
           return (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>All Audition Applications</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span>All Audition Applications</span>
+                <SectionInfoPanel sectionKey="auditions" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+              </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{auditions.length} total</span>
             </div>
 
@@ -2112,7 +2161,10 @@ export default function AdminDashboard() {
         {section === 'reports' && (
           <div className="adm-card">
             <div className="adm-card-head">
-              <span>User Reports</span>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span>User Reports</span>
+                <SectionInfoPanel sectionKey="reports" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+              </div>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 {reports.filter(r => r.status === 'pending').length} pending
               </span>
@@ -2206,7 +2258,10 @@ export default function AdminDashboard() {
           return (
             <div className="adm-card">
               <div className="adm-card-head">
-                <span>Content Monitor</span>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span>Content Monitor</span>
+                  <SectionInfoPanel sectionKey="moderation" show={showSectionInfo} onToggle={() => setShowSectionInfo(v => !v)} />
+                </div>
                 <span style={{ fontSize: 12, color: allFlagged.length > 0 ? 'var(--red)' : 'var(--green)' }}>
                   {allFlagged.length} flagged
                 </span>
