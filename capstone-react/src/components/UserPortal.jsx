@@ -6140,8 +6140,9 @@ export default function UserPortal() {
 
   const handleChatInputChange = async (value) => {
     setSendError('');
-    // Detect shoutout @mention for autocomplete — match 'shoutout! @query' anywhere at start
+    // Detect @mention — works for both 'shoutout! @name' and standalone '@name'
     const shoutMatch = value.match(/^shoutout!\s+@([^\s][\w\s]*)/i);
+    const mentionMatch = !shoutMatch && value.match(/@([\w\s]*)$/);
     if (shoutMatch) {
       const query = shoutMatch[1].trim();
       if (query.toLowerCase().startsWith('everyone')) {
@@ -6154,6 +6155,28 @@ export default function UserPortal() {
         setShoutoutSuggestions(data || []);
       } else {
         setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
+      }
+    } else if (mentionMatch) {
+      // Standalone @mention — search circle members
+      const query = mentionMatch[1].trim();
+      setShoutoutQuery(query);
+      if (query.length >= 1) {
+        // Filter from already-loaded circle members first, fall back to DB search
+        const memberMatches = circleChatMembers.filter(m =>
+          m.full_name?.toLowerCase().startsWith(query.toLowerCase()) && m.id !== user.id
+        ).slice(0, 5).map(m => ({ id: m.id, full_name: m.full_name }));
+        if (memberMatches.length > 0) {
+          setShoutoutSuggestions(memberMatches);
+        } else {
+          const { data } = await supabase.from('accounts')
+            .select('id, full_name').ilike('full_name', `${query}%`).neq('id', user.id).limit(5);
+          setShoutoutSuggestions(data || []);
+        }
+      } else {
+        // Just '@' typed — show all circle members
+        setShoutoutSuggestions(
+          circleChatMembers.filter(m => m.id !== user.id).slice(0, 6).map(m => ({ id: m.id, full_name: m.full_name }))
+        );
       }
     } else {
       setShoutoutSuggestions([]);
@@ -6373,6 +6396,29 @@ export default function UserPortal() {
             }
           }
           setShoutoutMention(null);
+        }
+
+        // @mention notifications for regular messages (non-shoutout)
+        if (!isShoutout && circleChatInput.includes('@')) {
+          const mentionRegex = /@([\w][\w\s]*)/g;
+          let match;
+          const notified = new Set();
+          while ((match = mentionRegex.exec(circleChatInput)) !== null) {
+            const query = match[1].trim();
+            const mentioned = circleChatMembers.find(m =>
+              m.full_name?.toLowerCase() === query.toLowerCase() && m.id !== user.id
+            );
+            if (mentioned && !notified.has(mentioned.id)) {
+              notified.add(mentioned.id);
+              const commName = communities.find(c => c.id === activeCommId)?.name || 'a circle';
+              await supabase.from('notifications').insert([{
+                user_id: mentioned.id,
+                type: 'new_announcement',
+                message: `💬 ${user.full_name} mentioned you in ${commName}: "${circleChatInput.slice(0, 60)}${circleChatInput.length > 60 ? '...' : ''}"`,
+                link_comm_id: activeCommId,
+              }]);
+            }
+          }
         }
       } else {
         throw new Error(error?.message || 'Failed to send');
