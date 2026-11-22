@@ -6780,36 +6780,50 @@ export default function UserPortal() {
                     <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
                       onClick={() => {
                         markRead(n.id);
-                        if (n.type === 'shoutout') {
-                          // Navigate to the circle chat where shoutout happened, or Global Feed
-                          setShowNotifications(false);
+                        setShowNotifications(false);
+
+                        if (n.type === 'shoutout' || n.type === 'new_announcement') {
+                          // Mention, shoutout, comment, reply — go to circle CHAT (not announcements)
                           if (n.link_comm_id) {
                             setActiveChannelId(null);
-                            setShowCircleAnnouncements(false);
+                            setShowCircleAnnouncements(false); // open chat, not announcements
                             navTo('circles', n.link_comm_id);
                           } else {
                             navTo('global', 'global');
+                            loadMessages('global', null);
                           }
+
                         } else if (n.type === 'circle_invite' && n.link_comm_id) {
-                          // If already a member, go directly to the circle
                           const existingMembership = myMemberships.find(m => m.community_id === n.link_comm_id && m.status === 'active');
                           if (existingMembership) {
                             navTo('circles', n.link_comm_id);
                           } else {
-                            // Open the Circle Info Card for the invited circle
                             const invitedCircle = communities.find(c => c.id === n.link_comm_id);
-                            if (invitedCircle) {
-                              setShowCircleInfo(invitedCircle);
-                            } else {
-                              setActiveCategory('all');
-                              navTo('activity', 'global');
-                            }
+                            if (invitedCircle) setShowCircleInfo(invitedCircle);
+                            else { setActiveCategory('all'); navTo('activity', 'global'); }
                           }
+
+                        } else if (n.type === 'circle_approved' || n.type === 'circle_rejected') {
+                          // Go to Explore so they can find their new circle or browse
+                          setActiveCategory('all');
+                          navTo('activity', 'global');
+
+                        } else if (n.type === 'system') {
+                          // Deletion warning — open Help Center to Support tab
+                          setShowHelp(true);
+
+                        } else if (n.type === 'Application_update' || n.type === 'audition_update') {
+                          // Application result — go to the circle
+                          if (n.link_comm_id) {
+                            setActiveChannelId(null);
+                            navTo('circles', n.link_comm_id);
+                          }
+
                         } else if (n.link_comm_id) {
+                          // Generic fallback — navigate to the circle
                           setActiveChannelId(null);
                           navTo('circles', n.link_comm_id);
                         }
-                        setShowNotifications(false);
                       }}>
                       <div className="notif-icon">
                         <i className={notifIcon(n.type)}></i>
