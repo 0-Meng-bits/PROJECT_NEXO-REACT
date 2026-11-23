@@ -5238,7 +5238,7 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
-  const [shoutoutMention, setShoutoutMention] = useState(null); // { id, full_name } - selected user
+  const [showAttachMenu, setShowAttachMenu] = useState(false); // + button in chat composer // { id, full_name } - selected user
   const [shoutoutSuggestions, setShoutoutSuggestions] = useState([]); // dropdown results
   const [shoutoutQuery, setShoutoutQuery] = useState(''); // current @query being typed
   const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } · message being replied to
@@ -7746,15 +7746,20 @@ export default function UserPortal() {
                     />
                   )}
                   <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-                    <MediaUploadButton 
-                      onMediaSelected={setPendingMedia} 
-                      disabled={uploading || !!pendingMedia}
-                    />
-                    <VoiceRecorder 
-                      onVoiceRecorded={setPendingMedia} 
-                      disabled={uploading || !!pendingMedia}
-                    />
-                    <input ref={msgInputRef} onChange={e => handleChatInputChange(e.target.value)}
+                    {/* + attach menu */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <button onClick={() => setShowAttachMenu(v => !v)} disabled={uploading}
+                        style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: showAttachMenu ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)', color: showAttachMenu ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s', transform: showAttachMenu ? 'rotate(45deg)' : 'none' }}>
+                        <i className="fa-solid fa-plus" />
+                      </button>
+                      {showAttachMenu && (
+                        <div style={{ position: 'absolute', bottom: 42, left: 0, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 400 }}>
+                          <MediaUploadButton onMediaSelected={(m) => { setPendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!pendingMedia} />
+                          <VoiceRecorder onVoiceRecorded={(m) => { setPendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!pendingMedia} />
+                        </div>
+                      )}
+                    </div>
+                    <input ref={msgInputRef} onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
                       placeholder="Say something to the Global Feed..."
                       disabled={uploading}
@@ -8472,15 +8477,19 @@ export default function UserPortal() {
                     />
                   )}
                   <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-                    <MediaUploadButton 
-                      onMediaSelected={setPendingMedia} 
-                      disabled={uploading || !!pendingMedia}
-                    />
-                    <VoiceRecorder 
-                      onVoiceRecorded={setPendingMedia} 
-                      disabled={uploading || !!pendingMedia}
-                    />
-                    <input ref={msgInputRef} onChange={e => handleChatInputChange(e.target.value)}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <button onClick={() => setShowAttachMenu(v => !v)} disabled={uploading}
+                        style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: showAttachMenu ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)', color: showAttachMenu ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s', transform: showAttachMenu ? 'rotate(45deg)' : 'none' }}>
+                        <i className="fa-solid fa-plus" />
+                      </button>
+                      {showAttachMenu && (
+                        <div style={{ position: 'absolute', bottom: 42, left: 0, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 400 }}>
+                          <MediaUploadButton onMediaSelected={(m) => { setPendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!pendingMedia} />
+                          <VoiceRecorder onVoiceRecorded={(m) => { setPendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!pendingMedia} />
+                        </div>
+                      )}
+                    </div>
+                    <input ref={msgInputRef} onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
                       onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
                       placeholder={`Say something to ${activeComm?.name || 'Circle Chat'}...`}
                       disabled={uploading}
@@ -8701,16 +8710,20 @@ export default function UserPortal() {
                     />
                   )}
                   <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-                    <MediaUploadButton 
-                      onMediaSelected={setCirclePendingMedia} 
-                      disabled={uploading || !!circlePendingMedia}
-                    />
-                    <VoiceRecorder 
-                      onVoiceRecorded={setCirclePendingMedia} 
-                      disabled={uploading || !!circlePendingMedia}
-                    />
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <button onClick={() => setShowAttachMenu(v => !v)} disabled={uploading}
+                        style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: showAttachMenu ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)', color: showAttachMenu ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s', transform: showAttachMenu ? 'rotate(45deg)' : 'none' }}>
+                        <i className="fa-solid fa-plus" />
+                      </button>
+                      {showAttachMenu && (
+                        <div style={{ position: 'absolute', bottom: 42, left: 0, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 400 }}>
+                          <MediaUploadButton onMediaSelected={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
+                          <VoiceRecorder onVoiceRecorded={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
+                        </div>
+                      )}
+                    </div>
                     <input ref={circleChatInputRef}
-                      onChange={e => handleChatInputChange(e.target.value)}
+                      onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
                       placeholder={`Message ${activeComm.name}...`}
                       disabled={uploading}
                       style={{ flex: 1 }} />
