@@ -4094,6 +4094,63 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   background: var(--border) !important;
 }
 
+/* ===================== LIGHT THEME TEXT & UI OVERRIDES ===================== */
+/* Applies to both light and retro-earthy — dark text on light backgrounds */
+[data-theme="light"] .home-hero,
+[data-theme="retro-earthy"] .home-hero {
+  background: linear-gradient(135deg, rgba(14,165,233,0.08), rgba(99,102,241,0.08)) !important;
+}
+[data-theme="light"] .home-section-title,
+[data-theme="retro-earthy"] .home-section-title,
+[data-theme="light"] .home-see-all,
+[data-theme="retro-earthy"] .home-see-all { color: var(--text-primary) !important; }
+
+[data-theme="light"] .popular-row,
+[data-theme="retro-earthy"] .popular-row {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .popular-row:hover,
+[data-theme="retro-earthy"] .popular-row:hover {
+  background: rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] .post,
+[data-theme="retro-earthy"] .post {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .post *,
+[data-theme="retro-earthy"] .post * { color: var(--text-primary); }
+
+[data-theme="light"] .post .text-muted,
+[data-theme="retro-earthy"] .post .text-muted,
+[data-theme="light"] [style*="rgba(255,255,255,0.4)"],
+[data-theme="retro-earthy"] [style*="rgba(255,255,255,0.4)"] { color: var(--text-muted) !important; }
+
+[data-theme="light"] .home-composer,
+[data-theme="retro-earthy"] .home-composer {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .announcement-card,
+[data-theme="retro-earthy"] .announcement-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .announcement-card *,
+[data-theme="retro-earthy"] .announcement-card * { color: var(--text-primary) !important; }
+
+[data-theme="light"] .top-nav-bar input,
+[data-theme="retro-earthy"] .top-nav-bar input {
+  background: rgba(0,0,0,0.06) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="light"] .sidebar,
+[data-theme="retro-earthy"] .sidebar {
+  background: var(--sidebar-bg) !important;
+}
+
 /* ===================== ID VERIFIER ===================== */
 .id-verifier {
   margin-top: 8px;
