@@ -367,6 +367,7 @@ function SupportTicketsSection() {
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -441,7 +442,10 @@ function SupportTicketsSection() {
                     <div style={{ color: 'var(--text-muted)' }}>{t.accounts?.ctu_id}</div>
                   </td>
                   <td><span className="adm-tag" style={{ color: categoryColor[t.category]?.color, background: categoryColor[t.category]?.bg, borderColor: categoryColor[t.category]?.border }}>{t.category}</span></td>
-                  <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div></td>
+                  <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 260, cursor: 'pointer' }} onClick={() => setSelectedTicket(t)} title="Click to view full message">
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.message}</div>
+                    <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', marginTop: 2 }}>Click to expand</div>
+                  </td>
                   <td><span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, color: statusColor[t.status] || 'var(--text-muted)', border: `1px solid ${statusColor[t.status] || '#333'}` }}>{t.status?.toUpperCase()}</span></td>
                   <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
                   <td>
@@ -454,6 +458,38 @@ function SupportTicketsSection() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Full message modal */}
+      {selectedTicket && (
+        <div className="modal-overlay" onClick={() => setSelectedTicket(null)}>
+          <div className="adm-modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 500, width: '90vw', padding: 28, borderRadius: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-primary)' }}>{selectedTicket.accounts?.full_name || '—'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selectedTicket.accounts?.ctu_id} · {new Date(selectedTicket.created_at).toLocaleDateString()}</div>
+              </div>
+              <span className="adm-tag" style={{ color: categoryColor[selectedTicket.category]?.color, background: categoryColor[selectedTicket.category]?.bg, borderColor: categoryColor[selectedTicket.category]?.border }}>{selectedTicket.category}</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+              {selectedTicket.message}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              {selectedTicket.status === 'open' && (
+                <button className="adm-btn" style={{ color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(62,207,142,0.08)' }}
+                  onClick={() => { updateStatus(selectedTicket.id, 'resolved', selectedTicket.user_id); setSelectedTicket(null); }}>
+                  <i className="fa-solid fa-check" style={{ marginRight: 5 }} />Resolve
+                </button>
+              )}
+              {selectedTicket.status !== 'closed' && (
+                <button className="adm-btn" style={{ color: 'var(--text-muted)', borderColor: '#333' }}
+                  onClick={() => { updateStatus(selectedTicket.id, 'closed', selectedTicket.user_id); setSelectedTicket(null); }}>
+                  Close
+                </button>
+              )}
+              <button className="adm-btn" onClick={() => setSelectedTicket(null)}>Dismiss</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
