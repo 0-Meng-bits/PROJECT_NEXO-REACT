@@ -6278,6 +6278,7 @@ export default function UserPortal() {
         await loadMyMemberships();
         showToast(data.activated ? 'Circle is now active! Chat unlocked.' : 'You joined the circle!');
         navTo('circles', commId);
+        setTimeout(() => loadMessages(commId, null), 300);
       } else {
         // If already a member, just navigate to the circle
         if (data.message?.toLowerCase().includes('already') || data.message?.toLowerCase().includes('active')) {
