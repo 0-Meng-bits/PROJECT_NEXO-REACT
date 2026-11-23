@@ -6713,7 +6713,7 @@ export default function UserPortal() {
 
   const activeComm = communities.find(c => c.id === activeCommId) || GLOBAL_COMM;
   const isOwner = activeComm.creator_id === user?.id;
-  const myRankLevel = getMembership(activeCommId)?.rank_level ?? (isOwner ? 3 : 0);
+  const myRankLevel = isOwner ? 3 : (getMembership(activeCommId)?.rank_level ?? 0);
   const myRole = myRankLevel >= 3 ? 'LEADER' : myRankLevel === 2 ? 'CO-LEADER' : myRankLevel === 1 ? 'MODERATOR' : 'MEMBER';
   const canModerate = isOwner || myRankLevel >= 2; // leader or co-leader
   const tagColor = myRole === 'LEADER' ? 'var(--cyber-yellow)' : myRole === 'CO-LEADER' ? 'var(--cyber-cyan)' : 'var(--text-muted)';
