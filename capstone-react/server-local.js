@@ -67,9 +67,17 @@ app.all('/api/verify-student', verifyStudent);
 // Serve built frontend static files
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// SPA fallback — all non-API routes serve index.html
+// Health check for UptimeRobot
+app.get('/', (req, res) => res.status(200).json({ status: 'ok', service: 'NEXO Connect API' }));
+
+// SPA fallback — only if dist exists (local dev), otherwise return 200
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).json({ status: 'ok', service: 'NEXO Connect API' });
+  }
 });
 
 app.listen(PORT, () => {
