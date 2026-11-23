@@ -4868,6 +4868,11 @@ export default function UserPortal() {
   const [announcements, setAnnouncements] = useState([]);
   const [circleAnnouncements, setCircleAnnouncements] = useState([]);
   const [qaFilter, setQaFilter] = useState('all'); // 'all' | 'questions' | 'unanswered'
+  const [circlePostSearch, setCirclePostSearch] = useState('');
+  const [bulletinSearch, setBulletinSearch] = useState('');
+  const [lastVisitedBulletin, setLastVisitedBulletin] = useState(
+    () => localStorage.getItem('nexo-bulletin-visited') || new Date(0).toISOString()
+  );
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
   const [connectedUserIds, setConnectedUserIds] = useState(new Set()); // accepted connection user IDs
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
@@ -5910,6 +5915,7 @@ export default function UserPortal() {
     loadChannels(activeCommId);
     loadCircleAnnouncements(activeCommId);
     setQaFilter('all'); // reset Q&A filter when switching communities
+    setCirclePostSearch(''); // reset post search when switching circles
     // Load members for the panel whenever we switch circles
     if (activeCommId && activeCommId !== 'global') {
       supabase.from('memberships')
@@ -6939,9 +6945,24 @@ export default function UserPortal() {
                   <i className="nav-icon fa-solid fa-house-chimney"></i>
                   <span className="node-name">Home Feed</span>
                 </div>
-                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => { navTo('bulletin', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => {
+                  navTo('bulletin', 'global');
+                  setMobileSidebarOpen(false);
+                  setShowDock(false);
+                  const now = new Date().toISOString();
+                  setLastVisitedBulletin(now);
+                  localStorage.setItem('nexo-bulletin-visited', now);
+                }}>
                   <i className="nav-icon fa-solid fa-thumbtack"></i>
                   <span className="node-name">Bulletin</span>
+                  {(() => {
+                    const unread = announcements.filter(a =>
+                      (a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null) &&
+                      a.post_type !== 'thread' && a.post_type !== 'general' &&
+                      new Date(a.created_at) > new Date(lastVisitedBulletin)
+                    ).length;
+                    return unread > 0 ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread}</span> : null;
+                  })()}
                 </div>
                 <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-message"></i>
@@ -7413,6 +7434,19 @@ export default function UserPortal() {
                 </div>
               </div>
 
+              {/* Bulletin search */}
+              <div style={{ position: 'relative', margin: '10px 0 4px' }}>
+                <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 12, pointerEvents: 'none' }}></i>
+                <input value={bulletinSearch} onChange={e => setBulletinSearch(e.target.value)}
+                  placeholder="Search bulletin posts..."
+                  style={{ width: '100%', paddingLeft: 34, paddingRight: bulletinSearch ? 34 : 12, paddingTop: 8, paddingBottom: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                {bulletinSearch && (
+                  <button onClick={() => setBulletinSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                )}
+              </div>
+
               {/* Filter bar */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '12px 0' }}>
                 {[
@@ -7478,12 +7512,16 @@ export default function UserPortal() {
                   (a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null) &&
                   (a.post_type !== 'thread' && a.post_type !== 'general')
                 );
-                const filtered = feedFilter === 'all' ? bulletinPosts : bulletinPosts.filter(a => a.post_type === feedFilter);
+                let filtered = feedFilter === 'all' ? bulletinPosts : bulletinPosts.filter(a => a.post_type === feedFilter);
+                if (bulletinSearch.trim()) {
+                  const q = bulletinSearch.toLowerCase();
+                  filtered = filtered.filter(a => a.title?.toLowerCase().includes(q) || a.content?.toLowerCase().includes(q));
+                }
                 return filtered.length === 0 ? (
                   <div className="post" style={{ textAlign: 'center', padding: 32 }}>
                     <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                      {feedFilter === 'all' ? 'No bulletin posts yet.' : `No ${feedFilter} posts yet.`}
+                      {bulletinSearch ? `No posts matching "${bulletinSearch}"` : feedFilter === 'all' ? 'No bulletin posts yet.' : `No ${feedFilter} posts yet.`}
                     </p>
                   </div>
                 ) : (
@@ -8154,6 +8192,24 @@ export default function UserPortal() {
                         ))}
                       </div>
                     )}
+                    {/* Post search bar */}
+                    {!showCircleArchive && (
+                      <div style={{ position: 'relative', marginBottom: 10 }}>
+                        <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 12, pointerEvents: 'none' }}></i>
+                        <input
+                          value={circlePostSearch}
+                          onChange={e => setCirclePostSearch(e.target.value)}
+                          placeholder="Search posts..."
+                          style={{ width: '100%', paddingLeft: 34, paddingRight: circlePostSearch ? 34 : 12, paddingTop: 8, paddingBottom: 8, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                        {circlePostSearch && (
+                          <button onClick={() => setCirclePostSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+                            <i className="fa-solid fa-xmark"></i>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {!showCircleArchive && circleAnnouncements.length === 0 ? (
                       <div className="post" style={{ textAlign: 'center', padding: 40 }}>
                         <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}></i>
@@ -8161,17 +8217,24 @@ export default function UserPortal() {
                       </div>
                     ) : !showCircleArchive ? (
                       (() => {
-                        const filtered = qaFilter === 'questions'
+                        let filtered = qaFilter === 'questions'
                           ? circleAnnouncements.filter(a => a.post_type === 'question')
                           : qaFilter === 'unanswered'
                           ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
                           : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll' || qaFilter === 'thread'
                           ? circleAnnouncements.filter(a => a.post_type === qaFilter || (qaFilter === 'thread' && a.post_type === 'general'))
                           : circleAnnouncements;
+                        // Apply post search on top of type filter
+                        if (circlePostSearch.trim()) {
+                          const q = circlePostSearch.toLowerCase();
+                          filtered = filtered.filter(a =>
+                            a.title?.toLowerCase().includes(q) || a.content?.toLowerCase().includes(q)
+                          );
+                        }
                         if (filtered.length === 0) return (
                           <div className="post" style={{ textAlign: 'center', padding: 32 }}>
                             <i className="fa-solid fa-thumbtack" style={{ fontSize: 28, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}></i>
-                            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No {qaFilter === 'all' ? '' : qaFilter + ' '}posts yet.</p>
+                            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{circlePostSearch ? `No posts matching "${circlePostSearch}"` : `No ${qaFilter === 'all' ? '' : qaFilter + ' '}posts yet.`}</p>
                           </div>
                         );
                         return filtered.map(a => (
