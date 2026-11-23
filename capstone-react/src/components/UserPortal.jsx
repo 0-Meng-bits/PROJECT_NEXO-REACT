@@ -4926,6 +4926,7 @@ export default function UserPortal() {
   const [circlePendingMedia, setCirclePendingMedia] = useState(null);
   const [toast, setToast] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [successorPicker, setSuccessorPicker] = useState(null); // { commId, members[] } when leader is leaving
   const [showProfile, setShowProfile] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
@@ -6571,13 +6572,64 @@ export default function UserPortal() {
   };
 
   const leaveCircle = async (commId) => {
-    if (!confirm('Leave this circle? You will need to request to join again.')) return;
     const membership = getMembership(commId);
     if (!membership) return;
-    const { error } = await supabase.from('memberships').delete().eq('id', membership.id);
-    if (error) { showToast('Failed to leave circle.'); return; }
+
+    // If the user is the leader, show successor picker instead of confirming directly
+    if (membership.rank_level === 3) {
+      // Fetch current active members (excluding self) to pick a successor
+      const { data: members } = await supabase
+        .from('memberships')
+        .select('id, user_id, rank_level, created_at, accounts(full_name, ctu_id)')
+        .eq('community_id', commId)
+        .eq('status', 'active')
+        .neq('user_id', user.id)
+        .order('rank_level', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (!members || members.length === 0) {
+        // No other members — can leave freely, circle may dissolve
+        if (!confirm('You are the only member. Leaving will dissolve this circle. Continue?')) return;
+      } else {
+        // Show successor picker
+        setSuccessorPicker({ commId, members: members.map(m => ({
+          id: m.user_id,
+          membershipId: m.id,
+          full_name: m.accounts?.full_name || 'Unknown',
+          ctu_id: m.accounts?.ctu_id,
+          rank_level: m.rank_level,
+        })) });
+        return;
+      }
+    } else {
+      if (!confirm('Leave this circle? You will need to request to join again.')) return;
+    }
+
+    // Non-leader leave (or no-members leader leave)
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/memberships'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'leave', community_id: commId }),
+    });
+    if (!res.ok) { showToast('Failed to leave circle.'); return; }
     await insertSystemMessage(commId, `${user.full_name} left the circle.`);
     showToast('You have left the circle.');
+    await loadMyMemberships();
+    navTo('home', 'global');
+  };
+
+  const confirmLeaveWithSuccessor = async (commId, successorId) => {
+    const token = localStorage.getItem('accessToken');
+    const res = await fetch(getApiUrl('/api/memberships'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'leave', community_id: commId, successor_id: successorId }),
+    });
+    if (!res.ok) { showToast('Failed to transfer leadership.'); return; }
+    setSuccessorPicker(null);
+    await insertSystemMessage(commId, `${user.full_name} left the circle and transferred leadership.`);
+    showToast('Leadership transferred. You have left the circle.');
     await loadMyMemberships();
     navTo('home', 'global');
   };
@@ -8832,6 +8884,42 @@ export default function UserPortal() {
         />
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
+
+      {/* ── SUCCESSOR PICKER MODAL ── */}
+      {successorPicker && (
+        <div className="modal-overlay" onClick={() => setSuccessorPicker(null)}>
+          <div className="auth-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, width: '94vw', padding: '28px 28px 24px', borderRadius: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 800, letterSpacing: 1, color: 'var(--cyber-cyan)', marginBottom: 6 }}>
+              <i className="fa-solid fa-crown" style={{ marginRight: 8 }} />TRANSFER LEADERSHIP
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+              You must appoint a successor before leaving. Select a member to become the new Leader.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', marginBottom: 20 }}>
+              {successorPicker.members.map(m => (
+                <button key={m.id} onClick={() => confirmLeaveWithSuccessor(successorPicker.commId, m.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s, background 0.2s' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,240,255,0.4)'; e.currentTarget.style.background = 'rgba(0,240,255,0.06)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
+                    {m.full_name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{m.full_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {m.rank_level === 2 ? '👑 Co-Leader' : m.rank_level === 1 ? '🛡 Moderator' : '👤 Member'}
+                    </div>
+                  </div>
+                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11 }} />
+                </button>
+              ))}
+            </div>
+            <button className="cyber-btn secondary" onClick={() => setSuccessorPicker(null)} style={{ width: '100%', fontSize: 12 }}>
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}}
       {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onUpdateUser={setCurrentUser} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal

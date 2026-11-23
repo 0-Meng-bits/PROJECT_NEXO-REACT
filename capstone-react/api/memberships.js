@@ -93,7 +93,7 @@ export default async function handler(req, res) {
   const userId = await getAuthUserId(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
-  const { action, community_id } = req.body;
+  const { action, community_id, successor_id } = req.body;
 
   // ── ACCEPT INVITE — accept a circle invite ──
   if (action === 'accept_invite') {
@@ -163,7 +163,6 @@ export default async function handler(req, res) {
   if (action === 'leave') {
     if (!community_id) return res.status(400).json({ message: 'Missing community_id.' });
 
-    // Get current membership and community info
     const { data: membership } = await supabaseAdmin
       .from('memberships')
       .select('id, rank_level, status')
@@ -179,18 +178,31 @@ export default async function handler(req, res) {
       .eq('id', community_id)
       .single();
 
+    // If successor explicitly chosen, promote them before deleting leader membership
+    if (successor_id && membership.rank_level === 3) {
+      await supabaseAdmin.from('memberships')
+        .update({ rank_level: 3 })
+        .eq('community_id', community_id)
+        .eq('user_id', successor_id);
+      await insertNotification({
+        userId: successor_id,
+        type: 'promoted',
+        message: `You have been appointed as the new Leader of this circle.`,
+        category: 'Circles',
+      });
+    }
+
     // Delete the membership
     await supabaseAdmin.from('memberships').delete().eq('id', membership.id);
 
     if (community?.status === 'pending') {
-      // Pending circle — auto-dissolve if leader leaves
       if (community.creator_id === userId) {
         await dissolvePendingCircle(community_id, community.name);
         return res.json({ success: true, dissolved: true });
       }
     } else {
-      // Active circle — handle leader succession
-      if (membership.rank_level === 3) {
+      // Only run auto-transfer if no successor was explicitly chosen
+      if (!successor_id && membership.rank_level === 3) {
         await promoteNextLeader(community_id, userId);
       }
     }
