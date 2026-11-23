@@ -3978,6 +3978,37 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 [data-theme="light"] .adm-nav-item { color: #334155; }
 [data-theme="light"] .adm-nav-item.active { background: rgba(14,165,233,0.1); color: var(--cyber-cyan); }
 
+/* Light — chat area overrides */
+[data-theme="light"] .c-feed {
+  background: rgba(255,255,255,0.9) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+[data-theme="light"] .c-feed-chat {
+  background: transparent !important;
+}
+[data-theme="light"] .circle-banner-wrap {
+  background: rgba(255,255,255,0.95) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .composer-chat {
+  background: rgba(241,245,249,0.95) !important;
+  border-top: 1px solid var(--border) !important;
+}
+[data-theme="light"] .c-input-wrap input {
+  background: #ffffff !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .chat-bubble.other {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .chat-bubble.own {
+  background: #bae6fd !important;
+  color: #0f172a !important;
+}
+
 /* -- RETRO EARTHY overrides (light background) -- */
 [data-theme="retro-earthy"] .auth-card,
 [data-theme="retro-earthy"] .sidebar,
@@ -4015,6 +4046,53 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 [data-theme="retro-earthy"] .adm-table td { color: #2C1A10; border-color: #D4C4A8; }
 [data-theme="retro-earthy"] .adm-nav-item { color: #5A3A2A; }
 [data-theme="retro-earthy"] .adm-nav-item.active { background: rgba(74,122,138,0.12); color: var(--cyber-cyan); }
+
+/* Retro Earthy — chat area overrides */
+[data-theme="retro-earthy"] .c-feed {
+  background: rgba(245,239,224,0.85) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+[data-theme="retro-earthy"] .c-feed-chat {
+  background: transparent !important;
+}
+[data-theme="retro-earthy"] .circle-banner-wrap {
+  background: rgba(245,239,224,0.95) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="retro-earthy"] .circle-cover-banner {
+  background: linear-gradient(135deg, #C8B898 0%, #B5A080 100%) !important;
+}
+[data-theme="retro-earthy"] .composer {
+  background: rgba(245,239,224,0.95) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="retro-earthy"] .composer-chat {
+  background: rgba(237,228,208,0.9) !important;
+  border-top: 1px solid var(--border) !important;
+}
+[data-theme="retro-earthy"] .chat-bubble.other {
+  background: #DDD0B8 !important;
+  color: #2C1A10 !important;
+  border-color: #C8B898 !important;
+}
+[data-theme="retro-earthy"] .chat-bubble.own {
+  background: #B5A882 !important;
+  color: #2C1A10 !important;
+  border-color: #A89870 !important;
+}
+[data-theme="retro-earthy"] .c-input-wrap input {
+  background: rgba(255,255,255,0.5) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="retro-earthy"] .chat-time-sep {
+  color: var(--text-muted) !important;
+}
+[data-theme="retro-earthy"] .chat-time-sep::before,
+[data-theme="retro-earthy"] .chat-time-sep::after {
+  background: var(--border) !important;
+}
 
 /* ===================== ID VERIFIER ===================== */
 .id-verifier {
