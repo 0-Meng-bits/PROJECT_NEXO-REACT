@@ -2980,11 +2980,82 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
 }
 
 // -- PROFILE MODAL -------------------------------------------------------------
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo, onReport }) {
+function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo, onReport, currentUserId, onShowToast }) {
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
+
+  // ── Connection state (read-only / other-user view only) ──────────────
+  const [connStatus, setConnStatus]     = useState(null);  // null | 'pending' | 'accepted'
+  const [connId, setConnId]             = useState(null);
+  const [connIsSender, setConnIsSender] = useState(false);
+  const [connLoading, setConnLoading]   = useState(false);
+
+  useEffect(() => {
+    if (!readOnly || !currentUserId || !user?.id) return;
+    const fetchConn = async () => {
+      const { data } = await supabase
+        .from('connections')
+        .select('id, status, user_id')
+        .or(`and(user_id.eq.${currentUserId},connected_user_id.eq.${user.id}),and(user_id.eq.${user.id},connected_user_id.eq.${currentUserId})`)
+        .maybeSingle();
+      if (data) {
+        setConnStatus(data.status);
+        setConnId(data.id);
+        setConnIsSender(data.user_id === currentUserId);
+      }
+    };
+    fetchConn();
+  }, [readOnly, currentUserId, user?.id]);
+
+  const handleConnect = async () => {
+    setConnLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/connections'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'send', target_user_id: user.id }),
+      });
+      const data = await res.json();
+      if (res.ok) { setConnStatus('pending'); setConnId(data.connection?.id || null); setConnIsSender(true); onShowToast?.('Connection request sent!'); }
+      else onShowToast?.(data.message || 'Failed to send request.');
+    } catch { onShowToast?.('Connection failed. Please try again.'); }
+    setConnLoading(false);
+  };
+
+  const handleCancelOrDisconnect = async () => {
+    if (!connId) return;
+    setConnLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/connections'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'remove', connection_id: connId }),
+      });
+      if (res.ok) { setConnStatus(null); setConnId(null); onShowToast?.(connStatus === 'accepted' ? 'Disconnected.' : 'Request cancelled.'); }
+      else onShowToast?.('Action failed.');
+    } catch { onShowToast?.('Action failed. Please try again.'); }
+    setConnLoading(false);
+  };
+
+  const handleAccept = async () => {
+    if (!connId) return;
+    setConnLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/connections'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'accept', connection_id: connId }),
+      });
+      if (res.ok) { setConnStatus('accepted'); onShowToast?.('Connection accepted!'); }
+      else onShowToast?.('Failed to accept.');
+    } catch { onShowToast?.('Failed. Please try again.'); }
+    setConnLoading(false);
+  };
   const [pendingAvatarUrl, setPendingAvatarUrl] = useState(null); // staged, committed on Save
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
@@ -3511,6 +3582,41 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             </div>
 
             <div className="profile-edit-actions" style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0, marginLeft: 'auto' }}>
+              {/* ── Connection buttons — read-only (other user's profile) ── */}
+              {readOnly && (
+                <>
+                  {connStatus === null && (
+                    <button className="cyber-btn" onClick={handleConnect} disabled={connLoading}
+                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
+                      {connLoading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />Sending...</> : <><i className="fa-solid fa-user-plus" style={{ marginRight: 5 }} />CONNECT</>}
+                    </button>
+                  )}
+                  {connStatus === 'pending' && connIsSender && (
+                    <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
+                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
+                      {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />PENDING</>}
+                    </button>
+                  )}
+                  {connStatus === 'pending' && !connIsSender && (
+                    <>
+                      <button className="cyber-btn" onClick={handleAccept} disabled={connLoading}
+                        style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
+                        {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-check" style={{ marginRight: 5 }} />ACCEPT</>}
+                      </button>
+                      <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
+                        style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
+                        DECLINE
+                      </button>
+                    </>
+                  )}
+                  {connStatus === 'accepted' && (
+                    <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
+                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap', borderColor: '#3ecf8e', color: '#3ecf8e' }}>
+                      {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-link" style={{ marginRight: 5 }} />CONNECTED</>}
+                    </button>
+                  )}
+                </>
+              )}
               {!readOnly && (!editing
                 ? <button className="cyber-btn" onClick={() => { setEditForm(f => ({ ...f, ...profile, full_name: user.full_name || '' })); setEditing(true); }} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
                 : <>
@@ -8728,6 +8834,8 @@ export default function UserPortal() {
           currentAvatarUrl={viewingProfile.avatar_url}
           onReport={(data) => setShowReport(data)}
           onCircleInfo={(c) => setShowCircleInfo(c)}
+          currentUserId={user?.id}
+          onShowToast={showToast}
           readOnly
         />
       )}
