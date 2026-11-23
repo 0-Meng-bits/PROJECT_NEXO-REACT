@@ -49,7 +49,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
 
-  const [step, setStep] = useState(1); // 1=avatar, 2=program/year, 3=interests
+  const [step, setStep] = useState(1); // 1=avatar, 2=program/year, 3=interests, 4=welcome
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [program, setProgram] = useState('');
@@ -202,7 +202,7 @@ export default function Onboarding() {
     }
 
     setSaving(false);
-    navigate('/portal');
+    setStep(4);
   };
 
   const initials = user.full_name
@@ -218,18 +218,18 @@ export default function Onboarding() {
         <div className="onboarding-card">
         {/* Progress bar */}
         <div className="onboarding-progress">
-          {[1, 2, 3].map(s => (
+          {[1, 2, 3, 4].map(s => (
             <div key={s} className={`ob-step ${step >= s ? 'active' : ''} ${step > s ? 'done' : ''}`}>
               <div className="ob-step-dot">
                 {step > s ? <i className="fa-solid fa-check" /> : s}
               </div>
               <span className="ob-step-label">
-                {s === 1 ? 'Profile' : s === 2 ? 'Details' : 'Interests'}
+                {s === 1 ? 'Profile' : s === 2 ? 'Details' : s === 3 ? 'Interests' : 'Welcome'}
               </span>
             </div>
           ))}
           <div className="ob-progress-line">
-            <div className="ob-progress-fill" style={{ width: `${((step - 1) / 2) * 100}%` }} />
+            <div className="ob-progress-fill" style={{ width: `${((step - 1) / 3) * 100}%` }} />
           </div>
         </div>
 
@@ -371,6 +371,75 @@ export default function Onboarding() {
                 {saving ? 'SAVING...' : 'ENTER NEXO →'}
               </button>
             </div>
+          </div>
+        )}
+        {/* ── STEP 4: Welcome ── */}
+        {step === 4 && (
+          <div className="ob-step-content fade-in" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
+            <h2 className="ob-title">You're all set, {user.full_name?.split(' ')[0] || 'there'}!</h2>
+            <p className="ob-subtitle" style={{ marginBottom: 24 }}>
+              Welcome to NEXO Connect. Here's what's waiting for you inside.
+            </p>
+
+            {/* Feature cards */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 10,
+              marginBottom: 24,
+            }}>
+              {[
+                { icon: 'fa-solid fa-fire',         color: '#f97316', label: 'Trust Points',  desc: 'Earn TP by participating' },
+                { icon: 'fa-solid fa-store',         color: '#a855f7', label: 'Shop',          desc: 'Spend TP on customizations' },
+                { icon: 'fa-solid fa-paw',           color: '#22c55e', label: 'Companions',    desc: 'Pick a pet for your profile' },
+                { icon: 'fa-solid fa-user-group',    color: '#00f0ff', label: 'Connections',   desc: 'Find people like you' },
+                { icon: 'fa-solid fa-users',         color: '#fcee0a', label: 'Circles',       desc: 'Join or create a group' },
+                { icon: 'fa-solid fa-bell',          color: '#f43f5e', label: 'Notifications', desc: 'Stay in the loop' },
+              ].map(f => (
+                <div key={f.label} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${f.color}30`,
+                  borderRadius: 10,
+                  padding: '12px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <i className={f.icon} style={{ fontSize: 22, color: f.color }} />
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{f.label}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.3 }}>{f.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tutorial video link */}
+            {NEXO_YOUTUBE_EMBED_URL ? (
+              <div style={{ marginBottom: 20, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,240,255,0.15)' }}>
+                <div style={{ padding: '8px 12px', background: 'rgba(0,240,255,0.06)', fontSize: 11, color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1 }}>
+                  <i className="fa-solid fa-circle-play" style={{ marginRight: 6 }} />WATCH: HOW NEXO WORKS
+                </div>
+                <VideoEmbed />
+              </div>
+            ) : (
+              <div style={{
+                marginBottom: 20,
+                padding: '12px 16px',
+                borderRadius: 10,
+                background: 'rgba(0,240,255,0.04)',
+                border: '1px solid rgba(0,240,255,0.15)',
+                fontSize: 13,
+                color: 'var(--text-muted)',
+              }}>
+                <i className="fa-brands fa-youtube" style={{ marginRight: 8, color: '#ff4444', fontSize: 16 }} />
+                Tutorial video coming soon — we'll walk you through everything!
+              </div>
+            )}
+
+            <button className="cyber-btn" style={{ width: '100%' }} onClick={() => navigate('/portal')}>
+              ENTER NEXO →
+            </button>
           </div>
         )}
         </div>
