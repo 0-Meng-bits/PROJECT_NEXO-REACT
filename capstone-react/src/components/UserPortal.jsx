@@ -7318,9 +7318,9 @@ export default function UserPortal() {
                           <i className="nav-icon fa-solid fa-gear"></i>
                           <span className="node-name">Settings</span>
                         </div>
-                        <div className="ls-item" style={{ color: 'var(--red)' }} onClick={() => deleteCircle(activeComm.id)}>
-                          <i className="nav-icon fa-solid fa-circle-xmark"></i>
-                          <span className="node-name">Delete Circle</span>
+                        <div className="ls-item" style={{ color: 'var(--red)' }} onClick={() => leaveCircle(activeComm.id)}>
+                          <i className="nav-icon fa-solid fa-right-from-bracket"></i>
+                          <span className="node-name">Leave Circle</span>
                         </div>
                       </>
                     )}
