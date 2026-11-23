@@ -8919,7 +8919,7 @@ export default function UserPortal() {
             </button>
           </div>
         </div>
-      )}}
+      )}
       {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onUpdateUser={setCurrentUser} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal
