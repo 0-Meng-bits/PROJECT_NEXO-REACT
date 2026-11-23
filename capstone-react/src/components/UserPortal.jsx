@@ -6395,7 +6395,7 @@ export default function UserPortal() {
         media_duration: mediaDuration,
         community_id: activeCommId === 'global' ? null : activeCommId,
         channel_id: activeCommId === 'global' ? null : activeChannelId,
-        role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+        role: myRankLevel >= 3 ? 'LEADER' : myRankLevel === 2 ? 'CO-LEADER' : myRankLevel === 1 ? 'MODERATOR' : 'MEMBER',
         ...(replyTo ? { reply_to_id: replyTo.id, reply_to_preview: replyTo.content?.slice(0, 100), reply_to_author: replyTo.full_name } : {}),
       };
 
@@ -6501,7 +6501,7 @@ export default function UserPortal() {
         media_duration: mediaDuration,
         community_id: activeCommId,
         channel_id: null,
-        role: isLeader ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER'),
+        role: myRankLevel >= 3 ? 'LEADER' : myRankLevel === 2 ? 'CO-LEADER' : myRankLevel === 1 ? 'MODERATOR' : 'MEMBER',
         ...(replyTo ? { reply_to_id: replyTo.id, reply_to_preview: replyTo.content?.slice(0, 100), reply_to_author: replyTo.full_name } : {}),
       };
 
@@ -6709,7 +6709,7 @@ export default function UserPortal() {
   const activeComm = communities.find(c => c.id === activeCommId) || GLOBAL_COMM;
   const isOwner = activeComm.creator_id === user?.id;
   const myRankLevel = getMembership(activeCommId)?.rank_level ?? (isOwner ? 3 : 0);
-  const myRole = isOwner ? 'LEADER' : (getMembership(activeCommId)?.role?.toUpperCase() || 'MEMBER');
+  const myRole = myRankLevel >= 3 ? 'LEADER' : myRankLevel === 2 ? 'CO-LEADER' : myRankLevel === 1 ? 'MODERATOR' : 'MEMBER';
   const canModerate = isOwner || myRankLevel >= 2; // leader or co-leader
   const tagColor = myRole === 'LEADER' ? 'var(--cyber-yellow)' : myRole === 'CO-LEADER' ? 'var(--cyber-cyan)' : 'var(--text-muted)';
 
