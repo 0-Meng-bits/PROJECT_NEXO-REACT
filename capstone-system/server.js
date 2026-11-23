@@ -1062,3 +1062,6 @@ app.post('/api/upload-media', async (req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`✅ CTU Connect server running at http://localhost:${port}`);
 });
+
+// ── HEALTH CHECK ──────────────────────────────────────────────────────────────
+app.get('/', (req, res) => res.status(200).json({ status: 'ok', service: 'NEXO Connect API' }));
