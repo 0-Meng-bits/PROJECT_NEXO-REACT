@@ -6615,8 +6615,11 @@ export default function UserPortal() {
   };
 
   const leaveCircle = async (commId) => {
+    if (leaveCircle._pending) return; // prevent double call
+    leaveCircle._pending = true;
+    try {
     const membership = getMembership(commId);
-    if (!membership) return;
+    if (!membership) { leaveCircle._pending = false; return; }
 
     // If the user is the leader, show successor picker instead of confirming directly
     if (membership.rank_level === 3) {
@@ -6655,11 +6658,12 @@ export default function UserPortal() {
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ action: 'leave', community_id: commId }),
     });
-    if (!res.ok) { showToast('Failed to leave circle.'); return; }
+    if (!res.ok) { showToast('Failed to leave circle.'); leaveCircle._pending = false; return; }
     await insertSystemMessage(commId, `${user.full_name} left the circle.`);
     showToast('You have left the circle.');
     await loadMyMemberships();
     navTo('home', 'global');
+    } finally { leaveCircle._pending = false; }
   };
 
   const confirmLeaveWithSuccessor = async (commId, successorId) => {
