@@ -2622,6 +2622,7 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
   const [recentMembers, setRecentMembers] = useState([]);
   const [stats, setStats] = useState({ postsThisMonth: 0, daysSinceCreated: 0 });
   const [reviews, setReviews] = useState([]);
+  const [showAllReviews, setShowAllReviews] = useState(false);
   const [avgRating, setAvgRating] = useState(0);
   const [myReview, setMyReview] = useState(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -2935,12 +2936,12 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
               </div>
             )}
 
-            {/* Recent reviews list — scrollable */}
+            {/* Recent reviews list — collapsible */}
             {reviews.length === 0 ? (
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>No reviews yet. Be the first!</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', paddingRight: 4 }}>
-                {reviews.map(r => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
+                {(showAllReviews ? reviews : reviews.slice(0, 2)).map(r => (
                   <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
@@ -2957,6 +2958,12 @@ function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, cu
                     {r.comment && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{r.comment}</p>}
                   </div>
                 ))}
+                {reviews.length > 2 && (
+                  <button onClick={() => setShowAllReviews(v => !v)}
+                    style={{ fontSize: 11, color: 'var(--cyber-cyan)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                    {showAllReviews ? '▲ Show less' : `▼ Show ${reviews.length - 2} more review${reviews.length - 2 !== 1 ? 's' : ''}`}
+                  </button>
+                )}
               </div>
             )}
           </div>
