@@ -22,16 +22,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'This CTU ID is already registered.' });
   }
 
-  // Also check profiles table (legacy)
-  const { data: existingProfile } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .eq('student_id', studentId)
-    .maybeSingle();
-  if (existingProfile) {
-    return res.status(400).json({ message: 'This CTU ID is already registered.' });
-  }
-
   // Create user with email_confirm: false (requires verification)
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -69,26 +59,6 @@ export default async function handler(req, res) {
     await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl, gender }]);
   } catch (e) {
     console.warn('[SIGNUP] New table insert warning:', e.message);
-  }
-
-  // Insert profile linked to auth user (backwards compat)
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .insert([{
-      id: authData.user.id,
-      student_id: studentId,
-      full_name: fullName,
-      email,
-      user_type,
-      is_verified: false,
-      id_verified: id_verified || false,
-      id_photo_url: idPhotoUrl,
-    }])
-    .select().single();
-
-  if (error) {
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-    return res.status(400).json({ message: error.message });
   }
 
   // Generate email verification link
@@ -159,7 +129,7 @@ export default async function handler(req, res) {
 
   res.status(200).json({
     message: 'Account created! Check your email to verify your account.',
-    user: data,
+    user: { id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type },
     session: null,
   });
 }

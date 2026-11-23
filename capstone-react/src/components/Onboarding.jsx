@@ -178,10 +178,9 @@ export default function Onboarding() {
 
     const profileUpdates = { ...detailsUpdates, onboarding_complete: true };
     const { data: updatedProfile } = await supabase
-      .from('profiles')
-      .update(profileUpdates)
+      .from('account_details')
+      .select('program, year_level, interests, avatar_url')
       .eq('id', user.id)
-      .select()
       .single();
 
     // Refresh localStorage with updated data

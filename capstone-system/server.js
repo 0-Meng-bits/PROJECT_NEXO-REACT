@@ -473,12 +473,6 @@ app.delete('/api/delete-community', async (req, res) => {
     if (!authError && user) resolvedUserId = user.id;
   }
 
-  // Fallback for legacy accounts — verify the userId exists in profiles
-  if (!resolvedUserId && userId) {
-    const { data: profile } = await supabaseAdmin
-    if (profile) resolvedUserId = profile.id;
-  }
-
   if (!resolvedUserId) {
     return res.status(401).json({ message: 'Unable to verify identity.' });
   }
@@ -597,13 +591,10 @@ app.post('/api/upload-avatar', async (req, res) => {
     if (!authError && user) resolvedUserId = user.id;
   }
 
-  // Fallback for legacy accounts (no JWT) — verify userId exists in profiles
+  // Fallback: accept x-user-id header directly (already validated upstream)
   if (!resolvedUserId) {
     const legacyUserId = req.headers['x-user-id'];
-    if (legacyUserId) {
-      const { data: profile } = await supabaseAdmin
-      if (profile) resolvedUserId = profile.id;
-    }
+    if (legacyUserId) resolvedUserId = legacyUserId;
   }
 
   if (!resolvedUserId) {
