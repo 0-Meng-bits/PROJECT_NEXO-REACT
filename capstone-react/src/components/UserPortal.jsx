@@ -5478,6 +5478,13 @@ export default function UserPortal() {
     }
     const allowedTypes = ['announcement', 'event', 'shoutout', 'thread', 'general', 'poll'];
     const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'thread';
+
+    // Block post if it contains inappropriate language
+    if (containsBadWord(newPost.title) || containsBadWord(newPost.content)) {
+      alert('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      return;
+    }
+
     setPostingAnnouncement(true);
     const pollOptions = type === 'poll' ? newPost.pollOptions.filter(o => o.trim()) : null;
 
@@ -5502,18 +5509,6 @@ export default function UserPortal() {
     }]);
     setPostingAnnouncement(false);
     if (!error) {
-      // Auto-flag if bad word detected in title or content
-      if (containsBadWord(newPost.title) || containsBadWord(newPost.content)) {
-        const { data: inserted } = await supabase.from('announcements')
-          .select('id').order('created_at', { ascending: false }).limit(1).single();
-        if (inserted) {
-          await autoFlagContent({
-            reporterId: user.id, reportedUserId: user.id,
-            contentType: 'announcement', contentId: inserted.id,
-            contentPreview: `${newPost.title}: ${newPost.content}`,
-          });
-        }
-      }
       setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
       setPostPendingMedia(null);
       loadAnnouncements();
@@ -5552,6 +5547,13 @@ export default function UserPortal() {
     }
     // Restrict posting to Leader (3) and Co-Leader (2) only — except Thread which all members can post
     if (myRankLevel < 2 && newCirclePost.post_type !== 'thread') { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
+
+    // Block post if it contains inappropriate language
+    if (containsBadWord(newCirclePost.title) || containsBadWord(newCirclePost.content)) {
+      showToast('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      return;
+    }
+
     setPostingAnnouncement(true);
     const pollOptions = newCirclePost.post_type === 'poll'
       ? newCirclePost.pollOptions.filter(o => o.trim()) : null;
