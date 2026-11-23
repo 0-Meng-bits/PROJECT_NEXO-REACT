@@ -4889,6 +4889,7 @@ export default function UserPortal() {
   const notifRef = useRef(null);
   const toastTimer = useRef(null);
   const feedBottomRef = useRef(null);
+  const chatFeedRef = useRef(null); // ref to the scrollable chat feed container
   const firstUnreadRef = useRef(null); // ref to scroll to on load
   const firstUnreadMsgId = useRef(null); // message id of the first unread message
   const [firstUnreadId, setFirstUnreadId] = useState(null); // state version to trigger render
@@ -6066,7 +6067,11 @@ export default function UserPortal() {
     if (firstUnreadRef.current) {
       firstUnreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (chatFeedRef.current) {
+        chatFeedRef.current.scrollTop = chatFeedRef.current.scrollHeight;
+      } else {
+        feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   }, [messages, messagesLoading]);
 
@@ -7555,7 +7560,7 @@ export default function UserPortal() {
                   Campus-wide chat, open to all verified users.
                 </p>
               </div>
-              <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
+              <div ref={chatFeedRef} className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
 
                 {messagesLoading ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-muted)' }}>
@@ -7951,7 +7956,7 @@ export default function UserPortal() {
                 </div>
               )}
 
-              <div className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
+              <div ref={chatFeedRef} className="c-feed fade-in c-feed-chat" style={{ margin: '0 20px 0 0', borderRadius: '0', flex: 1 }}>
                 {/* Access gate for non-members */}
                 {!isMember(activeCommId) ? (
                   <div className="post" style={{ textAlign: 'center', padding: 40 }}>
