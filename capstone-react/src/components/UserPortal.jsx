@@ -7105,6 +7105,7 @@ export default function UserPortal() {
           {myCircles.map(c => (
             <div key={c.id} className={`dock-icon ${activeCommId === c.id ? "active" : ""}`}
               title={c.name} onClick={() => {
+                setMessages([]);
                 navTo(c.id === "global" ? "home" : "circles", c.id);
                 setActiveChannelId(null);
                 setShowDock(false);
@@ -7178,7 +7179,7 @@ export default function UserPortal() {
                   })()}
                 </div>
                 <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => {
-                  navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false);
+                  setMessages([]); navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false);
                   const now = new Date().toISOString();
                   setLastVisitedGlobal(now);
                   localStorage.setItem('nexo-global-visited', now);
@@ -7246,7 +7247,7 @@ export default function UserPortal() {
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                   onClick={() => {
-                    setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
+                    setMessages([]); setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
                     const now = new Date().toISOString();
                     localStorage.setItem(`nexo-circle-visited-${activeCommId}`, now);
                     setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
