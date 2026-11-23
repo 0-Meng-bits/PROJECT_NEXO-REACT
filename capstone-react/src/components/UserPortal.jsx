@@ -4980,6 +4980,10 @@ export default function UserPortal() {
   const [lastVisitedBulletin, setLastVisitedBulletin] = useState(
     () => localStorage.getItem('nexo-bulletin-visited') || new Date(0).toISOString()
   );
+  const [lastVisitedGlobal, setLastVisitedGlobal] = useState(
+    () => localStorage.getItem('nexo-global-visited') || new Date(0).toISOString()
+  );
+  const [circleUnreadMap, setCircleUnreadMap] = useState({}); // { [commId]: count }
   const [newPost, setNewPost] = useState({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
   const [connectedUserIds, setConnectedUserIds] = useState(new Set()); // accepted connection user IDs
   const [newCirclePost, setNewCirclePost] = useState({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
@@ -5906,6 +5910,27 @@ export default function UserPortal() {
   }, [activeCommId, activeChannelId]);
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
+
+  // ── Unread circle message counts ─────────────────────────────────────
+  useEffect(() => {
+    const myActiveCircles = myMemberships.filter(m => m.status === 'active').map(m => m.community_id);
+    if (myActiveCircles.length === 0) return;
+    const fetchUnread = async () => {
+      const counts = {};
+      await Promise.all(myActiveCircles.map(async (commId) => {
+        const lastVisited = localStorage.getItem(`nexo-circle-visited-${commId}`) || new Date(0).toISOString();
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('community_id', commId)
+          .gt('created_at', lastVisited)
+          .neq('sender_id', user?.student_id || '');
+        counts[commId] = count || 0;
+      }));
+      setCircleUnreadMap(counts);
+    };
+    fetchUnread();
+  }, [myMemberships, user?.student_id]);
 
   // Load accepted connection user IDs for visibility filtering
   useEffect(() => {
@@ -7067,13 +7092,19 @@ export default function UserPortal() {
                 setActiveChannelId(null);
                 setShowDock(false);
                 setMobileSidebarOpen(true);
-              }}>
+              }} style={{ position: 'relative' }}>
               {c.id === "global"
                 ? <i className="fa-solid fa-earth-asia"></i>
                 : c.logo_url
                   ? <img src={c.logo_url} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} />
                   : <i className={c.icon || getCategoryIcon(c.category)}></i>
               }
+              {/* Unread badge on dock icon */}
+              {c.id !== 'global' && circleUnreadMap[c.id] > 0 && activeCommId !== c.id && (
+                <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 800, borderRadius: 10, padding: '1px 5px', minWidth: 16, textAlign: 'center', lineHeight: '14px' }}>
+                  {circleUnreadMap[c.id] > 99 ? '99+' : circleUnreadMap[c.id]}
+                </span>
+              )}
             </div>
           ))}
           {user?.is_verified && (
@@ -7123,9 +7154,23 @@ export default function UserPortal() {
                     return unread > 0 ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread}</span> : null;
                   })()}
                 </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => { navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false); }}>
+                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => {
+                  navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false);
+                  const now = new Date().toISOString();
+                  setLastVisitedGlobal(now);
+                  localStorage.setItem('nexo-global-visited', now);
+                }}>
                   <i className="nav-icon fa-solid fa-message"></i>
                   <span className="node-name">Global Feed</span>
+                  {(() => {
+                    const unread = messages.filter(m =>
+                      new Date(m.created_at) > new Date(lastVisitedGlobal) &&
+                      m.sender_id !== user?.student_id
+                    ).length;
+                    return unread > 0 && section !== 'global'
+                      ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread > 99 ? '99+' : unread}</span>
+                      : null;
+                  })()}
                 </div>
                 <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
                   <i className="nav-icon fa-solid fa-compass"></i>
@@ -7177,10 +7222,18 @@ export default function UserPortal() {
                 {/* General — virtual default channel */}
                 <div
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
-                  onClick={() => { setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null); }}
+                  onClick={() => {
+                    setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
+                    const now = new Date().toISOString();
+                    localStorage.setItem(`nexo-circle-visited-${activeCommId}`, now);
+                    setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+                  }}
                 >
                   <i className="channel-hash">#</i>
                   <span className="node-name">general</span>
+                  {circleUnreadMap[activeCommId] > 0 && (activeChannelId !== null || showCircleAnnouncements) && (
+                    <span className="req-badge" style={{ marginLeft: 'auto' }}>{circleUnreadMap[activeCommId] > 99 ? '99+' : circleUnreadMap[activeCommId]}</span>
+                  )}
                 </div>
 
                 {/* Huddle — hardcoded voice channel, always visible */}
