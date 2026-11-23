@@ -5989,6 +5989,23 @@ export default function UserPortal() {
   // Keep sectionRef in sync
   useEffect(() => { sectionRef.current = section; }, [section]);
 
+  // ── Auto-clear unread badges when actively viewing ───────────────────
+  useEffect(() => {
+    if (section === 'global') {
+      const now = new Date().toISOString();
+      setLastVisitedGlobal(now);
+      localStorage.setItem('nexo-global-visited', now);
+    }
+  }, [section]);
+
+  useEffect(() => {
+    if (section === 'circles' && activeCommId && activeCommId !== 'global') {
+      const now = new Date().toISOString();
+      localStorage.setItem(`nexo-circle-visited-${activeCommId}`, now);
+      setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+    }
+  }, [section, activeCommId]);
+
   // Ref that always holds the latest state values needed by the back handler.
   // Avoids stale closures · listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
@@ -7092,6 +7109,12 @@ export default function UserPortal() {
                 setActiveChannelId(null);
                 setShowDock(false);
                 setMobileSidebarOpen(true);
+                // Clear unread badge for this circle
+                if (c.id !== 'global') {
+                  const now = new Date().toISOString();
+                  localStorage.setItem(`nexo-circle-visited-${c.id}`, now);
+                  setCircleUnreadMap(prev => ({ ...prev, [c.id]: 0 }));
+                }
               }} style={{ position: 'relative' }}>
               {c.id === "global"
                 ? <i className="fa-solid fa-earth-asia"></i>
