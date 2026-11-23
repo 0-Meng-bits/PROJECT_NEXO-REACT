@@ -6258,6 +6258,7 @@ export default function UserPortal() {
   const handleChatInputChange = async (value) => {
     setSendError('');
     // Detect @mention — works for both 'shoutout! @name' and standalone '@name'
+    const isGlobal = !activeCommId || activeCommId === 'global';
     const shoutMatch = value.match(/^shoutout!\s+@([^\s][\w\s]*)/i);
     const mentionMatch = !shoutMatch && value.match(/@([\w\s]*)$/);
     if (shoutMatch) {
@@ -6274,26 +6275,32 @@ export default function UserPortal() {
         setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
       }
     } else if (mentionMatch) {
-      // Standalone @mention — search circle members
       const query = mentionMatch[1].trim();
       setShoutoutQuery(query);
-      if (query.length >= 1) {
-        // Filter from already-loaded circle members first, fall back to DB search
-        const memberMatches = circleChatMembers.filter(m =>
-          m.full_name?.toLowerCase().startsWith(query.toLowerCase()) && m.id !== user.id
-        ).slice(0, 5).map(m => ({ id: m.id, full_name: m.full_name }));
-        if (memberMatches.length > 0) {
-          setShoutoutSuggestions(memberMatches);
-        } else {
+      if (isGlobal) {
+        // Global Feed — search all verified accounts
+        if (query.length >= 1) {
           const { data } = await supabase.from('accounts')
-            .select('id, full_name').ilike('full_name', `${query}%`).neq('id', user.id).limit(5);
+            .select('id, full_name').ilike('full_name', `${query}%`).neq('id', user.id).limit(6);
           setShoutoutSuggestions(data || []);
+        } else {
+          // Just '@' typed in global — show recent/online users (use onlineProfiles if available)
+          const fallback = onlineProfiles.filter(p => p.id !== user?.id).slice(0, 6).map(p => ({ id: p.id, full_name: p.full_name }));
+          setShoutoutSuggestions(fallback);
         }
       } else {
-        // Just '@' typed — show all circle members
-        setShoutoutSuggestions(
-          circleChatMembers.filter(m => m.id !== user.id).slice(0, 6).map(m => ({ id: m.id, full_name: m.full_name }))
-        );
+        // Circle chat — only search within current circle members
+        const activeMembers = circleChatMembers.filter(m => m.id !== user.id);
+        if (query.length >= 1) {
+          const memberMatches = activeMembers
+            .filter(m => m.full_name?.toLowerCase().startsWith(query.toLowerCase()))
+            .slice(0, 6)
+            .map(m => ({ id: m.id, full_name: m.full_name }));
+          setShoutoutSuggestions(memberMatches);
+        } else {
+          // Just '@' typed — show all circle members only
+          setShoutoutSuggestions(activeMembers.slice(0, 6).map(m => ({ id: m.id, full_name: m.full_name })));
+        }
       }
     } else {
       setShoutoutSuggestions([]);
