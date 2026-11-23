@@ -6621,8 +6621,10 @@ export default function UserPortal() {
     const membership = getMembership(commId);
     if (!membership) { leaveCircle._pending = false; return; }
 
-    // If the user is the leader, show successor picker instead of confirming directly
-    if (membership.rank_level === 3) {
+    // If the user is the leader (owner or rank 3), show successor picker
+    const comm = communities.find(c => c.id === commId);
+    const isCircleOwner = comm?.creator_id === user?.id;
+    if (isCircleOwner || membership.rank_level === 3) {
       // Fetch current active members (excluding self) to pick a successor
       const { data: members } = await supabase
         .from('memberships')
