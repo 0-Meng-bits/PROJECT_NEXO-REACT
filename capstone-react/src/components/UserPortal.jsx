@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -2628,12 +2629,12 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
           );
         })}
       </div>
-      {/* Fullscreen photo viewer */}
-      {viewingPhoto && (
+      {/* Fullscreen photo viewer — rendered via portal to escape modal stacking */}
+      {viewingPhoto && ReactDOM.createPortal(
         <div onClick={() => setViewingPhoto(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <button onClick={() => setViewingPhoto(null)}
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18, color: 'white' }}>
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20, color: 'white', zIndex: 1 }}>
             <i className="fa-solid fa-xmark" />
           </button>
           <img src={viewingPhoto.url} alt="Profile photo"
@@ -2646,7 +2647,8 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
               {reactions[viewingPhoto.id]?.count > 0 && <span style={{ color: 'white', fontWeight: 700 }}>{reactions[viewingPhoto.id].count}</span>}
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -4100,18 +4102,19 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
         />
       )}
 
-      {/* Cover photo fullscreen viewer */}
-      {viewingCover && (coverUrl || user?.cover_url) && (
+      {/* Cover photo fullscreen viewer — rendered via portal to escape modal stacking */}
+      {viewingCover && (coverUrl || user?.cover_url) && ReactDOM.createPortal(
         <div onClick={() => setViewingCover(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <button onClick={() => setViewingCover(false)}
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18, color: 'white' }}>
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20, color: 'white', zIndex: 1 }}>
             <i className="fa-solid fa-xmark" />
           </button>
           <img src={coverUrl || user?.cover_url} alt="Cover photo"
             onClick={e => e.stopPropagation()}
             style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
