@@ -4752,8 +4752,11 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
+  align-items: stretch;
 }
+.lnd-about-grid > * { display: flex; }
 .lnd-about-card {
+  flex: 1;
   background: var(--card-bg);
   border: 1px solid var(--cyber-border);
   border-radius: 14px;
