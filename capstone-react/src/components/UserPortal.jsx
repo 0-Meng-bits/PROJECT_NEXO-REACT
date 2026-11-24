@@ -5499,7 +5499,7 @@ export default function UserPortal() {
     cutoff.setDate(cutoff.getDate() - 30);
     const { data } = await supabase.from('announcements')
       .select('*')
-      .is('community_id', null)
+      .or('community_id.is.null,cross_posted_from.not.is.null')
       .gte('created_at', cutoff.toISOString())
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false });
@@ -5528,7 +5528,7 @@ export default function UserPortal() {
   const loadPastAnnouncements = async () => {
     setLoadingPastAnnouncements(true);
     const { data } = await supabase.from('announcements')
-      .select('*').is('community_id', null).order('created_at', { ascending: false }).limit(50);
+      .select('*').or('community_id.is.null,cross_posted_from.not.is.null').order('created_at', { ascending: false }).limit(50);
     setPastAnnouncements(data || []);
     setLoadingPastAnnouncements(false);
   };
