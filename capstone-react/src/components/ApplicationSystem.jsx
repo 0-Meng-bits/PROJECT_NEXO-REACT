@@ -83,7 +83,8 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
             title: 'Application Open - ' + data.title + ' (' + comm.name + ')',
             content: comm.name + ' is now accepting applications for: ' + data.title + '. Visit the circle to apply.',
             post_type: 'thread',
-            community_id: null,
+            community_id: comm.id,
+            cross_posted_from: comm.id,
           }]);
         }
       } else {
