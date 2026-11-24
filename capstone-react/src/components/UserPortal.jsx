@@ -2509,9 +2509,8 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
   useEffect(() => {
     if (viewingPhoto) {
       window.history.pushState({ photoViewer: true }, '');
-      const onPop = () => { setViewingPhoto(null); };
-      window.addEventListener('popstate', onPop);
-      return () => window.removeEventListener('popstate', onPop);
+      window.__nexoOverlayCloser = () => setViewingPhoto(null);
+      return () => { window.__nexoOverlayCloser = null; };
     }
   }, [viewingPhoto]);
 
@@ -3116,9 +3115,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   useEffect(() => {
     if (viewingCover) {
       window.history.pushState({ coverViewer: true }, '');
-      const onPop = () => { setViewingCover(false); };
-      window.addEventListener('popstate', onPop);
-      return () => window.removeEventListener('popstate', onPop);
+      window.__nexoOverlayCloser = () => setViewingCover(false);
+      return () => { window.__nexoOverlayCloser = null; };
     }
   }, [viewingCover]);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
@@ -6121,6 +6119,8 @@ export default function UserPortal() {
   // Ref that always holds the latest state values needed by the back handler.
   // Avoids stale closures · listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
+  // Registry for child component overlay closers (photo viewers etc.)
+  const overlayCloserRef = useRef(null);
   useEffect(() => {
     backStateRef.current = {
       section,
@@ -6140,6 +6140,18 @@ export default function UserPortal() {
 
     const onPopState = () => {
       window.history.pushState({ portalTrap: true }, '');
+
+      // Check if a child overlay (photo viewer etc.) is open — close it first
+      if (overlayCloserRef.current) {
+        overlayCloserRef.current();
+        overlayCloserRef.current = null;
+        return;
+      }
+      if (window.__nexoOverlayCloser) {
+        window.__nexoOverlayCloser();
+        window.__nexoOverlayCloser = null;
+        return;
+      }
 
       const s = backStateRef.current;
 
