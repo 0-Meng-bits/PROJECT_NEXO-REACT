@@ -311,9 +311,9 @@ export default function Landing({ onEnter }) {
       {/* TUTORIAL VIDEO */}
       <section className="lnd-section" id="video" style={{ background: 'rgba(0,240,255,0.03)' }}>
         <div className="lnd-container">
-          <Reveal><p className="lnd-eyebrow">WATCH THE TUTORIAL</p></Reveal>
+          <Reveal><p className="lnd-eyebrow">WATCH THE VIDEO</p></Reveal>
           <Reveal delay={120}>
-            <h2 className="lnd-section-title">See how it <span className="lnd-cyan">works in action.</span></h2>
+            <h2 className="lnd-section-title">Meet <span className="lnd-cyan">Nexo Connect.</span></h2>
           </Reveal>
           <Reveal delay={240}>
             <div style={{ marginTop: 32, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,240,255,0.2)', boxShadow: '0 0 40px rgba(0,240,255,0.08)' }}>

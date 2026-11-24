@@ -3,7 +3,7 @@
 // YouTube tutorial/promotional video embed URL
 // Update this single value to change the embed across Landing, HelpModal, and Onboarding
 // Set to null or empty string to show "Coming Soon" placeholder instead
-export const NEXO_YOUTUBE_EMBED_URL = '';
+export const NEXO_YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/4iOoN-_u5Ps';
 
 // Maps circle categories to their relevant interest tags
 // Used in circle creation form and interest filtering
