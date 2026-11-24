@@ -2573,8 +2573,8 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
               {photo?.photo_url ? (
                 <>
                   <img src={photo.photo_url} alt={`Photo ${i + 1}`}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: readOnly ? 'pointer' : 'default' }}
-                    onClick={() => readOnly && setViewingPhoto({ url: photo.photo_url, id: photo.id })}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: !editing ? 'pointer' : 'default' }}
+                    onClick={() => !editing && setViewingPhoto({ url: photo.photo_url, id: photo.id })}
                   />
                   {!readOnly && editing && (
                     <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
@@ -3471,8 +3471,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }}>
 
         {/* COVER */}
-        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: readOnly && (coverUrl || user?.cover_url) ? 'pointer' : 'default' }}
-          onClick={() => readOnly && (coverUrl || user?.cover_url) && setViewingCover(true)}>
+        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: (coverUrl || user?.cover_url) && !editing ? 'pointer' : 'default' }}
+          onClick={() => (coverUrl || user?.cover_url) && !editing && setViewingCover(true)}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
           {!readOnly && editing && (
             <>
