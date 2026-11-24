@@ -5918,26 +5918,28 @@ export default function UserPortal() {
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
 
-  // ── Unread circle message counts ─────────────────────────────────────
+  // ── Unread circle message counts — uses message_reads for cross-device accuracy ─
   useEffect(() => {
     const myActiveCircles = myMemberships.filter(m => m.status === 'active').map(m => m.community_id);
-    if (myActiveCircles.length === 0) return;
+    if (myActiveCircles.length === 0 || !user?.id) return;
     const fetchUnread = async () => {
+      // Get all messages in my circles that I haven't read yet — single batch query
+      const { data: unreadMsgs } = await supabase
+        .from('messages')
+        .select('id, community_id')
+        .in('community_id', myActiveCircles)
+        .neq('sender_id', user.student_id || '')
+        .not('id', 'in', `(select message_id from message_reads where reader_id = '${user.id}')`);
+
       const counts = {};
-      await Promise.all(myActiveCircles.map(async (commId) => {
-        const lastVisited = localStorage.getItem(`nexo-circle-visited-${commId}`) || new Date(0).toISOString();
-        const { count } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('community_id', commId)
-          .gt('created_at', lastVisited)
-          .neq('sender_id', user?.student_id || '');
-        counts[commId] = count || 0;
-      }));
+      myActiveCircles.forEach(commId => { counts[commId] = 0; });
+      (unreadMsgs || []).forEach(m => {
+        if (m.community_id) counts[m.community_id] = (counts[m.community_id] || 0) + 1;
+      });
       setCircleUnreadMap(counts);
     };
     fetchUnread();
-  }, [myMemberships, user?.student_id]);
+  }, [myMemberships, user?.id, user?.student_id]);
 
   // Load accepted connection user IDs for visibility filtering
   useEffect(() => {
@@ -6006,12 +6008,27 @@ export default function UserPortal() {
   }, [section]);
 
   useEffect(() => {
-    if (section === 'circles' && activeCommId && activeCommId !== 'global') {
-      const now = new Date().toISOString();
-      localStorage.setItem(`nexo-circle-visited-${activeCommId}`, now);
-      setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+    if (section === 'circles' && activeCommId && activeCommId !== 'global' && user?.id) {
+      // Mark all unread messages in this circle as read in message_reads
+      supabase
+        .from('messages')
+        .select('id')
+        .eq('community_id', activeCommId)
+        .neq('sender_id', user.student_id || '')
+        .not('id', 'in', `(select message_id from message_reads where reader_id = '${user.id}')`)
+        .then(({ data }) => {
+          if (data?.length) {
+            supabase.from('message_reads').insert(
+              data.map(m => ({ message_id: m.id, reader_id: user.id }))
+            ).then(() => {
+              setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+            });
+          } else {
+            setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+          }
+        });
     }
-  }, [section, activeCommId]);
+  }, [section, activeCommId, user?.id, user?.student_id]);
 
   // Ref that always holds the latest state values needed by the back handler.
   // Avoids stale closures · listener registered once, reads fresh values via ref.
@@ -7126,8 +7143,6 @@ export default function UserPortal() {
                 setMobileSidebarOpen(true);
                 // Clear unread badge for this circle
                 if (c.id !== 'global') {
-                  const now = new Date().toISOString();
-                  localStorage.setItem(`nexo-circle-visited-${c.id}`, now);
                   setCircleUnreadMap(prev => ({ ...prev, [c.id]: 0 }));
                 }
               }} style={{ position: 'relative' }}>
@@ -7262,8 +7277,6 @@ export default function UserPortal() {
                   className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                   onClick={() => {
                     setMessages([]); setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
-                    const now = new Date().toISOString();
-                    localStorage.setItem(`nexo-circle-visited-${activeCommId}`, now);
                     setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
                   }}
                 >
