@@ -827,7 +827,7 @@ select option {
   font-size: 22px;
   transition: 0.2s;
   flex-shrink: 0;
-  margin-top: auto;
+  margin-top: 4px;
 }
 .dock-add-btn:hover { border-color: var(--cyber-cyan); color: var(--cyber-cyan); }
 
