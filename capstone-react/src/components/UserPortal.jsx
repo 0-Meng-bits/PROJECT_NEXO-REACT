@@ -3138,6 +3138,15 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [connectionsCount, setConnectionsCount] = useState(0);
   const [expandedAvatar, setExpandedAvatar] = useState(false);
 
+  // Push history state when avatar viewer opens so back button closes it
+  useEffect(() => {
+    if (expandedAvatar) {
+      window.history.pushState({ avatarViewer: true }, '');
+      window.__nexoOverlayCloser = () => setExpandedAvatar(false);
+      return () => { if (window.__nexoOverlayCloser) window.__nexoOverlayCloser = null; };
+    }
+  }, [expandedAvatar]);
+
   useEffect(() => {
     if (!user?.id) return;
     const load = async () => {
@@ -4026,12 +4035,12 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       </div>
       
       {/* Expanded Avatar Overlay */}
-      {expandedAvatar && avatarUrl && (
+      {expandedAvatar && avatarUrl && ReactDOM.createPortal(
         <div
           onClick={() => setExpandedAvatar(false)}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.92)',
+            position: 'fixed', inset: 0, zIndex: 99999,
+            background: 'rgba(0,0,0,0.95)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'zoom-out',
           }}
@@ -4039,6 +4048,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           <img
             src={avatarUrl}
             alt="Profile"
+            onClick={e => e.stopPropagation()}
             style={{
               maxWidth: '90vw', maxHeight: '90vh',
               borderRadius: 16,
@@ -4050,15 +4060,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
             onClick={() => setExpandedAvatar(false)}
             style={{
               position: 'absolute', top: 20, right: 20,
-              background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '50%', width: 40, height: 40,
-              color: 'white', fontSize: 18, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.15)', border: 'none',
+              borderRadius: '50%', width: 44, height: 44,
+              color: 'white', fontSize: 20, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
             }}
           >
             <i className="fa-solid fa-xmark"></i>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Warning History Modal */}
