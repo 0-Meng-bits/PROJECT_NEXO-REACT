@@ -574,8 +574,10 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
             ? <i className="fa-solid fa-user-secret"></i>
             : (() => {
                 const url = avatarCache?.[a.author_student_id] || avatarCache?.[String(a.author_student_id)];
-                return url
-                  ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                // For circle auto-posts (no author_student_id), use circle logo from avatarCache keyed by community_id
+                const circleLogoUrl = !a.author_student_id && a.community_id ? avatarCache?.[`circle_${a.community_id}`] : null;
+                return (url || circleLogoUrl)
+                  ? <img src={url || circleLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   : avatarChar;
               })()
           }
@@ -5450,6 +5452,16 @@ export default function UserPortal() {
       if (profiles) {
         const map = {};
         profiles.forEach(p => { map[p.ctu_id] = p.account_details?.avatar_url || null; });
+        setAvatarCache(prev => ({ ...prev, ...map }));
+      }
+    }
+    // For circle auto-posts (no author_student_id), fetch circle logos
+    const circleIds = [...new Set((data || []).filter(a => !a.author_student_id && a.community_id).map(a => a.community_id))];
+    if (circleIds.length > 0) {
+      const { data: circles } = await supabase.from('communities').select('id, logo_url').in('id', circleIds);
+      if (circles) {
+        const map = {};
+        circles.forEach(c => { if (c.logo_url) map[`circle_${c.id}`] = c.logo_url; });
         setAvatarCache(prev => ({ ...prev, ...map }));
       }
     }
