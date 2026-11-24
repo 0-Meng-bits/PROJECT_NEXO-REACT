@@ -2501,6 +2501,7 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
 function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUploading, onUpload, onDelete, onTogglePrivacy, onReport }) {
   const [savedPhotos, setSavedPhotos] = useState([null, null]);
   const [reactions, setReactions] = useState({});
+  const [viewingPhoto, setViewingPhoto] = useState(null); // { url, id } when viewing fullscreen
   const photoRefs = [useRef(null), useRef(null)];
 
   useEffect(() => {
@@ -2561,7 +2562,10 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
             <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
               {photo?.photo_url ? (
                 <>
-                  <img src={photo.photo_url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={photo.photo_url} alt={`Photo ${i + 1}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: readOnly ? 'pointer' : 'default' }}
+                    onClick={() => readOnly && setViewingPhoto({ url: photo.photo_url, id: photo.id })}
+                  />
                   {!readOnly && editing && (
                     <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
                       <button onClick={() => onTogglePrivacy(slot)} title={photo.is_public ? 'Public' : 'Private'}
@@ -2614,11 +2618,29 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
           );
         })}
       </div>
+      {/* Fullscreen photo viewer */}
+      {viewingPhoto && (
+        <div onClick={() => setViewingPhoto(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <button onClick={() => setViewingPhoto(null)}
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18, color: 'white' }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+          <img src={viewingPhoto.url} alt="Profile photo"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
+          {viewingPhoto.id && reactions[viewingPhoto.id] !== undefined && (
+            <button onClick={e => { e.stopPropagation(); toggleReact(viewingPhoto.id); }}
+              style={{ position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '8px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
+              <i className="fa-solid fa-heart" style={{ color: reactions[viewingPhoto.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)' }} />
+              {reactions[viewingPhoto.id]?.count > 0 && <span style={{ color: 'white', fontWeight: 700 }}>{reactions[viewingPhoto.id].count}</span>}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-// -- CIRCLE INFO CARD MODAL --------------------------------------------------
 function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile, onReport }) {
   const [leaderProfile, setLeaderProfile] = useState(null);
   const [recentMembers, setRecentMembers] = useState([]);
@@ -3076,6 +3098,7 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [editForm, setEditForm] = useState({ full_name: user.full_name || '', program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
   const [profile, setProfile] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
+  const [viewingCover, setViewingCover] = useState(false); // fullscreen cover viewer
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
   const [coverUploading, setCoverUploading] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState(null); // { file, type: 'avatar'|'cover' }
@@ -3428,7 +3451,8 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }}>
 
         {/* COVER */}
-        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0 }}>
+        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: readOnly && (coverUrl || user?.cover_url) ? 'pointer' : 'default' }}
+          onClick={() => readOnly && (coverUrl || user?.cover_url) && setViewingCover(true)}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
           {!readOnly && editing && (
             <>
@@ -4054,6 +4078,20 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
           }}
           onCancel={() => setPendingCropFile(null)}
         />
+      )}
+
+      {/* Cover photo fullscreen viewer */}
+      {viewingCover && (coverUrl || user?.cover_url) && (
+        <div onClick={() => setViewingCover(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <button onClick={() => setViewingCover(false)}
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 18, color: 'white' }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+          <img src={coverUrl || user?.cover_url} alt="Cover photo"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
+        </div>
       )}
     </div>
   );
