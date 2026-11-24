@@ -5250,7 +5250,8 @@ export default function UserPortal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef(null);
   const [sendError, setSendError] = useState('');
-  const [showAttachMenu, setShowAttachMenu] = useState(false); // + button in chat composer // { id, full_name } - selected user
+  const [showAttachMenu, setShowAttachMenu] = useState(false); // + button in chat composer
+  const [shoutoutMention, setShoutoutMention] = useState(null); // { id, full_name } - selected user
   const [shoutoutSuggestions, setShoutoutSuggestions] = useState([]); // dropdown results
   const [shoutoutQuery, setShoutoutQuery] = useState(''); // current @query being typed
   const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } · message being replied to
