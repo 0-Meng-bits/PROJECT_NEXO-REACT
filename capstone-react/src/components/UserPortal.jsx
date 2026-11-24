@@ -5923,18 +5923,30 @@ export default function UserPortal() {
     const myActiveCircles = myMemberships.filter(m => m.status === 'active').map(m => m.community_id);
     if (myActiveCircles.length === 0 || !user?.id) return;
     const fetchUnread = async () => {
-      // Get all messages in my circles that I haven't read yet — single batch query
-      const { data: unreadMsgs } = await supabase
+      // Step 1 — get all messages in my circles from others
+      const { data: allMsgs } = await supabase
         .from('messages')
         .select('id, community_id')
         .in('community_id', myActiveCircles)
-        .neq('sender_id', user.student_id || '')
-        .not('id', 'in', `(select message_id from message_reads where reader_id = '${user.id}')`);
+        .neq('sender_id', user.student_id || '');
 
+      if (!allMsgs?.length) { setCircleUnreadMap({}); return; }
+
+      // Step 2 — get which of those I've already read
+      const msgIds = allMsgs.map(m => m.id);
+      const { data: readMsgs } = await supabase
+        .from('message_reads')
+        .select('message_id')
+        .eq('reader_id', user.id)
+        .in('message_id', msgIds);
+
+      const readSet = new Set((readMsgs || []).map(r => r.message_id));
+
+      // Step 3 — count unread per circle
       const counts = {};
       myActiveCircles.forEach(commId => { counts[commId] = 0; });
-      (unreadMsgs || []).forEach(m => {
-        if (m.community_id) counts[m.community_id] = (counts[m.community_id] || 0) + 1;
+      allMsgs.forEach(m => {
+        if (!readSet.has(m.id)) counts[m.community_id] = (counts[m.community_id] || 0) + 1;
       });
       setCircleUnreadMap(counts);
     };
@@ -6009,23 +6021,25 @@ export default function UserPortal() {
 
   useEffect(() => {
     if (section === 'circles' && activeCommId && activeCommId !== 'global' && user?.id) {
-      // Mark all unread messages in this circle as read in message_reads
+      // Get unread messages in this circle then mark them all as read
       supabase
         .from('messages')
         .select('id')
         .eq('community_id', activeCommId)
         .neq('sender_id', user.student_id || '')
-        .not('id', 'in', `(select message_id from message_reads where reader_id = '${user.id}')`)
-        .then(({ data }) => {
-          if (data?.length) {
-            supabase.from('message_reads').insert(
-              data.map(m => ({ message_id: m.id, reader_id: user.id }))
-            ).then(() => {
-              setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
-            });
-          } else {
-            setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
+        .then(async ({ data: allMsgs }) => {
+          if (!allMsgs?.length) { setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 })); return; }
+          const msgIds = allMsgs.map(m => m.id);
+          const { data: readMsgs } = await supabase
+            .from('message_reads').select('message_id').eq('reader_id', user.id).in('message_id', msgIds);
+          const readSet = new Set((readMsgs || []).map(r => r.message_id));
+          const unread = allMsgs.filter(m => !readSet.has(m.id));
+          if (unread.length) {
+            await supabase.from('message_reads').insert(
+              unread.map(m => ({ message_id: m.id, reader_id: user.id }))
+            );
           }
+          setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
         });
     }
   }, [section, activeCommId, user?.id, user?.student_id]);
