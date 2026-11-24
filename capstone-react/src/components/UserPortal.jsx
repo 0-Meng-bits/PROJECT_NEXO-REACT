@@ -2504,6 +2504,16 @@ function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUpl
   const [viewingPhoto, setViewingPhoto] = useState(null); // { url, id } when viewing fullscreen
   const photoRefs = [useRef(null), useRef(null)];
 
+  // Push history state when photo viewer opens so back button closes it
+  useEffect(() => {
+    if (viewingPhoto) {
+      window.history.pushState({ photoViewer: true }, '');
+      const onPop = () => { setViewingPhoto(null); };
+      window.addEventListener('popstate', onPop);
+      return () => window.removeEventListener('popstate', onPop);
+    }
+  }, [viewingPhoto]);
+
   useEffect(() => {
     if (!user?.id) return;
     supabase.from('profile_photos').select('*').eq('user_id', user.id).then(({ data }) => {
@@ -3099,6 +3109,16 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
   const [profile, setProfile] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
   const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
   const [viewingCover, setViewingCover] = useState(false); // fullscreen cover viewer
+
+  // Push history state when cover viewer opens so back button closes it
+  useEffect(() => {
+    if (viewingCover) {
+      window.history.pushState({ coverViewer: true }, '');
+      const onPop = () => { setViewingCover(false); };
+      window.addEventListener('popstate', onPop);
+      return () => window.removeEventListener('popstate', onPop);
+    }
+  }, [viewingCover]);
   const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
   const [coverUploading, setCoverUploading] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState(null); // { file, type: 'avatar'|'cover' }
