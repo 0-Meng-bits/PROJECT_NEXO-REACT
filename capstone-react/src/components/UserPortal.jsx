@@ -3480,9 +3480,9 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       }}>
 
         {/* COVER */}
-        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: (coverUrl || user?.cover_url) && !editing ? 'pointer' : 'default' }}
-          onClick={() => (coverUrl || user?.cover_url) && !editing && setViewingCover(true)}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)' }} />
+        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: displayCoverUrl && !editing ? 'pointer' : 'default' }}
+          onClick={() => displayCoverUrl && !editing && setViewingCover(true)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)', pointerEvents: 'none' }} />
           {!readOnly && editing && (
             <>
               <button onClick={() => coverInputRef.current?.click()} disabled={coverUploading} title="Change cover"
@@ -4112,14 +4112,14 @@ function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, cu
       )}
 
       {/* Cover photo fullscreen viewer — rendered via portal to escape modal stacking */}
-      {viewingCover && (coverUrl || user?.cover_url) && ReactDOM.createPortal(
+      {viewingCover && displayCoverUrl && ReactDOM.createPortal(
         <div onClick={() => setViewingCover(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
           <button onClick={() => setViewingCover(false)}
             style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20, color: 'white', zIndex: 1 }}>
             <i className="fa-solid fa-xmark" />
           </button>
-          <img src={coverUrl || user?.cover_url} alt="Cover photo"
+          <img src={displayCoverUrl} alt="Cover photo"
             onClick={e => e.stopPropagation()}
             style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
         </div>,
