@@ -144,8 +144,12 @@ export default async function handler(req, res) {
       const { error } = await supabaseAdmin.from('accounts').delete().eq('id', id);
       if (error) return res.status(400).json({ error: error.message });
 
-      // Delete Supabase Auth user so email/ID can be reused
-      await supabaseAdmin.auth.admin.deleteUser(id);
+      // Delete Supabase Auth user so email/ID can be reused; if FK blocks delete, rename email as fallback
+      const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(id);
+      if (authDelErr) {
+        console.warn('[DELETE USER] auth.admin.deleteUser failed, freeing email:', authDelErr.message);
+        await supabaseAdmin.auth.admin.updateUserById(id, { email: `deleted_${id}@deleted.local` }).catch(() => {});
+      }
 
       return res.json({ ok: true });
     }

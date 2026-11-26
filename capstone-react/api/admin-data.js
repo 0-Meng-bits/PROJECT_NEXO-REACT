@@ -259,7 +259,10 @@ export default async function handler(req, res) {
         } else if (content_type === 'user') {
           // Delete account + auth user so email/ID can be reused
           await supabaseAdmin.from('accounts').delete().eq('id', id);
-          await supabaseAdmin.auth.admin.deleteUser(id).catch(() => {});
+          const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(id);
+          if (authDelErr) {
+            await supabaseAdmin.auth.admin.updateUserById(id, { email: `deleted_${id}@deleted.local` }).catch(() => {});
+          }
         } else if (content_type === 'circle') {
           await supabaseAdmin.from('communities').delete().eq('id', id);
         }

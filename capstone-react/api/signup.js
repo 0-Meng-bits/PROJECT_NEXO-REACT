@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'Invalid gender value.' });
   }
 
-  // Check for duplicate CTU ID before creating auth user
+  // Check for duplicate CTU ID or active email before creating auth user
   const { data: existingAccount } = await supabaseAdmin
     .from('accounts')
     .select('id')
@@ -22,15 +22,43 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'This CTU ID is already registered.' });
   }
 
+  const { data: existingEmailAcc } = await supabaseAdmin
+    .from('accounts')
+    .select('id')
+    .ilike('email', email)
+    .maybeSingle();
+  if (existingEmailAcc) {
+    return res.status(400).json({ message: 'This email is already registered.' });
+  }
+
   // Create user with email_confirm: false (requires verification)
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  let { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: false, // User must verify email
   });
 
+  // If Auth says email exists even though accounts has no row, clean up the orphaned auth user and retry
+  if (authError && /already|exists/i.test(authError.message || '')) {
+    const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const orphan = (listData?.users || []).find(u => u.email?.toLowerCase() === email.toLowerCase());
+    if (orphan) {
+      const { error: delErr } = await supabaseAdmin.auth.admin.deleteUser(orphan.id);
+      if (delErr) {
+        await supabaseAdmin.auth.admin.updateUserById(orphan.id, { email: `deleted_${orphan.id}@deleted.local` }).catch(() => {});
+      }
+      const retry = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+      });
+      authData = retry.data;
+      authError = retry.error;
+    }
+  }
+
   if (authError) return res.status(400).json({ message: authError.message });
-  if (!authData.user) return res.status(400).json({ message: 'Signup failed.' });
+  if (!authData?.user) return res.status(400).json({ message: 'Signup failed.' });
 
   // Upload ID photo via service role if provided
   let idPhotoUrl = null;
