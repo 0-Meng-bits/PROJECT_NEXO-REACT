@@ -12,9 +12,9 @@ async function processLoginStreak(userId) {
   const today = phTime.toISOString().slice(0, 10);
 
   const { data: record, error: fetchError } = await supabaseAdmin
-    .from('login_streaks')
+    .from('account_details')
     .select('streak_count, last_login_date, longest_streak')
-    .eq('user_id', userId)
+    .eq('id', userId)
     .maybeSingle();
 
   if (fetchError) {
@@ -30,13 +30,13 @@ async function processLoginStreak(userId) {
   let newStreak = 1;
   let pointsAwarded = 1;
 
-  if (!record) {
-    // First ever login — insert streak record
-    const { error: insertError } = await supabaseAdmin.from('login_streaks').insert([{
-      user_id: userId, streak_count: 1, last_login_date: today, longest_streak: 1,
-    }]);
-    if (insertError) {
-      console.error('[STREAK] insert error:', insertError.message);
+  if (!record || !record.last_login_date) {
+    // First ever login — upsert streak columns on account_details
+    const { error: upsertError } = await supabaseAdmin.from('account_details').upsert([{
+      id: userId, streak_count: 1, last_login_date: today, longest_streak: Math.max(1, record?.longest_streak || 0),
+    }], { onConflict: 'id' });
+    if (upsertError) {
+      console.error('[STREAK] upsert error:', upsertError.message);
       return { streak: 0, points_awarded: 0 };
     }
   } else {
@@ -52,9 +52,9 @@ async function processLoginStreak(userId) {
     pointsAwarded = Math.min(newStreak, 5);
     const newLongest = Math.max(newStreak, record.longest_streak || 0);
 
-    const { error: updateError } = await supabaseAdmin.from('login_streaks').update({
+    const { error: updateError } = await supabaseAdmin.from('account_details').update({
       streak_count: newStreak, last_login_date: today, longest_streak: newLongest,
-    }).eq('user_id', userId);
+    }).eq('id', userId);
 
     if (updateError) {
       console.error('[STREAK] update error:', updateError.message);
@@ -157,14 +157,19 @@ export default async function handler(req, res) {
     .eq('id', account.id)
     .single();
 
-  // Check for active deletion warning
-  const { data: delWarning } = await supabaseAdmin
-    .from('deletion_warnings')
-    .select('reason, deadline')
-    .eq('target_type', 'account')
-    .eq('target_id', account.id)
-    .eq('status', 'pending')
-    .maybeSingle();
+  // Check for active deletion warning and user interests
+  const [{ data: delWarning }, { data: interestRows }] = await Promise.all([
+    supabaseAdmin
+      .from('account_deletion_warnings')
+      .select('reason, deadline')
+      .eq('account_id', account.id)
+      .eq('status', 'pending')
+      .maybeSingle(),
+    supabaseAdmin
+      .from('user_interests')
+      .select('interest')
+      .eq('user_id', account.id),
+  ]);
 
   const user = {
     ...account,
@@ -178,6 +183,7 @@ export default async function handler(req, res) {
     deletion_reason: delWarning?.reason ?? null,
     deletion_deadline: delWarning?.deadline ?? null,
     ...details,
+    interests: (interestRows || []).map(r => r.interest),
   };
   delete user.account_status;
   delete user.account_details;

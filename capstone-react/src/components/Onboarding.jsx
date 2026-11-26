@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -62,12 +62,13 @@ export default function Onboarding() {
   useEffect(() => {
     if (selectedInterests.length === 0) { setAuraMatch(null); return; }
     const fetchAura = async () => {
-      // Count students with at least one matching interest (only works after migration)
-      const { count } = await supabase
-        .from('account_details')
-        .select('*', { count: 'exact', head: true })
-        .overlaps('interests', selectedInterests)
-        .neq('id', user.id || '');
+      // Count unique students who share at least one interest via user_interests table
+      const { data: matchRows } = await supabase
+        .from('user_interests')
+        .select('user_id')
+        .in('interest', selectedInterests)
+        .neq('user_id', user.id || '');
+      const uniqueCount = new Set((matchRows || []).map(r => r.user_id)).size;
 
       // Find top community whose category matches selected interests
       // Map interests to community categories
@@ -93,7 +94,7 @@ export default function Onboarding() {
       }
 
       setAuraMatch({
-        count: count || 0,
+        count: uniqueCount,
         topCommunity,
       });
     };
@@ -168,33 +169,42 @@ export default function Onboarding() {
     const detailsUpdates = {
       program,
       year_level: yearLevel,
-      interests: selectedInterests,
+      onboarding_complete: true,
       ...(avatarUrl && { avatar_url: avatarUrl }),
     };
-    await supabase.from('account_details').update(detailsUpdates).eq('id', user.id);
+    await supabase.from('account_details').upsert([{ id: user.id, ...detailsUpdates }], { onConflict: 'id' });
 
-    // Mark onboarding complete in account_details
-    await supabase.from('account_details').update({ onboarding_complete: true }).eq('id', user.id);
+    // Save interests into user_interests junction table
+    await supabase.from('user_interests').delete().eq('user_id', user.id);
+    if (Array.isArray(selectedInterests) && selectedInterests.length > 0) {
+      await supabase.from('user_interests').insert(
+        selectedInterests.map(interest => ({ user_id: user.id, interest }))
+      );
+    }
 
-    const profileUpdates = { ...detailsUpdates, onboarding_complete: true };
     const { data: updatedProfile } = await supabase
       .from('account_details')
-      .select('program, year_level, interests, avatar_url')
+      .select('program, year_level, avatar_url')
       .eq('id', user.id)
       .single();
+    const { data: interestRows } = await supabase.from('user_interests').select('interest').eq('user_id', user.id);
 
-    // Refresh localStorage with updated data
+    // Refresh localStorage with updated data (preserve existing account fields)
+    const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     if (updatedProfile) {
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({
+        ...stored,
         ...updatedProfile,
+        interests: (interestRows || []).map(r => r.interest),
         onboarding_complete: true,
         avatar_url: updatedProfile.avatar_url || avatarUrl || stored.avatar_url || null,
       }));
     } else {
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
       localStorage.setItem('currentUser', JSON.stringify({
         ...stored,
+        program,
+        year_level: yearLevel,
+        interests: selectedInterests,
         onboarding_complete: true,
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       }));

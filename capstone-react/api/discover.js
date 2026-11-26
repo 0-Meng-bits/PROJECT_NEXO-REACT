@@ -51,75 +51,46 @@ export default async function handler(req, res) {
       .map(([id]) => id)
   );
 
-  // 4. Fetch discoverable users with interests — query user_interests, accounts, and account_status separately
-  const { data: interestRows, error: detailsError } = await supabaseAdmin
-    .from('user_interests')
-    .select('user_id, interest');
+  // 4. Fetch all verified, non-banned, discoverable users (with or without interests)
+  const [accountsRes, statusesRes, detailsRes, interestsRes] = await Promise.all([
+    supabaseAdmin.from('accounts').select('id, full_name, ctu_id, user_type'),
+    supabaseAdmin.from('account_status').select('id, is_verified, is_banned'),
+    supabaseAdmin.from('account_details').select('id, program, avatar_url, discoverable'),
+    supabaseAdmin.from('user_interests').select('user_id, interest'),
+  ]);
 
-  if (detailsError) {
-    console.error('[DISCOVER] interestRows error:', detailsError);
-    return res.status(400).json({ message: detailsError.message });
+  if (accountsRes.error) {
+    console.error('[DISCOVER] accountsError:', accountsRes.error);
+    return res.status(400).json({ message: accountsRes.error.message });
   }
 
-  if (!interestRows || interestRows.length === 0) {
-    return res.json({ users: [], circles: [] });
-  }
-
-  // Group interests by user_id
   const interestsByUser = {};
-  interestRows.forEach(r => {
+  (interestsRes.data || []).forEach(r => {
     if (!interestsByUser[r.user_id]) interestsByUser[r.user_id] = [];
     interestsByUser[r.user_id].push(r.interest);
   });
 
-  const detailIds = Object.keys(interestsByUser);
-
-  // Fetch account_details for avatar and program
-  const { data: detailRows } = await supabaseAdmin
-    .from('account_details')
-    .select('id, program, avatar_url, discoverable')
-    .in('id', detailIds);
-
   const detailMap = {};
-  (detailRows || []).forEach(d => { detailMap[d.id] = d; });
+  (detailsRes.data || []).forEach(d => { detailMap[d.id] = d; });
 
-  // Fetch accounts for these IDs
-  const { data: accounts, error: accountsError } = await supabaseAdmin
-    .from('accounts')
-    .select('id, full_name, ctu_id, user_type')
-    .in('id', detailIds);
-
-  if (accountsError) {
-    console.error('[DISCOVER] accountsError:', accountsError);
-    return res.status(400).json({ message: accountsError.message });
-  }
-
-  // Fetch account_status for these IDs
-  const { data: statuses } = await supabaseAdmin
-    .from('account_status')
-    .select('id, is_verified, is_banned')
-    .in('id', detailIds);
-
-  const accountMap = {};
-  (accounts || []).forEach(a => { accountMap[a.id] = a; });
   const statusMap = {};
-  (statuses || []).forEach(s => { statusMap[s.id] = s; });
+  (statusesRes.data || []).forEach(s => { statusMap[s.id] = s; });
 
   // 5. Filter and map to user cards
-  const userCards = detailIds
-    .filter(id => {
+  const userCards = (accountsRes.data || [])
+    .filter(acc => {
+      const id = acc.id;
       const status = statusMap[id];
       const detail = detailMap[id];
       if (!status?.is_verified) return false;
       if (status?.is_banned) return false;
-      if (!detail?.discoverable) return false;
-      if (!interestsByUser[id] || interestsByUser[id].length === 0) return false;
+      if (detail?.discoverable === false) return false;
       if (id === userId) return false;
       if (blockedIds.has(id)) return false;
       return true;
     })
-    .map(id => {
-      const acc = accountMap[id] || {};
+    .map(acc => {
+      const id = acc.id;
       const d = detailMap[id] || {};
       const interests = interestsByUser[id] || [];
       const sharedInterests = viewerInterestList.filter(i => interests.includes(i));
@@ -147,15 +118,23 @@ export default async function handler(req, res) {
     return a.full_name.localeCompare(b.full_name);
   });
 
-  // 7. Fetch open circles with membership info
-  const { data: openCircles } = await supabaseAdmin
-    .from('communities')
-    .select(`
-      id, name, description, category, interest_tag, is_open, status,
-      memberships(user_id, status)
-    `)
-    .eq('is_open', true)
-    .eq('status', 'active');
+  // 7. Fetch open circles with membership info (compatible with both community_interests and legacy interest_tag)
+  const [{ data: openCircles }, { data: commInterests }] = await Promise.all([
+    supabaseAdmin
+      .from('communities')
+      .select('id, name, description, category, is_open, status, memberships(user_id, status)')
+      .eq('is_open', true)
+      .eq('status', 'active'),
+    supabaseAdmin
+      .from('community_interests')
+      .select('community_id, interest'),
+  ]);
+
+  const commIntMap = {};
+  (commInterests || []).forEach(r => {
+    if (!commIntMap[r.community_id]) commIntMap[r.community_id] = [];
+    commIntMap[r.community_id].push(r.interest);
+  });
 
   const circleCards = (openCircles || []).map(c => {
     const memberIds = new Set(
@@ -165,16 +144,14 @@ export default async function handler(req, res) {
     );
     const hasConnectedMember = [...acceptedConnectionIds].some(id => memberIds.has(id));
     const isMember = memberIds.has(userId);
-    const tags = c.interest_tag
-      ? String(c.interest_tag).split(',').map(t => t.trim()).filter(Boolean)
-      : [];
+    const tags = commIntMap[c.id] || [];
     return {
       id: c.id,
       name: c.name,
       description: c.description,
       category: c.category,
       interest_tags: tags,
-      interest_tag: c.interest_tag || '',
+      interest_tag: tags.join(','),
       member_count: memberIds.size,
       has_connected_member: hasConnectedMember,
       is_member: isMember,

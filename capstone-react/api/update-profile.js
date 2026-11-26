@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -10,7 +10,6 @@ export default async function handler(req, res) {
   const updates = {};
   if (program !== undefined) updates.program = program;
   if (year_level !== undefined) updates.year_level = year_level;
-  if (interests !== undefined) updates.interests = interests;
   if (last_seen !== undefined) updates.last_seen = last_seen;
   if (bio !== undefined) updates.bio = bio;
   if (cover_url !== undefined) updates.cover_url = cover_url;
@@ -18,15 +17,49 @@ export default async function handler(req, res) {
 
   // Update full_name in accounts table separately
   if (full_name !== undefined && full_name.trim()) {
-    await supabaseAdmin.from('accounts').update({ full_name: full_name.trim() }).eq('id', userId);
+    const { error: accErr } = await supabaseAdmin.from('accounts').update({ full_name: full_name.trim() }).eq('id', userId);
+    if (accErr) {
+      console.error('[UPDATE PROFILE] accounts error:', accErr);
+      return res.status(500).json({ message: 'Failed to update name.', error: accErr.message });
+    }
   }
 
-  if (!Object.keys(updates).length) return res.json({ message: 'Profile updated.' }); // only full_name changed, still success
+  // Update interests in user_interests junction table
+  if (interests !== undefined) {
+    const { error: delErr } = await supabaseAdmin.from('user_interests').delete().eq('user_id', userId);
+    if (delErr) {
+      console.error('[UPDATE PROFILE] delete interests error:', delErr);
+      return res.status(500).json({ message: 'Failed to update interests.', error: delErr.message });
+    }
+    if (Array.isArray(interests) && interests.length > 0) {
+      const { error: insErr } = await supabaseAdmin.from('user_interests').insert(
+        interests.map(interest => ({ user_id: userId, interest }))
+      );
+      if (insErr) {
+        console.error('[UPDATE PROFILE] insert interests error:', insErr);
+        return res.status(500).json({ message: 'Failed to save interests.', error: insErr.message });
+      }
+    }
+  }
 
-  const { error } = await supabaseAdmin
+  if (!Object.keys(updates).length) return res.json({ message: 'Profile updated.' });
+
+  let { error } = await supabaseAdmin
     .from('account_details')
-    .update(updates)
-    .eq('id', userId);
+    .upsert({ id: userId, ...updates }, { onConflict: 'id' });
+
+  // Graceful fallback if discoverable column is not yet migrated
+  if (error && updates.discoverable !== undefined && error.message?.includes('discoverable')) {
+    const { discoverable: _ignored, ...restUpdates } = updates;
+    if (Object.keys(restUpdates).length > 0) {
+      const retry = await supabaseAdmin
+        .from('account_details')
+        .upsert({ id: userId, ...restUpdates }, { onConflict: 'id' });
+      error = retry.error;
+    } else {
+      error = null;
+    }
+  }
 
   if (error) {
     console.error('[UPDATE PROFILE]', error);

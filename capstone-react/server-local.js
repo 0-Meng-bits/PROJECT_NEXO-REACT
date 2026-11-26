@@ -1,5 +1,10 @@
 // Local development server for API routes
 // Run with: node server-local.js
+import dns from 'dns';
+import net from 'net';
+dns.setDefaultResultOrder('ipv4first');
+net.setDefaultAutoSelectFamily?.(false);
+
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -18,6 +23,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Import API handlers
 import adminData from './api/admin-data.js';
+import callHandler from './api/call.js';
 import circleRequests from './api/circle-requests.js';
 import closePoll from './api/close-poll.js';
 import communities from './api/communities.js';
@@ -38,6 +44,7 @@ import verifyStudent from './api/verify-student.js';
 
 // Mount API routes
 app.all('/api/admin-data', adminData);
+app.all('/api/call', callHandler);
 app.all('/api/circle-requests/:action', (req, res) => {
   req.query = { ...req.query, action: req.params.action };
   circleRequests(req, res);

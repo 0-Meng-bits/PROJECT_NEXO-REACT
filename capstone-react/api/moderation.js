@@ -42,13 +42,14 @@ export default async function handler(req, res) {
         if (membership && membership.rank_level >= 2) maxRecipients = 5;
       }
 
-      // Check daily limit
+      // Check daily limit from point_transactions
       const today = new Date().toISOString().split('T')[0];
       const { count } = await supabaseAdmin
-        .from('appreciation_cooldowns')
+        .from('point_transactions')
         .select('*', { count: 'exact', head: true })
-        .eq('giver_id', giverId)
-        .gte('given_at', today);
+        .eq('transaction_type', 'appreciation')
+        .eq('from_user_id', giverId)
+        .gte('created_at', today);
 
       if (count >= maxRecipients) {
         return res.status(400).json({ error: `Daily limit reached (${maxRecipients} recipients)` });
@@ -76,13 +77,6 @@ export default async function handler(req, res) {
         .from('account_status')
         .update({ trust_points: (receiverStatus?.trust_points ?? 10) + amount })
         .eq('id', receiverId);
-
-      // Record cooldown
-      await supabaseAdmin.from('appreciation_cooldowns').insert([{
-        giver_id: giverId,
-        receiver_id: receiverId,
-        given_at: new Date().toISOString()
-      }]);
 
       // Send notification
       await supabaseAdmin.from('notifications').insert([{
@@ -125,9 +119,6 @@ export default async function handler(req, res) {
       }]);
 
       if (flagError) return res.status(400).json({ error: flagError.message });
-
-      // Run abuse pattern detection
-      await supabaseAdmin.rpc('detect_abuse_patterns');
 
       return res.json({ success: true });
     }
@@ -180,7 +171,7 @@ export default async function handler(req, res) {
 
       // Update warning status
       await supabaseAdmin.from('user_warnings')
-        .update({ status: 'appealed', appeal_reason: appealReason })
+        .update({ status: 'appealed' })
         .eq('id', warningId);
 
       return res.json({ success: true });

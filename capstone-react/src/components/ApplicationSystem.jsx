@@ -14,6 +14,41 @@ export function ApplicationStatusColor(status, phase2Result) {
   return 'var(--text-muted)';
 }
 
+// Fetch application_questions along with normalized application_question_options
+export async function fetchQuestionsWithOptions(applicationIds) {
+  const ids = (applicationIds || []).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: qData } = await supabase
+    .from('application_questions')
+    .select('*')
+    .in('application_id', ids)
+    .order('order_index');
+  const questions = qData || [];
+  if (!questions.length) return [];
+  const qIds = questions.map(q => q.id);
+  const { data: optData } = await supabase
+    .from('application_question_options')
+    .select('question_id, option_text, display_order')
+    .in('question_id', qIds)
+    .order('display_order');
+  const optsByQ = {};
+  (optData || []).forEach(o => {
+    if (!optsByQ[o.question_id]) optsByQ[o.question_id] = [];
+    optsByQ[o.question_id].push(o.option_text);
+  });
+  return questions.map(q => ({ ...q, options: optsByQ[q.id] || [] }));
+}
+
+async function syncQuestionOptions(questionId, options) {
+  await supabase.from('application_question_options').delete().eq('question_id', questionId);
+  const clean = (options || []).map(o => String(o).trim()).filter(Boolean);
+  if (clean.length > 0) {
+    await supabase.from('application_question_options').insert(
+      clean.map((option_text, display_order) => ({ question_id: questionId, option_text, display_order }))
+    );
+  }
+}
+
 // -- Application FORM BUILDER (leader side) --------------------------------------
 // Now supports multiple named Applications per circle
 export function ApplicationFormBuilder({ comm, onToggle }) {
@@ -38,9 +73,8 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   useEffect(() => { loadApplications(); }, [loadApplications]);
 
   const loadQuestions = useCallback(async (ApplicationId) => {
-    const { data } = await supabase.from('application_questions')
-      .select('*').eq('application_id', ApplicationId).order('order_index');
-    setQuestions(data || []);
+    const data = await fetchQuestionsWithOptions([ApplicationId]);
+    setQuestions(data);
   }, []);
 
   useEffect(() => {
@@ -67,8 +101,6 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
         // Always post to circle announcements
         await supabase.from('announcements').insert([{
           author_id: comm.creator_id,
-          author_name: comm.name,
-          author_type: 'Leader',
           title: 'Application Open - ' + data.title,
           content: (newForm.description || 'Applications are now open. Click Apply Now to submit your application.'),
           post_type: 'announcement',
@@ -78,8 +110,6 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
         if (newForm.post_to_feed) {
           await supabase.from('announcements').insert([{
             author_id: comm.creator_id,
-            author_name: comm.name,
-            author_type: 'Leader',
             title: 'Application Open - ' + data.title + ' (' + comm.name + ')',
             content: comm.name + ' is now accepting applications for: ' + data.title + '. Visit the circle to apply.',
             post_type: 'thread',
@@ -91,26 +121,25 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
         // Internal — post only to circle announcements
         await supabase.from('announcements').insert([{
           author_id: comm.creator_id,
-          author_name: 'Circle Leader',
-          author_type: 'Leader',
           title: 'Internal Application Open - ' + data.title,
           content: (newForm.description || 'An internal Application is now open for current members. Click Apply Now to participate.'),
           post_type: 'announcement',
           community_id: comm.id,
         }]);
       }
-      // Save questions for this Application
+      // Save questions + normalized options for this Application
       for (let i = 0; i < newQuestions.length; i++) {
         const q = newQuestions[i];
         if (!q.question.trim()) continue;
-        await supabase.from('application_questions').insert([{
-          community_id: comm.id,
+        const { data: qRow } = await supabase.from('application_questions').insert([{
           application_id: data.id,
           question: q.question.trim(),
           type: q.type,
-          options: q.options || [],
           order_index: i,
-        }]);
+        }]).select('id').single();
+        if (qRow?.id && q.type === 'choice') {
+          await syncQuestionOptions(qRow.id, q.options);
+        }
       }
       // Also update community application_enabled flag
       await supabase.from('communities').update({
@@ -152,7 +181,7 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
   const addQuestion = () => {
     setQuestions(prev => [...prev, {
       id: 'new_' + Date.now(), application_id: selectedApplication.id,
-      community_id: comm.id, question: '', type: 'text', options: [], order_index: prev.length, _new: true
+      question: '', type: 'text', options: [], order_index: prev.length, _new: true
     }]);
   };
 
@@ -172,15 +201,19 @@ export function ApplicationFormBuilder({ comm, onToggle }) {
       const q = questions[i];
       if (!q.question.trim()) continue;
       const payload = {
-        community_id: comm.id,
         application_id: selectedApplication.id,
         question: q.question.trim(),
-        type: q.type, options: q.options || [], order_index: i
+        type: q.type,
+        order_index: i,
       };
       if (q._new) {
-        await supabase.from('application_questions').insert([payload]);
+        const { data: inserted } = await supabase.from('application_questions').insert([payload]).select('id').single();
+        if (inserted?.id) {
+          await syncQuestionOptions(inserted.id, q.type === 'choice' ? q.options : []);
+        }
       } else {
         await supabase.from('application_questions').update(payload).eq('id', q.id);
+        await syncQuestionOptions(q.id, q.type === 'choice' ? q.options : []);
       }
     }
     await loadQuestions(selectedApplication.id);
@@ -473,38 +506,48 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
   useEffect(() => {
     if (Application?.id) {
       // A specific application was provided — load its questions directly
-      supabase.from('application_questions').select('*').eq('application_id', Application.id).order('order_index')
-        .then(({ data }) => { setQuestions(data || []); setLoading(false); });
+      fetchQuestionsWithOptions([Application.id])
+        .then((data) => { setQuestions(data); setLoading(false); });
       return;
     }
     // No specific application — fetch the open ones for this circle so the applicant can choose
-    supabase.from('applications')
-      .select('*').eq('community_id', comm.id).eq('is_open', true)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        // Only offer applications whose deadline hasn't passed (or has no deadline)
-        const open = (data || []).filter(a => !a.deadline || new Date(a.deadline) >= new Date());
-        setAvailableApps(open);
-        // Pre-select by title if provided (user clicked APPLY NOW on a specific announcement)
-        const byTitle = appTitle ? open.find(a => a.title === appTitle) : null;
-        const target = byTitle || (open.length === 1 ? open[0] : null);
-        if (target) {
-          setSelectedApp(target);
-          supabase.from('application_questions').select('*').eq('application_id', target.id).order('order_index')
-            .then(({ data: qData }) => { setQuestions(qData || []); setLoading(false); });
-        } else {
-          setLoading(false);
-        }
+    Promise.all([
+      supabase.from('applications')
+        .select('*').eq('community_id', comm.id).eq('is_open', true)
+        .order('created_at', { ascending: false }),
+      applicantId
+        ? supabase.from('memberships').select('id').eq('community_id', comm.id).eq('user_id', applicantId).eq('status', 'active').maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]).then(([{ data }, { data: membership }]) => {
+      const isMember = Boolean(membership?.id);
+      // Only offer applications whose deadline hasn't passed and that match the user's membership status
+      const open = (data || []).filter(a => {
+        if (a.deadline && new Date(a.deadline) < new Date()) return false;
+        if (!isMember && a.type === 'internal') return false;
+        return true;
       });
-  }, [comm.id, Application, appTitle]);
+      setAvailableApps(open);
+      // Pre-select by title if provided (user clicked APPLY NOW on a specific announcement)
+      const normalizedTitle = appTitle?.trim().toLowerCase();
+      const byTitle = normalizedTitle ? open.find(a => a.title?.trim().toLowerCase() === normalizedTitle) : null;
+      const target = byTitle || (open.length === 1 ? open[0] : null);
+      if (target) {
+        setSelectedApp(target);
+        fetchQuestionsWithOptions([target.id])
+          .then((qData) => { setQuestions(qData); setLoading(false); });
+      } else {
+        setLoading(false);
+      }
+    });
+  }, [comm.id, Application, appTitle, applicantId]);
 
   const pickApp = (app) => {
     setSelectedApp(app);
     setAnswers({});
     setQuestions([]);
     setLoading(true);
-    supabase.from('application_questions').select('*').eq('application_id', app.id).order('order_index')
-      .then(({ data }) => { setQuestions(data || []); setLoading(false); });
+    fetchQuestionsWithOptions([app.id])
+      .then((data) => { setQuestions(data); setLoading(false); });
   };
 
   const handleFileUpload = async (questionId, file) => {
@@ -520,16 +563,19 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
   const submit = async () => {
     const unanswered = questions.filter(q => q.type !== 'file' && !answers[q.id]?.trim());
     if (unanswered.length > 0) { alert('Please answer all questions.'); return; }
+    if (!activeApp?.id) { alert('No active application form selected.'); return; }
     setSubmitting(true);
 
-    // Server-side duplicate check — prevent spam even if frontend state is stale
+    // Server-side duplicate check — look up community's application IDs
+    const { data: commApps } = await supabase.from('applications').select('id').eq('community_id', comm.id);
+    const commAppIds = (commApps || []).map(a => a.id);
     const dupQuery = supabase
       .from('application_submissions')
       .select('id, status')
       .eq('applicant_id', applicantId)
-      .eq('community_id', comm.id)
-      .in('status', ['pending', 'phase2', 'accepted']);
+      .in('status', ['pending', 'phase2']);
     if (activeApp?.id) dupQuery.eq('application_id', activeApp.id);
+    else if (commAppIds.length) dupQuery.in('application_id', commAppIds);
     const { data: existing } = await dupQuery.maybeSingle();
     if (existing) {
       const label = { pending: 'Under Review', phase2: 'in Phase 2 screening', accepted: 'already accepted' }[existing.status] || existing.status;
@@ -537,13 +583,30 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
       setSubmitting(false);
       return;
     }
-    const { error } = await supabase.from('application_submissions').insert([{
-      community_id: comm.id,
-      application_id: activeApp?.id || null,
+    const { data: subRow, error } = await supabase.from('application_submissions').insert([{
+      application_id: activeApp.id,
       applicant_id: applicantId,
-      answers,
       status: 'pending',
-    }]);
+    }]).select('id').single();
+
+    if (!error && subRow?.id) {
+      const answerRows = questions
+        .filter(q => answers[q.id] !== undefined && String(answers[q.id]).trim() !== '')
+        .map(q => ({
+          submission_id: subRow.id,
+          question_id: q.id,
+          answer_text: String(answers[q.id]),
+        }));
+      if (answerRows.length > 0) {
+        const { error: ansErr } = await supabase.from('application_answers').insert(answerRows);
+        if (ansErr) {
+          setSubmitting(false);
+          alert('Failed to save answers. Please try again.');
+          return;
+        }
+      }
+    }
+
     setSubmitting(false);
     if (!error) onSubmitted();
     else alert('Failed to submit. Please try again.');
@@ -574,15 +637,15 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
               Choose which application to submit
             </div>
             {availableApps.map(app => (
-              <div key={app.id} className="Application-response-row" onClick={() => pickApp(app)} style={{ cursor: 'pointer' }}>
+              <div key={app.id} className="Application-response-row" onClick={() => pickApp(app)} style={{ cursor: 'pointer', overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
                 <div style={{ width: 38, height: 38, borderRadius: '50%', background: app.type === 'internal' ? 'rgba(252,238,10,0.15)' : 'rgba(0,240,255,0.15)', border: '1px solid ' + (app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)', flexShrink: 0 }}>
                   <i className={app.type === 'internal' ? 'fa-solid fa-lock' : 'fa-solid fa-globe'}></i>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{app.title}</div>
+                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.title}</div>
                   {app.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>}
                 </div>
-                <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8 }}></i>
+                <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}></i>
               </div>
             ))}
             <button className="cyber-btn secondary" onClick={onCancel} style={{ width: '100%', marginTop: 16 }}>Cancel</button>
@@ -687,36 +750,53 @@ export function ApplicationReviewPanel({ comm }) {
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
-    const [rRes, qRes] = await Promise.all([
+    const { data: commApps } = await supabase
+      .from('applications')
+      .select('id, title')
+      .eq('community_id', comm.id);
+    const appList = commApps || [];
+    const appIds = appList.map(a => a.id);
+    if (!appIds.length) {
+      setResponses([]);
+      setQuestions([]);
+      setLoading(false);
+      return;
+    }
+
+    const [rRes, qList] = await Promise.all([
       supabase.from('application_submissions')
-        .select('*, application_id, applicant_id, status, submitted_at, answers, feedback, phase2_details, phase2_result, reviewed_at')
-        .eq('community_id', comm.id)
+        .select('id, application_id, applicant_id, status, submitted_at, feedback, phase2_details, phase2_result, reviewed_at')
+        .in('application_id', appIds)
         .order('submitted_at', { ascending: false }),
-      supabase.from('application_questions')
-        .select('*').eq('community_id', comm.id).order('order_index')
+      fetchQuestionsWithOptions(appIds),
     ]);
     const subs = rRes.data || [];
-    // Two-step: fetch applicant accounts and application titles separately
     if (subs.length > 0) {
       const applicantIds = [...new Set(subs.map(s => s.applicant_id).filter(Boolean))];
-      const appIds = [...new Set(subs.map(s => s.application_id).filter(Boolean))];
-      const [accsRes, appsRes] = await Promise.all([
+      const subIds = subs.map(s => s.id);
+      const [accsRes, ansRes] = await Promise.all([
         applicantIds.length ? supabase.from('accounts').select('id, full_name, ctu_id').in('id', applicantIds) : { data: [] },
-        appIds.length ? supabase.from('applications').select('id, title').in('id', appIds) : { data: [] },
+        supabase.from('application_answers').select('submission_id, question_id, answer_text').in('submission_id', subIds),
       ]);
       const accMap = {};
       (accsRes.data || []).forEach(a => { accMap[a.id] = a; });
       const appMap = {};
-      (appsRes.data || []).forEach(a => { appMap[a.id] = a; });
+      appList.forEach(a => { appMap[a.id] = a; });
+      const ansBySub = {};
+      (ansRes.data || []).forEach(ans => {
+        if (!ansBySub[ans.submission_id]) ansBySub[ans.submission_id] = {};
+        ansBySub[ans.submission_id][ans.question_id] = ans.answer_text;
+      });
       setResponses(subs.map(s => ({
         ...s,
+        answers: ansBySub[s.id] || {},
         accounts: accMap[s.applicant_id] || null,
         Applications: appMap[s.application_id] || null,
       })));
     } else {
       setResponses([]);
     }
-    setQuestions(qRes.data || []);
+    setQuestions(qList);
     setLoading(false);
   }, [comm.id]);
 

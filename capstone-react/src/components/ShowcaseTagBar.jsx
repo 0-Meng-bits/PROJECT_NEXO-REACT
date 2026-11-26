@@ -31,9 +31,10 @@ export default function ShowcaseTagBar({
     try {
       // Get all feedback tags for this announcement
       const { data, error } = await supabase
-        .from('showcase_feedback')
-        .select('tag_type, user_id')
-        .eq('announcement_id', announcementId);
+        .from('post_reactions')
+        .select('reaction_type, user_id')
+        .eq('announcement_id', announcementId)
+        .in('reaction_type', FEEDBACK_TAGS.map(t => t.id));
 
       if (error) throw error;
 
@@ -42,9 +43,9 @@ export default function ShowcaseTagBar({
       const userTagsSet = new Set();
 
       data.forEach(row => {
-        counts[row.tag_type] = (counts[row.tag_type] || 0) + 1;
+        counts[row.reaction_type] = (counts[row.reaction_type] || 0) + 1;
         if (row.user_id === currentUserId) {
-          userTagsSet.add(row.tag_type);
+          userTagsSet.add(row.reaction_type);
         }
       });
 
@@ -71,7 +72,7 @@ export default function ShowcaseTagBar({
         {
           event: '*',
           schema: 'public',
-          table: 'showcase_feedback',
+          table: 'post_reactions',
           filter: `announcement_id=eq.${announcementId}`
         },
         () => {
@@ -103,11 +104,11 @@ export default function ShowcaseTagBar({
       if (isApplied) {
         // Remove tag
         const { error } = await supabase
-          .from('showcase_feedback')
+          .from('post_reactions')
           .delete()
           .eq('announcement_id', announcementId)
           .eq('user_id', currentUserId)
-          .eq('tag_type', tagType);
+          .eq('reaction_type', tagType);
 
         if (error) throw error;
 
@@ -152,11 +153,11 @@ export default function ShowcaseTagBar({
 
         // Apply tag
         const { error } = await supabase
-          .from('showcase_feedback')
+          .from('post_reactions')
           .insert({
             announcement_id: announcementId,
             user_id: currentUserId,
-            tag_type: tagType
+            reaction_type: tagType
           });
 
         if (error) throw error;

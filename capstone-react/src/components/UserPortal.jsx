@@ -1,8 +1,20 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
+import { GivePointsModal, FlagUserModal, WarningHistoryModal, AppealModal } from './ModerationModals';
+import AnnouncementCard, { Toast, TrustPointsBadge, POST_TYPE, timeSince, containsBadWord, autoFlagContent, FEEDBACK_TAGS } from './AnnouncementCard';
+import { fetchQuestionsWithOptions } from './ApplicationSystem';
+import OnlineStack from './OnlineStack';
+import { ChatTimeSeparator, UnreadDivider } from './ChatHelpers';
+import ReportModal from './ReportModal';
+import ApplicationDetailModal from './ApplicationDetailModal';
+import ManageGroupModal from './ManageGroupModal';
+import MessageItem from './MessageItem';
+import CreateModal from './CreateModal';
+import CircleInfoCard from './CircleInfoCard';
+import ProfileModal from './ProfileModal';
 import { clearCustomizationCache } from '../lib/customization';
 import Cropper from 'react-easy-crop';
 
@@ -154,28 +166,28 @@ const SHOP_API = window.location.hostname === 'localhost'
 function getCategoryIcon(category) {
   const map = {
     academic: 'fa-solid fa-graduation-cap',
-    project:  'fa-solid fa-flask',
-    hobby:    'fa-solid fa-gamepad',
-    social:   'fa-solid fa-user-group',
-    system:   'fa-solid fa-earth-asia',
+    project: 'fa-solid fa-flask',
+    hobby: 'fa-solid fa-gamepad',
+    social: 'fa-solid fa-user-group',
+    system: 'fa-solid fa-earth-asia',
   };
   return map[category] || 'fa-solid fa-network-wired';
 }
 
 function notifIcon(type) {
   const map = {
-    join_approved:    'fa-solid fa-circle-check',
-    join_denied:      'fa-solid fa-circle-xmark',
-    kicked:           'fa-solid fa-user-xmark',
-    promoted:         'fa-solid fa-arrow-up',
-    application_update:  'fa-solid fa-microphone',
+    join_approved: 'fa-solid fa-circle-check',
+    join_denied: 'fa-solid fa-circle-xmark',
+    kicked: 'fa-solid fa-user-xmark',
+    promoted: 'fa-solid fa-arrow-up',
+    application_update: 'fa-solid fa-microphone',
     new_announcement: 'fa-solid fa-bullhorn',
-    shoutout:         'fa-solid fa-star',
-    invite_accepted:  'fa-solid fa-envelope-open-text',
-    circle_invite:    'fa-solid fa-envelope',
-    circle_approved:  'fa-solid fa-circle-check',
-    circle_rejected:  'fa-solid fa-circle-xmark',
-    system:           'fa-solid fa-triangle-exclamation',
+    shoutout: 'fa-solid fa-star',
+    invite_accepted: 'fa-solid fa-envelope-open-text',
+    circle_invite: 'fa-solid fa-envelope',
+    circle_approved: 'fa-solid fa-circle-check',
+    circle_rejected: 'fa-solid fa-circle-xmark',
+    system: 'fa-solid fa-triangle-exclamation',
   };
   return map[type] || 'fa-solid fa-bell';
 }
@@ -193,9 +205,9 @@ function timeAgo(dateStr) {
 function categoryGradient(category) {
   const map = {
     academic: 'linear-gradient(135deg, #1a1a4e, #0d3b6e)',
-    project:  'linear-gradient(135deg, #1a3a1a, #0d5c2e)',
-    hobby:    'linear-gradient(135deg, #3a1a3a, #6e0d5c)',
-    social:   'linear-gradient(135deg, #3a2a0d, #6e4a0d)',
+    project: 'linear-gradient(135deg, #1a3a1a, #0d5c2e)',
+    hobby: 'linear-gradient(135deg, #3a1a3a, #6e0d5c)',
+    social: 'linear-gradient(135deg, #3a2a0d, #6e4a0d)',
   };
   return map[category] || 'linear-gradient(135deg, #0d1a2e, #0a0f1e)';
 }
@@ -206,4783 +218,14 @@ const GLOBAL_COMM = {
   icon: null, faIcon: 'fa-solid fa-earth-asia', category: 'system', creator_id: 'SYSTEM',
 };
 
-function Toast({ message }) {
-  return <div className={`toast ${message ? 'show' : ''}`}>{message?.toUpperCase()}</div>;
-}
+// OnlineStack, ChatTimeSeparator, UnreadDivider → extracted to their own files
 
-// -- TRUST POINTS BADGE --------------------------------------------------------
-function TrustPointsBadge({ points, size = 'medium', showLabel = true }) {
-  const getColor = (p) => {
-    if (p >= 10) return { bg: 'rgba(62, 207, 142, 0.15)', border: '#3ecf8e', text: '#3ecf8e', label: 'Good Standing' };
-    if (p >= 7) return { bg: 'rgba(252, 238, 10, 0.15)', border: 'var(--cyber-yellow)', text: 'var(--cyber-yellow)', label: 'Low Trust' };
-    if (p >= 4) return { bg: 'rgba(249, 115, 22, 0.15)', border: '#f97316', text: '#f97316', label: 'Restricted' };
-    return { bg: 'rgba(247, 95, 95, 0.15)', border: 'var(--red)', text: 'var(--red)', label: 'Severe Risk' };
-  };
-  
-  const color = getColor(points);
-  const sizes = {
-    small: { font: 10, padding: '2px 8px', iconSize: 9 },
-    medium: { font: 11, padding: '4px 10px', iconSize: 10 },
-    large: { font: 13, padding: '6px 14px', iconSize: 12 },
-  };
-  const s = sizes[size] || sizes.medium;
-  
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: color.bg, border: `1px solid ${color.border}`, borderRadius: 12, padding: s.padding, fontSize: s.font, fontWeight: 700, color: color.text }}>
-      <i className="fa-solid fa-shield-halved" style={{ fontSize: s.iconSize }}></i>
-      <span>{Number.isInteger(points) ? points : points.toFixed(1)}</span>
-      {showLabel && <span style={{ fontSize: s.font - 1, opacity: 0.8, marginLeft: 2 }}>· {color.label}</span>}
-    </div>
-  );
-}
+// MessageItem → extracted to MessageItem.jsx
+// CreateModal → extracted to CreateModal.jsx
+// ProfileModal (+ sub-components) → extracted to ProfileModal.jsx
+// autoFlagContent → imported from AnnouncementCard.jsx
 
-// -- BAD WORDS AUTO-DETECTION -------------------------------------------------
-const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol', 'tangina', 'pakyu', 'yawa', 'buang'];
-
-function containsBadWord(text) {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  return BAD_WORDS.some(w => lower.includes(w));
-}
-
-// -- POST TYPE CONFIG ----------------------------------------------------------
-const POST_TYPE = {
-  announcement: { label: 'Announcement', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-bullhorn' },
-  event:        { label: 'Event',         color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-calendar' },
-  shoutout:     { label: 'Shoutout',      color: 'var(--green)',        icon: 'fa-solid fa-star' },
-  general:      { label: 'Thread',        color: '#a78bfa',             icon: 'fa-solid fa-comments' },
-  thread:       { label: 'Thread',        color: '#a78bfa',             icon: 'fa-solid fa-comments' },
-  poll:         { label: 'Poll',          color: '#a855f7',             icon: 'fa-solid fa-chart-bar' },
-  showcase:     { label: 'Showcase',      color: '#f59e0b',             icon: 'fa-solid fa-palette' },
-  question:     { label: 'Question',      color: '#22d3ee',             icon: 'fa-solid fa-circle-question' },
-};
-
-// -- TIME SINCE HELPER --------------------------------------------------------
-const timeSince = (dateStr) => {
-  const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months} month${months > 1 ? 's' : ''} ago`;
-};
-
-// -- FEEDBACK TAGS CONFIG ------------------------------------------------------
-const FEEDBACK_TAGS = [
-  { id: 'effort',    label: 'Effort',    emoji: '??', color: '#22c55e' },
-  { id: 'creative',  label: 'Creative',  emoji: '??', color: '#a855f7' },
-  { id: 'technique', label: 'Technique', emoji: '??', color: '#3b82f6' },
-  { id: 'style',     label: 'Style',     emoji: '??', color: '#ec4899' },
-  { id: 'impact',    label: 'Impact',    emoji: '??', color: '#ef4444' },
-];
-
-function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport, avatarCache, communityCreatorId, onReload, onViewEvents, onViewProfile, onViewProfileById }) {
-  const type = POST_TYPE[a.post_type] || POST_TYPE.general;
-  const isAnon = a.author_name === 'Anonymous';
-  const displayName = isAnon ? 'Anonymous' : a.author_name;
-  const avatarChar = isAnon ? '?' : (a.author_name || 'A')[0].toUpperCase();
-
-  // Poll state
-  const isPoll = a.post_type === 'poll';
-  const pollOptions = isPoll ? (a.poll_options || []) : [];
-  const pollVotes = isPoll ? (a.poll_votes || {}) : {};
-  const totalVotes = Object.values(pollVotes).reduce((s, v) => s + (v?.length || 0), 0);
-  const myVote = isPoll ? pollOptions.find(opt => (pollVotes[opt] || []).includes(user?.id)) : null;
-
-  // Fetch user's rank level for this community (for PollClosureButton)
-  const [userRankLevel, setUserRankLevel] = useState(0);
-  
-  useEffect(() => {
-    if (a.community_id && user?.id) {
-      supabase.from('memberships')
-        .select('rank_level')
-        .eq('user_id', user.id)
-        .eq('community_id', a.community_id)
-        .eq('status', 'active')
-        .single()
-        .then(({ data }) => {
-          setUserRankLevel(data?.rank_level || 0);
-        });
-    }
-  }, [a.community_id, user?.id]);
-
-  // Detect showcase posts
-  const isShowcase = a.post_type === 'showcase';
-
-  // Detect question posts
-  const isQuestion = a.post_type === 'question';
-  const isSolved = isQuestion && !!a.solution_comment_id;
-  const [markingSolution, setMarkingSolution] = useState(false);
-  const isAuthorizedSolver = isQuestion && (
-    user?.id === a.author_id ||
-    user?.id === communityCreatorId
-  );
-
-  // Detect Application announcements by title pattern
-  const isApplicationPost = a.title?.includes('Application Open') || a.title?.includes('Internal Application Open');
-
-  // Comment state
-  const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [commentCount, setCommentCount] = useState(0);
-  const [commentInput, setCommentInput] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [postingComment, setPostingComment] = useState(false);
-  const [replyingTo, setReplyingTo] = useState(null); // { id, author_name, author_id }
-  const [replyInput, setReplyInput] = useState('');
-  const [commentHearts, setCommentHearts] = useState({}); // commentId -> { count, likedByMe }
-  const [commentAvatarCache, setCommentAvatarCache] = useState({}); // author_id (UUID) -> avatar_url
-  const [editingCommentId, setEditingCommentId] = useState(null);
-  const [editingCommentVal, setEditingCommentVal] = useState('');
-  const [commentSort, setCommentSort] = useState('new'); // 'new' | 'old' | 'top'
-  const [collapsedThreads, setCollapsedThreads] = useState({});
-
-  // Post like state
-  const [postLiked, setPostLiked] = useState(false);
-  const [postLikeCount, setPostLikeCount] = useState(0);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.from('post_likes')
-      .select('user_id', { count: 'exact' })
-      .eq('announcement_id', a.id)
-      .then(({ data, count }) => {
-        setPostLikeCount(count || 0);
-        setPostLiked((data || []).some(r => r.user_id === user.id));
-      });
-  }, [a.id, user?.id]);
-
-  const togglePostLike = async () => {
-    if (!user?.id) return;
-    if (postLiked) {
-      await supabase.from('post_likes').delete().eq('announcement_id', a.id).eq('user_id', user.id);
-      setPostLiked(false);
-      setPostLikeCount(p => Math.max(0, p - 1));
-    } else {
-      await supabase.from('post_likes').insert([{ announcement_id: a.id, user_id: user.id }]);
-      setPostLiked(true);
-      setPostLikeCount(p => p + 1);
-    }
-  };
-
-  // Load comment count on mount
-  useEffect(() => {
-    supabase.from('post_comments')
-      .select('id', { count: 'exact', head: true })
-      .eq('announcement_id', a.id)
-      .then(({ count }) => setCommentCount(count || 0));
-  }, [a.id]);
-
-  const loadComments = async () => {
-    setLoadingComments(true);
-    const { data } = await supabase.from('post_comments')
-      .select('*')
-      .eq('announcement_id', a.id)
-      .order('created_at', { ascending: true });
-
-    // Store flat — tree is built at render time by CommentTree
-    setComments(data || []);
-    setLoadingComments(false);
-    // Load heart counts for these comments
-    if (data?.length && user?.id) {
-      const ids = data.map(c => c.id);
-      const { data: hearts } = await supabase
-        .from('comment_hearts')
-        .select('comment_id, user_id')
-        .in('comment_id', ids);
-      if (hearts) {
-        const map = {};
-        hearts.forEach(h => {
-          if (!map[h.comment_id]) map[h.comment_id] = { count: 0, likedByMe: false };
-          map[h.comment_id].count++;
-          if (h.user_id === user.id) map[h.comment_id].likedByMe = true;
-        });
-        setCommentHearts(map);
-      }
-    }
-    // Load avatars for comment authors (keyed by their UUID)
-    if (data?.length) {
-      const authorIds = [...new Set([...data.map(c => c.author_id).filter(Boolean), user?.id].filter(Boolean))];
-      if (authorIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('accounts')
-          .select('id, account_details(avatar_url)')
-          .in('id', authorIds);
-        if (profiles) {
-          const map = {};
-          profiles.forEach(p => { if (p.account_details?.avatar_url) map[p.id] = p.account_details.avatar_url; });
-          setCommentAvatarCache(map);
-        }
-      }
-    }
-  };
-
-  const toggleCommentHeart = async (commentId) => {
-    if (!user?.id) return;
-    const current = commentHearts[commentId] || { count: 0, likedByMe: false };
-    if (current.likedByMe) {
-      await supabase.from('comment_hearts').delete().eq('comment_id', commentId).eq('user_id', user.id);
-      setCommentHearts(prev => ({ ...prev, [commentId]: { count: Math.max(0, (prev[commentId]?.count || 1) - 1), likedByMe: false } }));
-    } else {
-      await supabase.from('comment_hearts').insert([{ comment_id: commentId, user_id: user.id }]);
-      setCommentHearts(prev => ({ ...prev, [commentId]: { count: (prev[commentId]?.count || 0) + 1, likedByMe: true } }));
-    }
-  };
-
-  const markSolution = async (commentId) => {
-    // Validate comment belongs to this question
-    const targetComment = comments.find(c => c.id === commentId);
-    if (!targetComment || targetComment.announcement_id !== a.id) {
-      console.error('Comment does not belong to this question');
-      return;
-    }
-    setMarkingSolution(true);
-    // Toggle: if already solution ? NULL, otherwise ? commentId
-    const newValue = a.solution_comment_id === commentId ? null : commentId;
-    const { error } = await supabase
-      .from('announcements')
-      .update({ solution_comment_id: newValue })
-      .eq('id', a.id);
-    if (error) {
-      alert('Failed to update solution: ' + error.message);
-    } else {
-      // Notify comment author on mark (not unmark, not self)
-      if (newValue && targetComment.author_id !== user.id) {
-        await supabase.from('notifications').insert([{
-          user_id: targetComment.author_id,
-          type: 'solution_marked',
-          message: `Your answer was marked as the solution in "${a.title}"`,
-          link_comm_id: a.community_id,
-        }]);
-      }
-      onReload?.();
-    }
-    setMarkingSolution(false);
-  };
-
-  const toggleComments = () => {
-    if (!showComments) loadComments();
-    setShowComments(v => !v);
-  };
-
-  const submitComment = async () => {
-    if (!commentInput.trim() || !user) return;
-    setPostingComment(true);
-    const { data, error } = await supabase.from('post_comments').insert([{
-      announcement_id: a.id,
-      author_id: user.id,
-      author_name: user.full_name || user.student_id || 'User',
-      author_type: user.user_type || 'Student',
-      content: commentInput.trim(),
-    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at').single();
-    setPostingComment(false);
-    if (!error && data) {
-      setComments(prev => [...prev, data]);
-      setCommentInput('');
-      setCommentCount(prev => prev + 1);
-      // Notify the post author (if it's not yourself)
-      if (a.author_id && a.author_id !== user.id) {
-        await supabase.from('notifications').insert([{
-          user_id: a.author_id,
-          type: 'new_announcement',
-          message: `${user.full_name} commented on your post: "${a.title?.slice(0, 50)}"`,
-          link_comm_id: a.community_id || null,
-        }]);
-      }
-      // Auto-flag bad words in comment
-      if (containsBadWord(commentInput)) {
-        await autoFlagContent({
-          reporterId: user.id,
-          reportedUserId: user.id,
-          contentType: 'message',
-          contentId: data.id,
-          contentPreview: commentInput,
-        });
-      }
-    }
-  };
-
-  const deleteComment = async (commentId) => {
-    await supabase.from('post_comments').delete().eq('id', commentId);
-    setComments(prev => prev.filter(c => c.id !== commentId));
-    setCommentCount(prev => Math.max(0, prev - 1));
-  };
-
-  const updateComment = async (commentId, newContent) => {
-    if (!newContent.trim()) return;
-    const { error } = await supabase.from('post_comments')
-      .update({ content: newContent.trim(), edited: true })
-      .eq('id', commentId);
-    if (!error) {
-      setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: newContent.trim(), edited: true } : c));
-      setEditingCommentId(null);
-      setEditingCommentVal('');
-    }
-  };
-
-  const submitReply = async () => {
-    if (!replyInput.trim() || !user || !replyingTo) return;
-    const content = `@${replyingTo.author_name} ${replyInput.trim()}`;
-    const { data, error } = await supabase.from('post_comments').insert([{
-      announcement_id: a.id,
-      author_id: user.id,
-      author_name: user.full_name || user.student_id || 'User',
-      author_type: user.user_type || 'Student',
-      content,
-      parent_id: replyingTo.id,
-    }]).select('id, announcement_id, author_id, author_name, author_type, content, created_at, parent_id, edited').single();
-    if (!error && data) {
-      // Just append flat — CommentTree handles ordering via parent_id
-      setComments(prev => [...prev, data]);
-      setCommentCount(prev => prev + 1);
-      setReplyInput('');
-      setReplyingTo(null);
-      if (replyingTo.author_id && replyingTo.author_id !== user.id) {
-        await supabase.from('notifications').insert([{
-          user_id: replyingTo.author_id,
-          type: 'new_announcement',
-          message: `${user.full_name} replied to your comment on "${a.title?.slice(0, 50)}"`,
-          link_comm_id: a.community_id || null,
-        }]);
-      }
-      if (containsBadWord(replyInput)) {
-        await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: data.id, contentPreview: content });
-      }
-    }
-  };
-
-  return (
-    <div className={`announcement-card ${a.pinned ? 'pinned' : ''} ${isShowcase ? 'showcase' : ''}`}>
-      {a.pinned && (
-        <div className="announcement-pin-badge">
-          <i className="fa-solid fa-thumbtack"></i> Pinned
-        </div>
-      )}
-      {isShowcase && (
-        <div className="showcase-badge">
-          <i className="fa-solid fa-palette"></i> SHOWCASE
-        </div>
-      )}
-      <div className="announcement-header">
-        <div className={`announcement-author-avatar ${isAnon ? 'anon' : ''}`}
-          style={{ overflow: 'hidden', padding: 0, cursor: !isAnon && onViewProfile ? 'pointer' : 'default' }}
-          onClick={() => !isAnon && onViewProfile && onViewProfile(a.author_student_id)}>
-          {isAnon
-            ? <i className="fa-solid fa-user-secret"></i>
-            : (() => {
-                const url = avatarCache?.[a.author_student_id] || avatarCache?.[String(a.author_student_id)];
-                // For circle auto-posts (no author_student_id), use circle logo from avatarCache keyed by community_id
-                const circleLogoUrl = !a.author_student_id && a.community_id ? avatarCache?.[`circle_${a.community_id}`] : null;
-                return (url || circleLogoUrl)
-                  ? <img src={url || circleLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                  : avatarChar;
-              })()
-          }
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span
-              style={{ fontWeight: 700, fontSize: 13, color: isAnon ? 'var(--text-muted)' : 'var(--text-primary)', cursor: !isAnon && onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
-              onClick={() => !isAnon && onViewProfile && onViewProfile(a.author_student_id)}
-              onMouseEnter={e => { if (!isAnon && onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
-              onMouseLeave={e => { e.target.style.color = isAnon ? 'var(--text-muted)' : 'var(--text-primary)'; }}>
-              {displayName}
-            </span>
-            {isAnon && (
-              <span style={{ fontSize: 10, color: '#666', border: '1px solid #333', padding: '1px 7px', borderRadius: 10, fontStyle: 'italic' }}>
-                anonymous
-              </span>
-            )}
-            <span className="post-type-badge" style={{ fontSize: 10, color: type.color, border: `1px solid ${type.color}`, padding: '1px 7px', borderRadius: 10, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <i className={type.icon}></i><span className="post-type-label">{type.label}</span>
-            </span>
-            {isQuestion && (
-              <span style={{
-                fontSize: 10, padding: '1px 7px', borderRadius: 10, marginLeft: 6, fontWeight: 700,
-                background: isSolved ? 'rgba(34,211,238,0.1)' : 'rgba(251,191,36,0.1)',
-                color: isSolved ? '#22d3ee' : '#fbbf24',
-                border: `1px solid ${isSolved ? 'rgba(34,211,238,0.3)' : 'rgba(251,191,36,0.3)'}`,
-              }}>
-                {isSolved ? '✓ Solved' : '⏳ Unanswered'}
-              </span>
-            )}
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            {isAnon ? 'Anonymous' : a.author_type} · {new Date(a.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-            {!isAnon && a.post_type === 'thread' && a.author_student_id && (
-              <span style={{ marginLeft: 4, color: 'var(--text-muted)' }}>· {a.author_student_id}</span>
-            )}
-          </div>
-          {a.cross_posted_from && (
-            <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="fa-solid fa-circle-check"></i>
-              Originally posted in a verified circle
-            </div>
-          )}
-          {a.visibility === 'connections' && (
-            <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="fa-solid fa-lock"></i>
-              Connections only
-            </div>
-          )}
-        </div>
-        {(user?.user_type === 'Admin' || (!isAnon && a.author_id === user?.id) || (isAnon && a.author_id === user?.id)) && (
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {user?.user_type === 'Admin' && (
-              <button className="chat-action-btn" onClick={() => onPin(a.id, a.pinned)}
-                style={{ color: 'var(--cyber-yellow)' }} title={a.pinned ? 'Unpin' : 'Pin'}>
-                <i className="fa-solid fa-thumbtack"></i>
-              </button>
-            )}
-            <button className="chat-action-btn" onClick={() => onDelete(a.id)} style={{ color: 'var(--red)' }}>
-              <i className="fa-solid fa-trash-can"></i>
-            </button>
-          </div>
-        )}
-        {/* Report button "? always visible to non-owners */}
-        {onReport && user?.user_type !== 'Admin' && a.author_id !== user?.id && (
-          <button className="chat-action-btn" onClick={() => onReport({ type: 'announcement', id: a.id, preview: `${a.title}: ${a.content}`, reportedUserId: a.author_id })}
-            title="Report this post"
-            style={{ color: 'var(--text-muted)', marginLeft: 4, opacity: 0.6, transition: 'opacity 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.opacity = 1}
-            onMouseLeave={e => e.currentTarget.style.opacity = 0.6}>
-            <i className="fa-solid fa-flag"></i>
-          </button>
-        )}
-      </div>
-
-      {/* Flagged content warning */}
-      {(containsBadWord(a.title) || containsBadWord(a.content)) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '5px 10px', background: 'rgba(247,95,95,0.08)', border: '1px solid rgba(247,95,95,0.25)', borderRadius: 6, fontSize: 11, color: 'var(--red)' }}>
-          <i className="fa-solid fa-triangle-exclamation"></i>
-          This post has been flagged for inappropriate content.
-        </div>
-      )}
-
-      <h3 className="announcement-title">{a.title}</h3>
-      {a.content && <p className="announcement-body">{a.content}</p>}
-      {a.media_url && (
-        <div style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}>
-          {a.media_url.match(/\.(mp4|webm|mov)$/i)
-            ? <video src={a.media_url} controls style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, display: 'block' }} />
-            : <img src={a.media_url} alt="Post attachment" style={{ maxWidth: '100%', maxHeight: 320, borderRadius: 10, cursor: 'pointer', display: 'block' }} onClick={() => window.open(a.media_url, '_blank')} />
-          }
-        </div>
-      )}
-
-      {/* -- Application APPLY BUTTON -- */}
-      {isApplicationPost && onApply && (
-        <div style={{ marginTop: 14 }}>
-          <button onClick={() => onApply(a)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(252,238,10,0.1)', border: '1px solid var(--cyber-yellow)', color: 'var(--cyber-yellow)', borderRadius: 8, padding: '9px 20px', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: 'pointer', transition: 'background 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(252,238,10,0.2)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(252,238,10,0.1)'}>
-            <i className="fa-solid fa-microphone"></i> APPLY NOW
-          </button>
-        </div>
-      )}
-
-      {/* -- POLL OPTIONS -- */}
-      {isPoll && pollOptions.length > 0 && (
-        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {pollOptions.map((opt, i) => {
-            const votes = (pollVotes[opt] || []).length;
-            const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
-            const isMyChoice = myVote === opt;
-            const isClosed = a.event_metadata?.is_closed;
-            const isWinning = isClosed && opt === a.event_metadata?.winning_option;
-            return (
-              <button key={i} onClick={() => onVote && !isClosed && onVote(a.id, opt, pollVotes)} disabled={!!myVote || isClosed}
-                className={isWinning ? 'poll-winning-option' : ''}
-                style={{ position: 'relative', overflow: 'hidden', width: '100%', textAlign: 'left', background: isMyChoice ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isMyChoice ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '10px 14px', cursor: myVote || isClosed ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--text-primary)', transition: 'border-color 0.2s' }}>
-                {myVote && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${pct}%`, background: isMyChoice ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)', transition: 'width 0.4s ease', borderRadius: 8 }} />}
-                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{isMyChoice && <i className="fa-solid fa-check" style={{ marginRight: 8, color: '#a855f7', fontSize: 11 }}></i>}{opt}</span>
-                  {myVote && <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{pct}% · {votes}</span>}
-                </div>
-              </button>
-            );
-          })}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}{myVote ? ` · You voted "${myVote}"` : a.event_metadata?.is_closed ? " · Poll Closed" : " · Click to vote"}
-          </div>
-        </div>
-      )}
-
-      {/* -- EVENT POLL BADGE -- */}
-      {isPoll && a.event_metadata?.event_date && (
-        <EventPollBadge
-          eventDate={a.event_metadata.event_date}
-          eventTime={a.event_metadata.event_time}
-          location={a.event_metadata.location}
-        />
-      )}
-
-      {/* -- POLL CLOSED BANNER -- */}
-      {isPoll && a.event_metadata?.is_closed && (
-        <div className="poll-closed-banner">
-          <i className="fa-solid fa-lock"></i>
-          <span>
-            Poll closed on {new Date(a.event_metadata.closed_at).toLocaleDateString()}
-            {a.event_metadata.winning_option && ` · Winning option: ${a.event_metadata.winning_option}`}
-          </span>
-        </div>
-      )}
-
-      {/* -- POLL CLOSURE BUTTON -- */}
-      {isPoll && user && a.community_id && (
-        <PollClosureButton
-          announcementId={a.id}
-          communityId={a.community_id}
-          userRankLevel={userRankLevel}
-          hasEventMetadata={!!a.event_metadata?.event_date}
-          isClosed={!!a.event_metadata?.is_closed}
-          onPollClosed={(eventId) => {
-            onReload?.();
-          }}
-        />
-      )}
-
-      {/* -- GENERATED EVENT LINK -- */}
-      {isPoll && a.event_metadata?.generated_event_id && (
-        <GeneratedEventLink
-          eventId={a.event_metadata.generated_event_id}
-          eventTitle={a.event_metadata.winning_option || 'Campus Event'}
-          isAdmin={user?.user_type === 'Admin'}
-          onViewEvents={onViewEvents}
-        />
-      )}
-
-      {/* -- SHOWCASE TAG BAR -- */}
-      {isShowcase && user && (
-        <ShowcaseTagBar
-          announcementId={a.id}
-          authorId={a.author_id}
-          communityId={a.community_id}
-          currentUserId={user.id}
-          currentUserName={user.full_name || user.student_id || 'User'}
-          onShowToast={(msg) => {
-            // Use existing toast system if available, or console.error
-            console.error(msg);
-          }}
-        />
-      )}
-
-      {/* -- COMMENT SECTION -- */}
-      <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-        {/* Action bar: like + comments toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Like button */}
-          <button onClick={togglePostLike}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: postLiked ? '#f43f5e' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5, padding: '2px 0', transition: 'color 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#f43f5e'}
-            onMouseLeave={e => e.currentTarget.style.color = postLiked ? '#f43f5e' : 'var(--text-muted)'}>
-            <i className={postLiked ? 'fa-solid fa-heart' : 'fa-regular fa-heart'} />
-            {postLikeCount > 0 && <span>{postLikeCount}</span>}
-          </button>
-          {/* Toggle comments button */}
-          <button onClick={toggleComments}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0', transition: 'color 0.2s' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--cyber-cyan)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-            <i className="fa-regular fa-comment"></i>
-            {showComments ? 'Hide comments' : `Comments${commentCount > 0 ? ` (${commentCount})` : ''}`}
-            <i className={`fa-solid fa-chevron-${showComments ? 'up' : 'down'}`} style={{ fontSize: 9 }}></i>
-          </button>
-        </div>{/* end action bar */}
-
-        {showComments && (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
-            {/* Sort bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sort:</span>
-              {[['new','New'],['old','Old'],['top','Top']].map(([key, label]) => (
-                <button key={key} onClick={() => setCommentSort(key)}
-                  style={{ fontSize: 10, padding: '2px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                    fontWeight: commentSort === key ? 700 : 400,
-                    background: commentSort === key ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)',
-                    color: commentSort === key ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* Scrollable comment list — max 400px, input stays pinned below */}
-            <div style={{ overflowY: 'auto', maxHeight: 400, paddingRight: 4 }}>
-            {loadingComments ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>Loading comments...</p>
-            ) : comments.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>No comments yet. Be the first!</p>
-            ) : (
-              <CommentTree
-                comments={comments}
-                commentSort={commentSort}
-                commentHearts={commentHearts}
-                collapsedThreads={collapsedThreads}
-                setCollapsedThreads={setCollapsedThreads}
-                editingCommentId={editingCommentId}
-                editingCommentVal={editingCommentVal}
-                setEditingCommentId={setEditingCommentId}
-                setEditingCommentVal={setEditingCommentVal}
-                replyingTo={replyingTo}
-                setReplyingTo={setReplyingTo}
-                setReplyInput={setReplyInput}
-                user={user}
-                avatarCache={{ ...avatarCache, ...commentAvatarCache }}
-                onViewProfileById={onViewProfileById}
-                onReport={onReport}
-                isQuestion={isQuestion}
-                isAuthorizedSolver={isAuthorizedSolver}
-                solutionCommentId={a.solution_comment_id}
-                markingSolution={markingSolution}
-                markSolution={markSolution}
-                updateComment={updateComment}
-                deleteComment={deleteComment}
-                toggleCommentHeart={toggleCommentHeart}
-                containsBadWord={containsBadWord}
-              />
-            )}
-            </div>{/* end scrollable */}
-            {user?.is_verified && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, marginTop: 8 }}>
-                {replyingTo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '4px 10px', background: 'rgba(0,240,255,0.06)', borderRadius: 8, fontSize: 11 }}>
-                    <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 10 }}></i>
-                    <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>Replying to {replyingTo.author_name}</span>
-                    <button onClick={() => setReplyingTo(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, padding: 0 }}>
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0, overflow: 'hidden' }}>
-                    {commentAvatarCache?.[user.id] || avatarCache?.[user.id] ? <img src={commentAvatarCache[user.id] || avatarCache[user.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (user.full_name || 'U')[0].toUpperCase()}
-                  </div>
-                  <input
-                    value={replyingTo ? replyInput : commentInput}
-                    onChange={e => replyingTo ? setReplyInput(e.target.value) : setCommentInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { replyingTo ? submitReply() : submitComment(); } }}
-                    placeholder={replyingTo ? `Reply to ${replyingTo.author_name}...` : 'Write a comment...'}
-                    style={{ flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '7px 14px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', transition: 'border-color 0.2s' }}
-                    onFocus={e => e.target.style.borderColor = 'rgba(0,240,255,0.3)'}
-                    onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                  />
-                  <button
-                    onClick={() => replyingTo ? submitReply() : submitComment()}
-                    disabled={postingComment || !(replyingTo ? replyInput.trim() : commentInput.trim())}
-                    style={{ background: 'var(--cyber-cyan)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#000', fontSize: 12, flexShrink: 0, opacity: (replyingTo ? replyInput.trim() : commentInput.trim()) ? 1 : 0.4 }}>
-                    <i className="fa-solid fa-paper-plane"></i>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
-
-// -- ONLINE USERS STACK -------------------------------------------------------
-function OnlineStack({ onlineProfiles, circleMateIds, avatarCache, maxShow = 5, onClick }) {
-  if (!onlineProfiles.length) return null;
-
-  // Sort: circle mates first, then others
-  const sorted = [...onlineProfiles].sort((a, b) => {
-    const aIsMate = circleMateIds.has(a.id);
-    const bIsMate = circleMateIds.has(b.id);
-    return bIsMate - aIsMate;
-  });
-
-  const shown = sorted.slice(0, maxShow);
-  const rest = onlineProfiles.length - shown.length;
-
-  return (
-    <div
-      onClick={onClick}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: onClick ? 'pointer' : 'default' }}
-      title={onClick ? 'See who\'s online' : undefined}
-    >
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        {shown.map((p, i) => {
-          const url = avatarCache[p.student_id] || p.avatar_url;
-          const initials = (p.full_name || '?')[0].toUpperCase();
-          return (
-            <div key={p.id} title={p.full_name}
-              style={{
-                width: 26, height: 26, borderRadius: '50%',
-                border: '2px solid var(--card-bg)',
-                background: url ? 'transparent' : 'rgba(0,240,255,0.15)',
-                overflow: 'hidden',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 700, color: 'var(--cyber-cyan)',
-                marginLeft: i === 0 ? 0 : -8,
-                zIndex: maxShow - i,
-                position: 'relative',
-                flexShrink: 0,
-              }}>
-              {url
-                ? <img src={url} alt={p.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : initials
-              }
-            </div>
-          );
-        })}
-        {rest > 0 && (
-          <div style={{
-            width: 26, height: 26, borderRadius: '50%',
-            border: '2px solid var(--card-bg)',
-            background: 'rgba(255,255,255,0.08)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 9, fontWeight: 700, color: 'var(--text-muted)',
-            marginLeft: -8, position: 'relative', zIndex: 0, flexShrink: 0,
-          }}>
-            +{rest}
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#3ecf8e', flexShrink: 0 }} />
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-          {onlineProfiles.length} online
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// -- CHAT TIME SEPARATOR -------------------------------------------------------
-function ChatTimeSeparator({ date }) {
-  const now = new Date();
-  const d = new Date(date);
-  const diffDays = Math.floor((now - d) / 86400000);
-  let label;
-  if (diffDays === 0) {
-    label = 'Today ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    label = 'Yesterday ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays < 7) {
-    label = d.toLocaleDateString([], { weekday: 'long' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else {
-    label = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: diffDays > 365 ? 'numeric' : undefined });
-  }
-  return (
-    <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
-      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: 1 }}>{label}</span>
-    </div>
-  );
-}
-
-// -- UNREAD DIVIDER -----------------------------------------------------------
-function UnreadDivider() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '10px 0 6px' }}>
-      <div style={{ flex: 1, height: 1, background: 'rgba(247,95,95,0.4)' }} />
-      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', letterSpacing: 1, whiteSpace: 'nowrap' }}>
-        NEW MESSAGES
-      </span>
-      <div style={{ flex: 1, height: 1, background: 'rgba(247,95,95,0.4)' }} />
-    </div>
-  );
-}
-
-// -- MESSAGE ITEM --------------------------------------------------------------
-function MessageItem({ m, tagColor, isOwnerMsg, canDelete, onDelete, onEdit, onReport, currentStudentId, avatarUrl, onViewProfile, online, readers, isLastOwn, isGrouped, isLastInGroup, userCustomizations, onReply }) {
-  const [editing, setEditing] = useState(false);
-  const [editVal, setEditVal] = useState(m.content);
-  const [hovered, setHovered] = useState(false);
-  const [reactions, setReactions] = useState({});
-  const [reactorNames, setReactorNames] = useState({}); // studentId -> full_name
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showReactors, setShowReactors] = useState(false); // show the reactions modal
-  const [reactorTab, setReactorTab] = useState('all'); // active tab in the modal
-
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.from('message_reactions')
-        .select('reaction, sender_id').eq('message_id', m.id);
-      if (data) {
-        const grouped = {};
-        data.forEach(r => {
-          if (!grouped[r.reaction]) grouped[r.reaction] = [];
-          grouped[r.reaction].push(r.sender_id);
-        });
-        setReactions(grouped);
-        // Fetch names for all reactors
-        const ids = [...new Set(data.map(r => r.sender_id).filter(Boolean))];
-        if (ids.length) {
-          const { data: accounts } = await supabase
-            .from('accounts').select('ctu_id, full_name').in('ctu_id', ids);
-          if (accounts) {
-            const map = {};
-            accounts.forEach(a => { map[a.ctu_id] = a.full_name; });
-            setReactorNames(map);
-          }
-        }
-      }
-    };
-    load();
-  }, [m.id]);
-
-  const toggleReaction = async (type) => {
-    const mine = reactions[type]?.includes(currentStudentId);
-    if (mine) {
-      // Remove the reaction if clicking the same emoji
-      await supabase.from('message_reactions')
-        .delete().eq('message_id', m.id).eq('sender_id', currentStudentId);
-      setReactions(prev => ({ ...prev, [type]: (prev[type] || []).filter(s => s !== currentStudentId) }));
-    } else {
-      // Delete any existing reaction first, then add the new one
-      await supabase.from('message_reactions')
-        .delete().eq('message_id', m.id).eq('sender_id', currentStudentId);
-      await supabase.from('message_reactions')
-        .insert([{ message_id: m.id, sender_id: currentStudentId, reaction: type }]);
-      
-      // Update state: remove user from all reactions, then add to the new one
-      const updated = {};
-      Object.keys(reactions).forEach(key => {
-        updated[key] = (reactions[key] || []).filter(s => s !== currentStudentId);
-      });
-      updated[type] = [...(updated[type] || []), currentStudentId];
-      setReactions(updated);
-    }
-  };
-
-  const handleEdit = async () => {
-    if (!editVal.trim() || editVal === m.content) { setEditing(false); return; }
-    await onEdit(m.id, editVal.trim());
-    setEditing(false);
-  };
-
-  const initials = (m.full_name || 'U')[0].toUpperCase();
-  const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const showActions = (isOwnerMsg || canDelete || onReport) && hovered && !editing;
-
-  return (
-    <div className={`chat-row ${isOwnerMsg ? 'own' : 'other'} ${isGrouped ? 'grouped' : ''}`}>
-      {!isOwnerMsg && (
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          {!isGrouped ? (
-            <>
-              <div className="chat-avatar" onClick={() => onViewProfile && onViewProfile(m.sender_id)}
-                style={{ background: avatarUrl ? 'transparent' : tagColor, overflow: 'hidden', cursor: onViewProfile ? 'pointer' : 'default' }}>
-                {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-              </div>
-              {/* Companion sticker on chat avatar */}
-              {(() => {
-                const companion = userCustomizations?.[m.sender_id]?.companion;
-                if (!companion?.css_data) return null;
-                const d = typeof companion.css_data === 'string' ? JSON.parse(companion.css_data) : companion.css_data;
-                if (!d?.url) return null;
-                return (
-                  <img src={d.url} alt="" style={{
-                    position: 'absolute', top: '-15%', left: '-15%',
-                    width: '55%', height: 'auto',
-                    pointerEvents: 'none', zIndex: 2,
-                    filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))',
-                    transform: 'rotate(-15deg)',
-                  }} />
-                );
-              })()}
-              {online && (
-                <div style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)', zIndex: 1 }} />
-              )}
-            </>
-          ) : (
-            <div style={{ width: 40, height: 40 }} />
-          )}
-        </div>
-      )}
-
-      <div className="chat-body"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        {!isOwnerMsg && !isGrouped && (
-          <div className="chat-meta">
-            <span className="chat-name" onClick={() => onViewProfile && onViewProfile(m.sender_id)}
-              style={{ cursor: onViewProfile ? 'pointer' : 'default', transition: 'color 0.15s' }}
-              onMouseEnter={e => { if (onViewProfile) e.target.style.color = 'var(--cyber-cyan)'; }}
-              onMouseLeave={e => { e.target.style.color = ''; }}>
-              <CustomizedUsername 
-                studentId={m.sender_id} 
-                username={m.full_name}
-                customizations={userCustomizations[m.sender_id]}
-              />
-            </span>
-            {m.role && m.role !== 'MEMBER' && <span className="chat-role">{m.role}</span>}
-          </div>
-        )}
-        {editing ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input className="msg-edit-input" value={editVal}
-              onChange={e => setEditVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleEdit(); if (e.key === 'Escape') setEditing(false); }}
-              autoFocus />
-            <button className="msg-edit-save" onClick={handleEdit}><i className="fa-solid fa-check"></i></button>
-            <button className="msg-edit-cancel" onClick={() => setEditing(false)}><i className="fa-solid fa-xmark"></i></button>
-          </div>
-        ) : m.message_type === 'shoutout' ? (
-          // -- SHOUTOUT BUBBLE --
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(252,238,10,0.15), rgba(247,169,79,0.1))',
-            border: '1.5px solid rgba(252,238,10,0.5)',
-            borderRadius: 16, padding: '10px 16px',
-            boxShadow: '0 0 16px rgba(252,238,10,0.15)',
-            position: 'relative', maxWidth: 320,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <i className="fa-solid fa-star" style={{ color: '#f5e642', fontSize: 13 }}></i>
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#f5e642', letterSpacing: 2, textTransform: 'uppercase' }}>Shoutout</span>
-            </div>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-              {m.content.replace(/^shoutout!\s*/i, '')}
-            </p>
-            {m.edited && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4, display: 'block' }}>edited</span>}
-          </div>
-        ) : (
-          <div className={`chat-bubble ${isOwnerMsg ? 'own' : 'other'}`}
-            style={{
-              ...(containsBadWord(m.content) ? { borderColor: 'rgba(247,95,95,0.5)', background: isOwnerMsg ? 'rgba(247,95,95,0.15)' : 'rgba(247,95,95,0.08)' } : {}),
-              borderRadius: isOwnerMsg 
-                ? (isGrouped && !isLastInGroup ? '16px 16px 4px 16px' : isGrouped && isLastInGroup ? '16px 4px 16px 16px' : '16px')
-                : (isGrouped && !isLastInGroup ? '16px 16px 16px 4px' : isGrouped && isLastInGroup ? '4px 16px 16px 16px' : '16px')
-            }}>
-            {containsBadWord(m.content) && (
-              <div style={{ fontSize: 10, color: 'var(--red)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <i className="fa-solid fa-triangle-exclamation"></i> Flagged content
-              </div>
-            )}
-            {/* Reply quote block */}
-            {m.reply_to_id && (
-              <div style={{ background: 'rgba(0,0,0,0.25)', borderLeft: '3px solid rgba(0,240,255,0.5)', borderRadius: '6px 6px 0 0', padding: '5px 8px', marginBottom: 6, fontSize: 11 }}>
-                <div style={{ color: 'var(--cyber-cyan)', fontWeight: 700, marginBottom: 2 }}>{m.reply_to_author || 'Unknown'}</div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                  {m.reply_to_preview || '...'}
-                </div>
-              </div>
-            )}
-            <MediaMessage message={m} />
-          </div>
-        )}
-
-        {/* Inline action bar "? appears below bubble on hover */}
-        {showActions && (
-          <div className={`chat-actions ${isOwnerMsg ? 'own' : 'other'}`}>
-            {/* Reply button */}
-            <button className="chat-action-btn" onClick={() => onReply && onReply(m)} title="Reply">
-              <i className="fa-solid fa-reply"></i>
-            </button>
-            {/* Emoji reaction button */}
-            <div style={{ position: 'relative' }}>
-              <button className="chat-action-btn" onClick={() => setShowEmojiPicker(p => !p)} title="React">
-                <i className="fa-regular fa-face-smile"></i>
-              </button>
-              {showEmojiPicker && (
-                <div style={{ position: 'absolute', bottom: '100%', [isOwnerMsg ? 'right' : 'left']: 0, display: 'flex', gap: 4, background: 'var(--bg-card, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '4px 8px', zIndex: 100, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                  {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) => (
-                    <button key={type} onClick={() => { toggleReaction(type); setShowEmojiPicker(false); }}
-                      style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 4px', borderRadius: 8, transition: 'transform 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'}
-                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
-                      <i className={icon} style={{ color, fontSize: 18 }}></i>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {isOwnerMsg && (
-              <button className="chat-action-btn" onClick={() => setEditing(true)} title="Edit">
-                <i className="fa-solid fa-pen"></i>
-              </button>
-            )}
-            {isOwnerMsg && !canDelete && (
-              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Unsend"
-                style={{ color: 'var(--cyber-yellow)' }}>
-                <i className="fa-solid fa-rotate-left"></i>
-              </button>
-            )}
-            {canDelete && (
-              <button className="chat-action-btn" onClick={() => onDelete(m.id)} title="Delete"
-                style={{ color: 'var(--red)' }}>
-                <i className="fa-solid fa-trash-can"></i>
-              </button>
-            )}
-            {onReport && !isOwnerMsg && (
-              <button className="chat-action-btn" title="Report this message"
-                onClick={() => onReport({ type: 'message', id: m.id, preview: m.content, reportedUserId: m.sender_id })}
-                style={{ color: 'var(--text-muted)' }}>
-                <i className="fa-solid fa-flag"></i>
-              </button>
-            )}
-          </div>
-        )}
-
-        {Object.entries(reactions).some(([, users]) => users.length > 0) && (
-          <div style={{ position: 'relative' }}>
-            {/* Single row of all reaction chips · click any to open the unified popup */}
-            <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', justifyContent: isOwnerMsg ? 'flex-end' : 'flex-start' }}>
-              {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) =>
-                reactions[type]?.length > 0 ? (
-                  <button key={type} onClick={() => { setShowReactors(true); setReactorTab(type); }}
-                    style={{ background: reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.07)', border: `1px solid ${reactions[type]?.includes(currentStudentId) ? 'rgba(0,240,255,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 20, padding: '2px 8px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-primary)' }}>
-                    <i className={icon} style={{ color, fontSize: 13 }}></i> <span style={{ fontSize: 11 }}>{reactions[type].length}</span>
-                  </button>
-                ) : null
-              )}
-            </div>
-
-            {/* Unified reactions popup · rendered as fixed overlay to avoid layout glitch */}
-            {showReactors && (
-              <>
-                {/* Backdrop to close on outside click */}
-                <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => setShowReactors(false)} />
-                <div style={{
-                  position: 'absolute', bottom: 'calc(100% + 8px)',
-                  [isOwnerMsg ? 'right' : 'left']: 0,
-                  background: 'rgba(15,15,28,0.98)', border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 14, zIndex: 300, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                  minWidth: 220, maxWidth: 280, overflow: 'hidden',
-                }}>
-                {/* Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '6px 8px', gap: 4, overflowX: 'auto' }}>
-                  {/* All tab */}
-                  {(() => {
-                    const total = Object.values(reactions).reduce((s, arr) => s + arr.length, 0);
-                    return (
-                      <button onClick={() => setReactorTab('all')}
-                        style={{ background: reactorTab === 'all' ? 'rgba(0,240,255,0.15)' : 'none', border: `1px solid ${reactorTab === 'all' ? 'var(--cyber-cyan)' : 'transparent'}`, borderRadius: 20, padding: '3px 10px', fontSize: 11, cursor: 'pointer', color: reactorTab === 'all' ? 'var(--cyber-cyan)' : 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        All {total}
-                      </button>
-                    );
-                  })()}
-                  {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']].map(([type, icon, color]) =>
-                    reactions[type]?.length > 0 ? (
-                      <button key={type} onClick={() => setReactorTab(type)}
-                        style={{ background: reactorTab === type ? 'rgba(0,240,255,0.15)' : 'none', border: `1px solid ${reactorTab === type ? 'var(--cyber-cyan)' : 'transparent'}`, borderRadius: 20, padding: '3px 8px', fontSize: 12, cursor: 'pointer', color: reactorTab === type ? 'var(--cyber-cyan)' : 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        <i className={icon} style={{ color, fontSize: 12 }}></i> {reactions[type].length}
-                      </button>
-                    ) : null
-                  )}
-                  <button onClick={() => setShowReactors(false)}
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', flexShrink: 0 }}>
-                    <i className="fa-solid fa-xmark"></i>
-                  </button>
-                </div>
-                {/* Reactor list */}
-                <div style={{ padding: '6px 4px', maxHeight: 180, overflowY: 'auto' }}>
-                  {[['heart','fa-solid fa-heart','#f43f5e'],['laugh','fa-solid fa-face-laugh-squint','#facc15'],['sad','fa-solid fa-face-sad-tear','#60a5fa'],['fire','fa-solid fa-fire','#f97316'],['wow','fa-solid fa-face-surprise','#a78bfa']]
-                    .filter(([type]) => reactorTab === 'all' || reactorTab === type)
-                    .flatMap(([type, icon, color]) =>
-                      (reactions[type] || []).map(id => ({ id, icon, color, type }))
-                    )
-                    .map(({ id, icon, color, type }) => (
-                      <div key={type + '-' + id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', borderRadius: 8 }}>
-                        <span style={{ fontSize: 13, color: id === currentStudentId ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.85)' }}>
-                          {reactorNames[id] || '...'}
-                          {id === currentStudentId && <span style={{ fontSize: 10, marginLeft: 6, color: 'var(--text-muted)' }}>you</span>}
-                        </span>
-                        <i className={icon} style={{ color, fontSize: 16 }}></i>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {!editing && (isLastInGroup || m.edited) && (
-          <div className={`chat-meta${isOwnerMsg ? ' own' : ''}`} style={!isOwnerMsg ? { marginTop: 2 } : {}}>
-            {m.edited && <span style={{ fontStyle: 'italic' }}>edited</span>}
-            {isLastInGroup && <span className="chat-time">{time}</span>}
-            {isLastInGroup && readers?.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', marginLeft: 4 }} title={`Seen by: ${readers.map(r => r.full_name).join(', ')}`}>
-                {readers.slice(0, 5).map((r, i) => (
-                  <div key={r.reader_id} style={{
-                    width: 14, height: 14, borderRadius: '50%',
-                    border: '1px solid var(--card-bg)',
-                    background: r.avatar_url ? 'transparent' : 'rgba(0,240,255,0.2)',
-                    overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 7, fontWeight: 700, color: 'var(--cyber-cyan)',
-                    marginLeft: i === 0 ? 0 : -4, position: 'relative', zIndex: 10 - i, flexShrink: 0,
-                  }}>
-                    {r.avatar_url
-                      ? <img src={r.avatar_url} alt={r.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : (r.full_name?.[0] || '?').toUpperCase()
-                    }
-                  </div>
-                ))}
-                {readers.length > 5 && (
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--card-bg)', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: 'var(--text-muted)', marginLeft: -4, flexShrink: 0 }}>
-                    +{readers.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
-            {isOwnerMsg && isLastInGroup && (!readers || readers.length === 0) && (isLastOwn || hovered) && (
-              <span style={{ marginLeft: 3, color: 'var(--text-muted)', fontSize: 10 }} title="Sent">
-                <i className="fa-solid fa-check" />
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Icon options per category
-const CATEGORY_ICONS = {
-  academic: [
-    { icon: 'fa-solid fa-graduation-cap', label: 'Graduation' },
-    { icon: 'fa-solid fa-book-open',      label: 'Book' },
-    { icon: 'fa-solid fa-flask',          label: 'Science' },
-    { icon: 'fa-solid fa-chalkboard',     label: 'Chalkboard' },
-  ],
-  project: [
-    { icon: 'fa-solid fa-diagram-project', label: 'Diagram' },
-    { icon: 'fa-solid fa-code',            label: 'Code' },
-    { icon: 'fa-solid fa-rocket',          label: 'Rocket' },
-    { icon: 'fa-solid fa-lightbulb',       label: 'Idea' },
-  ],
-  hobby: [
-    { icon: 'fa-solid fa-gamepad',         label: 'Gaming' },
-    { icon: 'fa-solid fa-music',           label: 'Music' },
-    { icon: 'fa-solid fa-palette',         label: 'Art' },
-    { icon: 'fa-solid fa-camera',          label: 'Photo' },
-  ],
-  social: [
-    { icon: 'fa-solid fa-user-group',      label: 'Group' },
-    { icon: 'fa-solid fa-heart',           label: 'Heart' },
-    { icon: 'fa-solid fa-star',            label: 'Star' },
-    { icon: 'fa-solid fa-fire',            label: 'Fire' },
-  ],
-};
-
-// -- CREATE MODAL --------------------------------------------------------------
-function CreateModal({ onClose, onCreated, userId }) {
-  const [form, setForm] = useState({ name: '', description: '', category: 'academic', icon: 'fa-solid fa-graduation-cap', interest_tag: '', is_open: false });
-  const [loading, setLoading] = useState(false);
-  const [connections, setConnections] = useState([]);
-  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
-  const [invitees, setInvitees] = useState([]);
-  const [logoMode, setLogoMode] = useState('icon'); // 'icon' | 'photo'
-  const [logoUrl, setLogoUrl] = useState(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const logoInputRef = useRef(null);
-
-  const handleLogoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLogoUploading(true);
-    try {
-      const compressed = await new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          const SIZE = 200;
-          const canvas = document.createElement('canvas');
-          canvas.width = SIZE; canvas.height = SIZE;
-          const ctx = canvas.getContext('2d');
-          const scale = Math.max(SIZE / img.width, SIZE / img.height);
-          const sw = img.width * scale, sh = img.height * scale;
-          ctx.drawImage(img, (SIZE - sw) / 2, (SIZE - sh) / 2, sw, sh);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = reject;
-        img.src = objectUrl;
-      });
-      // Store base64 in state — same approach as circle settings.
-      // The admin API (upload-cover) writes the base64 directly into communities.logo_url
-      // when the circle is approved, via circle-requests.js → communities insert.
-      setLogoUrl(compressed);
-      setLogoMode('photo');
-    } catch { /* non-fatal */ }
-    setLogoUploading(false);
-  };
-
-  const INTEREST_LABELS_MAP = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'E-Sports', dancing:'Dancing', bl_gl:'Watching BL/GL', sports:'Sports', travel:'Travel' };
-  const CAT_INTERESTS = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
-
-  useEffect(() => {
-    getFreshToken().then(token => {
-    fetch(getApiUrl('/api/connections'), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(r => r.json())
-      .then(data => {
-        const accepted = (data || []).filter(c => c.status === 'accepted');
-        localStorage.setItem('nexo_connection_count', accepted.length);
-        setConnections(accepted);
-        setConnectionsLoaded(true);
-      })
-      .catch(() => setConnectionsLoaded(true));
-    });
-  }, []);
-
-  const acceptedCount = connections.length;
-  // is_open must be forced on if invitees < 2
-  const forcedOpen = invitees.length < 2;
-  const effectiveIsOpen = forcedOpen ? true : form.is_open;
-
-  // Sync is_open state when forced
-  useEffect(() => {
-    if (forcedOpen && !form.is_open) {
-      setForm(f => ({ ...f, is_open: true }));
-    }
-  }, [forcedOpen]);
-
-  const handleCategoryChange = (cat) => {
-    const firstIcon = CATEGORY_ICONS[cat]?.[0]?.icon || 'fa-solid fa-graduation-cap';
-    setForm(f => ({ ...f, category: cat, icon: firstIcon, interest_tag: '' }));
-  };
-
-  const toggleInvitee = (id) => {
-    setInvitees(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const interestOptions = CAT_INTERESTS[form.category] || [];
-  const icons = CATEGORY_ICONS[form.category] || [];
-
-  // Validation: name + interest_tag required
-  const canSubmit = form.name.trim() && form.interest_tag;
-
-  const openHint = invitees.length === 0
-    ? 'Required · you have no invited connections. Circle will recruit members publicly.'
-    : invitees.length === 1
-    ? 'Required · you need 1 more member. Circle will also recruit publicly.'
-    : 'Optional · you have 2 invites. Circle can activate privately or stay open.';
-
-  const submit = async () => {
-    if (!canSubmit) return;
-    setLoading(true);
-    const token = localStorage.getItem('accessToken');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    else if (userId) headers['x-user-id'] = userId;
-    try {
-      const res = await fetch(getApiUrl('/api/communities'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: form.name.trim(),
-          description: form.description.trim(),
-          category: form.category,
-          icon: form.icon,
-          interest_tag: form.interest_tag,
-          is_open: effectiveIsOpen,
-          invitees,
-          logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) { alert(data.message || 'Failed to submit request.'); setLoading(false); return; }
-      alert(`Your circle "${form.name.trim()}" has been submitted for admin approval. You'll be notified once it's reviewed.`);
-      onClose();
-    } catch {
-      alert('Network error · could not submit request.');
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto', width: '100%', maxWidth: 480 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--cyber-cyan)', marginBottom: 20 }}>CREATE NEW CIRCLE</h3>
-
-        {/* 1. LOGO + NAME + CATEGORY — all in one card */}
-        <div className="input-group">
-          <label>CIRCLE IDENTITY</label>
-          <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-
-          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
-            {/* Top row: logo + inline name + category inputs */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
-                {logoMode === 'photo' && logoUrl
-                  ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <i className={form.icon} style={{ fontSize: 24, color: 'var(--cyber-cyan)' }} />}
-                {logoMode === 'photo' && logoUrl && (
-                  <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                    style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="fa-solid fa-xmark" />
-                  </button>
-                )}
-              </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Circle Name"
-                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }} />
-                <select value={form.category} onChange={e => handleCategoryChange(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit', cursor: 'pointer' }}>
-                  <option value="academic">Academic / Study Group</option>
-                  <option value="project">Special Project / Capstone</option>
-                  <option value="hobby">Hobby / Interest</option>
-                  <option value="social">Social / Hangout</option>
-                </select>
-              </div>
-            </div>
-            {/* Icon grid + Photo as full-width button below */}
-            <div className="icon-picker" style={{ gap: 6, marginBottom: 8 }}>
-              {icons.map(opt => (
-                <button key={opt.icon} type="button"
-                  className={`icon-pick-btn ${logoMode === 'icon' && form.icon === opt.icon ? 'selected' : ''}`}
-                  onClick={() => { setLogoMode('icon'); setLogoUrl(null); setForm(f => ({ ...f, icon: opt.icon })); }} title={opt.label}>
-                  <i className={opt.icon}></i>
-                  <span>{opt.label}</span>
-                </button>
-              ))}
-            </div>
-            <button type="button"
-              onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-              style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.08)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.15s' }}>
-              {logoUploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-image" />}
-              {logoMode === 'photo' && logoUrl ? '✓ Photo uploaded — click to change' : 'Upload a Photo'}
-            </button>
-          </div>
-        </div>
-
-        {/* INTEREST TAG */}
-        {interestOptions.length > 0 && (
-          <div className="input-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              CIRCLE INTEREST TAG <span style={{ color: 'var(--red)', fontSize: 12 }}>*</span>
-            </label>
-            <select value={form.interest_tag} onChange={e => setForm(f => ({ ...f, interest_tag: e.target.value }))}>
-              <option value="">Select an interest...</option>
-              {interestOptions.map(i => (
-                <option key={i} value={i}>{INTEREST_LABELS_MAP[i] || i}</option>
-              ))}
-            </select>
-            {!form.interest_tag && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Required · pick what this circle is about.</div>}
-          </div>
-        )}
-
-        {/* 5. DESCRIPTION */}
-        <div className="input-group">
-          <label>DESCRIPTION</label>
-          <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Briefly describe this circle's purpose..." />
-        </div>
-
-        {/* 6. OPEN FOR APPLICATIONS */}
-        <div className="input-group">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ margin: 0 }}>OPEN FOR APPLICATIONS</label>
-            <input type="checkbox" checked={effectiveIsOpen}
-              onChange={e => !forcedOpen && setForm(f => ({ ...f, is_open: e.target.checked }))}
-              style={{ accentColor: 'var(--cyber-cyan)', width: 16, height: 16, cursor: forcedOpen ? 'not-allowed' : 'pointer', opacity: forcedOpen ? 0.6 : 1 }} />
-          </div>
-          <div style={{ fontSize: 11, color: forcedOpen ? 'var(--cyber-yellow)' : 'var(--text-muted)', marginTop: 6 }}>
-            {forcedOpen && <i className="fa-solid fa-lock" style={{ marginRight: 5 }}></i>}
-            {openHint}
-          </div>
-        </div>
-
-        {/* 7. INVITE CONNECTIONS */}
-        {connectionsLoaded && connections.length > 0 && (
-          <div className="input-group">
-            <label>INVITE YOUR CONNECTIONS</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
-              {connections.map(c => {
-                const other = c.user_id === userId ? c.recipient : c.requester;
-                const otherId = c.user_id === userId ? c.connected_user_id : c.user_id;
-                const name = other?.full_name || 'Connection';
-                const initials = name[0]?.toUpperCase() || '?';
-                const checked = invitees.includes(otherId);
-                return (
-                  <div key={otherId} onClick={() => toggleInvitee(otherId)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: `1px solid ${checked ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: checked ? 'rgba(0,240,255,0.06)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: '0.15s' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,240,255,0.15)', border: '2px solid rgba(0,240,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                      {initials}
-                    </div>
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{name}</span>
-                    <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.3)'}`, background: checked ? 'var(--cyber-cyan)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {checked && <i className="fa-solid fa-check" style={{ fontSize: 10, color: '#0d0d12' }}></i>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {invitees.length > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', marginTop: 6 }}>
-                <i className="fa-solid fa-users" style={{ marginRight: 5 }}></i>
-                {invitees.length} connection{invitees.length !== 1 ? 's' : ''} selected
-                {invitees.length < 2 && ' · select 1 more to make Open optional'}
-              </div>
-            )}
-          </div>
-        )}
-
-        {connectionsLoaded && connections.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 8 }}>
-            <i className="fa-solid fa-info-circle" style={{ marginRight: 6, color: 'var(--cyber-cyan)' }}></i>
-            No connections yet. Go to <strong style={{ color: 'var(--cyber-cyan)' }}>Discover People</strong> to connect with others.
-          </div>
-        )}
-
-        <div className="modal-actions" style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <button className="cyber-btn" onClick={submit} disabled={loading || !canSubmit} style={{ flex: 1 }}>
-            {loading ? 'SUBMITTING...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />SUBMIT FOR APPROVAL</>}
-          </button>
-          <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// rank_level: 0=Member, 1=Moderator, 2=Co-Leader, 3=Leader/Founder
-function rankLabel(level) {
-  return ['Member', 'Moderator', 'Co-Leader', 'Leader'][level ?? 0] || 'Member';
-}
-function rankColor(level) {
-  if (level >= 3) return 'var(--cyber-yellow)';
-  if (level >= 2) return 'var(--cyber-cyan)';
-  if (level >= 1) return 'var(--green)';
-  return 'var(--text-muted)';
-}
-
-// -- MEMBER CARD ---------------------------------------------------------------
-function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canManage = true, onGivePoints, onFlagUser, communityCategory, onUpdateRole }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [trustPoints, setTrustPoints] = useState(10);
-  const menuRef = useRef(null);
-  const name = m.accounts?.full_name || '??';
-  const initials = name !== '??'
-    ? name.trim().split(' ').filter(Boolean).map(p => p[0]).join('').toUpperCase().slice(0, 2)
-    : '?';
-
-  useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-  
-  // Load trust points
-  useEffect(() => {
-    if (!m.user_id) return;
-    supabase.from('account_status')
-      .select('trust_points')
-      .eq('id', m.user_id)
-      .single()
-      .then(({ data }) => setTrustPoints(data?.trust_points ?? 10));
-  }, [m.user_id]);
-
-  const ranks = [
-    { level: 2, label: 'Co-Leader',  capped: coLeaderCount >= 2 },
-    { level: 1, label: 'Moderator',  capped: moderatorCount >= 3 },
-    { level: 0, label: 'Member',     capped: false },
-  ].filter(r => r.level !== m.rank_level);
-
-  return (
-    <div className="member-card">
-      <div className="member-card-avatar">
-        {m.accounts?.avatar_url ? (
-          <img src={m.accounts.avatar_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          initials
-        )}
-      </div>
-      <div className="member-card-info">
-        <div className="member-card-name">{name}</div>
-        <div className="member-card-sub">
-          <span style={{ color: rankColor(m.rank_level), fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
-            {rankLabel(m.rank_level)}
-          </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 8 }}>
-            {m.accounts?.ctu_id}
-          </span>
-        </div>
-        <div style={{ marginTop: 6 }}>
-          <TrustPointsBadge points={trustPoints} size="small" showLabel={false} />
-        </div>
-        {/* Project Role Dropdown - only for project communities */}
-        {communityCategory === 'project' && canManage && (
-          <div style={{ marginTop: 8 }}>
-            <select
-              value={m.project_role || ''}
-              onChange={(e) => onUpdateRole && onUpdateRole(m.id, e.target.value)}
-              disabled={!canManage}
-              style={{
-                width: '100%',
-                padding: '4px 8px',
-                fontSize: 10,
-                background: 'rgba(0,0,0,0.3)',
-                border: '1px solid rgba(0,240,255,0.2)',
-                borderRadius: 4,
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="">No Role</option>
-              <option value="Leader">?? Leader</option>
-              <option value="Developer">?? Developer</option>
-              <option value="Designer">?? Designer</option>
-              <option value="Tester">?? Tester</option>
-              <option value="Other">?? Other</option>
-            </select>
-          </div>
-        )}
-      </div>
-      <div className="member-card-actions" ref={menuRef}>
-        {canManage && onFlagUser && (
-          <button
-            title="Flag for admin review"
-            onClick={() => onFlagUser(m)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '4px 6px', opacity: 0.5, transition: 'opacity 0.2s, color 0.2s' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--cyber-yellow)'; e.currentTarget.style.opacity = 1; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.opacity = 0.5; }}>
-            <i className="fa-solid fa-flag"></i>
-          </button>
-        )}
-        <button className="member-card-menu-btn" onClick={() => setMenuOpen(o => !o)}>
-          <i className="fa-solid fa-ellipsis-vertical"></i>
-        </button>
-        {menuOpen && (
-          <div className="member-card-dropdown">
-            {/* Give Points - always available */}
-            {onGivePoints && (
-              <>
-                <button onClick={() => { onGivePoints(m); setMenuOpen(false); }} style={{ color: 'var(--cyber-cyan)' }}>
-                  <i className="fa-solid fa-heart"></i> Give Trust Points
-                </button>
-                <div style={{ borderTop: '1px solid #222', margin: '4px 0' }}></div>
-              </>
-            )}
-            
-            {/* Management actions - only for leaders/co-leaders */}
-            {canManage && (
-              <>
-                {ranks.map(r => (
-                  <button
-                    key={r.level}
-                    onClick={() => { if (!r.capped) { onSetRank(m.id, r.level); setMenuOpen(false); } }}
-                    style={{ opacity: r.capped ? 0.4 : 1, cursor: r.capped ? 'not-allowed' : 'pointer' }}
-                    title={r.capped ? `Cap reached` : ''}
-                  >
-                    <i className={`fa-solid ${r.level > m.rank_level ? 'fa-arrow-up' : 'fa-arrow-down'}`}></i>
-                    Set as {r.label}
-                    {r.capped && <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--red)' }}>FULL</span>}
-                  </button>
-                ))}
-                <div style={{ borderTop: '1px solid #222', margin: '4px 0' }}></div>
-              </>
-            )}
-            
-            {/* Flag User - only for leaders/co-leaders */}
-            {canManage && onFlagUser && (
-              <button onClick={() => { onFlagUser(m); setMenuOpen(false); }} style={{ color: 'var(--cyber-yellow)' }}>
-                <i className="fa-solid fa-flag"></i> Flag for Admin Review
-              </button>
-            )}
-            
-            {/* Kick - only for leaders/co-leaders */}
-            {canManage && (
-              <>
-                <div style={{ borderTop: '1px solid #222', margin: '4px 0' }}></div>
-                <button onClick={() => { onKick(m.id, name); setMenuOpen(false); }} style={{ color: 'var(--red)' }}>
-                  <i className="fa-solid fa-user-xmark"></i> Kick from Circle
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -- MANAGE GROUP MODAL --------------------------------------------------------
-function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, onGivePoints, onFlagUser }) {
-  const [form, setForm] = useState({ name: comm.name, description: comm.description || '', category: comm.category || 'academic', is_open: comm.is_open !== false, interest_tags: comm.interest_tag ? String(comm.interest_tag).split(',').map(t => t.trim()).filter(Boolean) : [] });
-  const [members, setMembers] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [leader, setLeader] = useState(null);
-  const [loadingMembers, setLoadingMembers] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState(viewerIsOwner ? 'settings' : 'members');
-  const [inviteSearch, setInviteSearch] = useState('');
-
-  const sysMsg = async (text) => {
-    await supabase.from('messages').insert([{
-      full_name: 'System',
-      content: 'NEXOSYS:' + text,
-      message_type: 'text',
-      community_id: comm.id,
-      channel_id: null,
-    }]);
-  };
-  const [inviteResult, setInviteResult] = useState(null);
-  const [inviteSearching, setInviteSearching] = useState(false);
-  const [inviteHasSearched, setInviteHasSearched] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [logoUrl, setLogoUrl] = useState(comm.logo_url || null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const [logoMode, setLogoMode] = useState(comm.logo_url ? 'photo' : 'icon'); // 'icon' | 'photo'
-  const logoInputRef = useRef(null);
-
-  const fetchMembers = useCallback(async () => {
-    setLoadingMembers(true);
-    // fetch leader profile with avatar
-    const { data: leaderData } = await supabase
-      .from('accounts')
-      .select('full_name, ctu_id, account_details(avatar_url)')
-      .eq('id', comm.creator_id)
-      .single();
-    if (leaderData) setLeader({ 
-      full_name: leaderData.full_name, 
-      student_id: leaderData.ctu_id, 
-      avatar_url: leaderData.account_details?.avatar_url 
-    });
-
-    const { data, error } = await supabase
-      .from('memberships')
-      .select(`
-        *,
-        accounts:user_id (
-          full_name,
-          ctu_id,
-          account_details(avatar_url)
-        )
-      `)
-      .eq('community_id', comm.id);
-    
-    if (error) {
-      console.error('Error fetching members:', error);
-    }
-    
-    if (data) {
-      setMembers(data.filter(m => m.status === 'active').map(m => ({
-        ...m,
-        accounts: {
-          ...m.accounts,
-          avatar_url: m.accounts?.account_details?.avatar_url
-        }
-      })));
-      setRequests(data.filter(m => m.status === 'pending'));
-      setRequests(data.filter(m => m.status === 'pending'));
-    }
-    setLoadingMembers(false);
-  }, [comm.id, comm.creator_id]);
-
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
-
-  const saveSettings = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    const updates = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      category: form.category,
-      logo_url: logoMode === 'photo' && logoUrl ? logoUrl : null,
-      is_open: form.is_open,
-      interest_tag: form.interest_tags.join(','),
-    };
-    // Use service-role API to bypass RLS
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl(`/api/upload`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ action: 'upload-cover', ...updates, communityId: comm.id }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert('Failed to save: ' + (err.message || res.status));
-        setSaving(false);
-        return;
-      }
-      onSaved({ ...comm, ...updates });
-      onClose();
-    } catch (err) {
-      alert('Failed to save: ' + err.message);
-    }
-    setSaving(false);
-  };
-
-  const handleLogoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLogoUploading(true);
-    try {
-      const compressed = await new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          const SIZE = 200;
-          const canvas = document.createElement('canvas');
-          canvas.width = SIZE; canvas.height = SIZE;
-          const ctx = canvas.getContext('2d');
-          const scale = Math.max(SIZE / img.width, SIZE / img.height);
-          const sw = img.width * scale, sh = img.height * scale;
-          ctx.drawImage(img, (SIZE - sw) / 2, (SIZE - sh) / 2, sw, sh);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = reject;
-        img.src = objectUrl;
-      });
-      setLogoUrl(compressed);
-      setLogoMode('photo');
-    } catch (err) { console.error(err); }
-    finally { setLogoUploading(false); }
-  };
-
-  const approveRequest = async (memberId) => {
-    const member = requests.find(r => r.id === memberId);
-    const { error } = await supabase.from('memberships')
-      .update({ status: 'active' }).eq('id', memberId);
-    if (!error) {
-      if (member?.user_id) {
-        await supabase.from('notifications').insert([{
-          user_id: member.user_id,
-          type: 'join_approved',
-          message: `Your request to join "${comm.name}" has been approved!`,
-          link_comm_id: comm.id,
-        }]);
-      }
-      await sysMsg(`${member?.accounts?.full_name || 'A user'} joined the circle.`);
-      fetchMembers();
-    }
-  };
-
-  const denyRequest = async (memberId) => {
-    const member = requests.find(r => r.id === memberId);
-    const { error } = await supabase.from('memberships').delete().eq('id', memberId);
-    if (!error) {
-      if (member?.user_id) {
-        await supabase.from('notifications').insert([{
-          user_id: member.user_id,
-          type: 'join_denied',
-          message: `Your request to join "${comm.name}" was not approved.`,
-          link_comm_id: comm.id,
-        }]);
-      }
-      fetchMembers();
-    }
-  };
-
-  const kickMember = async (memberId, name) => {
-    if (!confirm(`Remove ${name} from this group?`)) return;
-    const member = members.find(m => m.id === memberId);
-    const { error } = await supabase.from('memberships').delete().eq('id', memberId);
-    if (!error) {
-      if (member?.user_id) {
-        await supabase.from('notifications').insert([{
-          user_id: member.user_id,
-          type: 'kicked',
-          message: `You have been removed from "${comm.name}".`,
-        }]);
-      }
-      await sysMsg(`${name} was removed from the circle.`);
-      fetchMembers();
-    }
-  };
-  
-  const setRank = async (memberId, level) => {
-    if (level === 2 && members.filter(m => m.rank_level === 2).length >= 2) {
-      alert('This circle already has 2 Co-Leaders. Demote one first.'); return;
-    }
-    if (level === 1 && members.filter(m => m.rank_level === 1).length >= 3) {
-      alert('This circle already has 3 Moderators. Demote one first.'); return;
-    }
-    const member = members.find(m => m.id === memberId);
-    const { error } = await supabase.from('memberships')
-      .update({ rank_level: level }).eq('id', memberId);
-    if (!error) {
-      if (member?.user_id && level > (member.rank_level ?? 0)) {
-        const labels = ['Member', 'Moderator', 'Co-Leader'];
-        await supabase.from('notifications').insert([{
-          user_id: member.user_id,
-          type: 'promoted',
-          message: `You've been promoted to ${labels[level]} in "${comm.name}"!`,
-          link_comm_id: comm.id,
-        }]);
-      }
-      const rankLabels = ['Member', 'Moderator', 'Co-Leader', 'Leader'];
-      const memberName = member?.accounts?.full_name || 'A member';
-      const isPromotion = level > (member?.rank_level ?? 0);
-      await sysMsg(isPromotion
-        ? `${memberName} was promoted to ${rankLabels[level]}.`
-        : `${memberName} was set to ${rankLabels[level]}.`
-      );
-      fetchMembers();
-    }
-  };
-
-  const updateMemberRole = async (membershipId, newRole) => {
-    const { error } = await supabase
-      .from('memberships')
-      .update({ project_role: newRole || null })
-      .eq('id', membershipId);
-    
-    if (error) {
-      alert('Failed to update role: ' + error.message);
-    } else {
-      fetchMembers();
-    }
-  };
-
-  const searchInviteStudent = async () => {
-    if (!inviteSearch.trim()) return;
-    setInviteSearching(true);
-    setInviteResult(null);
-    setInviteHasSearched(true);
-    const { data } = await supabase.from('accounts')
-      .select('id, full_name, ctu_id')
-      .ilike('ctu_id', `%${inviteSearch.trim()}%`)
-      .limit(1).single();
-    if (data) {
-      const { data: membership } = await supabase.from('memberships')
-        .select('status')
-        .eq('community_id', comm.id)
-        .eq('user_id', data.id)
-        .maybeSingle();
-      setInviteResult({ ...data, student_id: data.ctu_id, membershipStatus: membership?.status || null });
-    } else {
-      setInviteResult(null);
-    }
-    setInviteSearching(false);
-  };
-
-  const inviteMember = async () => {
-    if (!inviteResult) return;
-    setInviting(true);
-    // Check if already a member
-    const { data: existing } = await supabase.from('memberships')
-      .select('id, status')
-      .eq('community_id', comm.id)
-      .eq('user_id', inviteResult.id)
-      .maybeSingle();
-    if (existing) {
-      alert(existing.status === 'active' ? 'This student is already a member.' : 'This student already has a pending request.');
-      setInviting(false);
-      return;
-    }
-    const { error } = await supabase.from('memberships').insert([{
-      community_id: comm.id,
-      user_id: inviteResult.id,
-      rank_level: 0,
-      status: 'invited',
-    }]);
-    if (!error) {
-      await supabase.from('notifications').insert([{
-        user_id: inviteResult.id,
-        type: 'circle_invite',
-        message: `You've been invited to join "${comm.name}"! Click this notification to view the circle.`,
-        link_comm_id: comm.id,
-      }]);
-      setInviteSearch('');
-      setInviteResult(null);
-      alert(`Invite sent to ${inviteResult.full_name}. They can accept or decline from their notifications.`);
-    } else {
-      alert('Failed to send invite.');
-    }
-    setInviting(false);
-  };
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="manage-modal-box" onClick={e => e.stopPropagation()}>
-        <div className="manage-modal-header">
-          <h2><i className="fa-solid fa-gear" style={{ marginRight: 10 }}></i>CIRCLE SETTINGS</h2>
-          <button className="manage-close-btn" onClick={onClose}>&times;</button>
-        </div>
-        <div className="manage-tabs">
-          {(viewerIsOwner || viewerRankLevel >= 2) && (
-            <button className={`manage-tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
-              <i className="fa-solid fa-sliders"></i><span> Settings</span>
-            </button>
-          )}
-          <button className={`manage-tab ${tab === 'members' ? 'active' : ''}`} onClick={() => setTab('members')}>
-            <i className="fa-solid fa-users"></i><span> Members {members.length > 0 && `(${members.length})`}</span>
-          </button>
-          {(viewerIsOwner || viewerRankLevel >= 2) && (
-            <button className={`manage-tab ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>
-              <i className="fa-solid fa-user-clock"></i><span> Requests</span>
-              {requests.length > 0 && <span className="req-badge">{requests.length}</span>}
-            </button>
-          )}
-          {(viewerIsOwner || viewerRankLevel >= 2) && (
-            <button className={`manage-tab ${tab === 'Application' ? 'active' : ''}`} onClick={() => setTab('Application')}>
-              <i className="fa-solid fa-microphone"></i><span> Application</span>
-            </button>
-          )}
-          {(viewerIsOwner || viewerRankLevel >= 2) && (
-            <button className={`manage-tab ${tab === 'invite' ? 'active' : ''}`} onClick={() => setTab('invite')}>
-              <i className="fa-solid fa-user-plus"></i><span> Invite</span>
-            </button>
-          )}
-        </div>
-
-        {tab === 'settings' && (viewerIsOwner || viewerRankLevel >= 2) && (
-          <div className="manage-tab-content">
-            {/* CIRCLE LOGO */}
-            <div className="input-group">
-              <label>CIRCLE IDENTITY</label>
-              <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
-              <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', padding: 14 }}>
-                {/* Top row: logo + inline name + category */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', background: 'rgba(0,240,255,0.1)', border: '2px solid rgba(0,240,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
-                    {logoMode === 'photo' && logoUrl
-                      ? <img src={logoUrl} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <i className={comm.icon || getCategoryIcon(comm.category)} style={{ fontSize: 22, color: 'var(--cyber-cyan)' }} />}
-                    {logoMode === 'photo' && logoUrl && (
-                      <button type="button" onClick={() => { setLogoUrl(null); setLogoMode('icon'); }}
-                        style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 10, borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <i className="fa-solid fa-xmark" />
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit' }} />
-                    <select value={form.category} onChange={e => {
-                      const newCat = e.target.value;
-                      const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
-                      const available = catInterests[newCat] || [];
-                      setForm(f => ({ ...f, category: newCat, interest_tags: f.interest_tags.filter(t => available.includes(t)) }));
-                    }}
-                      style={{ background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: 12, padding: '2px 0', outline: 'none', width: '100%', fontFamily: 'inherit', cursor: 'pointer' }}>
-                      <option value="academic">Academic / Study Group</option>
-                      <option value="project">Special Project / Capstone</option>
-                      <option value="hobby">Hobby / Interest</option>
-                      <option value="social">Social / Hangout</option>
-                    </select>
-                  </div>
-                </div>
-                {/* Icon grid + Photo as full-width button below */}
-                <div className="icon-picker" style={{ gap: 6, marginBottom: 8 }}>
-                  {(CATEGORY_ICONS[form.category] || CATEGORY_ICONS.academic || []).map(opt => (
-                    <button key={opt.icon} type="button"
-                      className={`icon-pick-btn ${logoMode === 'icon' && (comm.icon === opt.icon || form.icon === opt.icon) ? 'selected' : ''}`}
-                      onClick={() => { setLogoMode('icon'); setLogoUrl(null); }}
-                      title={opt.label}>
-                      <i className={opt.icon}></i>
-                      <span>{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <button type="button"
-                  onClick={() => { setLogoMode('photo'); logoInputRef.current?.click(); }}
-                  style={{ width: '100%', padding: '10px 0', borderRadius: 8, border: `1px solid ${logoMode === 'photo' ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`, background: logoMode === 'photo' ? 'rgba(0,240,255,0.08)' : 'transparent', color: logoMode === 'photo' ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: '0.15s' }}>
-                  {logoUploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-image" />}
-                  {logoMode === 'photo' && logoUrl ? '✓ Photo uploaded — click to change' : 'Upload a Photo'}
-                </button>
-              </div>
-            </div>
-            <div className="input-group">
-              <label>DESCRIPTION</label>
-              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe this channel's purpose..." />
-            </div>
-            <div className="input-group">
-              <label>JOIN TYPE</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button"
-                  onClick={() => setForm(f => ({ ...f, is_open: true }))}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${form.is_open ? '#3ecf8e' : '#333'}`, background: form.is_open ? 'rgba(62,207,142,0.1)' : 'transparent', color: form.is_open ? '#3ecf8e' : 'var(--text-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <i className="fa-solid fa-door-open" style={{ marginRight: 6 }}></i>Open
-                  <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, opacity: 0.8 }}>Anyone can request to join</div>
-                </button>
-                <button type="button"
-                  onClick={() => setForm(f => ({ ...f, is_open: false }))}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `1px solid ${!form.is_open ? 'var(--cyber-yellow)' : '#333'}`, background: !form.is_open ? 'rgba(252,238,10,0.08)' : 'transparent', color: !form.is_open ? 'var(--cyber-yellow)' : 'var(--text-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Closed
-                  <div style={{ fontSize: 10, fontWeight: 400, marginTop: 3, opacity: 0.8 }}>Invite only</div>
-                </button>
-              </div>
-            </div>
-            <div className="input-group">
-              <label>INTERESTS <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>— select all that apply</span></label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 4 }}>
-                {(['research','debate','business','language_learning','robotics','reading','coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','sports','travel']).map(interest => {
-                  const label = { research:'Research', debate:'Debate', business:'Business', language_learning:'Language Learning', robotics:'Robotics', reading:'Reading', coding:'Coding', design:'Design', gaming:'Gaming', music:'Music', art:'Art', photography:'Photography', writing:'Writing', cooking:'Cooking', anime:'Anime', fitness:'Fitness', podcasting:'Podcasting', esports:'Esports', dancing:'Dancing', sports:'Sports', travel:'Travel' };
-                  const catInterests = { academic:['research','debate','business','language_learning','robotics','reading'], hobby:['coding','design','gaming','music','art','photography','writing','cooking','anime','fitness','podcasting','esports','dancing','bl_gl'], social:['sports','travel','fitness','dancing','esports'], project:['coding','robotics','design','business','research'] };
-                  const available = catInterests[form.category] || catInterests.academic;
-                  if (!available.includes(interest)) return null;
-                  const selected = form.interest_tags.includes(interest);
-                  return (
-                    <button key={interest} type="button"
-                      onClick={() => setForm(f => ({
-                        ...f,
-                        interest_tags: selected
-                          ? f.interest_tags.filter(t => t !== interest)
-                          : [...f.interest_tags, interest]
-                      }))}
-                      style={{ padding: '4px 12px', borderRadius: 20, fontSize: 11, fontFamily: 'inherit', cursor: 'pointer', border: `1px solid ${selected ? 'var(--cyber-cyan)' : '#333'}`, background: selected ? 'rgba(0,240,255,0.12)' : 'transparent', color: selected ? 'var(--cyber-cyan)' : 'var(--text-muted)', fontWeight: selected ? 700 : 400, transition: '0.15s' }}>
-                      {label[interest] || interest}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="cyber-btn" onClick={saveSettings} disabled={saving} style={{ flex: 1 }}>
-                {saving ? 'SAVING...' : <><i className="fa-solid fa-floppy-disk" style={{ marginRight: 6 }}></i>SAVE CHANGES</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>CANCEL</button>
-            </div>
-          </div>
-        )}
-
-        {tab === 'members' && (
-          <div className="manage-tab-content" style={{ padding: 0 }}>
-            {/* Leader profile banner */}
-            <div className="members-banner">
-              <div className="members-banner-avatar">
-                {leader?.avatar_url ? (
-                  <img src={leader.avatar_url} alt={leader.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--cyber-yellow)' }}>
-                    {leader?.full_name
-                      ? leader.full_name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)
-                      : '?'}
-                  </span>
-                )}
-              </div>
-              <div className="members-banner-name">{leader?.full_name || '"?'}</div>
-              <div className="members-banner-handle">
-                <span style={{ color: 'var(--cyber-yellow)', fontSize: 11, border: '1px solid var(--cyber-yellow)', padding: '2px 10px', borderRadius: 20 }}>
-                  Leader / Founder
-                </span>
-              </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 6, fontFamily: 'monospace' }}>
-                {leader?.student_id}
-              </div>
-            </div>
-
-            <div style={{ padding: '0 20px 20px' }}>
-              {loadingMembers ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>Loading members...</p>
-              ) : members.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>No active members yet.</p>
-              ) : (
-                <>
-                  {(() => {
-                    // Filter out the leader from members list to avoid duplicate display
-                    const membersWithoutLeader = members.filter(m => m.user_id !== comm?.creator_id);
-                    const coLeaderCount = membersWithoutLeader.filter(m => m.rank_level === 2).length;
-                    const moderatorCount = membersWithoutLeader.filter(m => m.rank_level === 1).length;
-                    return [
-                      { label: 'Co-Leaders', filter: m => m.rank_level === 2, cap: 2 },
-                      { label: 'Moderators', filter: m => m.rank_level === 1, cap: 3 },
-                      { label: 'Members',    filter: m => m.rank_level === 0, cap: null },
-                    ].map(({ label, filter, cap }) => {
-                      const group = membersWithoutLeader.filter(filter);
-                      if (group.length === 0) return null;
-                      return (
-                        <div key={label}>
-                          <div className="members-section-label">
-                            <span>{label}</span>
-                            <span style={{ color: cap && group.length >= cap ? 'var(--red)' : 'var(--cyber-cyan)', fontSize: 11 }}>
-                              {group.length}{cap ? `/${cap}` : ''}
-                            </span>
-                          </div>
-                          {group.map(m => (
-                            <MemberCard
-                              key={m.id} m={m}
-                              onSetRank={setRank} onKick={kickMember}
-                              coLeaderCount={coLeaderCount}
-                              moderatorCount={moderatorCount}
-                              canManage={viewerRankLevel >= 2}
-                              onGivePoints={onGivePoints}
-                              onFlagUser={viewerRankLevel >= 2 ? onFlagUser : null}
-                              communityCategory={comm.category}
-                              onUpdateRole={updateMemberRole}
-                            />
-                          ))}
-                        </div>
-                      );
-                    });
-                  })()}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === 'requests' && (viewerIsOwner || viewerRankLevel >= 2) && (
-          <div className="manage-tab-content">
-            {loadingMembers ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>Loading...</p>
-            ) : requests.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, padding: '20px 0' }}>No pending join requests.</p>
-            ) : (
-              <table className="members-table">
-                <thead><tr><th>NAME</th><th>STUDENT ID</th><th>ACTION</th></tr></thead>
-                <tbody>
-                  {requests.map(r => (
-                    <tr key={r.id}>
-                      <td style={{ color: 'var(--text-primary)' }}>{r.accounts?.full_name || '??'}</td>
-                      <td style={{ fontFamily: 'monospace', color: 'var(--cyber-cyan)' }}>{r.accounts?.ctu_id || '??'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="member-action-btn promote" onClick={() => approveRequest(r.id)}><i className="fa-solid fa-check"></i> Approve</button>
-                          <button className="member-action-btn kick" onClick={() => denyRequest(r.id)}><i className="fa-solid fa-xmark"></i> Deny</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {tab === 'Application' && (viewerIsOwner || viewerRankLevel >= 2) && (
-          <div className="manage-tab-content">
-            <ApplicationFormBuilder
-              comm={comm}
-              onToggle={(enabled) => onSaved({ ...comm, application_enabled: enabled })}
-            />
-            {comm.application_enabled && (
-              <>
-                <div className="Application-section-label" style={{ marginTop: 28, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <span>Applications Received</span>
-                </div>
-                <ApplicationReviewPanel comm={comm} />
-              </>
-            )}
-          </div>
-        )}
-
-        {tab === 'invite' && (viewerIsOwner || viewerRankLevel >= 2) && (
-          <div className="manage-tab-content">
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--cyber-cyan)', marginBottom: 6 }}>
-                <i className="fa-solid fa-user-plus" style={{ marginRight: 8 }}></i>Personal Invite
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                Search for a CTU student by their Student ID and invite them directly into the circle, bypassing the Application process.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <input
-                className="channel-name-input"
-                style={{ flex: 1, padding: '10px 12px', fontSize: 13 }}
-                placeholder="Enter Student ID (e.g. 1234567)"
-                value={inviteSearch}
-                onChange={e => { setInviteSearch(e.target.value); setInviteHasSearched(false); setInviteResult(null); }}
-                onKeyDown={e => e.key === 'Enter' && searchInviteStudent()}
-              />
-              <button className="cyber-btn" style={{ padding: '8px 16px', fontSize: 12 }}
-                onClick={searchInviteStudent} disabled={inviteSearching}>
-                {inviteSearching ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-magnifying-glass"></i>}
-              </button>
-            </div>
-
-            {inviteResult === null && inviteSearch.trim() && !inviteSearching && inviteHasSearched && (
-              <p style={{ fontSize: 12, color: 'var(--red)', padding: '10px 0' }}>
-                <i className="fa-solid fa-circle-xmark" style={{ marginRight: 6 }}></i>No student found with that ID.
-              </p>
-            )}
-
-            {inviteResult && (
-              <div style={{
-                background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)',
-                borderRadius: 10, padding: 16, display: 'flex', alignItems: 'center', gap: 14,
-              }}>
-                <div className="member-card-avatar" style={{ width: 44, height: 44, fontSize: 16 }}>
-                  {(inviteResult.full_name || 'U')[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{inviteResult.full_name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontFamily: 'monospace', marginTop: 2 }}>{inviteResult.student_id}</div>
-                </div>
-                {inviteResult.membershipStatus === 'active' ? (
-                  <span style={{ padding: '8px 18px', fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>
-                    <i className="fa-solid fa-check-circle" style={{ marginRight: 6 }}></i>Member
-                  </span>
-                ) : inviteResult.membershipStatus === 'invited' ? (
-                  <span style={{ padding: '8px 18px', fontSize: 12, color: 'var(--cyber-cyan)', fontWeight: 700 }}>
-                    <i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>Invited
-                  </span>
-                ) : (
-                  <button className="cyber-btn" style={{ padding: '8px 18px', fontSize: 12 }}
-                    onClick={inviteMember} disabled={inviting}>
-                    {inviting ? 'Inviting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Invite</>}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -- PROFILE MODAL -------------------------------------------------------------
-const INTEREST_LABELS = {
-  art: 'Art', coding: 'Coding', design: 'Design', gaming: 'Gaming',
-  music: 'Music', sports: 'Sports', research: 'Research',
-  photography: 'Photography', writing: 'Writing', travel: 'Travel',
-  debate: 'Debate', language: 'Language Learning', anime: 'Anime',
-  bxgl: 'Watching BL/GL',
-};
-const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({ id, label }));
-const PROGRAMS = ['BEED','BIT - AUTOMOTIVE','BIT - COMPUTER TECHNOLOGY','BIT - ELECTRONICS','BSED - MATH','BSFI','BSHM','BSIE','BSIT','BTLED - HE'];
-
-// -- PROFILE TRUST POINTS SECTION ---------------------------------------------
-function ProfileTrustPointsSection({ userId, onViewHistory }) {
-  const [trustPoints, setTrustPoints] = useState(10);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!userId) return;
-    const load = async () => {
-      const { data } = await supabase
-        .from('account_status')
-        .select('trust_points')
-        .eq('id', userId)
-        .single();
-      setTrustPoints(data?.trust_points ?? 10);
-      setLoading(false);
-    };
-    load();
-  }, [userId]);
-
-  if (loading) {
-    return (
-      <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16, textAlign: 'center' }}>
-        <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 16, color: 'var(--text-muted)' }}></i>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>
-        TRUST POINTS
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <TrustPointsBadge points={trustPoints} size="large" showLabel={true} />
-        <button
-          onClick={onViewHistory}
-          style={{
-            background: 'rgba(0,240,255,0.1)',
-            border: '1px solid rgba(0,240,255,0.3)',
-            color: 'var(--cyber-cyan)',
-            borderRadius: 8,
-            padding: '8px 14px',
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6
-          }}
-        >
-          <i className="fa-solid fa-history"></i>
-          View History
-        </button>
-      </div>
-      {trustPoints < 10 && (
-        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          <i className="fa-solid fa-info-circle" style={{ marginRight: 4, color: 'var(--cyber-cyan)' }}></i>
-          You can earn points through peer appreciation and daily good behavior.
-        </div>
-      )}
-    </div>
-  );
-}
-
-// -- PROFILE PHOTOS SECTION ----------------------------------------------------
-function ProfilePhotosSection({ user, readOnly, editing, pendingPhotos, photoUploading, onUpload, onDelete, onTogglePrivacy, onReport }) {
-  const [savedPhotos, setSavedPhotos] = useState([null, null]);
-  const [reactions, setReactions] = useState({});
-  const [viewingPhoto, setViewingPhoto] = useState(null); // { url, id } when viewing fullscreen
-  const photoRefs = [useRef(null), useRef(null)];
-
-  // Push history state when photo viewer opens so back button closes it
-  useEffect(() => {
-    if (viewingPhoto) {
-      window.history.pushState({ photoViewer: true }, '');
-      window.__nexoOverlayCloser = () => setViewingPhoto(null);
-      return () => { window.__nexoOverlayCloser = null; };
-    }
-  }, [viewingPhoto]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.from('profile_photos').select('*').eq('user_id', user.id).then(({ data }) => {
-      if (data) {
-        const arr = [null, null];
-        data.forEach(p => { arr[p.slot - 1] = p; });
-        setSavedPhotos(arr);
-      }
-    });
-  }, [user?.id]);
-
-  // In edit mode show pending, in read-only show saved
-  const photos = editing && pendingPhotos
-    ? [pendingPhotos[1], pendingPhotos[2]]
-    : savedPhotos;
-
-  useEffect(() => {
-    const photoIds = photos.filter(p => p?.id).map(p => p.id);
-    if (!photoIds.length) return;
-    supabase.from('profile_photo_reactions').select('photo_id, user_id').in('photo_id', photoIds)
-      .then(({ data }) => {
-        if (!data) return;
-        const map = {};
-        data.forEach(r => {
-          if (!map[r.photo_id]) map[r.photo_id] = { count: 0, myReact: false };
-          map[r.photo_id].count++;
-          if (r.user_id === user.id) map[r.photo_id].myReact = true;
-        });
-        setReactions(map);
-      });
-  }, [photos[0]?.id, photos[1]?.id, user?.id]);
-
-  const toggleReact = async (photoId) => {
-    const curr = reactions[photoId];
-    if (curr?.myReact) {
-      await supabase.from('profile_photo_reactions').delete().eq('photo_id', photoId).eq('user_id', user.id);
-      setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 1) - 1, myReact: false } }));
-    } else {
-      await supabase.from('profile_photo_reactions').insert([{ photo_id: photoId, user_id: user.id }]);
-      setReactions(prev => ({ ...prev, [photoId]: { count: (prev[photoId]?.count || 0) + 1, myReact: true } }));
-    }
-  };
-
-  const visiblePhotos = readOnly ? photos.filter(p => p?.is_public) : photos;
-  if (readOnly && visiblePhotos.every(p => !p)) return null;
-
-  return (
-    <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>PHOTOS</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {[0, 1].map(i => {
-          const slot = i + 1;
-          const photo = photos[i];
-          const isUploading = photoUploading === slot;
-          return (
-            <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {photo?.photo_url ? (
-                <>
-                  <img src={photo.photo_url} alt={`Photo ${i + 1}`}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: !editing ? 'pointer' : 'default' }}
-                    onClick={() => !editing && setViewingPhoto({ url: photo.photo_url, id: photo.id })}
-                  />
-                  {!readOnly && editing && (
-                    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
-                      <button onClick={() => onTogglePrivacy(slot)} title={photo.is_public ? 'Public' : 'Private'}
-                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: photo.is_public ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                        <i className={`fa-solid ${photo.is_public ? 'fa-globe' : 'fa-lock'}`}></i>
-                      </button>
-                      <button onClick={() => photoRefs[i].current?.click()} title="Replace"
-                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'white' }}>
-                        <i className="fa-solid fa-camera"></i>
-                      </button>
-                      <button onClick={() => onDelete(slot)} title="Delete"
-                        style={{ background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 11, color: 'var(--red)' }}>
-                        <i className="fa-solid fa-trash"></i>
-                      </button>
-                    </div>
-                  )}
-                  {readOnly && photo.id && (
-                    <>
-                      <button onClick={() => toggleReact(photo.id)}
-                        style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
-                        <i className="fa-solid fa-heart" style={{ color: reactions[photo.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)', transition: 'color 0.2s' }}></i>
-                        {reactions[photo.id]?.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 700 }}>{reactions[photo.id].count}</span>}
-                      </button>
-                      {onReport && (
-                        <button onClick={() => onReport({ type: 'profile_photo', id: photo.id, preview: `Profile photo ${slot} of ${user?.full_name}`, reportedUserId: user?.id })}
-                          title="Report this photo"
-                          style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(247,95,95,0.4)', borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 10, color: 'var(--red)' }}>
-                          <i className="fa-solid fa-flag" />
-                        </button>
-                      )}
-                    </>
-                  )}
-                </>
-              ) : (
-                !readOnly && editing && (
-                  <div onClick={() => photoRefs[i].current?.click()}
-                    style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', color: 'var(--text-muted)' }}>
-                    {isUploading
-                      ? <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 22 }}></i>
-                      : <><i className="fa-solid fa-plus" style={{ fontSize: 22 }}></i><span style={{ fontSize: 11 }}>Add Photo</span></>
-                    }
-                  </div>
-                )
-              )}
-              {!readOnly && editing && (
-                <input ref={photoRefs[i]} type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => onUpload(slot, e.target.files[0])} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {/* Fullscreen photo viewer — rendered via portal to escape modal stacking */}
-      {viewingPhoto && ReactDOM.createPortal(
-        <div onClick={() => setViewingPhoto(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <button onClick={() => setViewingPhoto(null)}
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20, color: 'white', zIndex: 1 }}>
-            <i className="fa-solid fa-xmark" />
-          </button>
-          <img src={viewingPhoto.url} alt="Profile photo"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
-          {viewingPhoto.id && reactions[viewingPhoto.id] !== undefined && (
-            <button onClick={e => { e.stopPropagation(); toggleReact(viewingPhoto.id); }}
-              style={{ position: 'absolute', bottom: 30, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: 20, padding: '8px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 16 }}>
-              <i className="fa-solid fa-heart" style={{ color: reactions[viewingPhoto.id]?.myReact ? '#ff4d6d' : 'rgba(255,255,255,0.5)' }} />
-              {reactions[viewingPhoto.id]?.count > 0 && <span style={{ color: 'white', fontWeight: 700 }}>{reactions[viewingPhoto.id].count}</span>}
-            </button>
-          )}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-function CircleInfoCard({ circle, memberCount, myMemberships, myApplications, currentUser, onClose, onEnter, onRequestJoin, onApply, onAcceptInvite, onDeclineInvite, onLeave, onViewApplication, onViewLeaderProfile, onReport }) {
-  const [leaderProfile, setLeaderProfile] = useState(null);
-  const [recentMembers, setRecentMembers] = useState([]);
-  const [stats, setStats] = useState({ postsThisMonth: 0, daysSinceCreated: 0 });
-  const [reviews, setReviews] = useState([]);
-  const [showAllReviews, setShowAllReviews] = useState(false);
-  const [avgRating, setAvgRating] = useState(0);
-  const [myReview, setMyReview] = useState(null);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
-
-  const rawTags = circle.interest_tag;
-  const tags = Array.isArray(rawTags)
-    ? rawTags
-    : (rawTags ? String(rawTags).split(',').map(t => t.trim()).filter(Boolean) : []);
-
-  // Fetch leader + recent members + stats
-  useEffect(() => {
-    if (!circle.creator_id) return;
-    // Leader
-    supabase.from('accounts').select('id, full_name, ctu_id, account_details(avatar_url)')
-      .eq('id', circle.creator_id).maybeSingle()
-      .then(({ data }) => { if (data) setLeaderProfile({ id: data.id, full_name: data.full_name, ctu_id: data.ctu_id, avatar_url: data.account_details?.avatar_url || null }); });
-    // Recently joined — two-step to avoid RLS join issues
-    // Recently joined — only fetch if user is a member (RLS blocks non-members)
-    const isUserMember = myMemberships?.some(m => m.community_id === circle.id && m.status === 'active');
-    if (isUserMember) {
-      supabase.from('memberships').select('user_id, created_at')
-        .eq('community_id', circle.id).eq('status', 'active')
-        .order('created_at', { ascending: false }).limit(5)
-        .then(async ({ data: mData, error }) => {
-          if (error || !mData?.length) return;
-          const ids = mData.map(m => m.user_id);
-          const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
-          if (accs) {
-            const map = {};
-            accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
-            setRecentMembers(mData.map(m => ({ ...m, _acc: map[m.user_id] || {} })));
-          }
-        });
-    }
-    // Stats
-    const now = new Date();
-    const monthAgo = new Date(now); monthAgo.setDate(now.getDate() - 30);
-    const daysSince = circle.created_at ? Math.floor((now - new Date(circle.created_at)) / (1000 * 60 * 60 * 24)) : 0;
-    supabase.from('announcements').select('id', { count: 'exact', head: true })
-      .eq('community_id', circle.id).gte('created_at', monthAgo.toISOString())
-      .then(({ count }) => setStats(prev => ({ ...prev, postsThisMonth: count || 0, daysSinceCreated: daysSince })));
-    // Reviews — two-step to avoid RLS join issues
-    supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id')
-      .eq('community_id', circle.id).order('created_at', { ascending: false }).limit(20)
-      .then(async ({ data }) => {
-        if (!data?.length) return;
-        setReviews(data);
-        const avg = data.reduce((s, r) => s + r.rating, 0) / data.length;
-        setAvgRating(Math.round(avg * 10) / 10);
-        // Fetch reviewer accounts separately
-        const ids = data.map(r => r.reviewer_id).filter(Boolean);
-        if (ids.length) {
-          const { data: accs } = await supabase.from('accounts').select('id, full_name, account_details(avatar_url)').in('id', ids);
-          if (accs) {
-            const map = {};
-            accs.forEach(a => { map[a.id] = { full_name: a.full_name, avatar_url: a.account_details?.avatar_url || null }; });
-            setReviews(prev => prev.map(r => ({ ...r, _reviewer: map[r.reviewer_id] || {} })));
-          }
-        }
-      });
-    if (currentUser?.id) {
-      supabase.from('circle_reviews').select('id, rating, comment').eq('community_id', circle.id).eq('reviewer_id', currentUser.id).maybeSingle()
-        .then(({ data }) => { if (data) { setMyReview(data); setReviewRating(data.rating); setReviewComment(data.comment || ''); } });
-    }
-  }, [circle.id, circle.creator_id, circle.created_at]);
-
-  // Membership state
-  const getMembership = (commId) => myMemberships.find(m => m.community_id === commId);
-  const isOwner = circle.creator_id === currentUser?.id;
-  const membership = getMembership(circle.id);
-  const isActive = isOwner || membership?.status === 'active';
-  const isPending = membership?.status === 'pending';
-  const isInvitedState = membership?.status === 'invited';
-  const myApp = myApplications.find(a => a.community_id === circle.id);
-  const isVerified = currentUser?.is_verified;
-
-  const catColors = { academic: 'var(--cyber-cyan)', project: 'var(--cyber-yellow)', hobby: 'var(--green)', social: '#a78bfa' };
-  const catColor = catColors[circle.category] || 'var(--cyber-cyan)';
-
-  // Action button
-  let actionBtn = null;
-  if (isActive) {
-    actionBtn = (
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="group-action-btn manage" onClick={() => onEnter(circle.id)} style={{ fontSize: 12, padding: '8px 20px' }}>
-          <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 7 }}></i>ENTER CIRCLE
-        </button>
-        {!isOwner && (
-          <button className="group-action-btn terminate" onClick={() => onLeave && onLeave(circle.id)} style={{ fontSize: 12, padding: '8px 12px' }}>
-            <i className="fa-solid fa-right-from-bracket"></i>
-          </button>
-        )}
-      </div>
-    );
-  } else if (isInvitedState) {
-    actionBtn = (
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="group-action-btn manage" onClick={() => onAcceptInvite && onAcceptInvite(circle.id)} style={{ fontSize: 12, padding: '8px 18px', background: 'rgba(62,207,142,0.15)', borderColor: 'var(--green)', color: 'var(--green)' }}>
-          <i className="fa-solid fa-check" style={{ marginRight: 7 }}></i>ACCEPT
-        </button>
-        <button className="group-action-btn terminate" onClick={() => onDeclineInvite && onDeclineInvite(circle.id)} style={{ fontSize: 12, padding: '8px 18px' }}>
-          <i className="fa-solid fa-xmark" style={{ marginRight: 7 }}></i>DECLINE
-        </button>
-      </div>
-    );
-  } else if (!isVerified) {
-    actionBtn = <span style={{ fontSize: 12, color: 'var(--text-muted)', border: '1px solid #333', padding: '8px 18px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 6 }}></i>Verify to join</span>;
-  } else if (isPending) {
-    actionBtn = <span style={{ fontSize: 12, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '8px 18px', borderRadius: 20 }}><i className="fa-solid fa-clock" style={{ marginRight: 6 }}></i>PENDING APPROVAL</span>;
-  } else if (myApp) {
-    const appColor = { pending: 'var(--cyber-yellow)', approved: 'var(--green)', rejected: 'var(--red)' }[myApp.status] || 'var(--cyber-cyan)';
-    actionBtn = (
-      <button onClick={() => onViewApplication && onViewApplication(myApp, circle)}
-        style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}`, background: 'transparent', cursor: 'pointer' }}>
-        <i className="fa-solid fa-microphone" style={{ marginRight: 6 }}></i>APPLICATION {(myApp.status || '').toUpperCase()}
-      </button>
-    );
-  } else if (circle.application_enabled && !circle.internal_Application) {
-    actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onApply(circle)} style={{ fontSize: 12, padding: '8px 20px' }}>
-        <i className="fa-solid fa-microphone" style={{ marginRight: 7 }}></i>APPLY TO JOIN
-      </button>
-    );
-  } else {
-    actionBtn = (
-      <button className="group-action-btn manage" onClick={() => onRequestJoin(circle.id)} style={{ fontSize: 12, padding: '8px 20px' }}>
-        <i className="fa-solid fa-paper-plane" style={{ marginRight: 7 }}></i>JOIN CIRCLE
-      </button>
-    );
-  }
-
-  const initials = leaderProfile?.full_name ? leaderProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
-
-  const submitReview = async () => {
-    if (!reviewRating) return;
-    setSubmittingReview(true);
-    if (myReview) {
-      await supabase.from('circle_reviews').update({ rating: reviewRating, comment: reviewComment.trim() }).eq('id', myReview.id);
-    } else {
-      await supabase.from('circle_reviews').insert([{ community_id: circle.id, reviewer_id: currentUser.id, rating: reviewRating, comment: reviewComment.trim() }]);
-    }
-    // Refresh reviews
-    const { data } = await supabase.from('circle_reviews').select('id, rating, comment, created_at, reviewer_id').eq('community_id', circle.id).order('created_at', { ascending: false }).limit(20);
-    if (data) { setReviews(data); const avg = data.length ? data.reduce((s, r) => s + r.rating, 0) / data.length : 0; setAvgRating(Math.round(avg * 10) / 10); }
-    const { data: mine } = await supabase.from('circle_reviews').select('id, rating, comment').eq('community_id', circle.id).eq('reviewer_id', currentUser.id).maybeSingle();
-    if (mine) setMyReview(mine);
-    setShowReviewForm(false);
-    setSubmittingReview(false);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 660, padding: 0, overflow: 'hidden', borderRadius: 16 }}>
-
-        {/* Cover banner */}
-        <div style={{ height: 160, position: 'relative', background: circle.cover_url ? `url(${circle.cover_url}) center/cover no-repeat` : `linear-gradient(135deg, ${catColor}30, rgba(0,0,0,0.6))`, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 15, borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="fa-solid fa-xmark"></i>
-          </button>
-          {/* Logo + name + leader overlapping bottom of cover */}
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 16px 12px', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)', display: 'flex', alignItems: 'flex-end', gap: 14 }}>
-            {/* Logo */}
-            <div style={{ width: 66, height: 66, borderRadius: 14, border: '3px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {circle.logo_url ? <img src={circle.logo_url} alt={circle.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <i className={circle.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 26, color: 'var(--cyber-cyan)' }} />}
-            </div>
-            {/* Name + Leader stacked */}
-            <div style={{ paddingBottom: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 18, fontWeight: 800, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{circle.name}</span>
-                {circle.is_official && <span style={{ fontSize: 10, color: 'var(--green)', border: '1px solid var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700, background: 'rgba(0,0,0,0.5)' }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Verified</span>}
-              </div>
-              {leaderProfile && (
-                <button onClick={() => { onClose(); onViewLeaderProfile && onViewLeaderProfile(leaderProfile.ctu_id); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '3px 10px 3px 5px', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Leader</span>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                    {leaderProfile.avatar_url ? <img src={leaderProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-                  </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{leaderProfile.full_name}</span>
-                  <i className="fa-solid fa-arrow-up-right-from-square" style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}></i>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 160px)', height: 380 }}>
-
-          {/* Two-column layout — left wider, right narrower. On mobile: single column */}
-          <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 480 ? '1fr' : '1fr 160px', gap: 10, marginBottom: 10 }}>
-
-            {/* Left column — two separate cards stacked */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Top card — badges + interests */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ fontSize: 10, color: catColor, border: `1px solid ${catColor}`, padding: '2px 9px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>{circle.category}</span>
-                  {circle.status === 'pending' && <span style={{ fontSize: 10, color: 'var(--orange)', border: '1px solid var(--orange)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>}
-                  {circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-door-open" style={{ marginRight: 4 }}></i>Open</span>}
-                  {!circle.is_open && circle.status !== 'pending' && <span style={{ fontSize: 10, color: 'var(--text-muted)', border: '1px solid #444', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-lock" style={{ marginRight: 4 }}></i>Closed</span>}
-                  {circle.application_enabled && <span style={{ fontSize: 10, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', padding: '2px 9px', borderRadius: 20 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>Application Required</span>}
-                </div>
-                {/* Interests */}
-                {tags.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>INTERESTS</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {tags.map((tag, i) => (
-                        <span key={i} style={{ fontSize: 11, background: 'rgba(0,240,255,0.07)', border: '1px solid rgba(0,240,255,0.18)', color: 'var(--cyber-cyan)', padding: '3px 10px', borderRadius: 20 }}>{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Recently Joined */}
-                {recentMembers.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>RECENTLY JOINED</div>
-                    <div style={{ display: 'flex' }}>
-                      {recentMembers.map((m, i) => {
-                        const avatarUrl = m._acc?.avatar_url;
-                        const name = m._acc?.full_name || '?';
-                        return (
-                          <div key={i} title={name} style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--bg-primary)', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--cyber-cyan)', marginLeft: i > 0 ? -8 : 0, zIndex: recentMembers.length - i }}>
-                            {avatarUrl ? <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : name[0].toUpperCase()}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Bottom card — description only, scrollable */}
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px', flex: 1 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700, marginBottom: 5 }}>DESCRIPTION</div>
-                <p style={{ fontSize: 12, color: circle.description ? 'var(--text-muted)' : 'rgba(255,255,255,0.2)', lineHeight: 1.6, margin: 0, fontStyle: circle.description ? 'normal' : 'italic', wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', maxHeight: 100, overflowY: 'auto', paddingRight: 4 }}>
-                  {circle.description || 'No description provided.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Right column — 3 stat cards, stretch to fill total left height */}
-            <div style={{ display: 'flex', flexDirection: window.innerWidth < 480 ? 'row' : 'column', gap: 8 }}>
-              {[
-                { label: 'Members', value: memberCount, icon: 'fa-solid fa-users', color: 'var(--cyber-cyan)' },
-                { label: 'Posts/mo', value: stats.postsThisMonth, icon: 'fa-solid fa-bullhorn', color: 'var(--cyber-yellow)' },
-                { label: 'Days active', value: stats.daysSinceCreated, icon: 'fa-solid fa-calendar', color: 'var(--green)' },
-              ].map((s, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                  <i className={s.icon} style={{ fontSize: 14, color: s.color, flexShrink: 0 }}></i>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap' }}>{s.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Review section */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 1, fontWeight: 700 }}>REVIEWS</div>
-                {avgRating > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b' }}>{avgRating}</span>
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {[1,2,3,4,5].map(s => (
-                        <i key={s} className={s <= Math.round(avgRating) ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 10, color: '#f59e0b' }} />
-                      ))}
-                    </div>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({reviews.length})</span>
-                  </div>
-                )}
-              </div>
-              {isActive && (
-                <button onClick={() => setShowReviewForm(v => !v)}
-                  style={{ fontSize: 11, color: 'var(--cyber-cyan)', background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 20, padding: '3px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {myReview ? 'Edit Review' : '+ Review'}
-                </button>
-              )}
-            </div>
-
-            {/* Review form */}
-            {showReviewForm && (
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {[1,2,3,4,5].map(s => (
-                    <button key={s} onClick={() => setReviewRating(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 20, color: s <= reviewRating ? '#f59e0b' : 'rgba(255,255,255,0.2)' }}>
-                      <i className={s <= reviewRating ? 'fa-solid fa-star' : 'fa-regular fa-star'} />
-                    </button>
-                  ))}
-                </div>
-                <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="Share your experience (optional)..."
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: 'var(--text-primary)', fontFamily: 'inherit', fontSize: 12, outline: 'none', resize: 'none', height: 60, boxSizing: 'border-box' }} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button onClick={submitReview} disabled={!reviewRating || submittingReview}
-                    style={{ flex: 1, background: 'var(--cyber-cyan)', border: 'none', borderRadius: 8, padding: '6px 0', cursor: 'pointer', color: '#000', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
-                    {submittingReview ? 'Saving...' : 'Submit'}
-                  </button>
-                  <button onClick={() => setShowReviewForm(false)}
-                    style={{ flex: 1, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 0', cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit', fontSize: 12 }}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Recent reviews list — collapsible */}
-            {reviews.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', margin: 0 }}>No reviews yet. Be the first!</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
-                {(showAllReviews ? reviews : reviews.slice(0, 2)).map(r => (
-                  <div key={r.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 12px', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                        {r._reviewer?.avatar_url ? <img src={r._reviewer.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (r._reviewer?.full_name || '?')[0].toUpperCase()}
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{r._reviewer?.full_name || 'Member'}</span>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                        {new Date(r.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                      </span>
-                      <div style={{ display: 'flex', gap: 2 }}>
-                        {[1,2,3,4,5].map(s => <i key={s} className={s <= r.rating ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ fontSize: 9, color: '#f59e0b' }} />)}
-                      </div>
-                    </div>
-                    {r.comment && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{r.comment}</p>}
-                  </div>
-                ))}
-                {reviews.length > 2 && (
-                  <button onClick={() => setShowAllReviews(v => !v)}
-                    style={{ fontSize: 11, color: 'var(--cyber-cyan)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
-                    {showAllReviews ? '▲ Show less' : `▼ Show ${reviews.length - 2} more review${reviews.length - 2 !== 1 ? 's' : ''}`}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Action button */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
-            {onReport && currentUser?.user_type !== 'Admin' && (
-              <button onClick={() => { onClose(); onReport({ type: 'circle', id: circle.id, preview: `Circle: ${circle.name}`, reportedUserId: circle.creator_id }); }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 0', opacity: 0.6, transition: 'opacity 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                onMouseLeave={e => e.currentTarget.style.opacity = 0.6}>
-                <i className="fa-solid fa-flag" style={{ fontSize: 10 }}></i> Report Circle
-              </button>
-            )}
-            <div style={{ marginLeft: 'auto' }}>{actionBtn}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// -- PROFILE MODAL -------------------------------------------------------------
-function ProfileModal({ user, communities, onClose, onLogout, onAvatarUpdate, currentAvatarUrl, readOnly, onUpdateUser, onCircleInfo, onReport, currentUserId, onShowToast }) {
-  const initials = user.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
-  const [uploading, setUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl || user.avatar_url || null);
-
-  // ── Connection state (read-only / other-user view only) ──────────────
-  const [connStatus, setConnStatus]     = useState(null);  // null | 'pending' | 'accepted'
-  const [connId, setConnId]             = useState(null);
-  const [connIsSender, setConnIsSender] = useState(false);
-  const [connLoading, setConnLoading]   = useState(false);
-
-  useEffect(() => {
-    if (!readOnly || !currentUserId || !user?.id) return;
-    const fetchConn = async () => {
-      const { data } = await supabase
-        .from('connections')
-        .select('id, status, user_id')
-        .or(`and(user_id.eq.${currentUserId},connected_user_id.eq.${user.id}),and(user_id.eq.${user.id},connected_user_id.eq.${currentUserId})`)
-        .maybeSingle();
-      if (data) {
-        setConnStatus(data.status);
-        setConnId(data.id);
-        setConnIsSender(data.user_id === currentUserId);
-      }
-    };
-    fetchConn();
-  }, [readOnly, currentUserId, user?.id]);
-
-  const handleConnect = async () => {
-    setConnLoading(true);
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/connections'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'send', target_user_id: user.id }),
-      });
-      const data = await res.json();
-      if (res.ok) { setConnStatus('pending'); setConnId(data.connection?.id || null); setConnIsSender(true); onShowToast?.('Connection request sent!'); }
-      else onShowToast?.(data.message || 'Failed to send request.');
-    } catch { onShowToast?.('Connection failed. Please try again.'); }
-    setConnLoading(false);
-  };
-
-  const handleCancelOrDisconnect = async () => {
-    if (!connId) return;
-    setConnLoading(true);
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/connections'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'remove', connection_id: connId }),
-      });
-      if (res.ok) { setConnStatus(null); setConnId(null); onShowToast?.(connStatus === 'accepted' ? 'Disconnected.' : 'Request cancelled.'); }
-      else onShowToast?.('Action failed.');
-    } catch { onShowToast?.('Action failed. Please try again.'); }
-    setConnLoading(false);
-  };
-
-  const handleAccept = async () => {
-    if (!connId) return;
-    setConnLoading(true);
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/connections'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'accept', connection_id: connId }),
-      });
-      if (res.ok) { setConnStatus('accepted'); onShowToast?.('Connection accepted!'); }
-      else onShowToast?.('Failed to accept.');
-    } catch { onShowToast?.('Failed. Please try again.'); }
-    setConnLoading(false);
-  };
-  const [pendingAvatarUrl, setPendingAvatarUrl] = useState(null); // staged, committed on Save
-  const fileInputRef = useRef(null);
-  const coverInputRef = useRef(null);
-  const idPhotoRef = useRef(null);
-  const [saving, setSaving] = useState(false);
-  const [idUploading, setIdUploading] = useState(false);
-  const [idUploaded, setIdUploaded] = useState(!!user.id_photo_url);
-  const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ full_name: user.full_name || '', program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '', discoverable: user.discoverable !== false });
-  const [profile, setProfile] = useState({ program: user.program || '', year_level: user.year_level || '', interests: user.interests || [], bio: user.bio || '' });
-  const [coverUrl, setCoverUrl] = useState(user.cover_url || null);
-  const [viewingCover, setViewingCover] = useState(false); // fullscreen cover viewer
-
-  // Push history state when cover viewer opens so back button closes it
-  useEffect(() => {
-    if (viewingCover) {
-      window.history.pushState({ coverViewer: true }, '');
-      window.__nexoOverlayCloser = () => setViewingCover(false);
-      return () => { window.__nexoOverlayCloser = null; };
-    }
-  }, [viewingCover]);
-  const [pendingCoverUrl, setPendingCoverUrl] = useState(null); // staged, committed on Save
-  const [coverUploading, setCoverUploading] = useState(false);
-  const [pendingCropFile, setPendingCropFile] = useState(null); // { file, type: 'avatar'|'cover' }
-  const [showWarningHistory, setShowWarningHistory] = useState(false);
-  const [appealingWarning, setAppealingWarning] = useState(null);
-  const [customizations, setCustomizations] = useState(null);
-  const [ownedItems, setOwnedItems] = useState([]);
-  const [custSettings, setCustSettings] = useState(null);
-  // Pending (staged) customization selections · only committed on Save
-  const [pendingCustSettings, setPendingCustSettings] = useState(null);
-  const [profilePhotos, setProfilePhotos] = useState({ 1: null, 2: null }); // slot -> { id, photo_url, is_public }
-  const [pendingPhotos, setPendingPhotos] = useState({ 1: null, 2: null }); // staged changes
-  const [photoUploading, setPhotoUploading] = useState(null); // slot being uploaded
-  const photo1Ref = useRef(null);
-  const photo2Ref = useRef(null);
-  const [profileConnections, setProfileConnections] = useState([]);
-  const [connectionsCount, setConnectionsCount] = useState(0);
-  const [expandedAvatar, setExpandedAvatar] = useState(false);
-
-  // Push history state when avatar viewer opens so back button closes it
-  useEffect(() => {
-    if (expandedAvatar) {
-      window.history.pushState({ avatarViewer: true }, '');
-      window.__nexoOverlayCloser = () => setExpandedAvatar(false);
-      return () => { if (window.__nexoOverlayCloser) window.__nexoOverlayCloser = null; };
-    }
-  }, [expandedAvatar]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const load = async () => {
-      const { data, error } = await supabase.from('account_details')
-        .select('program, year_level, interests, avatar_url, id_photo_url, cover_url, bio')
-        .eq('id', user.id).single();
-      if (!error && data) {
-        setProfile({ program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' });
-        setEditForm(f => ({ ...f, program: data.program || '', year_level: data.year_level || '', interests: data.interests || [], bio: data.bio || '' }));
-        if (data.avatar_url && !avatarUrl) setAvatarUrl(data.avatar_url);
-        if (data.cover_url) setCoverUrl(data.cover_url);
-        if (data.id_photo_url) setIdUploaded(true);
-      }
-      // Load profile photos
-      if (user?.id) {
-        const { data: photos } = await supabase.from('profile_photos')
-          .select('*').eq('user_id', user.id);
-        if (photos) {
-          const map = { 1: null, 2: null };
-          photos.forEach(p => { map[p.slot] = p; });
-          setProfilePhotos(map);
-          setPendingPhotos({ ...map });
-        }
-      }
-    };
-    load();
-  }, [user?.id]);
-
-  // Load connections for this profile
-  useEffect(() => {
-    if (!user?.id) return;
-
-    if (readOnly) {
-      // Viewing someone else's profile · count their connections via Supabase directly
-      supabase
-        .from('connections')
-        .select('id', { count: 'exact', head: true })
-        .or(`user_id.eq.${user.id},connected_user_id.eq.${user.id}`)
-        .eq('status', 'accepted')
-        .then(({ count }) => setConnectionsCount(count || 0));
-    } else {
-      // Own profile · load full connections list
-      getFreshToken().then(token => fetch(getApiUrl('/api/connections'), {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-        .then(r => r.json())
-        .then(data => {
-          const accepted = (data || []).filter(c => c.status === 'accepted');
-          setConnectionsCount(accepted.length);
-          setProfileConnections(accepted);
-        })
-        .catch(() => {}));
-    }
-  }, [user?.id, readOnly]);
-
-  // Load active customizations + owned items
-  useEffect(() => {
-    if (!user?.id) return;
-    const loadCustomizations = async () => {      const { data: settings } = await supabase
-        .from('user_profile_settings')
-        .select('active_name_color, active_background, active_theme, active_avatar_border, active_companion')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      setCustSettings(settings || {});
-      setPendingCustSettings(settings || {});
-
-      if (settings) {
-        const itemIds = [settings.active_name_color, settings.active_background, settings.active_theme, settings.active_avatar_border, settings.active_companion].filter(Boolean);
-        if (itemIds.length > 0) {
-          const { data: items } = await supabase.from('shop_items').select('*').in('id', itemIds);
-          if (items) {
-            setCustomizations({
-              name_color: items.find(i => i.id === settings.active_name_color),
-              background: items.find(i => i.id === settings.active_background),
-              theme: items.find(i => i.id === settings.active_theme),
-              avatar_border: items.find(i => i.id === settings.active_avatar_border),
-              companion: items.find(i => i.id === settings.active_companion),
-            });
-          }
-        }
-      }
-
-      // Load owned items for the customize panel
-      const { data: purchases } = await supabase
-        .from('user_purchases')
-        .select('item_id, shop_items(*)')
-        .eq('user_id', user.id);
-      if (purchases) setOwnedItems(purchases);
-    };
-    loadCustomizations();
-  }, [user?.id]);
-
-  const saveProfile = async () => {
-    setSaving(true);
-    try {
-      // Save profile fields
-      const res = await fetch(getApiUrl(`/api/update-profile?userId=${user.id}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: editForm.full_name, program: editForm.program, year_level: editForm.year_level, interests: editForm.interests, bio: editForm.bio, discoverable: editForm.discoverable !== false }),
-      });
-      if (!res.ok) { setSaving(false); return; }
-      setProfile({ ...editForm });
-      const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const updates = { ...editForm };
-
-      // Commit pending cover
-      if (pendingCoverUrl) {
-        const token = localStorage.getItem('accessToken');
-        await fetch(getApiUrl('/api/update-profile'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ userId: user.id, cover_url: pendingCoverUrl }),
-        });
-        setCoverUrl(pendingCoverUrl);
-        setPendingCoverUrl(null);
-        updates.cover_url = pendingCoverUrl;
-      }
-
-      // Commit pending avatar
-      if (pendingAvatarUrl) {
-        const res2 = await fetch(getApiUrl('/api/upload'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('accessToken') ? { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } : {}) },
-          body: JSON.stringify({ action: 'upload-avatar', userId: user.id, avatar: pendingAvatarUrl }),
-        });
-        if (res2.ok) {
-          const { url } = await res2.json();
-          onAvatarUpdate(url || pendingAvatarUrl);
-          updates.avatar_url = url || pendingAvatarUrl;
-        } else {
-          onAvatarUpdate(pendingAvatarUrl);
-          updates.avatar_url = pendingAvatarUrl;
-        }
-        setPendingAvatarUrl(null);
-      }
-
-      localStorage.setItem('currentUser', JSON.stringify({ ...stored, ...updates }));
-      if (editForm.full_name && editForm.full_name !== user.full_name) {
-        onUpdateUser && onUpdateUser(prev => ({ ...prev, full_name: editForm.full_name }));
-      }
-
-      // Commit pending customizations to DB
-      if (pendingCustSettings) {
-        const token = localStorage.getItem('accessToken');
-        const types = ['name_color', 'avatar_border', 'background', 'companion', 'theme'];
-        for (const type of types) {
-          const pendingVal = pendingCustSettings[`active_${type}`];
-          const savedVal = custSettings?.[`active_${type}`];
-          if (pendingVal !== savedVal) {
-            await fetch(SHOP_API, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-              body: JSON.stringify({ action: 'apply-customization', userId: user.id, type, itemId: pendingVal || null }),
-            });
-          }
-        }
-        clearCustomizationCache(user.id);
-        setCustSettings({ ...pendingCustSettings });
-      }
-
-      // Commit pending photos to DB
-      for (const slot of [1, 2]) {
-        const pending = pendingPhotos[slot];
-        const saved = profilePhotos[slot];
-        if (pending === null && saved) {
-          // deleted
-          await supabase.from('profile_photos').delete().eq('id', saved.id);
-          setProfilePhotos(prev => ({ ...prev, [slot]: null }));
-        } else if (pending && pending !== saved) {
-          // new or replaced
-          if (saved) {
-            await supabase.from('profile_photos').update({ photo_url: pending.photo_url, is_public: pending.is_public }).eq('id', saved.id);
-            setProfilePhotos(prev => ({ ...prev, [slot]: { ...saved, photo_url: pending.photo_url, is_public: pending.is_public } }));
-          } else {
-            const { data } = await supabase.from('profile_photos').insert([{ user_id: user.id, photo_url: pending.photo_url, slot, is_public: pending.is_public ?? true }]).select().single();
-            if (data) setProfilePhotos(prev => ({ ...prev, [slot]: data }));
-          }
-        } else if (pending && pending.is_public !== saved?.is_public) {
-          await supabase.from('profile_photos').update({ is_public: pending.is_public }).eq('id', saved.id);
-          setProfilePhotos(prev => ({ ...prev, [slot]: { ...saved, is_public: pending.is_public } }));
-        }
-      }
-      setPendingPhotos({ 1: profilePhotos[1], 2: profilePhotos[2] });
-
-      setEditing(false);
-    } catch (err) { console.error(err); }
-    finally { setSaving(false); }
-  };
-
-  const handlePhotoUpload = async (slot, file) => {
-    if (!file || !user?.id) return;
-    setPhotoUploading(slot);
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `profile-photos/${user.id}/slot${slot}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-      const photoUrl = urlData.publicUrl;
-      // Stage in pending · DB write happens on Save
-      setPendingPhotos(prev => ({ ...prev, [slot]: { ...(prev[slot] || {}), photo_url: photoUrl, slot, is_public: prev[slot]?.is_public ?? true } }));
-    } catch (err) { console.error('Photo upload error:', err); }
-    setPhotoUploading(null);
-  };
-
-  const handlePhotoDelete = async (slot) => {
-    // Stage deletion · DB write happens on Save
-    setPendingPhotos(prev => ({ ...prev, [slot]: null }));
-  };
-
-  const togglePhotoPrivacy = async (slot) => {
-    setPendingPhotos(prev => ({ ...prev, [slot]: prev[slot] ? { ...prev[slot], is_public: !prev[slot].is_public } : null }));
-  };
-
-  const applyCustomization = async (type, itemId) => {
-    // Only stage the change locally · committed to DB on Save
-    setPendingCustSettings(prev => ({ ...prev, [`active_${type}`]: itemId }));
-    if (itemId) {
-      const { data: item } = await supabase.from('shop_items').select('*').eq('id', itemId).single();
-      if (item) setCustomizations(prev => ({ ...prev, [type]: item }));
-    } else {
-      setCustomizations(prev => ({ ...prev, [type]: null }));
-    }
-  };
-
-  const handleIdPhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIdUploading(true);
-    try {
-      const ext = file.name.split('.').pop() || 'jpg';
-      const path = `id-photos/${user.id}_${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from('id-photos')
-        .upload(path, file, { contentType: file.type, upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: urlData } = supabase.storage.from('id-photos').getPublicUrl(path);
-      const { error: dbError } = await supabase.from('account_details').update({ id_photo_url: urlData.publicUrl }).eq('id', user.id);
-      if (dbError) throw dbError;
-      setIdUploaded(true);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to upload ID photo. Please try again.');
-    } finally { setIdUploading(false); }
-  };
-
-  const handleCoverChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setPendingCropFile({ file, type: 'cover' });
-    e.target.value = '';
-  };
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setPendingCropFile({ file, type: 'avatar' });
-    e.target.value = '';
-  };
-
-  const coverGradients = [
-    'linear-gradient(135deg,#0d3b6e 0%,#00f0ff 100%)',
-    'linear-gradient(135deg,#1a003a 0%,#c084fc 100%)',
-    'linear-gradient(135deg,#003a1a 0%,#3ecf8e 100%)',
-    'linear-gradient(135deg,#3a1a00 0%,#f97316 100%)',
-    'linear-gradient(135deg,#1a0a0f 0%,#f43f5e 100%)',
-  ];
-  const gradIdx = (user.student_id || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % coverGradients.length;
-  const displayCoverUrl = editing ? (pendingCoverUrl ?? coverUrl) : coverUrl;
-  const coverBg = displayCoverUrl ? `url(${displayCoverUrl}) center/cover no-repeat` : coverGradients[gradIdx];
-
-  const getBackgroundStyle = () => {
-    if (customizations?.background?.css_data) {
-      const data = typeof customizations.background.css_data === 'string' 
-        ? JSON.parse(customizations.background.css_data) 
-        : customizations.background.css_data;
-      
-      if (data.pattern) {
-        return {
-          background: data.pattern,
-          backgroundSize: data.size || '30px 30px'
-        };
-      }
-      if (data.backgroundImage) {
-        return {
-          backgroundImage: data.backgroundImage,
-          backgroundSize: data.backgroundSize || 'cover',
-          backgroundPosition: data.backgroundPosition || 'center',
-          backgroundRepeat: data.backgroundRepeat || 'no-repeat',
-        };
-      }
-      if (data.image) {
-        return { 
-          background: data.image,
-          backgroundSize: data.backgroundSize || 'auto',
-          backgroundRepeat: data.backgroundRepeat || 'repeat'
-        };
-      }
-      if (data.gradient) return { background: data.gradient };
-    }
-    return {};
-  };
-
-  const getThemeStyle = () => {
-    if (customizations?.theme?.css_data) {
-      const data = typeof customizations.theme.css_data === 'string' 
-        ? JSON.parse(customizations.theme.css_data) 
-        : customizations.theme.css_data;
-      
-      return {
-        '--cyber-cyan': data.primary || 'var(--cyber-cyan)',
-        '--cyber-yellow': data.secondary || 'var(--cyber-yellow)'
-      };
-    }
-    return {};
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="profile-modal-box" onClick={e => e.stopPropagation()} style={{
-        backgroundColor: 'var(--card-bg)',
-        ...getBackgroundStyle(),
-        ...getThemeStyle(),
-        border: '1px solid rgba(0,240,255,0.15)',
-        borderRadius: 16, width: '100%', maxWidth: 820,
-        maxHeight: '92vh', overflowY: 'auto',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
-        scrollbarWidth: 'none',
-      }}>
-
-        {/* COVER */}
-        <div className="profile-modal-cover" style={{ position: 'relative', height: 220, background: coverBg, borderRadius: '16px 16px 0 0', overflow: 'hidden', flexShrink: 0, cursor: displayCoverUrl && !editing ? 'pointer' : 'default' }}
-          onClick={() => displayCoverUrl && !editing && setViewingCover(true)}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.55) 100%)', pointerEvents: 'none' }} />
-          {!readOnly && editing && (
-            <>
-              <button onClick={() => coverInputRef.current?.click()} disabled={coverUploading} title="Change cover"
-                style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(6px)' }}>
-                {coverUploading ? <><i className="fa-solid fa-spinner fa-spin" /> UPLOADING</> : <><i className="fa-solid fa-image" /> COVER</>}
-              </button>
-              <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCoverChange} />
-            </>
-          )}
-          {/* Report cover photo · only when viewing another user's profile and cover exists */}
-          {readOnly && user?.cover_url && onReport && (
-            <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Cover photo of ${user.full_name}`, reportedUserId: user.id })}
-              title="Report this cover photo"
-              style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(247,95,95,0.4)', color: 'var(--red)', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, backdropFilter: 'blur(6px)', opacity: 0.8 }}
-              onMouseEnter={e => e.currentTarget.style.opacity = 1}
-              onMouseLeave={e => e.currentTarget.style.opacity = 0.8}>
-              <i className="fa-solid fa-flag" style={{ fontSize: 10 }} /> Report Cover
-            </button>
-          )}
-        </div>
-
-        {/* AVATAR + NAME ROW */}
-        <div style={{ position: 'relative', padding: '0 28px', marginTop: -60 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div className="profile-modal-avatar" style={{ 
-                width: 116, 
-                height: 116, 
-                border: customizations?.avatar_border?.css_data?.border || '4px solid var(--card-bg)', 
-                borderRadius: '50%', 
-                background: 'rgba(0,240,255,0.08)', 
-                overflow: 'hidden', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                fontSize: 38, 
-                fontWeight: 800, 
-                color: 'var(--cyber-cyan)', 
-                boxShadow: customizations?.avatar_border?.css_data?.boxShadow || '0 0 20px rgba(0,240,255,0.25)'
-              }}>
-                {avatarUrl ? <img src={avatarUrl} alt="avatar" onClick={() => setExpandedAvatar(true)} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} /> : initials}
-              </div>
-              {/* Companion sticker */}
-              {customizations?.companion?.css_data && (() => {
-                const d = typeof customizations.companion.css_data === 'string'
-                  ? JSON.parse(customizations.companion.css_data)
-                  : customizations.companion.css_data;
-                return (
-                  <img
-                    src={d.url}
-                    alt="companion"
-                    className="profile-modal-companion"
-                    style={{
-                      position: 'absolute',
-                      top: -28,
-                      left: -24,
-                      width: '80px',
-                      height: 'auto',
-                      pointerEvents: 'none',
-                      filter: 'drop-shadow(0 3px 8px rgba(0,0,0,0.8))',
-                      zIndex: 3,
-                      transform: 'rotate(-15deg)',
-                    }}
-                  />
-                );
-              })()}
-              {!readOnly && editing && (
-                <>
-                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Change photo"
-                    style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: '50%', background: 'var(--cyber-cyan)', color: '#000', border: '2px solid var(--card-bg)', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {uploading ? <i className="fa-solid fa-spinner fa-spin" /> : <i className="fa-solid fa-camera" />}
-                  </button>
-                  <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
-                </>
-              )}
-              {/* Report avatar · only when viewing another user's profile */}
-              {readOnly && avatarUrl && onReport && (
-                <button onClick={() => onReport({ type: 'profile_photo', id: user.id, preview: `Avatar photo of ${user.full_name}`, reportedUserId: user.id })}
-                  title="Report this profile photo"
-                  style={{ position: 'absolute', bottom: 2, right: 2, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(247,95,95,0.5)', color: 'var(--red)', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i className="fa-solid fa-flag" />
-                </button>
-              )}
-            </div>
-
-            <div style={{ paddingBottom: 8, flex: 1, minWidth: 0 }}>
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8
-              }}>
-                {editing ? (
-                  <input
-                    value={editForm.full_name}
-                    onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
-                    maxLength={60}
-                    autoComplete="off"
-                    className="profile-modal-name"
-                    style={{ fontSize: 24, fontWeight: 800, letterSpacing: 1, lineHeight: 1.2, background: 'transparent', border: 'none', borderBottom: '2px solid var(--cyber-cyan)', color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit', textTransform: 'uppercase', padding: '0 2px', width: 'auto', minWidth: 60, maxWidth: 260 }}
-                    placeholder="YOUR NAME"
-                  />
-                ) : (
-                <span className="profile-modal-name" style={{
-                  fontSize: 24, 
-                  fontWeight: 800,
-                  letterSpacing: 1, 
-                  lineHeight: 1.2,
-                  ...(customizations?.name_color?.css_data 
-                    ? (typeof customizations.name_color.css_data === 'string' 
-                        ? JSON.parse(customizations.name_color.css_data) 
-                        : customizations.name_color.css_data).gradient 
-                      ? { 
-                          background: (typeof customizations.name_color.css_data === 'string' 
-                            ? JSON.parse(customizations.name_color.css_data) 
-                            : customizations.name_color.css_data).gradient,
-                          backgroundSize: '100%',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                          color: 'transparent',
-                          display: 'inline-block'
-                        }
-                      : { 
-                          color: (typeof customizations.name_color.css_data === 'string' 
-                            ? JSON.parse(customizations.name_color.css_data) 
-                            : customizations.name_color.css_data).color 
-                        }
-                    : { color: 'var(--text-primary)' }
-                  )
-                }}>
-                  {user.full_name?.toUpperCase()}
-                </span>
-                )}
-                {customizations?.badge && (
-                  <span style={{ fontSize: 16 }} title={customizations.badge.name}>
-                    {customizations.badge.preview_url}
-                  </span>
-                )}
-                {/* Line 1: Name + gender icon */}
-                {user?.gender === 'Male' && <i className="fa-solid fa-mars" style={{ fontSize: 13, color: 'var(--cyber-cyan)', marginLeft: 4 }} title="Male" />}
-                {user?.gender === 'Female' && <i className="fa-solid fa-venus" style={{ fontSize: 13, color: '#f472b6', marginLeft: 4 }} title="Female" />}
-              </div>
-              {/* Line 2: ID + verified icon */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                <span style={{
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  fontWeight: 600,
-                  letterSpacing: 1,
-                  color: 'rgba(0,240,255,0.65)',
-                }}>
-                  <i className="fa-solid fa-id-card" style={{ marginRight: 5 }}></i>{user.student_id}
-                </span>
-                {user.is_verified
-                  ? <i className="fa-solid fa-shield-halved" style={{ fontSize: 13, color: 'var(--cyber-cyan)' }} title="Verified Student" />
-                  : <i className="fa-solid fa-clock" style={{ fontSize: 13, color: 'var(--orange)' }} title="Pending Verification" />
-                }
-              </div>
-            </div>
-
-            <div className="profile-edit-actions" style={{ display: 'flex', gap: 8, paddingBottom: 8, flexShrink: 0, marginLeft: 'auto' }}>
-              {/* ── Connection buttons — read-only (other user's profile) ── */}
-              {readOnly && (
-                <>
-                  {connStatus === null && (
-                    <button className="cyber-btn" onClick={handleConnect} disabled={connLoading}
-                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
-                      {connLoading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />Sending...</> : <><i className="fa-solid fa-user-plus" style={{ marginRight: 5 }} />CONNECT</>}
-                    </button>
-                  )}
-                  {connStatus === 'pending' && connIsSender && (
-                    <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
-                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
-                      {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-clock" style={{ marginRight: 5 }} />PENDING</>}
-                    </button>
-                  )}
-                  {connStatus === 'pending' && !connIsSender && (
-                    <>
-                      <button className="cyber-btn" onClick={handleAccept} disabled={connLoading}
-                        style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
-                        {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-check" style={{ marginRight: 5 }} />ACCEPT</>}
-                      </button>
-                      <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
-                        style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
-                        DECLINE
-                      </button>
-                    </>
-                  )}
-                  {connStatus === 'accepted' && (
-                    <button className="cyber-btn secondary" onClick={handleCancelOrDisconnect} disabled={connLoading}
-                      style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap', borderColor: '#3ecf8e', color: '#3ecf8e' }}>
-                      {connLoading ? <i className="fa-solid fa-spinner fa-spin" /> : <><i className="fa-solid fa-link" style={{ marginRight: 5 }} />CONNECTED</>}
-                    </button>
-                  )}
-                </>
-              )}
-              {!readOnly && (!editing
-                ? <button className="cyber-btn" onClick={() => { setEditForm(f => ({ ...f, ...profile, full_name: user.full_name || '' })); setEditing(true); }} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}><i className="fa-solid fa-pen" style={{ marginRight: 5 }} />EDIT</button>
-                : <>
-                    <button className="cyber-btn secondary" onClick={() => { 
-                      setEditForm({ ...profile, full_name: user.full_name || '' }); 
-                      setPendingCustSettings({ ...custSettings });
-                      setPendingPhotos({ ...profilePhotos });
-                      // revert cover and avatar previews
-                      setPendingCoverUrl(null);
-                      setPendingAvatarUrl(null);
-                      setAvatarUrl(currentAvatarUrl || user.avatar_url || null);
-                      // revert customizations display back to saved
-                      if (custSettings) {
-                        const itemIds = Object.values(custSettings).filter(Boolean);
-                        if (itemIds.length > 0) {
-                          supabase.from('shop_items').select('*').in('id', itemIds).then(({ data: items }) => {
-                            if (items) setCustomizations({
-                              name_color: items.find(i => i.id === custSettings.active_name_color),
-                              background: items.find(i => i.id === custSettings.active_background),
-                              theme: items.find(i => i.id === custSettings.active_theme),
-                              avatar_border: items.find(i => i.id === custSettings.active_avatar_border),
-                              companion: items.find(i => i.id === custSettings.active_companion),
-                            });
-                          });
-                        } else {
-                          setCustomizations(null);
-                        }
-                      }
-                      setEditing(false); 
-                    }} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>CANCEL</button>
-                    <button className="cyber-btn" onClick={saveProfile} disabled={saving} style={{ fontSize: 11, padding: '7px 14px', whiteSpace: 'nowrap' }}>
-                      {saving ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 5 }} />SAVING</> : 'SAVE'}
-                    </button>
-                  </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* BODY */}
-        <div className="profile-modal-body" style={{ padding: '20px 28px 28px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 20 }}>
-
-          {/* LEFT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {/* Member Since · always read-only */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px', gridColumn: '1 / -1' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>BIO</div>
-                {editing ? (
-                  <>
-                    <textarea
-                      value={editForm.bio}
-                      onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
-                      maxLength={200}
-                      placeholder="Write something about yourself..."
-                      style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.6, resize: 'none', outline: 'none', fontFamily: 'inherit', minHeight: 60, boxSizing: 'border-box' }}
-                    />
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'right' }}>{(editForm.bio || '').length}/200</div>
-                  </>
-                ) : (
-                  <div style={{ fontSize: 13, color: profile.bio ? 'var(--text-primary)' : 'var(--text-muted)', lineHeight: 1.6, fontStyle: profile.bio ? 'normal' : 'italic' }}>
-                    {profile.bio || 'No bio yet.'}
-                  </div>
-                )}
-              </div>
-              {/* Program · read-only, contact admin to change */}
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>PROGRAM</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.program || '·'}</div>
-                {editing && <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>Contact admin to change your program.</div>}
-              </div>
-              {/* Year · editable inline */}
-              {true && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: `1px solid ${editing ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.25)'}`, borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>YEAR</div>
-                {editing ? (
-                  <select value={editForm.year_level} onChange={e => setEditForm(f => ({ ...f, year_level: e.target.value }))}
-                    className="dark-select"
-                    style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700, padding: 0, outline: 'none', cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#1a1a2e', color: 'white' }}>Select year</option>
-                    {['1st Year','2nd Year','3rd Year','4th Year'].map(y => <option key={y} value={y} style={{ background: '#1a1a2e', color: 'white' }}>{y}</option>)}
-                  </select>
-                ) : (
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cyber-cyan)' }}>{profile.year_level || '·'}</div>
-                )}
-              </div>
-              )}
-            </div>
-
-            {/* Trust Points Badge */}
-            <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
-
-            {/* Appear in Discover toggle · only for own profile in edit mode */}
-            {!readOnly && editing && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 2 }}>APPEAR IN DISCOVER</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Allow others to find you on the Discover page</div>
-                  </div>
-                  <input type="checkbox"
-                    checked={editForm.discoverable !== false}
-                    onChange={e => setEditForm(f => ({ ...f, discoverable: e.target.checked }))}
-                    style={{ accentColor: 'var(--cyber-cyan)', width: 18, height: 18, cursor: 'pointer' }} />
-                </div>
-              </div>
-            )}
-
-            {/* Interests · view or edit inline */}
-            {(!editing && profile.interests?.length > 0) && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                  {profile.interests.map(id => (
-                    <span key={id} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(0,240,255,0.15)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)', fontWeight: 600 }}>
-                      {INTEREST_LABELS[id] || id}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {!readOnly && editing && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>INTERESTS</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {INTEREST_BUBBLES.map(({ id, label }) => (
-                    <span key={id}
-                      onClick={() => setEditForm(f => ({ ...f, interests: f.interests.includes(id) ? f.interests.filter(i => i !== id) : [...f.interests, id] }))}
-                      style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                        background: editForm.interests.includes(id) ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                        color: editForm.interests.includes(id) ? 'var(--cyber-cyan)' : 'var(--text-muted)' }}>
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* PROFILE PHOTOS */}
-            <ProfilePhotosSection 
-              user={user} readOnly={readOnly} editing={editing}
-              pendingPhotos={pendingPhotos}
-              photoUploading={photoUploading}
-              onUpload={handlePhotoUpload}
-              onDelete={handlePhotoDelete}
-              onTogglePrivacy={togglePhotoPrivacy}
-              onReport={onReport}
-            />
-
-            {/* CUSTOMIZE panel · shown in edit mode */}
-            {!readOnly && editing && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>
-                  <i className="fa-solid fa-palette" style={{ marginRight: 6 }} />CUSTOMIZE
-                </div>
-                {ownedItems.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>You don't own any items yet. Visit the Profile Shop to get some!</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {['name_color', 'avatar_border', 'background', 'companion', 'theme'].map(type => {
-                      const typeItems = ownedItems.filter(p => p.shop_items?.type === type);
-                      if (typeItems.length === 0) return null;
-                      const activeId = pendingCustSettings?.[`active_${type}`];
-                      return (
-                        <div key={type}>
-                          <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 7, textTransform: 'uppercase' }}>
-                            {type.replace('_', ' ')}
-                          </div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <button onClick={() => applyCustomization(type, null)}
-                              style={{ padding: '5px 11px', fontSize: 11, borderRadius: 6, cursor: 'pointer',
-                                background: !activeId ? 'var(--cyber-cyan)' : 'rgba(0,0,0,0.4)',
-                                color: !activeId ? '#000' : 'var(--text-muted)',
-                                border: `1px solid ${!activeId ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.2)'}` }}>
-                              None
-                            </button>
-                            {typeItems.map(p => (
-                              <button key={p.item_id} onClick={() => applyCustomization(type, p.item_id)}
-                                title={p.shop_items.name}
-                                style={{ padding: '5px 11px', fontSize: 12, borderRadius: 6, cursor: 'pointer',
-                                  background: activeId === p.item_id ? 'var(--cyber-cyan)' : 'rgba(0,0,0,0.4)',
-                                  color: activeId === p.item_id ? '#000' : 'var(--text-primary)',
-                                  border: `1px solid ${activeId === p.item_id ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.2)'}` }}>
-                                {/* Show emoji for badges, name for everything else */}
-                                {p.shop_items.type === 'badge' && p.shop_items.preview_url
-                                  ? <>{p.shop_items.preview_url} {p.shop_items.name}</>
-                                  : p.shop_items.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!readOnly && !user.is_verified && (
-              <div style={{ padding: '12px 14px', background: 'rgba(247,169,79,0.06)', border: '1px solid rgba(247,169,79,0.25)', borderRadius: 10 }}>
-                <div style={{ fontSize: 11, color: 'var(--orange)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
-                  <i className="fa-solid fa-id-card" style={{ marginRight: 6 }} />SCHOOL ID VERIFICATION
-                </div>
-                {idUploaded && (
-                  <div style={{ fontSize: 12, color: 'var(--green)', marginBottom: 8 }}>
-                    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />ID submitted ? awaiting admin review
-                  </div>
-                )}
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                  {idUploaded ? 'Want to send a clearer photo? Upload a new one below.' : 'Upload a clear photo of your CTU school ID so the admin can verify your account.'}
-                </p>
-                <button className="cyber-btn" onClick={() => idPhotoRef.current?.click()} disabled={idUploading}
-                  style={{ width: '100%', background: 'rgba(247,169,79,0.15)', borderColor: 'var(--orange)', color: 'var(--orange)', fontSize: 11 }}>
-                  {idUploading ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }} />UPLOADING...</> : <><i className="fa-solid fa-upload" style={{ marginRight: 6 }} />{idUploaded ? 'RE-UPLOAD SCHOOL ID' : 'UPLOAD SCHOOL ID'}</>}
-                </button>
-                <input ref={idPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleIdPhotoUpload} />
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {communities.length > 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
-                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>MY CIRCLES</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }}>
-                  {communities.map(c => (
-                    <div key={c.id}
-                      onClick={() => {
-                        if (readOnly && onCircleInfo) {
-                          // Viewing someone else's profile — show Circle Info Card
-                          onCircleInfo(c);
-                        } else {
-                          // Own profile — navigate directly to the circle
-                          if (onClose) onClose();
-                          if (c.id && c.id !== 'global') {
-                            setTimeout(() => { window.dispatchEvent(new CustomEvent('nexo-navigate-circle', { detail: { circleId: c.id } })); }, 100);
-                          }
-                        }
-                      }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', borderRadius: 8, padding: '4px 6px', transition: 'background 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.07)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--cyber-cyan)', overflow: 'hidden' }}>
-                        {c.logo_url
-                          ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
-                          : <i className={c.faIcon || c.icon || 'fa-solid fa-circle-nodes'} style={{ fontSize: 12 }} />
-                        }
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Connections count + list (own profile only) */}
-            {!readOnly && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '14px 16px' }}>
-                <div style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>CONNECTIONS</span>
-                  <span style={{ fontSize: 13, color: 'var(--cyber-cyan)', fontWeight: 800 }}>{connectionsCount}</span>
-                </div>
-                {profileConnections.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No connections yet. Visit Discover to connect with peers.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
-                    {profileConnections.map(c => {
-                      const currentUserId = user.id;
-                      const other = c.user_id === currentUserId ? c.recipient : c.requester;
-                      const name = other?.full_name || 'Unknown';
-                      const initials = (name[0] || 'U').toUpperCase();
-                      return (
-                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
-                            {initials}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{name}</div>
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Disconnect from ${name}?`)) return;
-                              const token = localStorage.getItem('accessToken');
-                              const res = await fetch(getApiUrl('/api/connections'), {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                body: JSON.stringify({ action: 'remove', connection_id: c.id }),
-                              });
-                              if (res.ok) {
-                                setProfileConnections(prev => prev.filter(x => x.id !== c.id));
-                                setConnectionsCount(prev => Math.max(0, prev - 1));
-                              }
-                            }}
-                            title="Disconnect"
-                            style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', opacity: 0.6, flexShrink: 0 }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                            onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
-                          >
-                            <i className="fa-solid fa-user-xmark"></i>
-                          </button>
-                          <button
-                            onClick={async () => {
-                              const otherId = c.user_id === user.id ? c.connected_user_id : c.user_id;
-                              if (!confirm(`Block ${name}? They won't be able to see you on Discover or send you connection requests.`)) return;
-                              const token = localStorage.getItem('accessToken');
-                              const res = await fetch(getApiUrl('/api/connections'), {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                                body: JSON.stringify({ action: 'block', target_id: otherId }),
-                              });
-                              if (res.ok) {
-                                setProfileConnections(prev => prev.filter(x => x.id !== c.id));
-                                setConnectionsCount(prev => Math.max(0, prev - 1));
-                              }
-                            }}
-                            title="Block user"
-                            style={{ background: 'none', border: 'none', color: '#f97316', cursor: 'pointer', fontSize: 12, padding: '2px 4px', opacity: 0.6, flexShrink: 0 }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                            onMouseLeave={e => e.currentTarget.style.opacity = 0.6}
-                          >
-                            <i className="fa-solid fa-ban"></i>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Connection count on read-only (viewing another profile) */}
-            {readOnly && connectionsCount > 0 && (
-              <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <i className="fa-solid fa-link" style={{ color: 'var(--cyber-cyan)', fontSize: 13 }}></i>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}><strong style={{ color: 'var(--cyber-cyan)' }}>{connectionsCount}</strong> Connection{connectionsCount !== 1 ? 's' : ''}</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>              {!readOnly && (
-                <button className="cyber-btn danger" onClick={onLogout} style={{ width: '100%', fontSize: 11, background: 'rgba(180,30,30,0.85)', borderColor: 'var(--red)', color: '#fff', fontWeight: 700, backdropFilter: 'blur(8px)' }}>
-                  <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 6 }} />LOGOUT
-                </button>
-              )}
-              {readOnly && onReport && (
-                <button onClick={() => onReport({ type: 'user', id: user.id, preview: `User: ${user.full_name} (${user.student_id})`, reportedUserId: user.id })}
-                  style={{ width: '100%', fontSize: 11, padding: '9px 0', background: 'rgba(247,95,95,0.08)', border: '1px solid rgba(247,95,95,0.3)', borderRadius: 8, color: 'var(--red)', cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <i className="fa-solid fa-flag"></i> Report User
-                </button>
-              )}
-              <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', fontSize: 11, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,240,255,0.5)', color: 'var(--cyber-cyan)', fontWeight: 700 }}>CLOSE</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Expanded Avatar Overlay */}
-      {expandedAvatar && avatarUrl && ReactDOM.createPortal(
-        <div
-          onClick={() => setExpandedAvatar(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 99999,
-            background: 'rgba(0,0,0,0.95)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'zoom-out',
-          }}
-        >
-          <img
-            src={avatarUrl}
-            alt="Profile"
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: '90vw', maxHeight: '90vh',
-              borderRadius: 16,
-              boxShadow: '0 0 60px rgba(0,240,255,0.3)',
-              objectFit: 'contain',
-            }}
-          />
-          <button
-            onClick={() => setExpandedAvatar(false)}
-            style={{
-              position: 'absolute', top: 20, right: 20,
-              background: 'rgba(255,255,255,0.15)', border: 'none',
-              borderRadius: '50%', width: 44, height: 44,
-              color: 'white', fontSize: 20, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1,
-            }}
-          >
-            <i className="fa-solid fa-xmark"></i>
-          </button>
-        </div>,
-        document.body
-      )}
-
-      {/* Warning History Modal */}
-      {showWarningHistory && (
-        <WarningHistoryModal
-          userId={user.id}
-          onClose={() => setShowWarningHistory(false)}
-          onAppeal={(warning) => { setAppealingWarning(warning); setShowWarningHistory(false); }}
-        />
-      )}
-      
-      {/* Appeal Modal */}
-      {appealingWarning && (
-        <AppealModal
-          warning={appealingWarning}
-          userId={user.id}
-          onClose={() => { setAppealingWarning(null); setShowWarningHistory(true); }}
-        />
-      )}
-
-      {/* Image Crop Modal */}
-      {pendingCropFile && (
-        <ImageCropModal
-          file={pendingCropFile.file}
-          aspect={pendingCropFile.type === 'avatar' ? 1 : 3}
-          circular={pendingCropFile.type === 'avatar'}
-          outputW={pendingCropFile.type === 'avatar' ? 300 : 900}
-          outputH={pendingCropFile.type === 'avatar' ? 300 : 300}
-          onConfirm={(croppedDataUrl) => {
-            if (pendingCropFile.type === 'avatar') {
-              setPendingAvatarUrl(croppedDataUrl);
-              setAvatarUrl(croppedDataUrl);
-            } else {
-              setPendingCoverUrl(croppedDataUrl);
-            }
-            setPendingCropFile(null);
-          }}
-          onCancel={() => setPendingCropFile(null)}
-        />
-      )}
-
-      {/* Cover photo fullscreen viewer — rendered via portal to escape modal stacking */}
-      {viewingCover && displayCoverUrl && ReactDOM.createPortal(
-        <div onClick={() => setViewingCover(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <button onClick={() => setViewingCover(false)}
-            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20, color: 'white', zIndex: 1 }}>
-            <i className="fa-solid fa-xmark" />
-          </button>
-          <img src={displayCoverUrl} alt="Cover photo"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 0 60px rgba(0,0,0,0.8)' }} />
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
-function ApplicationDetailModal({ data, onClose }) {
-  const { response: r, community: c, questions } = data;
-  const statusColor = ApplicationStatusColor(r.status, r.phase2_result);
-  const statusLabel = ApplicationStatusLabel(r.status, r.phase2_result);
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 500, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-        <h3><i className="fa-solid fa-microphone" style={{ marginRight: 8 }}></i>My Application "? {c.name}</h3>
-
-        {/* Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: `${statusColor}10`, border: `1px solid ${statusColor}40`, borderRadius: 8 }}>
-          <i className="fa-solid fa-circle-info" style={{ color: statusColor }}></i>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: statusColor }}>{statusLabel}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-              Submitted {new Date(r.submitted_at).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
-            </div>
-          </div>
-        </div>
-
-        {/* Phase 2 details */}
-        {r.status === 'phase2' && r.phase2_details && (
-          <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--cyber-yellow)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
-              <i className="fa-solid fa-calendar" style={{ marginRight: 6 }}></i>PHASE 2 "? LIVE SCREENING
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{r.phase2_details}</p>
-          </div>
-        )}
-
-        {/* Leader feedback */}
-        {r.feedback && (
-          <div style={{ background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--cyber-cyan)', fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
-              <i className="fa-solid fa-comment" style={{ marginRight: 6 }}></i>FEEDBACK FROM LEADER
-            </div>
-            <p style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}>{r.feedback}</p>
-          </div>
-        )}
-
-        {/* Submitted answers */}
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 12, textTransform: 'uppercase' }}>
-          Your Submitted Answers
-        </div>
-        {questions.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No questions on record.</p>
-        ) : (
-          questions.map(q => (
-            <div key={q.id} style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{q.question}</div>
-              {q.type === 'file' ? (
-                r.answers[q.id]
-                  ? <a href={r.answers[q.id]} target="_blank" rel="noreferrer" style={{ color: 'var(--cyber-cyan)', fontSize: 13 }}>
-                      <i className="fa-solid fa-file" style={{ marginRight: 6 }}></i>View uploaded file
-                    </a>
-                  : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No file uploaded</span>
-              ) : (
-                <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)' }}>
-                  {r.answers?.[q.id] || '"?'}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-
-        <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', marginTop: 8 }}>CLOSE</button>
-      </div>
-    </div>
-  );
-}
-
-async function autoFlagContent({ reporterId, reportedUserId, contentType, contentId, contentPreview }) {
-  // Create the report only "? admin reviews and decides on formal warnings
-  await supabase.from('reports').insert([{
-    reporter_id: reporterId,
-    reported_user_id: reportedUserId,
-    content_type: contentType,
-    content_id: contentId,
-    content_preview: contentPreview?.slice(0, 200),
-    reason: 'Auto-detected: inappropriate language',
-    status: 'pending',
-  }]);
-  // Send a mild alert to the user (no point deduction "? admin decides that)
-  if (reportedUserId) {
-    await supabase.from('notifications').insert([{
-      user_id: reportedUserId,
-      type: 'application_update',
-      message: 'Your message was flagged for inappropriate language and blocked. Please follow community guidelines.',
-    }]);
-  }
-}
-
-// -- REPORT MODAL -------------------------------------------------------------
-function ReportModal({ data, user, onClose }) {
-  const [reason, setReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-
-  // Context-aware title and reasons based on report type
-  const isPhoto = data.type === 'profile_photo' || data.type === 'circle_photo';
-  const isUser = data.type === 'user';
-  const isMessage = data.type === 'message';
-  const isCircle = data.type === 'circle';
-
-  const TITLE = isPhoto ? 'Report Photo' : isUser ? 'Report User' : isCircle ? 'Report Circle' : isMessage ? 'Report Message' : 'Report Post';
-
-  const REASONS = isPhoto ? [
-    'Inappropriate or explicit content',
-    'Impersonation / fake identity',
-    'Offensive or disturbing imagery',
-    'Spam or fake profile photo',
-    'Other',
-  ] : isUser ? [
-    'Harassment or bullying',
-    'Fake or impersonation account',
-    'Spam behavior',
-    'Inappropriate conduct',
-    'Other',
-  ] : isCircle ? [
-    'Harmful or dangerous content',
-    'Spam or misleading circle',
-    'Hate speech or discrimination',
-    'Impersonation of a real organization',
-    'Inappropriate circle name or description',
-    'Other',
-  ] : [
-    'Inappropriate language / profanity',
-    'Harassment or bullying',
-    'Spam or irrelevant content',
-    'Misinformation',
-    'Hate speech or discrimination',
-    'Other',
-  ];
-
-  const submit = async () => {
-    if (!reason.trim()) return;
-    setSubmitting(true);
-    await supabase.from('reports').insert([{
-      reporter_id: user.id,
-      reported_user_id: data.reportedUserId || null,
-      content_type: data.type,
-      content_id: data.id,
-      content_preview: data.preview?.slice(0, 200),
-      reason,
-      status: 'pending',
-    }]);
-    setSubmitting(false);
-    setDone(true);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-        {done ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <i className="fa-solid fa-circle-check" style={{ fontSize: 36, color: 'var(--green)', marginBottom: 14, display: 'block' }}></i>
-            <h3 style={{ color: 'var(--green)', marginBottom: 8 }}>Report Submitted</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-              Thank you. The admin will review this report.
-            </p>
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
-          </div>
-        ) : (
-          <>
-            <h3 style={{ marginBottom: 6 }}>
-              <i className="fa-solid fa-flag" style={{ marginRight: 8, color: 'var(--red)' }}></i>
-              {TITLE}
-            </h3>
-            {data.preview && (
-              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, fontStyle: 'italic' }}>
-                "{data.preview.slice(0, 120)}{data.preview.length > 120 ? '...' : ''}"
-              </div>
-            )}
-            <div className="input-group">
-              <label>REASON FOR REPORT</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {REASONS.map(r => (
-                  <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, width: '100%', boxSizing: 'border-box', color: reason === r ? 'var(--text-primary)' : 'var(--text-muted)', padding: '9px 12px', borderRadius: 8, border: `1px solid ${reason === r ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: reason === r ? 'rgba(0,240,255,0.06)' : 'transparent', transition: '0.15s' }}>
-                    <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} style={{ accentColor: 'var(--cyber-cyan)', flexShrink: 0, width: 16, height: 16 }} />
-                    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.45 }}>{r}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="cyber-btn" onClick={submit} disabled={submitting || !reason}
-                style={{ flex: 1, background: 'rgba(247,95,95,0.15)', color: 'var(--red)', border: '1px solid var(--red)' }}>
-                {submitting ? 'Submitting...' : <><i className="fa-solid fa-flag" style={{ marginRight: 6 }}></i>Submit Report</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -- GIVE POINTS MODAL ---------------------------------------------------------
-function GivePointsModal({ targetUser, onClose, currentUser, communityId, myRankLevel }) {
-  const [amount, setAmount] = useState(0);
-  const [reason, setReason] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
-
-  const maxAmount = myRankLevel >= 2 ? 5 : 3;
-  const maxRecipients = myRankLevel >= 2 ? 5 : 3;
-
-  const submit = async () => {
-    if (!reason.trim() || amount <= 0) return;
-    setSubmitting(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/moderation'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'give-appreciation',
-          giverId: currentUser.id,
-          receiverId: targetUser.id,
-          amount: amount,
-          reason: reason.trim(),
-          communityId: communityId
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to give points');
-        setSubmitting(false);
-        return;
-      }
-
-      setDone(true);
-    } catch (err) {
-      setError('Network error. Please try again.');
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-        {done ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <i className="fa-solid fa-heart" style={{ fontSize: 36, color: 'var(--cyber-cyan)', marginBottom: 14, display: 'block' }}></i>
-            <h3 style={{ color: 'var(--cyber-cyan)', marginBottom: 8 }}>Points Sent!</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-              You gave <strong style={{ color: 'var(--cyber-yellow)' }}>{amount} point{amount !== 1 ? 's' : ''}</strong> to <strong>{targetUser.full_name}</strong>
-            </p>
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
-          </div>
-        ) : (
-          <>
-            <h3 style={{ marginBottom: 6, color: 'var(--cyber-cyan)' }}>
-              <i className="fa-solid fa-heart" style={{ marginRight: 8 }}></i>
-              Give Trust Points
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Recognize {targetUser.full_name} for positive contributions
-            </p>
-
-            {/* Target user card */}
-            <div style={{ background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, var(--cyber-cyan), #00a2ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#000', overflow: 'hidden' }}>
-                {targetUser.avatar_url ? (
-                  <img src={targetUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  targetUser.full_name?.[0]?.toUpperCase() || '?'
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{targetUser.full_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{targetUser.ctu_id}</div>
-              </div>
-            </div>
-
-            {/* Amount selector */}
-            <div className="input-group">
-              <label>POINTS TO GIVE (Max: {maxAmount})</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[1, 2, 3, myRankLevel >= 2 ? 4 : null, myRankLevel >= 2 ? 5 : null].filter(Boolean).map(val => (
-                  <button
-                    key={val}
-                    onClick={() => setAmount(val)}
-                    className="cyber-btn"
-                    style={{
-                      flex: 1,
-                      padding: '10px',
-                      fontSize: 13,
-                      background: amount === val ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.1)',
-                      color: amount === val ? '#000' : 'var(--cyber-cyan)',
-                      border: `1px solid ${amount === val ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.3)'}`
-                    }}
-                  >
-                    +{val}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Reason */}
-            <div className="input-group">
-              <label>REASON (REQUIRED)</label>
-              <textarea
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder="e.g., 'Helped me understand the lesson', 'Great team player', 'Organized a helpful event'"
-                style={{ width: '100%', minHeight: 80, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
-                maxLength={200}
-              />
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
-                {reason.length}/200
-              </div>
-            </div>
-
-            {/* Daily limit info */}
-            <div style={{ background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-yellow)' }}>
-              <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
-              Daily limit: {maxRecipients} recipients · Cooldown: 12 hours per person
-            </div>
-            {/* Rank info */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
-              <div style={{ marginBottom: 6, color: myRankLevel >= 2 ? '#f5e642' : 'var(--cyber-cyan)', fontWeight: 700 }}>
-                <i className={`fa-solid ${myRankLevel >= 3 ? 'fa-crown' : myRankLevel >= 2 ? 'fa-crown' : myRankLevel >= 1 ? 'fa-shield' : 'fa-user'}`} style={{ marginRight: 6 }}></i>
-                Your rank: {myRankLevel >= 3 ? 'Leader' : myRankLevel >= 2 ? 'Co-Leader' : myRankLevel >= 1 ? 'Moderator' : 'Member'} — can give up to +{maxAmount} TP · {maxRecipients} people/day
-              </div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-crown" style={{ marginRight: 5, color: '#f5e642' }}></i>Leader / Co-Leader</span><span>Max +5 TP · 5 people/day</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-shield" style={{ marginRight: 5, color: 'var(--cyber-cyan)' }}></i>Moderator / Member</span><span>Max +3 TP · 3 people/day</span></div>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{ background: 'rgba(247,95,95,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--red)' }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>
-                {error}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button className="cyber-btn" onClick={submit} disabled={submitting || !reason.trim() || amount <= 0} style={{ flex: 1 }}>
-                {submitting ? 'Sending...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Give Points</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -- FLAG USER MODAL -----------------------------------------------------------
-function FlagUserModal({ targetUser, onClose, currentUser, communityId }) {
-  const [reason, setReason] = useState('');
-  const [severity, setSeverity] = useState('moderate');
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
-
-  const SEVERITIES = [
-    { value: 'minor', label: 'Minor', desc: 'Small issue, needs attention', color: 'var(--orange)' },
-    { value: 'moderate', label: 'Moderate', desc: 'Concerning behavior', color: 'var(--cyber-yellow)' },
-    { value: 'severe', label: 'Severe', desc: 'Serious violation', color: 'var(--red)' },
-    { value: 'critical', label: 'Critical', desc: 'Immediate admin action needed', color: '#ff0000' },
-  ];
-
-  const submit = async () => {
-    if (!reason.trim()) return;
-    setSubmitting(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/moderation'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'flag-user',
-          flaggerId: currentUser.id,
-          flaggedUserId: targetUser.id,
-          communityId: communityId,
-          reason: reason.trim(),
-          severity: severity
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to flag user');
-        setSubmitting(false);
-        return;
-      }
-
-      setDone(true);
-    } catch (err) {
-      setError('Network error. Please try again.');
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
-        {done ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <i className="fa-solid fa-flag-checkered" style={{ fontSize: 36, color: 'var(--cyber-yellow)', marginBottom: 14, display: 'block' }}></i>
-            <h3 style={{ color: 'var(--cyber-yellow)', marginBottom: 8 }}>Flag Submitted</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-              A system admin will review this flag within 24-48 hours.
-            </p>
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
-          </div>
-        ) : (
-          <>
-            <h3 style={{ marginBottom: 6, color: 'var(--cyber-yellow)' }}>
-              <i className="fa-solid fa-flag" style={{ marginRight: 8 }}></i>
-              Flag User for Admin Review
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              This will notify admins to review {targetUser.full_name}'s behavior. Only admins can issue official warnings.
-            </p>
-
-            {/* Target user card */}
-            <div style={{ background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.15)', borderRadius: 10, padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, var(--cyber-yellow), #f5a623)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#000', overflow: 'hidden' }}>
-                {targetUser.avatar_url ? (
-                  <img src={targetUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  targetUser.full_name?.[0]?.toUpperCase() || '?'
-                )}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{targetUser.full_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{targetUser.ctu_id}</div>
-              </div>
-            </div>
-
-            {/* Severity selector */}
-            <div className="input-group">
-              <label>SEVERITY LEVEL</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {SEVERITIES.map(s => (
-                  <label
-                    key={s.value}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      border: `1px solid ${severity === s.value ? s.color : 'rgba(255,255,255,0.08)'}`,
-                      background: severity === s.value ? `${s.color}15` : 'transparent',
-                      transition: '0.15s'
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="severity"
-                      value={s.value}
-                      checked={severity === s.value}
-                      onChange={() => setSeverity(s.value)}
-                      style={{ accentColor: s.color }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, color: severity === s.value ? s.color : 'var(--text-primary)' }}>{s.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.desc}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Reason */}
-            <div className="input-group">
-              <label>REASON (REQUIRED)</label>
-              <textarea
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder="Describe the issue in detail. Include specific examples if possible."
-                style={{ width: '100%', minHeight: 100, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
-                maxLength={500}
-              />
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
-                {reason.length}/500
-              </div>
-            </div>
-
-            {/* Warning */}
-            <div style={{ background: 'rgba(247,95,95,0.08)', border: '1px solid rgba(247,95,95,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--red)' }}>
-              <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>
-              False flagging may result in consequences for your account. Be honest and factual.
-            </div>
-
-            {error && (
-              <div style={{ background: 'rgba(247,95,95,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--red)' }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>
-                {error}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button
-                className="cyber-btn"
-                onClick={submit}
-                disabled={submitting || !reason.trim()}
-                style={{ flex: 1, background: 'rgba(252,238,10,0.15)', color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)' }}
-              >
-                {submitting ? 'Submitting...' : <><i className="fa-solid fa-flag" style={{ marginRight: 6 }}></i>Submit Flag</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// -- WARNING HISTORY MODAL -----------------------------------------------------
-function WarningHistoryModal({ userId, onClose, onAppeal }) {
-  const [warnings, setWarnings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('active'); // 'active' | 'appealed' | 'overturned'
-
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from('user_warnings')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-      setWarnings(data || []);
-      setLoading(false);
-    };
-    load();
-  }, [userId]);
-
-  const getSeverityColor = (s) => {
-    if (s === 'critical') return 'var(--red)';
-    if (s === 'severe') return '#ff5555';
-    if (s === 'moderate') return 'var(--cyber-yellow)';
-    return 'var(--orange)';
-  };
-
-  const getStatusBadge = (status) => {
-    const map = {
-      active: { label: 'Active', color: 'var(--red)', bg: 'rgba(247,95,95,0.15)' },
-      appealed: { label: 'Appealed', color: 'var(--cyber-yellow)', bg: 'rgba(252,238,10,0.15)' },
-      overturned: { label: 'Overturned', color: '#3ecf8e', bg: 'rgba(62,207,142,0.15)' },
-      expired: { label: 'Expired', color: 'var(--text-muted)', bg: 'rgba(255,255,255,0.05)' },
-    };
-    const s = map[status] || map.active;
-    return <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, color: s.color, background: s.bg, border: `1px solid ${s.color}` }}>{s.label}</span>;
-  };
-
-  const filtered = warnings.filter(w => {
-    if (tab === 'active') return w.status === 'active';
-    if (tab === 'appealed') return w.status === 'appealed';
-    if (tab === 'overturned') return w.status === 'overturned' || w.status === 'expired';
-    return true;
-  });
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 650, maxHeight: '85vh', overflowY: 'auto' }}>
-        <h3 style={{ marginBottom: 6, color: 'var(--red)' }}>
-          <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 8 }}></i>
-          Warning History
-        </h3>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
-          All warnings issued to your account.
-        </p>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
-          {['active', 'appealed', 'overturned'].map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                background: tab === t ? 'rgba(0,240,255,0.1)' : 'transparent',
-                border: 'none',
-                borderBottom: tab === t ? '2px solid var(--cyber-cyan)' : '2px solid transparent',
-                color: tab === t ? 'var(--cyber-cyan)' : 'var(--text-muted)',
-                fontSize: 12,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 1,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: '0.2s'
-              }}
-            >
-              {t} ({warnings.filter(w => t === 'overturned' ? (w.status === 'overturned' || w.status === 'expired') : w.status === t).length})
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-            <i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 10 }}></i>
-            <p>Loading warnings...</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-            <i className="fa-solid fa-circle-check" style={{ fontSize: 32, color: '#3ecf8e', marginBottom: 10 }}></i>
-            <p>No {tab} warnings</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filtered.map(w => (
-              <div
-                key={w.id}
-                style={{
-                  background: 'rgba(0,0,0,0.3)',
-                  border: `1px solid ${getSeverityColor(w.severity)}`,
-                  borderRadius: 10,
-                  padding: 16,
-                  position: 'relative'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: getSeverityColor(w.severity), textTransform: 'uppercase', letterSpacing: 1 }}>
-                        {w.severity}
-                      </span>
-                      {getStatusBadge(w.status)}
-                    </div>
-                    <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>{w.reason}</p>
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--red)', marginLeft: 12 }}>
-                    -{w.points_deducted} pts
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <i className="fa-solid fa-clock" style={{ marginRight: 4 }}></i>
-                  {new Date(w.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
-
-                {w.status === 'active' && (
-                  <button
-                    onClick={() => onAppeal(w)}
-                    style={{
-                      marginTop: 12,
-                      width: '100%',
-                      background: 'rgba(0,240,255,0.1)',
-                      border: '1px solid rgba(0,240,255,0.3)',
-                      color: 'var(--cyber-cyan)',
-                      borderRadius: 8,
-                      padding: '8px 12px',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6
-                    }}
-                  >
-                    <i className="fa-solid fa-gavel"></i>
-                    Appeal This Warning
-                  </button>
-                )}
-
-                {w.appeal_reason && (
-                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(252,238,10,0.08)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--cyber-yellow)', marginBottom: 4 }}>
-                      <i className="fa-solid fa-gavel" style={{ marginRight: 4 }}></i> Appeal Submitted
-                    </div>
-                    <p style={{ fontSize: 12, margin: 0, color: 'var(--text-primary)' }}>{w.appeal_reason}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%', marginTop: 18 }}>Close</button>
-      </div>
-    </div>
-  );
-}
-
-// -- APPEAL MODAL --------------------------------------------------------------
-function AppealModal({ warning, onClose, userId }) {
-  const [reason, setReason] = useState('');
-  const [evidence, setEvidence] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
-
-  const submit = async () => {
-    if (!reason.trim()) return;
-    setSubmitting(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('accessToken');
-      const res = await fetch(getApiUrl('/api/moderation'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'appeal-warning',
-          warningId: warning.id,
-          userId: userId,
-          appealReason: reason.trim(),
-          evidence: evidence.trim() || null
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to submit appeal');
-        setSubmitting(false);
-        return;
-      }
-
-      setDone(true);
-    } catch (err) {
-      setError('Network error. Please try again.');
-      setSubmitting(false);
-    }
-  };
-
-  const getSeverityColor = (s) => {
-    if (s === 'critical') return 'var(--red)';
-    if (s === 'severe') return '#ff5555';
-    if (s === 'moderate') return 'var(--cyber-yellow)';
-    return 'var(--orange)';
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-        {done ? (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <i className="fa-solid fa-gavel" style={{ fontSize: 36, color: 'var(--cyber-cyan)', marginBottom: 14, display: 'block' }}></i>
-            <h3 style={{ color: 'var(--cyber-cyan)', marginBottom: 8 }}>Appeal Submitted</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-              A system admin will review your appeal within 24-48 hours.
-            </p>
-            <button className="cyber-btn secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
-          </div>
-        ) : (
-          <>
-            <h3 style={{ marginBottom: 6, color: 'var(--cyber-cyan)' }}>
-              <i className="fa-solid fa-gavel" style={{ marginRight: 8 }}></i>
-              Appeal Warning
-            </h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Explain why you believe this warning was issued incorrectly.
-            </p>
-
-            {/* Warning being appealed */}
-            <div style={{
-              background: 'rgba(0,0,0,0.3)',
-              border: `1px solid ${getSeverityColor(warning.severity)}`,
-              borderRadius: 10,
-              padding: 14,
-              marginBottom: 18
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: getSeverityColor(warning.severity), textTransform: 'uppercase', letterSpacing: 1 }}>
-                  {warning.severity} WARNING
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--red)', marginLeft: 'auto' }}>
-                  -{warning.points_deducted} pts
-                </span>
-              </div>
-              <p style={{ fontSize: 13, lineHeight: 1.5, margin: '6px 0 0' }}>{warning.reason}</p>
-            </div>
-
-            {/* Appeal reason */}
-            <div className="input-group">
-              <label>YOUR APPEAL (REQUIRED)</label>
-              <textarea
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                placeholder="Explain why this warning should be overturned. Be clear and factual."
-                style={{ width: '100%', minHeight: 100, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
-                maxLength={500}
-              />
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
-                {reason.length}/500
-              </div>
-            </div>
-
-            {/* Evidence (optional) */}
-            <div className="input-group">
-              <label>EVIDENCE (OPTIONAL)</label>
-              <textarea
-                value={evidence}
-                onChange={e => setEvidence(e.target.value)}
-                placeholder="Provide any additional context, screenshots, or proof that supports your appeal."
-                style={{ width: '100%', minHeight: 80, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', color: 'white', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
-                maxLength={500}
-              />
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, textAlign: 'right' }}>
-                {evidence.length}/500
-              </div>
-            </div>
-
-            {/* Info box */}
-            <div style={{ background: 'rgba(0,240,255,0.08)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 11, color: 'var(--cyber-cyan)' }}>
-              <i className="fa-solid fa-circle-info" style={{ marginRight: 6 }}></i>
-              If your appeal is approved, the points will be restored to your account plus a +1 bonus.
-            </div>
-
-            {error && (
-              <div style={{ background: 'rgba(247,95,95,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--red)' }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>
-                {error}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button
-                className="cyber-btn"
-                onClick={submit}
-                disabled={submitting || !reason.trim()}
-                style={{ flex: 1 }}
-              >
-                {submitting ? 'Submitting...' : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Submit Appeal</>}
-              </button>
-              <button className="cyber-btn secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
+// ReportModal → extracted to ReportModal.jsx
 // -- MAIN PORTAL ---------------------------------------------------------------
 export default function UserPortal() {
   const navigate = useNavigate();
@@ -5108,8 +351,8 @@ export default function UserPortal() {
   const [showOnlineModal, setShowOnlineModal] = useState(false); // online members modal in circle chat
   const [pendingCircleCropFile, setPendingCircleCropFile] = useState(null); // file pending crop for circle cover
 
-  // Block navigation away from /portal when on home feed · show logout modal instead
-  const blocker = { state: 'idle', reset: () => {}, proceed: () => {} };
+  // Block navigation away from /portal when on home feed ? show logout modal instead
+  const blocker = { state: 'idle', reset: () => { }, proceed: () => { } };
 
   useEffect(() => {
     if (blocker.state === 'blocked') {
@@ -5168,9 +411,9 @@ export default function UserPortal() {
     }
     // Load current streak count
     if (user?.id) {
-      supabase.from('login_streaks')
+      supabase.from('account_details')
         .select('streak_count')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .maybeSingle()
         .then(({ data }) => setStreakCount(data?.streak_count || 0));
     }
@@ -5196,14 +439,18 @@ export default function UserPortal() {
     }
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url, gender)')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, avatar_url, cover_url, gender, bio)')
       .eq('ctu_id', String(studentId)).single();
     if (!error && data) {
+      const { data: interestRows } = await supabase.from('user_interests').select('interest').eq('user_id', data.id);
+      const statusObj = Array.isArray(data.account_status) ? data.account_status[0] : data.account_status;
+      const detailObj = Array.isArray(data.account_details) ? data.account_details[0] : data.account_details;
       const flat = {
         ...data,
         student_id: data.ctu_id,
-        is_verified: data.account_status?.is_verified,
-        ...(data.account_details || {}),
+        is_verified: statusObj?.is_verified,
+        ...(detailObj || {}),
+        interests: (interestRows || []).map(r => r.interest),
       };
       delete flat.account_status; delete flat.account_details;
       const { data: memberships } = await supabase
@@ -5232,10 +479,13 @@ export default function UserPortal() {
     if (userId === user?.id) { setShowProfile(true); return; }
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, interests, avatar_url, cover_url, gender)')
+      .select('id, full_name, ctu_id, user_type, account_status(is_verified), account_details(program, year_level, avatar_url, cover_url, gender, bio)')
       .eq('id', userId).single();
     if (!error && data) {
-      const flat = { ...data, student_id: data.ctu_id, is_verified: data.account_status?.is_verified, ...(data.account_details || {}) };
+      const { data: interestRows } = await supabase.from('user_interests').select('interest').eq('user_id', data.id);
+      const statusObj = Array.isArray(data.account_status) ? data.account_status[0] : data.account_status;
+      const detailObj = Array.isArray(data.account_details) ? data.account_details[0] : data.account_details;
+      const flat = { ...data, student_id: data.ctu_id, is_verified: statusObj?.is_verified, ...(detailObj || {}), interests: (interestRows || []).map(r => r.interest) };
       delete flat.account_status; delete flat.account_details;
       const { data: memberships } = await supabase.from('memberships').select('community_id').eq('user_id', data.id).in('status', ['active', 'approved']);
       let circles = [];
@@ -5252,7 +502,7 @@ export default function UserPortal() {
   // Also treats reactors as implicit readers since reacting means they saw the message
   const fetchReadCounts = useCallback(async (msgIds) => {
     if (!msgIds?.length) return;
-    const _chunk = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i*n, i*n+n));
+    const _chunk = (a, n) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
     const _batches = _chunk(msgIds, 50);
     const [reads, reacts] = await Promise.all([
       Promise.all(_batches.map(b => supabase.from('message_reads').select('message_id, reader_id, accounts:reader_id(full_name, account_details(avatar_url))').in('message_id', b).then(r => r.data || []))).then(r => r.flat()),
@@ -5274,7 +524,7 @@ export default function UserPortal() {
       }
     });
 
-    // Add reactors as implicit readers · use accounts.id (UUID) for consistent dedup
+    // Add reactors as implicit readers ? use accounts.id (UUID) for consistent dedup
     (reacts || []).forEach(r => {
       const uuid = r.accounts?.id;
       if (!uuid) return;
@@ -5288,7 +538,7 @@ export default function UserPortal() {
       }
     });
 
-    // Final dedup pass · ensure no duplicate reader_ids per message
+    // Final dedup pass ? ensure no duplicate reader_ids per message
     Object.keys(grouped).forEach(msgId => {
       const seen = new Set();
       grouped[msgId] = grouped[msgId].filter(r => {
@@ -5316,7 +566,7 @@ export default function UserPortal() {
       await supabase.from('message_reads').upsert(inserts, { onConflict: 'message_id,reader_id', ignoreDuplicates: true });
       const myMsgs = msgs.filter(m => m.sender_id === user.student_id).map(m => m.id);
       if (myMsgs.length) fetchReadCounts(myMsgs);
-    } catch (_) {}
+    } catch (_) { }
   }, [user?.id, user?.student_id, fetchReadCounts]);
 
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -5326,7 +576,7 @@ export default function UserPortal() {
   const [shoutoutMention, setShoutoutMention] = useState(null); // { id, full_name } - selected user
   const [shoutoutSuggestions, setShoutoutSuggestions] = useState([]); // dropdown results
   const [shoutoutQuery, setShoutoutQuery] = useState(''); // current @query being typed
-  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } · message being replied to
+  const [replyTo, setReplyTo] = useState(null); // { id, content, full_name } ? message being replied to
   const [navAvatarUrl, setNavAvatarUrl] = useState(() => {
     const stored = JSON.parse(localStorage.getItem('currentUser') || '{}');
     return stored?.avatar_url || null;
@@ -5337,9 +587,9 @@ export default function UserPortal() {
   const loadEvents = useCallback(async () => {
     if (!user) return;
     setEventsLoading(true);
-    
+
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Single query - RLS automatically filters by membership
     const { data, error } = await supabase
       .from('campus_events')
@@ -5363,7 +613,7 @@ export default function UserPortal() {
       .gte('event_date', today)
       .order('event_date', { ascending: true })
       .limit(50);
-    
+
     if (!error && data) {
       const campus = data.filter(e => e.community_id === null);
       const circles = data.filter(e => e.community_id !== null);
@@ -5392,14 +642,14 @@ export default function UserPortal() {
     });
   }, [user?.id]);
 
-  // Heartbeat: update last_seen every 60s
+  // Heartbeat: update last_seen every 60s directly via Supabase client
   useEffect(() => {
     if (!user?.id) return;
-    const ping = () => fetch(getApiUrl('/api/update-profile?userId=' + user.id), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ last_seen: new Date().toISOString() }),
-    }).catch(() => {});
+    const ping = () => supabase
+      .from('account_details')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('id', user.id)
+      .then(() => {}, () => {});
     ping();
     const t = setInterval(ping, 60000);
     return () => clearInterval(t);
@@ -5500,33 +750,103 @@ export default function UserPortal() {
     if (!user?.id) return;
     const { data } = await supabase
       .from('application_submissions')
-      .select('community_id, application_id, status, phase2_result, id')
-      .eq('applicant_id', user.id);
-    setMyApplications(data || []);
+      .select('id, application_id, status, phase2_result, submitted_at, applications(community_id)')
+      .eq('applicant_id', user.id)
+      .order('submitted_at', { ascending: false });
+    setMyApplications((data || []).map(r => ({
+      ...r,
+      community_id: r.applications?.community_id || null,
+    })));
   }, [user?.id]);
 
-  const loadAnnouncements = useCallback(async () => {
-    // Only load posts from the last 30 days for the main feed
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const { data } = await supabase.from('announcements')
-      .select('*')
-      .or('community_id.is.null,cross_posted_from.not.is.null')
-      .gte('created_at', cutoff.toISOString())
-      .order('pinned', { ascending: false })
-      .order('created_at', { ascending: false });
-    setAnnouncements(data || []);
-    const authorIds = [...new Set((data || []).map(a => a.author_student_id).filter(Boolean))];
+  // Enrich announcements with author info, poll options, votes, and event metadata from normalized tables
+  const enrichAnnouncements = useCallback(async (rows) => {
+    if (!rows?.length) return rows || [];
+
+    const annIds = rows.map(a => a.id);
+    const authorIds = [...new Set(rows.map(a => a.author_id).filter(Boolean))];
+
+    // Fetch author info, poll options, votes, event metadata in parallel
+    const [authorsRes, optionsRes, votesRes, eventsRes] = await Promise.all([
+      authorIds.length ? supabase.from('accounts').select('id, full_name, user_type, ctu_id').in('id', authorIds) : { data: [] },
+      supabase.from('poll_options').select('id, announcement_id, option_text, display_order').in('announcement_id', annIds).order('display_order', { ascending: true }),
+      supabase.from('poll_votes').select('announcement_id, option_id, voter_id').in('announcement_id', annIds),
+      supabase.from('announcement_events').select('*').in('announcement_id', annIds),
+    ]);
+
+    const authorMap = {};
+    (authorsRes.data || []).forEach(a => { authorMap[a.id] = a; });
+
+    // Group poll options by announcement
+    const optsByAnn = {};
+    (optionsRes.data || []).forEach(o => {
+      if (!optsByAnn[o.announcement_id]) optsByAnn[o.announcement_id] = [];
+      optsByAnn[o.announcement_id].push(o);
+    });
+
+    // Group votes by announcement ? build { option_text: [voter_ids] }
+    const votesByAnn = {};
+    const optIdToText = {};
+    (optionsRes.data || []).forEach(o => { optIdToText[o.id] = o.option_text; });
+    (votesRes.data || []).forEach(v => {
+      if (!votesByAnn[v.announcement_id]) votesByAnn[v.announcement_id] = {};
+      const text = optIdToText[v.option_id];
+      if (text) {
+        if (!votesByAnn[v.announcement_id][text]) votesByAnn[v.announcement_id][text] = [];
+        votesByAnn[v.announcement_id][text].push(v.voter_id);
+      }
+    });
+
+    // Group event metadata by announcement
+    const eventByAnn = {};
+    (eventsRes.data || []).forEach(e => { eventByAnn[e.announcement_id] = e; });
+
+    return rows.map(a => {
+      const author = authorMap[a.author_id] || {};
+      const opts = (optsByAnn[a.id] || []).map(o => o.option_text);
+      const votes = votesByAnn[a.id] || {};
+      // Initialise empty vote arrays for options with no votes
+      opts.forEach(opt => { if (!votes[opt]) votes[opt] = []; });
+      const evtMeta = eventByAnn[a.id] || null;
+
+      return {
+        ...a,
+        author_student_id: author.ctu_id || null,
+        // Provide author_name and author_type from accounts (keep Anonymous override)
+        author_name: a.anonymous ? 'Anonymous' : (author.full_name || 'User'),
+        author_type: a.anonymous ? 'Anonymous' : (author.user_type || 'Student'),
+        // Poll data from new tables
+        poll_options: opts,
+        poll_votes: votes,
+        // Event metadata from announcement_events
+        event_metadata: evtMeta ? {
+          event_date: evtMeta.event_date,
+          event_time: evtMeta.event_time,
+          location: evtMeta.location,
+          is_closed: evtMeta.is_closed,
+          closed_at: evtMeta.closed_at,
+          closed_by: evtMeta.closed_by,
+          generated_event_id: evtMeta.generated_event_id,
+          winning_option: evtMeta.winning_option,
+        } : null,
+      };
+    });
+  }, []);
+
+  const cachePostAvatars = useCallback(async (enriched) => {
+    const authorIds = [...new Set(enriched.map(a => a.author_student_id).filter(Boolean))];
     if (authorIds.length > 0) {
       const { data: profiles } = await supabase.from('accounts').select('ctu_id, account_details(avatar_url)').in('ctu_id', authorIds);
       if (profiles) {
         const map = {};
-        profiles.forEach(p => { map[p.ctu_id] = p.account_details?.avatar_url || null; });
+        profiles.forEach(p => {
+          const det = Array.isArray(p.account_details) ? p.account_details[0] : p.account_details;
+          map[p.ctu_id] = det?.avatar_url || null;
+        });
         setAvatarCache(prev => ({ ...prev, ...map }));
       }
     }
-    // For circle auto-posts (no author_student_id), fetch circle logos
-    const circleIds = [...new Set((data || []).filter(a => !a.author_student_id && a.community_id).map(a => a.community_id))];
+    const circleIds = [...new Set(enriched.filter(a => !a.author_student_id && a.community_id).map(a => a.community_id))];
     if (circleIds.length > 0) {
       const { data: circles } = await supabase.from('communities').select('id, logo_url').in('id', circleIds);
       if (circles) {
@@ -5537,11 +857,28 @@ export default function UserPortal() {
     }
   }, []);
 
+  const loadAnnouncements = useCallback(async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const { data, error } = await supabase.from('announcements')
+      .select('*')
+      .or('community_id.is.null,cross_posted_from.not.is.null')
+      .gte('created_at', cutoff.toISOString())
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) console.error('[LOAD ANNOUNCEMENTS]', error.message);
+    const enriched = await enrichAnnouncements(data || []);
+    setAnnouncements(enriched);
+    cachePostAvatars(enriched);
+  }, [enrichAnnouncements, cachePostAvatars]);
+
   const loadPastAnnouncements = async () => {
     setLoadingPastAnnouncements(true);
     const { data } = await supabase.from('announcements')
       .select('*').or('community_id.is.null,cross_posted_from.not.is.null').order('created_at', { ascending: false }).limit(50);
-    setPastAnnouncements(data || []);
+    const enriched = await enrichAnnouncements(data || []);
+    setPastAnnouncements(enriched);
+    cachePostAvatars(enriched);
     setLoadingPastAnnouncements(false);
   };
 
@@ -5550,29 +887,35 @@ export default function UserPortal() {
     setLoadingPastCircle(true);
     const { data } = await supabase.from('announcements')
       .select('*').eq('community_id', commId).order('created_at', { ascending: false }).limit(30);
-    setPastCircleAnnouncements(data || []);
+    const enriched = await enrichAnnouncements(data || []);
+    setPastCircleAnnouncements(enriched);
+    cachePostAvatars(enriched);
     setLoadingPastCircle(false);
   };
 
   const loadCircleAnnouncements = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleAnnouncements([]); return; }
-    const { data } = await supabase.from('announcements')
+    const { data, error } = await supabase.from('announcements')
       .select('*')
       .eq('community_id', commId)
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false });
-    setCircleAnnouncements(data || []);
-  }, []);
+    if (error) console.error('[LOAD CIRCLE ANNOUNCEMENTS]', error.message);
+    const enriched = await enrichAnnouncements(data || []);
+    setCircleAnnouncements(enriched);
+    cachePostAvatars(enriched);
+  }, [enrichAnnouncements, cachePostAvatars]);
 
-  const postAnnouncement = async () => {
+  const postAnnouncement = async (typeOverride) => {
     if (!newPost.title.trim()) return;
-    if (newPost.post_type !== 'poll' && !newPost.content.trim()) return;
-    if (newPost.post_type === 'poll') {
+    const requestedType = typeOverride || newPost.post_type;
+    if (requestedType !== 'poll' && !newPost.content.trim()) return;
+    if (requestedType === 'poll') {
       const validOptions = newPost.pollOptions.filter(o => o.trim());
       if (validOptions.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
     const allowedTypes = ['announcement', 'event', 'shoutout', 'thread', 'general', 'poll'];
-    const type = allowedTypes.includes(newPost.post_type) ? newPost.post_type : 'thread';
+    const type = allowedTypes.includes(requestedType) ? requestedType : 'thread';
 
     // Block post if it contains inappropriate language
     if (containsBadWord(newPost.title) || containsBadWord(newPost.content)) {
@@ -5588,20 +931,37 @@ export default function UserPortal() {
       try { mediaUrl = await uploadMediaFile(postPendingMedia.file, user.id, postPendingMedia.mediaType); } catch { /* non-fatal */ }
     }
 
-    const { error } = await supabase.from('announcements').insert([{
-      author_id: user.id,
-      author_student_id: user.student_id,
-      author_name: newPost.anonymous ? 'Anonymous' : user.full_name,
-      author_type: newPost.anonymous ? 'Anonymous' : user.user_type,
-      title: newPost.title.trim(),
-      content: newPost.content.trim(),
-      post_type: type,
-      community_id: null,
-      media_url: mediaUrl,
-      visibility: newPost.visibility || 'public',
-      ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
-      ...(type === 'poll' && newPost.event_metadata ? { event_metadata: newPost.event_metadata } : {}),
-    }]);
+    const { data: homAnn, error } = await supabase
+      .from('announcements')
+      .insert([{
+        author_id: user.id,
+        title: newPost.title.trim(),
+        content: newPost.content.trim(),
+        post_type: type,
+        community_id: null,
+        media_url: mediaUrl,
+        visibility: newPost.visibility || 'public',
+        anonymous: newPost.anonymous || false,
+      }])
+      .select('id')
+      .single();
+
+    // Insert poll options into poll_options table
+    if (!error && homAnn?.id && pollOptions) {
+      await supabase.from('poll_options').insert(
+        pollOptions.map((opt, i) => ({ announcement_id: homAnn.id, option_text: opt, display_order: i }))
+      );
+    }
+    // Insert event metadata into announcement_events table
+    if (!error && homAnn?.id && type === 'poll' && newPost.event_metadata?.event_date) {
+      await supabase.from('announcement_events').insert({
+        announcement_id: homAnn.id,
+        event_date: newPost.event_metadata.event_date,
+        event_time: newPost.event_metadata.event_time ? `${newPost.event_metadata.event_time}:00` : '00:00:00',
+        location: newPost.event_metadata.location || '',
+        is_closed: false,
+      });
+    }
     setPostingAnnouncement(false);
     if (!error) {
       setNewPost({ title: '', content: '', post_type: 'general', anonymous: false, pollOptions: ['', ''], event_metadata: null, visibility: 'public' });
@@ -5622,10 +982,9 @@ export default function UserPortal() {
             event_date: newPost.event_metadata.event_date,
             event_time: newPost.event_metadata.event_time || null,
             location: newPost.event_metadata.location || null,
-            poster_name: user.full_name || 'Admin',
-            poster_type: 'Admin',
+            poster_id: user.id,
           }),
-        }).catch(() => {}); // non-fatal
+        }).catch(() => { }); // non-fatal
       }
     } else {
       console.error('Post announcement error:', error);
@@ -5640,7 +999,7 @@ export default function UserPortal() {
       const valid = newCirclePost.pollOptions.filter(o => o.trim());
       if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
-    // Restrict posting to Leader (3) and Co-Leader (2) only — except Thread which all members can post
+    // Restrict posting to Leader (3) and Co-Leader (2) only ? except Thread which all members can post
     if (myRankLevel < 2 && newCirclePost.post_type !== 'thread') { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
 
     // Block post if it contains inappropriate language
@@ -5660,18 +1019,31 @@ export default function UserPortal() {
 
     const postPayload = {
       author_id: user.id,
-      author_student_id: user.student_id,
-      author_name: user.full_name,
-      author_type: user.user_type,
       title: newCirclePost.title.trim(),
       content: newCirclePost.content.trim(),
       post_type: newCirclePost.post_type,
       community_id: commId,
       media_url: mediaUrl,
-      ...(pollOptions ? { poll_options: pollOptions, poll_votes: {} } : {}),
-      ...(newCirclePost.post_type === 'poll' && newCirclePost.event_metadata ? { event_metadata: newCirclePost.event_metadata } : {}),
     };
-    const { error } = await supabase.from('announcements').insert([postPayload]);
+    const { data: annData, error } = await supabase.from('announcements').insert([postPayload]).select('id').single();
+
+    // Insert poll options + event metadata into normalized tables
+    if (!error && annData?.id) {
+      if (pollOptions) {
+        await supabase.from('poll_options').insert(
+          pollOptions.map((opt, i) => ({ announcement_id: annData.id, option_text: opt, display_order: i }))
+        );
+      }
+      if (newCirclePost.post_type === 'poll' && newCirclePost.event_metadata?.event_date) {
+        await supabase.from('announcement_events').insert({
+          announcement_id: annData.id,
+          event_date: newCirclePost.event_metadata.event_date,
+          event_time: newCirclePost.event_metadata.event_time ? `${newCirclePost.event_metadata.event_time}:00` : '00:00:00',
+          location: newCirclePost.event_metadata.location || '',
+          is_closed: false,
+        });
+      }
+    }
 
     // If leader/co-leader manually toggled "Post to Home Feed" on a verified circle
     const comm = communities.find(c => c.id === commId);
@@ -5680,7 +1052,6 @@ export default function UserPortal() {
         ...postPayload,
         community_id: null,
         cross_posted_from: commId,
-        author_name: `${user.full_name} (${comm.name})`,
       }]);
     }
 
@@ -5706,10 +1077,9 @@ export default function UserPortal() {
             event_date: newCirclePost.event_metadata.event_date,
             event_time: newCirclePost.event_metadata.event_time || null,
             location: newCirclePost.event_metadata.location || null,
-            poster_name: `${user.full_name} (${comm.name})`,
-            poster_type: 'Student',
+            poster_id: user.id,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Notify all active members
@@ -5736,35 +1106,49 @@ export default function UserPortal() {
     if (!confirm('Delete this announcement?')) return;
     const post = announcements.find(a => a.id === id) || circleAnnouncements.find(a => a.id === id);
     await deleteMediaFromStorage(post?.media_url);
-    await supabase.from('announcements').delete().eq('id', id);
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) {
+      showToast('Failed to delete post: ' + error.message);
+      return;
+    }
     loadAnnouncements();
+    if (activeCommId && activeCommId !== 'global') loadCircleAnnouncements(activeCommId);
   };
 
   const togglePin = async (id, pinned) => {
-    await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
+    const { error } = await supabase.from('announcements').update({ pinned: !pinned }).eq('id', id);
+    if (error) {
+      showToast('Failed to update pin: ' + error.message);
+      return;
+    }
+    loadAnnouncements();
+    if (activeCommId && activeCommId !== 'global') loadCircleAnnouncements(activeCommId);
+  };
+
+  const handleVote = async (announcementId, option) => {
+    if (!user?.id) return;
+    // Look up option_id from poll_options table
+    const { data: optRow } = await supabase.from('poll_options')
+      .select('id').eq('announcement_id', announcementId).eq('option_text', option).single();
+    if (!optRow) return;
+    // Delete any existing vote by this user on this poll (one vote per poll)
+    await supabase.from('poll_votes')
+      .delete().eq('announcement_id', announcementId).eq('voter_id', user.id);
+    // Insert new vote
+    await supabase.from('poll_votes')
+      .insert({ announcement_id: announcementId, option_id: optRow.id, voter_id: user.id });
     loadAnnouncements();
   };
 
-  const handleVote = async (announcementId, option, currentVotes) => {
+  const handleCircleVote = async (announcementId, option) => {
     if (!user?.id) return;
-    // Remove user from any existing option, add to chosen option
-    const updated = { ...currentVotes };
-    Object.keys(updated).forEach(opt => {
-      updated[opt] = (updated[opt] || []).filter(id => id !== user.id);
-    });
-    updated[option] = [...(updated[option] || []), user.id];
-    await supabase.from('announcements').update({ poll_votes: updated }).eq('id', announcementId);
-    loadAnnouncements();
-  };
-
-  const handleCircleVote = async (announcementId, option, currentVotes) => {
-    if (!user?.id) return;
-    const updated = { ...currentVotes };
-    Object.keys(updated).forEach(opt => {
-      updated[opt] = (updated[opt] || []).filter(id => id !== user.id);
-    });
-    updated[option] = [...(updated[option] || []), user.id];
-    await supabase.from('announcements').update({ poll_votes: updated }).eq('id', announcementId);
+    const { data: optRow } = await supabase.from('poll_options')
+      .select('id').eq('announcement_id', announcementId).eq('option_text', option).single();
+    if (!optRow) return;
+    await supabase.from('poll_votes')
+      .delete().eq('announcement_id', announcementId).eq('voter_id', user.id);
+    await supabase.from('poll_votes')
+      .insert({ announcement_id: announcementId, option_id: optRow.id, voter_id: user.id });
     loadCircleAnnouncements(activeCommId);
   };
 
@@ -5802,9 +1186,27 @@ export default function UserPortal() {
     }
   }, []);
 
+  const enrichMessages = useCallback(async (msgs) => {
+    if (!msgs?.length) return msgs || [];
+    const senderIds = [...new Set(msgs.map(m => m.sender_id).filter(Boolean))];
+    let nameMap = {};
+    if (senderIds.length > 0) {
+      const { data: senders } = await supabase.from('accounts').select('ctu_id, full_name').in('ctu_id', senderIds);
+      if (senders) {
+        nameMap = Object.fromEntries(senders.map(s => [s.ctu_id, s.full_name]));
+      }
+    }
+    return msgs.map(m => ({
+      ...m,
+      full_name: m.content?.startsWith('NEXOSYS:') && !m.sender_id
+        ? 'System'
+        : (nameMap[m.sender_id] || m.full_name || 'User'),
+    }));
+  }, []);
+
   const loadCustomizationsForMessages = useCallback(async (msgs) => {
     if (!msgs || msgs.length === 0) return;
-    
+
     const studentIds = [...new Set(msgs.map(m => m.sender_id).filter(Boolean))];
     if (studentIds.length === 0) return;
 
@@ -5818,7 +1220,7 @@ export default function UserPortal() {
       if (!accounts || accounts.length === 0) return;
 
       const accountIds = accounts.map(a => a.id);
-      
+
       // Load all customizations at once
       const { data: settings } = await supabase
         .from('user_profile_settings')
@@ -5834,7 +1236,7 @@ export default function UserPortal() {
       if (!settings) return;
 
       // Get shop items for the active customizations
-      const itemIds = settings.flatMap(s => 
+      const itemIds = settings.flatMap(s =>
         [s.active_theme, s.active_name_color, s.active_background, s.active_companion].filter(Boolean)
       );
 
@@ -5886,24 +1288,24 @@ export default function UserPortal() {
     if (commId === 'global') {
       const { data } = await supabase.from('messages').select('*')
         .is('community_id', null).order('created_at', { ascending: true });
-      await calcFirstUnread(data || []);
-      setMessages(data || []);
-      fetchAvatarsForMessages(data || []);
-      loadCustomizationsForMessages(data || []);
-      setTimeout(() => markMessagesRead(data || []), 1000);
-      const msgs = data || [];
+      const msgs = await enrichMessages(data || []);
+      await calcFirstUnread(msgs);
+      setMessages(msgs);
+      fetchAvatarsForMessages(msgs);
+      loadCustomizationsForMessages(msgs);
+      setTimeout(() => markMessagesRead(msgs), 1000);
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
     } else if (channelId) {
       const { data } = await supabase.from('messages').select('*')
         .eq('channel_id', channelId).order('created_at', { ascending: true });
-      await calcFirstUnread(data || []);
-      setMessages(data || []);
-      fetchAvatarsForMessages(data || []);
-      loadCustomizationsForMessages(data || []);
-      setTimeout(() => markMessagesRead(data || []), 1000);
-      const msgs = data || [];
+      const msgs = await enrichMessages(data || []);
+      await calcFirstUnread(msgs);
+      setMessages(msgs);
+      fetchAvatarsForMessages(msgs);
+      loadCustomizationsForMessages(msgs);
+      setTimeout(() => markMessagesRead(msgs), 1000);
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
@@ -5912,12 +1314,12 @@ export default function UserPortal() {
         .eq('community_id', commId)
         .is('channel_id', null)
         .order('created_at', { ascending: true });
-      await calcFirstUnread(data || []);
-      setMessages(data || []);
-      fetchAvatarsForMessages(data || []);
-      loadCustomizationsForMessages(data || []);
-      setTimeout(() => markMessagesRead(data || []), 1000);
-      const msgs = data || [];
+      const msgs = await enrichMessages(data || []);
+      await calcFirstUnread(msgs);
+      setMessages(msgs);
+      fetchAvatarsForMessages(msgs);
+      loadCustomizationsForMessages(msgs);
+      setTimeout(() => markMessagesRead(msgs), 1000);
       const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
       const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
       if (idsToFetch.length) fetchReadCounts(idsToFetch);
@@ -5925,7 +1327,7 @@ export default function UserPortal() {
       setMessages([]);
     }
     setMessagesLoading(false);
-  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
+  }, [enrichMessages, fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   const loadCircleChatMessages = useCallback(async (commId) => {
     if (!commId || commId === 'global') { setCircleChatMessages([]); return; }
@@ -5934,9 +1336,10 @@ export default function UserPortal() {
       .eq('community_id', commId)
       .is('channel_id', null)
       .order('created_at', { ascending: true });
+    const msgs = await enrichMessages(data || []);
     // Find first unread before marking as read
-    if (user?.id && data?.length) {
-      const otherMsgs = data.filter(m => m.sender_id !== user.student_id);
+    if (user?.id && msgs.length) {
+      const otherMsgs = msgs.filter(m => m.sender_id !== user.student_id);
       if (otherMsgs.length) {
         const { data: reads } = await supabase.from('message_reads')
           .select('message_id').eq('reader_id', user.id)
@@ -5946,15 +1349,14 @@ export default function UserPortal() {
         if (first) { firstUnreadMsgId.current = first.id; setFirstUnreadId(prev => prev || first.id); }
       }
     }
-    setCircleChatMessages(data || []);
-    fetchAvatarsForMessages(data || []);
-    loadCustomizationsForMessages(data || []);
-      setTimeout(() => markMessagesRead(data || []), 1000);
-    const msgs = data || [];
+    setCircleChatMessages(msgs);
+    fetchAvatarsForMessages(msgs);
+    loadCustomizationsForMessages(msgs);
+    setTimeout(() => markMessagesRead(msgs), 1000);
     const lastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null;
     const idsToFetch = [...new Set([...msgs.filter(m => m.sender_id === user?.student_id).map(m => m.id), ...(lastId ? [lastId] : [])])];
     if (idsToFetch.length) fetchReadCounts(idsToFetch);
-  }, [fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
+  }, [enrichMessages, fetchAvatarsForMessages, loadCustomizationsForMessages, markMessagesRead, fetchReadCounts, user?.student_id, user?.id]);
 
   // Initial load + realtime subscription ? re-runs when channel/community changes
   useEffect(() => {
@@ -5978,12 +1380,14 @@ export default function UserPortal() {
           const isChannel = msg.channel_id === activeChannelId && activeChannelId !== null;
           const isCommunityNoChannel = activeCommId !== 'global' && !activeChannelId && msg.community_id === activeCommId && !msg.channel_id;
           if (isGlobal || isChannel || isCommunityNoChannel) {
-            setMessages(prev => {
-              if (prev.find(m => m.id === msg.id)) return prev;
-              fetchAvatarsForMessages([msg]);
-              markMessagesRead([msg]);
-              fetchReadCounts([msg.id]);
-              return [...prev, msg];
+            enrichMessages([msg]).then(([enrichedMsg]) => {
+              setMessages(prev => {
+                if (prev.find(m => m.id === enrichedMsg.id)) return prev;
+                fetchAvatarsForMessages([enrichedMsg]);
+                markMessagesRead([enrichedMsg]);
+                fetchReadCounts([enrichedMsg.id]);
+                return [...prev, enrichedMsg];
+              });
             });
           }
         }
@@ -6001,12 +1405,12 @@ export default function UserPortal() {
 
   useEffect(() => { loadCommunities(); loadMyMemberships(); loadMyApplications(); loadAnnouncements(); loadNotifications(); }, [loadCommunities, loadMyMemberships, loadMyApplications, loadAnnouncements, loadNotifications]);
 
-  // ── Unread circle message counts — uses message_reads for cross-device accuracy ─
+  // -- Unread circle message counts ? uses message_reads for cross-device accuracy -
   useEffect(() => {
     const myActiveCircles = myMemberships.filter(m => m.status === 'active').map(m => m.community_id);
     if (myActiveCircles.length === 0 || !user?.id) return;
     const fetchUnread = async () => {
-      // Step 1 — get all messages in my circles from others
+      // Step 1 ? get all messages in my circles from others
       const { data: allMsgs } = await supabase
         .from('messages')
         .select('id, community_id')
@@ -6015,7 +1419,7 @@ export default function UserPortal() {
 
       if (!allMsgs?.length) { setCircleUnreadMap({}); return; }
 
-      // Step 2 — get which of those I've already read
+      // Step 2 ? get which of those I've already read
       const msgIds = allMsgs.map(m => m.id);
       const { data: readMsgs } = await supabase
         .from('message_reads')
@@ -6025,7 +1429,7 @@ export default function UserPortal() {
 
       const readSet = new Set((readMsgs || []).map(r => r.message_id));
 
-      // Step 3 — count unread per circle
+      // Step 3 ? count unread per circle
       const counts = {};
       myActiveCircles.forEach(commId => { counts[commId] = 0; });
       allMsgs.forEach(m => {
@@ -6093,7 +1497,7 @@ export default function UserPortal() {
   // Keep sectionRef in sync
   useEffect(() => { sectionRef.current = section; }, [section]);
 
-  // ── Auto-clear unread badges when actively viewing ───────────────────
+  // -- Auto-clear unread badges when actively viewing -------------------
   useEffect(() => {
     if (section === 'global') {
       const now = new Date().toISOString();
@@ -6128,7 +1532,7 @@ export default function UserPortal() {
   }, [section, activeCommId, user?.id, user?.student_id]);
 
   // Ref that always holds the latest state values needed by the back handler.
-  // Avoids stale closures · listener registered once, reads fresh values via ref.
+  // Avoids stale closures ? listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
   // Registry for child component overlay closers (photo viewers etc.)
   const overlayCloserRef = useRef(null);
@@ -6142,8 +1546,8 @@ export default function UserPortal() {
   });
 
   // Guard flag: set to true when WE trigger replaceState/pushState so popstate
-  // Back-button / swipe-back handler · registered ONCE on mount.
-  // pushState never fires popstate · only the user's back gesture does.
+  // Back-button / swipe-back handler ? registered ONCE on mount.
+  // pushState never fires popstate ? only the user's back gesture does.
   // So every popstate here is a genuine back press, no need to suppress.
   useEffect(() => {
     // Push a trap entry so we can intercept the back button
@@ -6152,7 +1556,7 @@ export default function UserPortal() {
     const onPopState = () => {
       window.history.pushState({ portalTrap: true }, '');
 
-      // Check if a child overlay (photo viewer etc.) is open — close it first
+      // Check if a child overlay (photo viewer etc.) is open ? close it first
       if (overlayCloserRef.current) {
         overlayCloserRef.current();
         overlayCloserRef.current = null;
@@ -6167,17 +1571,17 @@ export default function UserPortal() {
       const s = backStateRef.current;
 
       // a. Close open overlays first
-      if (s.showProfile)         { setShowProfile(false);        return; }
-      if (s.viewingProfile)      { setViewingProfile(null);      return; }
-      if (s.showManage)          { setShowManage(false);         return; }
-      if (s.showMembersPanel)    { setShowMembersPanel(false);   return; }
-      if (s.showNotifications)   { setShowNotifications(false);  return; }
-      if (s.showShop)            { setShowShop(false);           return; }
-      if (s.showHelp)            { setShowHelp(false);           return; }      if (s.showThemePicker)     { setShowThemePicker(false);    return; }
-      if (s.showEventsModal)     { setShowEventsModal(false);    return; }
-      if (s.showCreate)          { setShowCreate(false);         return; }
+      if (s.showProfile) { setShowProfile(false); return; }
+      if (s.viewingProfile) { setViewingProfile(null); return; }
+      if (s.showManage) { setShowManage(false); return; }
+      if (s.showMembersPanel) { setShowMembersPanel(false); return; }
+      if (s.showNotifications) { setShowNotifications(false); return; }
+      if (s.showShop) { setShowShop(false); return; }
+      if (s.showHelp) { setShowHelp(false); return; } if (s.showThemePicker) { setShowThemePicker(false); return; }
+      if (s.showEventsModal) { setShowEventsModal(false); return; }
+      if (s.showCreate) { setShowCreate(false); return; }
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
-      if (s.viewingApplication)  { setViewingApplication(null); return; }
+      if (s.viewingApplication) { setViewingApplication(null); return; }
 
       // b. Not on home ? go to home feed
       if (s.section !== 'home') {
@@ -6210,8 +1614,8 @@ export default function UserPortal() {
         .eq('community_id', activeCommId).eq('status', 'active')
         .then(({ data, error }) => {
           if (error) console.error('Error loading circle members:', error);
-          setCircleChatMembers((data || []).map(m => ({ 
-            ...m.accounts, 
+          setCircleChatMembers((data || []).map(m => ({
+            ...m.accounts,
             avatar_url: m.accounts?.account_details?.avatar_url,
             rank_level: m.rank_level,
             student_id: m.accounts?.ctu_id
@@ -6229,13 +1633,13 @@ export default function UserPortal() {
   // Load active call for current circle
   useEffect(() => {
     if (!activeCommId || activeCommId === 'global') { setCircleActiveCall(null); return; }
-    supabase.from('circle_calls').select('room_url, room_name, started_at')
+    supabase.from('circle_calls').select('room_name, started_at')
       .eq('community_id', activeCommId).eq('status', 'active').maybeSingle()
       .then(({ data }) => setCircleActiveCall(data || null));
     // Subscribe to circle_calls changes
     const sub = supabase.channel(`circle-calls-${activeCommId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_calls', filter: `community_id=eq.${activeCommId}` }, () => {
-        supabase.from('circle_calls').select('room_url, room_name, started_at')
+        supabase.from('circle_calls').select('room_name, started_at')
           .eq('community_id', activeCommId).eq('status', 'active').maybeSingle()
           .then(({ data }) => setCircleActiveCall(data || null));
       }).subscribe();
@@ -6250,10 +1654,12 @@ export default function UserPortal() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' },
         (payload) => {
           if (!payload.new.community_id) {
-            setAnnouncements(prev => {
-              if (prev.find(a => a.id === payload.new.id)) return prev;
-              const updated = [payload.new, ...prev];
-              return updated.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+            enrichAnnouncements([payload.new]).then(([enriched]) => {
+              setAnnouncements(prev => {
+                if (prev.find(a => a.id === enriched.id)) return prev;
+                const updated = [enriched, ...prev];
+                return updated.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+              });
             });
           }
         }
@@ -6288,7 +1694,11 @@ export default function UserPortal() {
     const sub = supabase.channel('announcements:' + activeCommId)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'announcements', filter: `community_id=eq.${activeCommId}` },
-        (payload) => setCircleAnnouncements(prev => [payload.new, ...prev])
+        (payload) => {
+          enrichAnnouncements([payload.new]).then(([enriched]) => {
+            setCircleAnnouncements(prev => prev.find(a => a.id === enriched.id) ? prev : [enriched, ...prev]);
+          });
+        }
       )
       .on('postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'announcements' },
@@ -6312,8 +1722,8 @@ export default function UserPortal() {
       .eq('community_id', activeCommId).eq('status', 'active')
       .then(({ data, error }) => {
         if (error) console.error('Error loading circle members:', error);
-        setCircleChatMembers((data || []).map(m => ({ 
-          ...m.accounts, 
+        setCircleChatMembers((data || []).map(m => ({
+          ...m.accounts,
           avatar_url: m.accounts?.account_details?.avatar_url,
           rank_level: m.rank_level,
           student_id: m.accounts?.ctu_id
@@ -6325,12 +1735,14 @@ export default function UserPortal() {
         (payload) => {
           const msg = payload.new;
           if (!msg.channel_id) {
-            setCircleChatMessages(prev => {
-              if (prev.find(m => m.id === msg.id)) return prev;
-              fetchAvatarsForMessages([msg]);
-              markMessagesRead([msg]);
-              fetchReadCounts([msg.id]);
-              return [...prev, msg];
+            enrichMessages([msg]).then(([enrichedMsg]) => {
+              setCircleChatMessages(prev => {
+                if (prev.find(m => m.id === enrichedMsg.id)) return prev;
+                fetchAvatarsForMessages([enrichedMsg]);
+                markMessagesRead([enrichedMsg]);
+                fetchReadCounts([enrichedMsg.id]);
+                return [...prev, enrichedMsg];
+              });
             });
           }
         }
@@ -6383,7 +1795,6 @@ export default function UserPortal() {
 
   const insertSystemMessage = async (commId, text) => {
     await supabase.from('messages').insert([{
-      full_name: 'System',
       content: 'NEXOSYS:' + text,
       message_type: 'text',
       community_id: commId,
@@ -6438,7 +1849,7 @@ export default function UserPortal() {
 
   const handleChatInputChange = async (value) => {
     setSendError('');
-    // Detect @mention — works for both 'shoutout! @name' and standalone '@name'
+    // Detect @mention ? works for both 'shoutout! @name' and standalone '@name'
     const isGlobal = !activeCommId || activeCommId === 'global';
     const shoutMatch = value.match(/^shoutout!\s+@([^\s][\w\s]*)/i);
     const mentionMatch = !shoutMatch && value.match(/@([\w\s]*)$/);
@@ -6456,7 +1867,7 @@ export default function UserPortal() {
         setShoutoutSuggestions([{ id: 'everyone', full_name: '@everyone' }]);
       }
     } else if (mentionMatch && !isGlobal) {
-      // Standalone @mention — circle chat only, not Global Feed (use shoutout! there)
+      // Standalone @mention ? circle chat only, not Global Feed (use shoutout! there)
       const query = mentionMatch[1].trim();
       setShoutoutQuery(query);
       const activeMembers = circleChatMembers.filter(m => m.id !== user.id);
@@ -6467,7 +1878,7 @@ export default function UserPortal() {
           .map(m => ({ id: m.id, full_name: m.full_name }));
         setShoutoutSuggestions(memberMatches);
       } else {
-        // Just '@' typed — show all circle members only
+        // Just '@' typed ? show all circle members only
         setShoutoutSuggestions(activeMembers.slice(0, 6).map(m => ({ id: m.id, full_name: m.full_name })));
       }
     } else {
@@ -6494,7 +1905,7 @@ export default function UserPortal() {
     const msgInput = msgInputRef.current?.value || '';
     if (!msgInput.trim() && !pendingMedia) return;
     if (msgInput.trim() && containsBadWord(msgInput)) {
-      setSendError('Ã¢Å¡Â Ã¯Â¸Â Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: null, contentPreview: msgInput });
       return;
@@ -6505,7 +1916,7 @@ export default function UserPortal() {
     try {
       const comm = communities.find(c => c.id === activeCommId);
       const isLeader = comm?.creator_id === user?.id;
-      
+
       let mediaUrl = null;
       let mediaSize = null;
       let mediaDuration = null;
@@ -6523,7 +1934,6 @@ export default function UserPortal() {
 
       const payload = {
         sender_id: user.student_id,
-        full_name: user.full_name,
         content: msgInput.trim() || '',
         message_type: isShoutout ? 'shoutout' : messageType,
         media_url: mediaUrl,
@@ -6537,12 +1947,13 @@ export default function UserPortal() {
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
-        setMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
+        const sentMsg = { ...data[0], full_name: user.full_name };
+        setMessages(prev => prev.find(m => m.id === sentMsg.id) ? prev : [...prev, sentMsg]);
         if (msgInputRef.current) msgInputRef.current.value = '';
         setPendingMedia(null);
         setReplyTo(null);
 
-        // Shoutout notifications — use exact ID if selected from dropdown
+        // Shoutout notifications ? use exact ID if selected from dropdown
         if (isShoutout) {
           const shoutText = msgInput.trim().replace(/^shoutout!\s*/i, '');
           const isEveryoneShout = shoutoutMention?.id === 'everyone' ||
@@ -6555,7 +1966,7 @@ export default function UserPortal() {
               const comm = communities.find(c => c.id === activeCommId);
               await supabase.from('notifications').insert(members.map(m => ({
                 user_id: m.user_id, type: 'new_announcement',
-                message: `📣 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
+                message: `📢 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
                 link_comm_id: activeCommId,
               })));
             }
@@ -6564,7 +1975,7 @@ export default function UserPortal() {
             const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
             await supabase.from('notifications').insert([{
               user_id: shoutoutMention.id, type: 'new_announcement',
-              message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+              message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
               link_comm_id: activeCommId !== 'global' ? activeCommId : null,
             }]);
           } else {
@@ -6577,7 +1988,7 @@ export default function UserPortal() {
                 const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
                 await supabase.from('notifications').insert([{
                   user_id: mentioned.id, type: 'new_announcement',
-                  message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
                   link_comm_id: activeCommId !== 'global' ? activeCommId : null,
                 }]);
               }
@@ -6601,7 +2012,7 @@ export default function UserPortal() {
     const circleChatInput = circleChatInputRef.current?.value || '';
     if (!circleChatInput.trim() && !circlePendingMedia) return;
     if (circleChatInput.trim() && containsBadWord(circleChatInput)) {
-      setSendError('Ã¢Å¡Â Ã¯Â¸Â Your message contains inappropriate language and was not sent.');
+      setSendError('⚠️ Your message contains inappropriate language and was not sent.');
       setTimeout(() => setSendError(''), 4000);
       await autoFlagContent({ reporterId: user.id, reportedUserId: user.id, contentType: 'message', contentId: null, contentPreview: circleChatInput });
       return;
@@ -6629,7 +2040,6 @@ export default function UserPortal() {
 
       const payload = {
         sender_id: user.student_id,
-        full_name: user.full_name,
         content: circleChatInput.trim() || '',
         message_type: isShoutout ? 'shoutout' : messageType,
         media_url: mediaUrl,
@@ -6643,7 +2053,8 @@ export default function UserPortal() {
 
       const { data, error } = await supabase.from('messages').insert([payload]).select();
       if (!error && data) {
-        setCircleChatMessages(prev => prev.find(m => m.id === data[0].id) ? prev : [...prev, data[0]]);
+        const sentMsg = { ...data[0], full_name: user.full_name };
+        setCircleChatMessages(prev => prev.find(m => m.id === sentMsg.id) ? prev : [...prev, sentMsg]);
         if (circleChatInputRef.current) circleChatInputRef.current.value = '';
         setCirclePendingMedia(null);
         setReplyTo(null);
@@ -6661,7 +2072,7 @@ export default function UserPortal() {
               const comm = communities.find(c => c.id === activeCommId);
               await supabase.from('notifications').insert(members.map(m => ({
                 user_id: m.user_id, type: 'new_announcement',
-                message: `📣 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
+                message: `📢 ${user.full_name} shouted out everyone in "${comm?.name || 'a circle'}": ${shoutText.replace(/^@everyone\s*/i, '')}`,
                 link_comm_id: activeCommId,
               })));
             }
@@ -6669,7 +2080,7 @@ export default function UserPortal() {
             const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
             await supabase.from('notifications').insert([{
               user_id: shoutoutMention.id, type: 'new_announcement',
-              message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+              message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
               link_comm_id: activeCommId,
             }]);
           } else {
@@ -6681,7 +2092,7 @@ export default function UserPortal() {
                 const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
                 await supabase.from('notifications').insert([{
                   user_id: mentioned.id, type: 'new_announcement',
-                  message: `⭐ ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
                   link_comm_id: activeCommId,
                 }]);
               }
@@ -6745,7 +2156,7 @@ export default function UserPortal() {
       navTo('home', 'global');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error · could not delete circle.');
+      showToast('Network error ? could not delete circle.');
     }
   };
 
@@ -6753,53 +2164,55 @@ export default function UserPortal() {
     if (leaveCircle._pending) return; // prevent double call
     leaveCircle._pending = true;
     try {
-    const membership = getMembership(commId);
-    if (!membership) { leaveCircle._pending = false; return; }
+      const membership = getMembership(commId);
+      if (!membership) { leaveCircle._pending = false; return; }
 
-    // If the user is the leader (owner or rank 3), show successor picker
-    const comm = communities.find(c => c.id === commId);
-    const isCircleOwner = comm?.creator_id === user?.id;
-    if (isCircleOwner || membership.rank_level === 3) {
-      // Fetch current active members (excluding self) to pick a successor
-      const { data: members } = await supabase
-        .from('memberships')
-        .select('id, user_id, rank_level, created_at, accounts(full_name, ctu_id)')
-        .eq('community_id', commId)
-        .eq('status', 'active')
-        .neq('user_id', user.id)
-        .order('rank_level', { ascending: false })
-        .order('created_at', { ascending: true });
+      // If the user is the leader (owner or rank 3), show successor picker
+      const comm = communities.find(c => c.id === commId);
+      const isCircleOwner = comm?.creator_id === user?.id;
+      if (isCircleOwner || membership.rank_level === 3) {
+        // Fetch current active members (excluding self) to pick a successor
+        const { data: members } = await supabase
+          .from('memberships')
+          .select('id, user_id, rank_level, created_at, accounts(full_name, ctu_id)')
+          .eq('community_id', commId)
+          .eq('status', 'active')
+          .neq('user_id', user.id)
+          .order('rank_level', { ascending: false })
+          .order('created_at', { ascending: true });
 
-      if (!members || members.length === 0) {
-        // No other members — can leave freely, circle may dissolve
-        if (!confirm('You are the only member. Leaving will dissolve this circle. Continue?')) return;
+        if (!members || members.length === 0) {
+          // No other members ? can leave freely, circle may dissolve
+          if (!confirm('You are the only member. Leaving will dissolve this circle. Continue?')) return;
+        } else {
+          // Show successor picker
+          setSuccessorPicker({
+            commId, members: members.map(m => ({
+              id: m.user_id,
+              membershipId: m.id,
+              full_name: m.accounts?.full_name || 'Unknown',
+              ctu_id: m.accounts?.ctu_id,
+              rank_level: m.rank_level,
+            }))
+          });
+          return;
+        }
       } else {
-        // Show successor picker
-        setSuccessorPicker({ commId, members: members.map(m => ({
-          id: m.user_id,
-          membershipId: m.id,
-          full_name: m.accounts?.full_name || 'Unknown',
-          ctu_id: m.accounts?.ctu_id,
-          rank_level: m.rank_level,
-        })) });
-        return;
+        if (!confirm('Leave this circle? You will need to request to join again.')) return;
       }
-    } else {
-      if (!confirm('Leave this circle? You will need to request to join again.')) return;
-    }
 
-    // Non-leader leave (or no-members leader leave)
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(getApiUrl('/api/memberships'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'leave', community_id: commId }),
-    });
-    if (!res.ok) { showToast('Failed to leave circle.'); leaveCircle._pending = false; return; }
-    await insertSystemMessage(commId, `${user.full_name} left the circle.`);
-    showToast('You have left the circle.');
-    await loadMyMemberships();
-    navTo('home', 'global');
+      // Non-leader leave (or no-members leader leave)
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/memberships'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'leave', community_id: commId }),
+      });
+      if (!res.ok) { showToast('Failed to leave circle.'); leaveCircle._pending = false; return; }
+      await insertSystemMessage(commId, `${user.full_name} left the circle.`);
+      showToast('You have left the circle.');
+      await loadMyMemberships();
+      navTo('home', 'global');
     } finally { leaveCircle._pending = false; }
   };
 
@@ -6822,11 +2235,11 @@ export default function UserPortal() {
     const name = newChannelName.trim().toLowerCase().replace(/\s+/g, '-');
     if (!name) return;
     const { data, error } = await supabase.from('channels')
-      .insert([{ 
-        community_id: activeCommId, 
-        name, 
+      .insert([{
+        community_id: activeCommId,
+        name,
         channel_type: newChannelType,
-        created_by: user.id 
+        created_by: user.id
       }])
       .select();
     if (!error && data) {
@@ -6871,7 +2284,7 @@ export default function UserPortal() {
     setStartingCall(true);
     try {
       const token = await getFreshToken();
-      // Always use Vercel for /api/call — it doesn't exist on Render
+      // Always use Vercel for /api/call ? it doesn't exist on Render
       const callUrl = window.location.hostname === 'localhost'
         ? 'http://localhost:3000/api/call'
         : '/api/call';
@@ -6882,36 +2295,45 @@ export default function UserPortal() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.message || 'Failed to start call.'); setStartingCall(false); return; }
-      // Post system message when a new call is started (not when joining existing)
-      if (!data.existing) {
-        await supabase.from('messages').insert([{
-          full_name: 'System',
-          content: `NEXOSYS:📞 ${user.full_name} started a call`,
-          message_type: 'text',
-          community_id: commId,
-          channel_id: null,
-          sender_id: user.student_id,
-        }]);
-      }
+      // Post system message when starting or joining a call
+      await supabase.from('messages').insert([{
+        content: data.existing
+          ? `NEXOSYS:📞 ${user.full_name} joined the call`
+          : `NEXOSYS:📞 ${user.full_name} started a call`,
+        message_type: 'text',
+        community_id: commId,
+        channel_id: null,
+        sender_id: user.student_id,
+      }]);
       setActiveCall({ token: data.token, livekit_url: data.livekit_url, room_name: data.room_name, comm_id: commId });
     } catch { showToast('Failed to start call.'); }
     setStartingCall(false);
   };
 
-  const endCall = async () => {
+  const endCall = async (isLastParticipant = true) => {
     if (!activeCall) return;
-    try {
-      const token = await getFreshToken();
-      const callUrl = window.location.hostname === 'localhost'
-        ? 'http://localhost:3000/api/call'
-        : '/api/call';
-      await fetch(callUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'delete', room_name: activeCall.room_name }),
-      });
-    } catch { /* non-fatal */ }
+    const callToEnd = activeCall;
     setActiveCall(null);
+    try {
+      await supabase.from('messages').insert([{
+        content: `NEXOSYS:📞 ${user.full_name} left the call`,
+        message_type: 'text',
+        community_id: callToEnd.comm_id,
+        channel_id: null,
+        sender_id: user.student_id,
+      }]);
+      if (isLastParticipant) {
+        const token = await getFreshToken();
+        const callUrl = window.location.hostname === 'localhost'
+          ? 'http://localhost:3000/api/call'
+          : '/api/call';
+        await fetch(callUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ action: 'delete', room_name: callToEnd.room_name }),
+        });
+      }
+    } catch { /* non-fatal */ }
   };
 
 
@@ -6945,7 +2367,7 @@ export default function UserPortal() {
     c.id === 'global' || c.creator_id === user?.id || isMember(c.id)
   );
 
-  // Circles for profile display · excludes the global feed
+  // Circles for profile display ? excludes the global feed
   const myCirclesForProfile = myCircles.filter(c => c.id !== 'global');
 
   return (
@@ -6970,13 +2392,13 @@ export default function UserPortal() {
             <i className="fa-solid fa-bars"></i>
           </button>
           <div className="nav-clock">
-          <span className="nav-clock-time">
-            {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </span>
-          <span className="nav-clock-date">
-            {clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
-        </div>
+            <span className="nav-clock-time">
+              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+            <span className="nav-clock-date">
+              {clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
         </div>
 
         {/* CENTER "? search */}
@@ -6993,12 +2415,25 @@ export default function UserPortal() {
               if (val.trim().length < 2) { setSearchUsers([]); setSearchLoading(false); return; }
               setSearchLoading(true);
               searchTimeout.current = setTimeout(async () => {
-                const { data } = await supabase.from('accounts')
-                  .select('id, full_name, ctu_id, account_details(avatar_url)')
-                  .or(`full_name.ilike.%${val.trim()}%,ctu_id.ilike.%${val.trim()}%`)
-                  .neq('ctu_id', user?.student_id)
-                  .limit(5);
-                setSearchUsers(data || []);
+                const q = val.trim();
+                let query = supabase.from('accounts')
+                  .select('id, full_name, ctu_id, account_status(is_verified, is_banned), account_details(avatar_url)')
+                  .or(`full_name.ilike.%${q}%,ctu_id.ilike.%${q}%`)
+                  .limit(10);
+                if (user?.id) query = query.neq('id', user.id);
+                const { data, error } = await query;
+                if (error) console.error('[SEARCH] error:', error.message);
+                const filtered = (data || [])
+                  .filter(u => {
+                    const st = Array.isArray(u.account_status) ? u.account_status[0] : u.account_status;
+                    return !st?.is_banned && st?.is_verified !== false;
+                  })
+                  .slice(0, 5)
+                  .map(u => {
+                    const det = Array.isArray(u.account_details) ? u.account_details[0] : u.account_details;
+                    return { ...u, avatar_url: det?.avatar_url || null };
+                  });
+                setSearchUsers(filtered);
                 setSearchLoading(false);
               }, 300);
             }}
@@ -7041,8 +2476,8 @@ export default function UserPortal() {
                       viewUserProfile(u.ctu_id); setSearch(''); setSearchUsers([]);
                     }}>
                       <div style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)', flexShrink: 0 }}>
-                        {u.account_details?.avatar_url
-                          ? <img src={u.account_details.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {(u.avatar_url || u.account_details?.avatar_url)
+                          ? <img src={u.avatar_url || u.account_details.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           : (u.full_name?.[0] || '?').toUpperCase()
                         }
                       </div>
@@ -7066,7 +2501,7 @@ export default function UserPortal() {
           )}
         </div>
 
-        {/* RIGHT · notifications + user hud */}
+        {/* RIGHT ? notifications + user hud */}
         <div className="user-hud">
           {/* Desktop-only: Shop + Theme + Calendar buttons */}
           <button className="notif-bell desktop-only-btn" onClick={() => setShowShop(true)} title="Profile Shop">
@@ -7125,65 +2560,65 @@ export default function UserPortal() {
                   </div>
                 ) : (
                   <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {notifications.map(n => (
-                    <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
-                      onClick={() => {
-                        markRead(n.id);
-                        setShowNotifications(false);
+                    {notifications.map(n => (
+                      <div key={n.id} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                        onClick={() => {
+                          markRead(n.id);
+                          setShowNotifications(false);
 
-                        if (n.type === 'shoutout' || n.type === 'new_announcement') {
-                          // Mention, shoutout, comment, reply — go to circle CHAT (not announcements)
-                          if (n.link_comm_id) {
+                          if (n.type === 'shoutout' || n.type === 'new_announcement') {
+                            // Mention, shoutout, comment, reply ? go to circle CHAT (not announcements)
+                            if (n.link_comm_id) {
+                              setActiveChannelId(null);
+                              setShowCircleAnnouncements(false); // open chat, not announcements
+                              navTo('circles', n.link_comm_id);
+                            } else {
+                              navTo('global', 'global');
+                              loadMessages('global', null);
+                            }
+
+                          } else if (n.type === 'circle_invite' && n.link_comm_id) {
+                            const existingMembership = myMemberships.find(m => m.community_id === n.link_comm_id && m.status === 'active');
+                            if (existingMembership) {
+                              navTo('circles', n.link_comm_id);
+                            } else {
+                              const invitedCircle = communities.find(c => c.id === n.link_comm_id);
+                              if (invitedCircle) setShowCircleInfo(invitedCircle);
+                              else { setActiveCategory('all'); navTo('activity', 'global'); }
+                            }
+
+                          } else if (n.type === 'circle_approved' || n.type === 'circle_rejected') {
+                            // Go to Explore so they can find their new circle or browse
+                            setActiveCategory('all');
+                            navTo('activity', 'global');
+
+                          } else if (n.type === 'system') {
+                            // Deletion warning ? open Help Center to Support tab
+                            setShowHelp(true);
+
+                          } else if (n.type === 'Application_update' || n.type === 'audition_update') {
+                            // Application result ? go to the circle
+                            if (n.link_comm_id) {
+                              setActiveChannelId(null);
+                              navTo('circles', n.link_comm_id);
+                            }
+
+                          } else if (n.link_comm_id) {
+                            // Generic fallback ? navigate to the circle
                             setActiveChannelId(null);
-                            setShowCircleAnnouncements(false); // open chat, not announcements
-                            navTo('circles', n.link_comm_id);
-                          } else {
-                            navTo('global', 'global');
-                            loadMessages('global', null);
-                          }
-
-                        } else if (n.type === 'circle_invite' && n.link_comm_id) {
-                          const existingMembership = myMemberships.find(m => m.community_id === n.link_comm_id && m.status === 'active');
-                          if (existingMembership) {
-                            navTo('circles', n.link_comm_id);
-                          } else {
-                            const invitedCircle = communities.find(c => c.id === n.link_comm_id);
-                            if (invitedCircle) setShowCircleInfo(invitedCircle);
-                            else { setActiveCategory('all'); navTo('activity', 'global'); }
-                          }
-
-                        } else if (n.type === 'circle_approved' || n.type === 'circle_rejected') {
-                          // Go to Explore so they can find their new circle or browse
-                          setActiveCategory('all');
-                          navTo('activity', 'global');
-
-                        } else if (n.type === 'system') {
-                          // Deletion warning — open Help Center to Support tab
-                          setShowHelp(true);
-
-                        } else if (n.type === 'Application_update' || n.type === 'audition_update') {
-                          // Application result — go to the circle
-                          if (n.link_comm_id) {
-                            setActiveChannelId(null);
                             navTo('circles', n.link_comm_id);
                           }
-
-                        } else if (n.link_comm_id) {
-                          // Generic fallback — navigate to the circle
-                          setActiveChannelId(null);
-                          navTo('circles', n.link_comm_id);
-                        }
-                      }}>
-                      <div className="notif-icon">
-                        <i className={notifIcon(n.type)}></i>
+                        }}>
+                        <div className="notif-icon">
+                          <i className={notifIcon(n.type)}></i>
+                        </div>
+                        <div className="notif-content">
+                          <p className="notif-msg">{n.group_count > 1 ? n.message : n.message}</p>
+                          <span className="notif-time">{timeAgo(n.created_at)}</span>
+                        </div>
+                        {!n.is_read && <div className="notif-unread-dot"></div>}
                       </div>
-                      <div className="notif-content">
-                        <p className="notif-msg">{n.group_count > 1 ? n.message : n.message}</p>
-                        <span className="notif-time">{timeAgo(n.created_at)}</span>
-                      </div>
-                      {!n.is_read && <div className="notif-unread-dot"></div>}
-                    </div>
-                  ))}
+                    ))}
                   </div>
                 )}
                 {/* Notification mute controls */}
@@ -7280,7 +2715,7 @@ export default function UserPortal() {
           <div className="sidebar-backdrop show" onClick={() => { setShowDock(false); setMobileSidebarOpen(false); }} />
         )}
 
-        {/* SIDEBAR — context aware */}
+        {/* SIDEBAR ? context aware */}
         <div className={`sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
           {activeCommId === 'global' ? (
             /* -- GLOBAL / HOME sidebar -- */
@@ -7293,62 +2728,62 @@ export default function UserPortal() {
                 </div>
               </div>
               <div className="sidebar-scroll">
-              <div className="sidebar-label">MAIN</div>
-              <div className="nav-links">
-                <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-house-chimney"></i>
-                  <span className="node-name">Home Feed</span>
+                <div className="sidebar-label">MAIN</div>
+                <div className="nav-links">
+                  <div className={`ls-item ${section === 'home' ? 'active' : ''}`} onClick={() => { navTo('home', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                    <i className="nav-icon fa-solid fa-house-chimney"></i>
+                    <span className="node-name">Home Feed</span>
+                  </div>
+                  <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => {
+                    navTo('bulletin', 'global');
+                    setMobileSidebarOpen(false);
+                    setShowDock(false);
+                    const now = new Date().toISOString();
+                    setLastVisitedBulletin(now);
+                    localStorage.setItem('nexo-bulletin-visited', now);
+                  }}>
+                    <i className="nav-icon fa-solid fa-thumbtack"></i>
+                    <span className="node-name">Bulletin</span>
+                    {(() => {
+                      const unread = announcements.filter(a =>
+                        (a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null) &&
+                        a.post_type !== 'thread' && a.post_type !== 'general' &&
+                        new Date(a.created_at) > new Date(lastVisitedBulletin)
+                      ).length;
+                      return unread > 0 ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread}</span> : null;
+                    })()}
+                  </div>
+                  <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => {
+                    setMessages([]); navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false);
+                    const now = new Date().toISOString();
+                    setLastVisitedGlobal(now);
+                    localStorage.setItem('nexo-global-visited', now);
+                  }}>
+                    <i className="nav-icon fa-solid fa-message"></i>
+                    <span className="node-name">Global Feed</span>
+                    {(() => {
+                      const unread = messages.filter(m =>
+                        new Date(m.created_at) > new Date(lastVisitedGlobal) &&
+                        m.sender_id !== user?.student_id
+                      ).length;
+                      return unread > 0 && section !== 'global'
+                        ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread > 99 ? '99+' : unread}</span>
+                        : null;
+                    })()}
+                  </div>
+                  <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                    <i className="nav-icon fa-solid fa-compass"></i>
+                    <span className="node-name">Explore</span>
+                  </div>
+                  <div className={`ls-item ${section === 'discover' ? 'active' : ''}`} onClick={() => { navTo('discover', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
+                    <i className="nav-icon fa-solid fa-people-group"></i>
+                    <span className="node-name">Discover People</span>
+                  </div>
+                  <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
+                    <i className="nav-icon fa-solid fa-calendar-days"></i>
+                    <span className="node-name">Campus Events</span>
+                  </div>
                 </div>
-                <div className={`ls-item ${section === 'bulletin' ? 'active' : ''}`} onClick={() => {
-                  navTo('bulletin', 'global');
-                  setMobileSidebarOpen(false);
-                  setShowDock(false);
-                  const now = new Date().toISOString();
-                  setLastVisitedBulletin(now);
-                  localStorage.setItem('nexo-bulletin-visited', now);
-                }}>
-                  <i className="nav-icon fa-solid fa-thumbtack"></i>
-                  <span className="node-name">Bulletin</span>
-                  {(() => {
-                    const unread = announcements.filter(a =>
-                      (a.author_type === 'Admin' || a.community_id !== null || a.cross_posted_from != null) &&
-                      a.post_type !== 'thread' && a.post_type !== 'general' &&
-                      new Date(a.created_at) > new Date(lastVisitedBulletin)
-                    ).length;
-                    return unread > 0 ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread}</span> : null;
-                  })()}
-                </div>
-                <div className={`ls-item ${section === 'global' ? 'active' : ''}`} onClick={() => {
-                  setMessages([]); navTo('global', 'global'); loadMessages('global', null); setMobileSidebarOpen(false); setShowDock(false);
-                  const now = new Date().toISOString();
-                  setLastVisitedGlobal(now);
-                  localStorage.setItem('nexo-global-visited', now);
-                }}>
-                  <i className="nav-icon fa-solid fa-message"></i>
-                  <span className="node-name">Global Feed</span>
-                  {(() => {
-                    const unread = messages.filter(m =>
-                      new Date(m.created_at) > new Date(lastVisitedGlobal) &&
-                      m.sender_id !== user?.student_id
-                    ).length;
-                    return unread > 0 && section !== 'global'
-                      ? <span className="req-badge" style={{ marginLeft: 'auto' }}>{unread > 99 ? '99+' : unread}</span>
-                      : null;
-                  })()}
-                </div>
-                <div className={`ls-item ${section === 'activity' && activeCategory === 'all' ? 'active' : ''}`} onClick={() => { navTo('activity', 'global'); setActiveCategory('all'); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-compass"></i>
-                  <span className="node-name">Explore</span>
-                </div>
-                <div className={`ls-item ${section === 'discover' ? 'active' : ''}`} onClick={() => { navTo('discover', 'global'); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-people-group"></i>
-                  <span className="node-name">Discover People</span>
-                </div>
-                <div className={`ls-item ${showEventsModal ? 'active' : ''}`} onClick={() => { loadEvents(); setShowEventsModal(true); setMobileSidebarOpen(false); setShowDock(false); }}>
-                  <i className="nav-icon fa-solid fa-calendar-days"></i>
-                  <span className="node-name">Campus Events</span>
-                </div>
-              </div>
               </div>
             </>
           ) : (
@@ -7369,193 +2804,193 @@ export default function UserPortal() {
               </div>
 
               <div className="sidebar-scroll">
-              <div className="sidebar-label">CHANNELS</div>
-              <div className="nav-links">
-                {/* Announcements ? always first, powered by announcements table */}
-                <div
-                  className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
-                  onClick={() => { setShowCircleAnnouncements(true); navTo('circles', activeCommId); }}
-                >
-                  <i className="channel-hash">#</i>
-                  <span className="node-name">announcements</span>
-                  {circleAnnouncements.length > 0 && (
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>{circleAnnouncements.length}</span>
-                  )}
-                </div>
-
-                {/* General — virtual default channel */}
-                <div
-                  className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
-                  onClick={() => {
-                    setMessages([]); setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
-                    setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
-                  }}
-                >
-                  <i className="channel-hash">#</i>
-                  <span className="node-name">general</span>
-                  {circleUnreadMap[activeCommId] > 0 && (activeChannelId !== null || showCircleAnnouncements) && (
-                    <span className="req-badge" style={{ marginLeft: 'auto' }}>{circleUnreadMap[activeCommId] > 99 ? '99+' : circleUnreadMap[activeCommId]}</span>
-                  )}
-                </div>
-
-                {/* Huddle — hardcoded voice channel, always visible */}
-                {user?.is_verified && isMember(activeCommId) && (
+                <div className="sidebar-label">CHANNELS</div>
+                <div className="nav-links">
+                  {/* Announcements ? always first, powered by announcements table */}
                   <div
-                    className="ls-item"
-                    onClick={() => startCall(activeCommId)}
-                    style={{ cursor: 'pointer' }}
+                    className={`ls-item ${showCircleAnnouncements ? 'active' : ''}`}
+                    onClick={() => { setShowCircleAnnouncements(true); navTo('circles', activeCommId); }}
                   >
-                    <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
-                    <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>call</span>
-                    {circleActiveCall && (
-                      <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block' }}></span>
-                        Live
-                      </span>
+                    <i className="channel-hash">#</i>
+                    <span className="node-name">announcements</span>
+                    {circleAnnouncements.length > 0 && (
+                      <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>{circleAnnouncements.length}</span>
                     )}
                   </div>
-                )}
 
-
-
-                {channels.filter(ch => ch.channel_type !== 'voice' && ch.type !== 'voice').map(ch => (
+                  {/* General ? virtual default channel */}
                   <div
-                    key={ch.id}
-                    className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
+                    className={`ls-item ${!showCircleAnnouncements && activeChannelId === null ? 'active' : ''}`}
                     onClick={() => {
-                      if (ch.channel_type === 'voice' || ch.type === 'voice') {
-                        // Voice channel — start or join call
-                        startCall(activeCommId);
-                      } else {
-                        setActiveChannelId(ch.id);
-                        navTo('circles', activeCommId);
-                        setShowCircleAnnouncements(false);
-                      }
+                      setMessages([]); setActiveChannelId(null); setShowCircleAnnouncements(false); navTo('circles', activeCommId); loadMessages(activeCommId, null);
+                      setCircleUnreadMap(prev => ({ ...prev, [activeCommId]: 0 }));
                     }}
                   >
-                    {ch.channel_type === 'voice' || ch.type === 'voice' ? (
-                      <>
-                        <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
-                        <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>{ch.name}</span>
-                        {circleActiveCall && (
-                          <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }}></span>
-                            Live
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <i className="channel-hash">#</i>
-                        <span className="node-name">{ch.name}</span>
-                        {canModerate && (
-                          <i
-                            className="fa-solid fa-xmark channel-delete-btn"
-                            onClick={e => { e.stopPropagation(); deleteChannel(ch.id); }}
-                            title="Delete channel"
-                          ></i>
-                        )}
-                      </>
+                    <i className="channel-hash">#</i>
+                    <span className="node-name">general</span>
+                    {circleUnreadMap[activeCommId] > 0 && (activeChannelId !== null || showCircleAnnouncements) && (
+                      <span className="req-badge" style={{ marginLeft: 'auto' }}>{circleUnreadMap[activeCommId] > 99 ? '99+' : circleUnreadMap[activeCommId]}</span>
                     )}
                   </div>
-                ))}
 
-                {/* Add channel - leaders/co-leaders only */}
-                {canModerate && (
-                  showAddChannel ? (
+                  {/* Huddle ? hardcoded voice channel, always visible */}
+                  {user?.is_verified && isMember(activeCommId) && (
                     <div
-                      style={{ padding: "6px 10px" }}
-                      onBlur={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget)) {
-                          setShowAddChannel(false);
-                          setNewChannelType("chat");
-                          setNewChannelName("");
+                      className="ls-item"
+                      onClick={() => startCall(activeCommId)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
+                      <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>call</span>
+                      {circleActiveCall && (
+                        <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block' }}></span>
+                          Live
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+
+
+                  {channels.filter(ch => ch.channel_type !== 'voice' && ch.type !== 'voice').map(ch => (
+                    <div
+                      key={ch.id}
+                      className={`ls-item ${activeChannelId === ch.id && !showCircleAnnouncements ? 'active' : ''}`}
+                      onClick={() => {
+                        if (ch.channel_type === 'voice' || ch.type === 'voice') {
+                          // Voice channel ? start or join call
+                          startCall(activeCommId);
+                        } else {
+                          setActiveChannelId(ch.id);
+                          navTo('circles', activeCommId);
+                          setShowCircleAnnouncements(false);
                         }
                       }}
                     >
-                      <input
-                        className="channel-name-input"
-                        value={newChannelName}
-                        onChange={e => setNewChannelName(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") addChannel(); if (e.key === "Escape") { setShowAddChannel(false); setNewChannelType("chat"); } }}
-                        placeholder="channel-name"
-                        autoFocus
-                        style={{ marginBottom: 6 }}
-                      />
-                      {activeComm?.category === "project" && (
-                        <select
-                          value={newChannelType}
-                          onChange={e => setNewChannelType(e.target.value)}
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            background: "rgba(0,0,0,0.3)",
-                            border: "1px solid rgba(0,240,255,0.2)",
-                            borderRadius: 6,
-                            color: "white",
-                            fontSize: 11,
-                            marginBottom: 6
-                          }}
-                        >
-                          <option value="chat">Chat</option>
-                          <option value="tasks">Tasks</option>
-                        </select>
+                      {ch.channel_type === 'voice' || ch.type === 'voice' ? (
+                        <>
+                          <i className="fa-solid fa-volume-high" style={{ fontSize: 13, color: circleActiveCall ? '#3ecf8e' : 'var(--text-muted)', width: 16, flexShrink: 0 }}></i>
+                          <span className="node-name" style={{ color: circleActiveCall ? '#3ecf8e' : undefined }}>{ch.name}</span>
+                          {circleActiveCall && (
+                            <span style={{ marginLeft: 'auto', fontSize: 9, color: '#3ecf8e', display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3ecf8e', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }}></span>
+                              Live
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <i className="channel-hash">#</i>
+                          <span className="node-name">{ch.name}</span>
+                          {canModerate && (
+                            <i
+                              className="fa-solid fa-xmark channel-delete-btn"
+                              onClick={e => { e.stopPropagation(); deleteChannel(ch.id); }}
+                              title="Delete channel"
+                            ></i>
+                          )}
+                        </>
                       )}
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="channel-confirm-btn" onClick={addChannel} style={{ flex: 1 }}>
-                          <i className="fa-solid fa-check"></i> Create
-                        </button>
-                        <button className="channel-cancel-btn" onClick={() => { setShowAddChannel(false); setNewChannelType("chat"); setNewChannelName(""); }}>
-                          <i className="fa-solid fa-xmark"></i>
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="ls-item add-channel-btn" onClick={() => setShowAddChannel(true)}>
-                      <i className="channel-hash" style={{ color: "var(--text-muted)" }}>+</i>
-                      <span className="node-name" style={{ color: "var(--text-muted)", fontSize: 12 }}>Add Channel</span>
-                    </div>
-                  )
-                )}
-              </div>
+                  ))}
 
-              {/* Leaders and Co-Leaders can manage, regular members can view members */}
-              {activeCommId !== 'global' && isMember(activeCommId) && (
-                <>
-                  <div className="sidebar-label" style={{ marginTop: 12 }}>
-                    {canModerate ? 'MANAGE' : 'INFO'}
-                  </div>
-                  <div className="nav-links">
-                    {/* Leaders see Settings + Delete */}
-                    {isOwner && (
-                      <>
+                  {/* Add channel - leaders/co-leaders only */}
+                  {canModerate && (
+                    showAddChannel ? (
+                      <div
+                        style={{ padding: "6px 10px" }}
+                        onBlur={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget)) {
+                            setShowAddChannel(false);
+                            setNewChannelType("chat");
+                            setNewChannelName("");
+                          }
+                        }}
+                      >
+                        <input
+                          className="channel-name-input"
+                          value={newChannelName}
+                          onChange={e => setNewChannelName(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") addChannel(); if (e.key === "Escape") { setShowAddChannel(false); setNewChannelType("chat"); } }}
+                          placeholder="channel-name"
+                          autoFocus
+                          style={{ marginBottom: 6 }}
+                        />
+                        {activeComm?.category === "project" && (
+                          <select
+                            value={newChannelType}
+                            onChange={e => setNewChannelType(e.target.value)}
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              background: "rgba(0,0,0,0.3)",
+                              border: "1px solid rgba(0,240,255,0.2)",
+                              borderRadius: 6,
+                              color: "white",
+                              fontSize: 11,
+                              marginBottom: 6
+                            }}
+                          >
+                            <option value="chat">Chat</option>
+                            <option value="tasks">Tasks</option>
+                          </select>
+                        )}
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="channel-confirm-btn" onClick={addChannel} style={{ flex: 1 }}>
+                            <i className="fa-solid fa-check"></i> Create
+                          </button>
+                          <button className="channel-cancel-btn" onClick={() => { setShowAddChannel(false); setNewChannelType("chat"); setNewChannelName(""); }}>
+                            <i className="fa-solid fa-xmark"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="ls-item add-channel-btn" onClick={() => setShowAddChannel(true)}>
+                        <i className="channel-hash" style={{ color: "var(--text-muted)" }}>+</i>
+                        <span className="node-name" style={{ color: "var(--text-muted)", fontSize: 12 }}>Add Channel</span>
+                      </div>
+                    )
+                  )}
+                </div>
+
+                {/* Leaders and Co-Leaders can manage, regular members can view members */}
+                {activeCommId !== 'global' && isMember(activeCommId) && (
+                  <>
+                    <div className="sidebar-label" style={{ marginTop: 12 }}>
+                      {canModerate ? 'MANAGE' : 'INFO'}
+                    </div>
+                    <div className="nav-links">
+                      {/* Leaders see Settings + Delete */}
+                      {isOwner && (
+                        <>
+                          <div className="ls-item" onClick={() => setShowManage(true)}>
+                            <i className="nav-icon fa-solid fa-gear"></i>
+                            <span className="node-name">Settings</span>
+                          </div>
+                          <div className="ls-item" style={{ color: 'var(--red)' }} onClick={() => leaveCircle(activeComm.id)}>
+                            <i className="nav-icon fa-solid fa-right-from-bracket"></i>
+                            <span className="node-name">Leave Circle</span>
+                          </div>
+                        </>
+                      )}
+                      {/* Co-Leaders see Settings (no delete) */}
+                      {!isOwner && canModerate && (
                         <div className="ls-item" onClick={() => setShowManage(true)}>
                           <i className="nav-icon fa-solid fa-gear"></i>
                           <span className="node-name">Settings</span>
                         </div>
-                        <div className="ls-item" style={{ color: 'var(--red)' }} onClick={() => leaveCircle(activeComm.id)}>
-                          <i className="nav-icon fa-solid fa-right-from-bracket"></i>
-                          <span className="node-name">Leave Circle</span>
+                      )}
+                      {/* Regular members see View Members */}
+                      {!canModerate && (
+                        <div className="ls-item" onClick={() => setShowManage(true)}>
+                          <i className="nav-icon fa-solid fa-users"></i>
+                          <span className="node-name">View Members</span>
                         </div>
-                      </>
-                    )}
-                    {/* Co-Leaders see Settings (no delete) */}
-                    {!isOwner && canModerate && (
-                      <div className="ls-item" onClick={() => setShowManage(true)}>
-                        <i className="nav-icon fa-solid fa-gear"></i>
-                        <span className="node-name">Settings</span>
-                      </div>
-                    )}
-                    {/* Regular members see View Members */}
-                    {!canModerate && (
-                      <div className="ls-item" onClick={() => setShowManage(true)}>
-                        <i className="nav-icon fa-solid fa-users"></i>
-                        <span className="node-name">View Members</span>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+                      )}
+                    </div>
+                  </>
+                )}
 
               </div>{/* end sidebar-scroll */}
 
@@ -7649,29 +3084,29 @@ export default function UserPortal() {
                     {communities.filter(c => c.id !== 'global')
                       .sort((a, b) => (memberCounts[b.id] || 0) - (memberCounts[a.id] || 0))
                       .slice(0, 3).map(c => (
-                      <div key={c.id} className="popular-row"
-                        onClick={() => { navTo('circles', c.id); }}>
-                        <div className="popular-row-icon" style={{
-                          background: c.logo_url ? undefined : c.cover_url ? undefined : categoryGradient(c.category),
-                          backgroundImage: c.logo_url ? `url(${c.logo_url})` : c.cover_url ? `url(${c.cover_url})` : undefined,
-                          backgroundSize: 'cover', backgroundPosition: 'center',
-                        }}>
-                          {!c.logo_url && !c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>
-                            {c.category}
-                            {memberCounts[c.id] > 0 && (
-                              <span style={{ marginLeft: 8, color: 'var(--cyber-yellow)' }}>
-                                <i className="fa-solid fa-user" style={{ fontSize: 9, marginRight: 3 }}></i> {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? "s" : ""}
-                              </span>
-                            )}
+                        <div key={c.id} className="popular-row"
+                          onClick={() => { navTo('circles', c.id); }}>
+                          <div className="popular-row-icon" style={{
+                            background: c.logo_url ? undefined : c.cover_url ? undefined : categoryGradient(c.category),
+                            backgroundImage: c.logo_url ? `url(${c.logo_url})` : c.cover_url ? `url(${c.cover_url})` : undefined,
+                            backgroundSize: 'cover', backgroundPosition: 'center',
+                          }}>
+                            {!c.logo_url && !c.cover_url && <i className={(c.icon || getCategoryIcon(c.category))}></i>}
                           </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 2 }}>
+                              {c.category}
+                              {memberCounts[c.id] > 0 && (
+                                <span style={{ marginLeft: 8, color: 'var(--cyber-yellow)' }}>
+                                  <i className="fa-solid fa-user" style={{ fontSize: 9, marginRight: 3 }}></i> {memberCounts[c.id]} member{memberCounts[c.id] !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
                         </div>
-                        <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 12 }}></i>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </>
               )}
@@ -7711,7 +3146,7 @@ export default function UserPortal() {
                       <div className="home-composer-footer">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 11, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <i className="fa-solid fa-comments" style={{ fontSize: 10 }}></i> Thread · {user.student_id}
+                            <i className="fa-solid fa-comments" style={{ fontSize: 10 }}></i> Thread ? {user.student_id}
                           </div>
                           {/* Visibility toggle */}
                           <button
@@ -7731,7 +3166,7 @@ export default function UserPortal() {
                           <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
                           <button className="cyber-btn" style={{ width: 'auto', padding: '8px 22px', fontSize: 12 }}
                             disabled={postingAnnouncement || !newPost.title.trim() || !newPost.content.trim()}
-                            onClick={() => { setNewPost(p => ({ ...p, post_type: 'thread' })); postAnnouncement(); setShowComposer(false); }}>
+                            onClick={() => { postAnnouncement('thread'); setShowComposer(false); }}>
                             {postingAnnouncement
                               ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
                               : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
@@ -7793,7 +3228,7 @@ export default function UserPortal() {
                 );
               })()}
 
-              {/* Popular by category — now shown above, removed from here */}
+              {/* Popular by category ? now shown above, removed from here */}
 
             </div>
           )}
@@ -7824,11 +3259,11 @@ export default function UserPortal() {
               {/* Filter bar */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '12px 0' }}>
                 {[
-                  { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
+                  { key: 'all', label: 'All', icon: 'fa-solid fa-layer-group' },
                   { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
-                  { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
-                  { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
-                  { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
+                  { key: 'event', label: 'Event', icon: 'fa-solid fa-calendar' },
+                  { key: 'poll', label: 'Poll', icon: 'fa-solid fa-chart-bar' },
+                  { key: 'archive', label: 'Archive', icon: 'fa-solid fa-box-archive' },
                 ].map(f => {
                   const cfg = POST_TYPE[f.key];
                   const color = f.key === 'archive' ? 'var(--text-muted)' : (cfg?.color || 'var(--cyber-cyan)');
@@ -7951,14 +3386,14 @@ export default function UserPortal() {
                     const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                     const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
                     const isLastMsg = m.id === lastMsgId;
-                    
+
                     // Group consecutive messages from same user within 3 minutes
-                    const isGrouped = prev && 
-                      prev.sender_id === m.sender_id && 
+                    const isGrouped = prev &&
+                      prev.sender_id === m.sender_id &&
                       (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
-                    
-                    const isLastInGroup = !next || 
-                      next.sender_id !== m.sender_id || 
+
+                    const isLastInGroup = !next ||
+                      next.sender_id !== m.sender_id ||
                       (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
 
                     return (
@@ -8008,8 +3443,8 @@ export default function UserPortal() {
                     </div>
                   )}
                   {pendingMedia && (
-                    <MediaPreview 
-                      file={pendingMedia.file} 
+                    <MediaPreview
+                      file={pendingMedia.file}
                       mediaType={pendingMedia.mediaType}
                       onCancel={() => setPendingMedia(null)}
                     />
@@ -8082,12 +3517,12 @@ export default function UserPortal() {
                 </p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {[
-                    { key: 'all',      label: 'All',      icon: 'fa-solid fa-border-all' },
+                    { key: 'all', label: 'All', icon: 'fa-solid fa-border-all' },
                     { key: 'academic', label: 'Academic', icon: 'fa-solid fa-graduation-cap' },
-                    { key: 'project',  label: 'Projects', icon: 'fa-solid fa-flask' },
-                    { key: 'hobby',    label: 'Hobbies',  icon: 'fa-solid fa-gamepad' },
-                    { key: 'social',   label: 'Social',   icon: 'fa-solid fa-user-group' },
-                    { key: 'forming',  label: 'Forming',  icon: 'fa-solid fa-hourglass-half' },
+                    { key: 'project', label: 'Projects', icon: 'fa-solid fa-flask' },
+                    { key: 'hobby', label: 'Hobbies', icon: 'fa-solid fa-gamepad' },
+                    { key: 'social', label: 'Social', icon: 'fa-solid fa-user-group' },
+                    { key: 'forming', label: 'Forming', icon: 'fa-solid fa-hourglass-half' },
                   ].map(cat => (
                     <button key={cat.key} onClick={() => setActiveCategory(cat.key)}
                       style={{
@@ -8108,8 +3543,8 @@ export default function UserPortal() {
                 const filtered = communities.filter(c =>
                   c.id !== 'global' && (
                     activeCategory === 'all' ? true :
-                    activeCategory === 'forming' ? c.status === 'pending' :
-                    c.category === activeCategory
+                      activeCategory === 'forming' ? c.status === 'pending' :
+                        c.category === activeCategory
                   )
                 ).sort((a, b) => {
                   // Invited circles always float to the top
@@ -8127,6 +3562,7 @@ export default function UserPortal() {
                       const pending = isPending(c.id);
                       const invited = isInvited(c.id);
                       const myApplication = getMyApplication(c.id);
+                      const isAcceptedApp = myApplication && (myApplication.status === 'accepted' || myApplication.status === 'approved' || myApplication.phase2_result === 'accepted');
 
                       // Status indicator shown on the card (quick glance only)
                       let statusBadge = null;
@@ -8134,7 +3570,7 @@ export default function UserPortal() {
                       else if (owned) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>YOUR CIRCLE</span>;
                       else if (joined) statusBadge = <span style={{ fontSize: 10, color: '#3ecf8e', border: '1px solid #3ecf8e', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>JOINED</span>;
                       else if (pending) statusBadge = <span style={{ fontSize: 10, color: 'var(--cyber-yellow)', border: '1px solid var(--cyber-yellow)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-clock" style={{ marginRight: 4 }}></i>PENDING</span>;
-                      else if (myApplication) statusBadge = <span style={{ fontSize: 10, color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result), border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`, padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>{ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}</span>;
+                      else if (myApplication && !isAcceptedApp) statusBadge = <span style={{ fontSize: 10, color: ApplicationStatusColor(myApplication.status, myApplication.phase2_result), border: `1px solid ${ApplicationStatusColor(myApplication.status, myApplication.phase2_result)}`, padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-microphone" style={{ marginRight: 4 }}></i>{ApplicationStatusLabel(myApplication.status, myApplication.phase2_result)}</span>;
 
                       return (
                         <div key={c.id} className="post circle-explore-card"
@@ -8196,7 +3632,7 @@ export default function UserPortal() {
                     ? `url(${activeComm.cover_url}) center/cover no-repeat`
                     : categoryGradient(activeComm.category),
                 }}>
-                  {/* Cover photo edit button · top-right, only for creator */}
+                  {/* Cover photo edit button ? top-right, only for creator */}
                   {isOwner && (
                     <label className="circle-cover-edit-btn" title="Change circle cover photo">
                       <i className="fa-solid fa-image"></i>
@@ -8213,7 +3649,7 @@ export default function UserPortal() {
                       />
                     </label>
                   )}
-                  {/* Report circle cover/logo · visible to non-owners when cover exists */}
+                  {/* Report circle cover/logo ? visible to non-owners when cover exists */}
                   {!isOwner && activeComm.cover_url && user?.user_type !== 'Admin' && (
                     <button onClick={() => setShowReport({ type: 'circle_photo', id: activeComm.id, preview: `Cover photo of circle: ${activeComm.name}`, reportedUserId: activeComm.creator_id })}
                       title="Report this circle cover photo"
@@ -8290,14 +3726,14 @@ export default function UserPortal() {
                         return (
                           <div key={label}>
                             <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                              {label} · {group.length}
+                              {label} ? {group.length}
                             </div>
                             {group.map(m => {
                               const url = avatarCache[m.sender_id] || m.avatar_url;
                               const initials = (m.full_name || '?')[0].toUpperCase();
                               return (
                                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 20px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}
-                                  onClick={() => { 
+                                  onClick={() => {
                                     setShowOnlineModal(false);
                                     const memberStudentId = m.student_id || m.ctu_id;
                                     if (memberStudentId === user?.student_id || memberStudentId === String(user?.ctu_id)) {
@@ -8348,7 +3784,8 @@ export default function UserPortal() {
                           </button>
                         ) : (() => {
                           const myApp = getMyApplication(activeCommId);
-                          if (myApp) {
+                          const isAcceptedApp = myApp && (myApp.status === 'accepted' || myApp.status === 'approved' || myApp.phase2_result === 'accepted');
+                          if (myApp && !isAcceptedApp) {
                             const appColor = { pending: 'var(--cyber-yellow)', accepted: 'var(--green)', rejected: 'var(--red)' }[myApp.status] || 'var(--cyber-cyan)';
                             return (
                               <span style={{ fontSize: 12, fontWeight: 700, padding: '8px 18px', borderRadius: 20, color: appColor, border: `1px solid ${appColor}` }}>
@@ -8379,7 +3816,7 @@ export default function UserPortal() {
                 ) : showCircleAnnouncements ? (
                   /* -- CIRCLE ANNOUNCEMENTS VIEW -- */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    {/* Post composer — Leaders/Co-Leaders for all types; all verified members for Thread */}
+                    {/* Post composer ? Leaders/Co-Leaders for all types; all verified members for Thread */}
                     {isMember(activeCommId) && user?.is_verified && (
                       <div className="home-post-composer">
                         <div className="home-composer-header">
@@ -8466,40 +3903,40 @@ export default function UserPortal() {
                             })}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {activeComm.is_official && (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: crossPostToFeed ? 'var(--green)' : 'var(--text-muted)', userSelect: 'none' }}>
-                              <input
-                                type="checkbox"
-                                checked={crossPostToFeed}
-                                onChange={e => setCrossPostToFeed(e.target.checked)}
-                                style={{ accentColor: 'var(--green)', width: 13, height: 13, cursor: 'pointer' }}
-                              />
-                              <i className="fa-solid fa-earth-asia" style={{ fontSize: 10 }}></i>
-                              Post to Bulletin
-                            </label>
-                          )}
-                          <button className="cyber-btn"
-                            style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
-                            disabled={postingAnnouncement || !newCirclePost.title.trim() || (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim())}
-                            onClick={() => postCircleAnnouncement(activeCommId)}>
-                            {postingAnnouncement
-                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
-                              : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
-                          </button>
-                          <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
+                            {activeComm.is_official && (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: crossPostToFeed ? 'var(--green)' : 'var(--text-muted)', userSelect: 'none' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={crossPostToFeed}
+                                  onChange={e => setCrossPostToFeed(e.target.checked)}
+                                  style={{ accentColor: 'var(--green)', width: 13, height: 13, cursor: 'pointer' }}
+                                />
+                                <i className="fa-solid fa-earth-asia" style={{ fontSize: 10 }}></i>
+                                Post to Bulletin
+                              </label>
+                            )}
+                            <button className="cyber-btn"
+                              style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
+                              disabled={postingAnnouncement || !newCirclePost.title.trim() || (newCirclePost.post_type !== 'poll' && !newCirclePost.content.trim())}
+                              onClick={() => postCircleAnnouncement(activeCommId)}>
+                              {postingAnnouncement
+                                ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Posting...</>
+                                : <><i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }}></i>Post</>}
+                            </button>
+                            <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
                           </div>
                         </div>
                       </div>
                     )}
-                    {/* Circle filter bar — All, Announcement, Event, Poll, Archive */}
+                    {/* Circle filter bar ? All, Announcement, Event, Poll, Archive */}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                       {[
-                        { key: 'all',          label: 'All',          icon: 'fa-solid fa-layer-group' },
+                        { key: 'all', label: 'All', icon: 'fa-solid fa-layer-group' },
                         { key: 'announcement', label: 'Announcement', icon: 'fa-solid fa-bullhorn' },
-                        { key: 'event',        label: 'Event',        icon: 'fa-solid fa-calendar' },
-                        { key: 'thread',       label: 'Thread',       icon: 'fa-solid fa-comments' },
-                        { key: 'poll',         label: 'Poll',         icon: 'fa-solid fa-chart-bar' },
-                        { key: 'archive',      label: 'Archive',      icon: 'fa-solid fa-box-archive' },
+                        { key: 'event', label: 'Event', icon: 'fa-solid fa-calendar' },
+                        { key: 'thread', label: 'Thread', icon: 'fa-solid fa-comments' },
+                        { key: 'poll', label: 'Poll', icon: 'fa-solid fa-chart-bar' },
+                        { key: 'archive', label: 'Archive', icon: 'fa-solid fa-box-archive' },
                       ].map(f => {
                         const active = f.key === 'archive' ? showCircleArchive : (!showCircleArchive && (f.key === 'all' ? qaFilter === 'all' : qaFilter === f.key));
                         return (
@@ -8513,7 +3950,8 @@ export default function UserPortal() {
                                 setQaFilter(f.key);
                               }
                             }}
-                            style={{ padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                            style={{
+                              padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
                               border: active ? '1px solid var(--cyber-cyan)' : '1px solid rgba(0,240,255,0.15)',
                               background: active ? 'rgba(0,240,255,0.1)' : 'rgba(0,0,0,0.2)',
                               color: active ? 'var(--cyber-cyan)' : 'var(--text-muted)',
@@ -8558,8 +3996,8 @@ export default function UserPortal() {
                       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                         {[
                           { key: 'all', label: 'All Posts' },
-                          { key: 'questions', label: '📌 Questions' },
-                          { key: 'unanswered', label: '⏳ Unanswered' },
+                          { key: 'questions', label: '❓ Questions' },
+                          { key: 'unanswered', label: '📭 Unanswered' },
                         ].map(f => (
                           <button key={f.key} onClick={() => setQaFilter(f.key)} style={{
                             padding: '4px 12px', fontSize: 11, borderRadius: 12, cursor: 'pointer',
@@ -8599,10 +4037,10 @@ export default function UserPortal() {
                         let filtered = qaFilter === 'questions'
                           ? circleAnnouncements.filter(a => a.post_type === 'question')
                           : qaFilter === 'unanswered'
-                          ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
-                          : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll' || qaFilter === 'thread'
-                          ? circleAnnouncements.filter(a => a.post_type === qaFilter || (qaFilter === 'thread' && a.post_type === 'general'))
-                          : circleAnnouncements;
+                            ? circleAnnouncements.filter(a => a.post_type === 'question' && !a.solution_comment_id)
+                            : qaFilter === 'announcement' || qaFilter === 'event' || qaFilter === 'poll' || qaFilter === 'thread'
+                              ? circleAnnouncements.filter(a => a.post_type === qaFilter || (qaFilter === 'thread' && a.post_type === 'general'))
+                              : circleAnnouncements;
                         // Apply post search on top of type filter
                         if (circlePostSearch.trim()) {
                           const q = circlePostSearch.toLowerCase();
@@ -8643,7 +4081,7 @@ export default function UserPortal() {
                     if (activeChannelId && channelType === 'tasks') {
                       return (
                         <div style={{ height: '100%', overflow: 'hidden' }}>
-                          <TaskBoard 
+                          <TaskBoard
                             channelId={activeChannelId}
                             canManage={myRankLevel >= 1}
                             currentUserId={user.id}
@@ -8673,16 +4111,16 @@ export default function UserPortal() {
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
                       const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
                       const isLastMsg = m.id === lastMsgId;
-                      
+
                       // Group consecutive messages from same user within 3 minutes
-                      const isGrouped = prev && 
-                        prev.sender_id === m.sender_id && 
+                      const isGrouped = prev &&
+                        prev.sender_id === m.sender_id &&
                         (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
-                      
-                      const isLastInGroup = !next || 
-                        next.sender_id !== m.sender_id || 
+
+                      const isLastInGroup = !next ||
+                        next.sender_id !== m.sender_id ||
                         (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
-                      
+
                       return (
                         <React.Fragment key={m.id}>
                           {showSep && <ChatTimeSeparator date={m.created_at} />}
@@ -8695,25 +4133,25 @@ export default function UserPortal() {
                               <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                             </div>
                           ) : (
-                          <MessageItem
-                            m={m}
-                            tagColor={tagColor}
-                            isOwnerMsg={isOwnerMsg}
-                            canDelete={canDelete}
-                            onDelete={deleteMessage}
-                            onEdit={editMessage}
-                            onReport={(data) => setShowReport(data)}
-                            currentStudentId={user?.student_id}
-                            avatarUrl={avatarCache[m.sender_id] || null}
-                            onViewProfile={viewUserProfile}
-                            online={isOnline(profileIdCache[m.sender_id])}
-                            readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
-                            isLastOwn={isLastOwn}
-                            isGrouped={isGrouped}
-                            isLastInGroup={isLastInGroup}
-                            userCustomizations={userCustomizations}
-                            onReply={(msg) => setReplyTo(msg)}
-                          />
+                            <MessageItem
+                              m={m}
+                              tagColor={tagColor}
+                              isOwnerMsg={isOwnerMsg}
+                              canDelete={canDelete}
+                              onDelete={deleteMessage}
+                              onEdit={editMessage}
+                              onReport={(data) => setShowReport(data)}
+                              currentStudentId={user?.student_id}
+                              avatarUrl={avatarCache[m.sender_id] || null}
+                              onViewProfile={viewUserProfile}
+                              online={isOnline(profileIdCache[m.sender_id])}
+                              readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
+                              isLastOwn={isLastOwn}
+                              isGrouped={isGrouped}
+                              isLastInGroup={isLastInGroup}
+                              userCustomizations={userCustomizations}
+                              onReply={(msg) => setReplyTo(msg)}
+                            />
                           )}
                         </React.Fragment>
                       );
@@ -8739,8 +4177,8 @@ export default function UserPortal() {
                     </div>
                   )}
                   {pendingMedia && (
-                    <MediaPreview 
-                      file={pendingMedia.file} 
+                    <MediaPreview
+                      file={pendingMedia.file}
                       mediaType={pendingMedia.mediaType}
                       onCancel={() => setPendingMedia(null)}
                     />
@@ -8759,7 +4197,7 @@ export default function UserPortal() {
                       )}
                     </div>
                     <input ref={msgInputRef} onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
-                      onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()} 
+                      onKeyDown={e => e.key === 'Enter' && !uploading && sendPost()}
                       placeholder={`Say something to ${activeComm?.name || 'Circle Chat'}...`}
                       disabled={uploading}
                       style={sendError ? { borderColor: 'var(--red)', flex: 1 } : { flex: 1 }} />
@@ -8828,239 +4266,239 @@ export default function UserPortal() {
               <div style={{ display: 'flex', flex: 1, margin: '0 0 0 0', overflow: 'hidden', gap: 0 }}>
                 <div className="c-feed fade-in" style={{ margin: 0, borderRadius: showMembersPanel ? '0 0 0 15px' : '0 0 15px 15px', flex: 1 }}>
 
-                {!isMember(activeCommId) ? (
-                  <div className="post" style={{ textAlign: 'center', padding: 40 }}>
-                    <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 16, display: 'block' }}></i>
-                    <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
-                  </div>
-                ) : activeComm?.status === 'pending' ? (
-                  <div className="post" style={{ textAlign: 'center', padding: 40 }}>
-                    <i className="fa-solid fa-hourglass-half" style={{ fontSize: 32, color: 'var(--orange)', marginBottom: 16, display: 'block' }}></i>
-                    <p style={{ color: 'var(--orange)', fontWeight: 700, marginBottom: 8 }}>Circle is still forming</p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chat unlocks once 3 members have joined. Share the circle in Explore so others can apply!</p>
-                  </div>
-                ) : (
-                  (() => {
-                    const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
-                    const lastMsgId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].id : null;
-                    const lastMsgSenderId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].student_id : null;
-                    const lastMsgReaders = (messageReads[lastMsgId] || []).filter(
-                      r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
-                    );
-                    return circleChatMessages.map((m, idx) => {
-                      const isSysMsg = m.content?.startsWith('NEXOSYS:');
-                      const isOwnerMsg = m.sender_id === user?.student_id;
-                      const canDelete = isOwnerMsg || canModerate;
-                      const prev = circleChatMessages[idx - 1];
-                      const next = circleChatMessages[idx + 1];
-                      const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
-                      const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
-                      const isLastMsg = m.id === lastMsgId;
-                      
-                      // Group consecutive messages from same user within 3 minutes
-                      // Group consecutive messages from same user within 3 minutes
-                      const isGrouped = !isSysMsg && prev &&
-                        !prev.content?.startsWith('NEXOSYS:') &&
-                        prev.sender_id === m.sender_id &&
-                        (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
-                      
-                      const isLastInGroup = isSysMsg || !next ||
-                        next.content?.startsWith('NEXOSYS:') ||
-                        next.sender_id !== m.sender_id ||
-                        (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
-                      return (
-                        <React.Fragment key={m.id}>
-                          {showSep && <ChatTimeSeparator date={m.created_at} />}
-                          {m.id === firstUnreadId && (
-                            <div ref={firstUnreadRef}><UnreadDivider /></div>
-                          )}
-                          {m.content?.startsWith('NEXOSYS:') ? (
-                            (() => {
-                              const body = m.content.slice('NEXOSYS:'.length);
-                              if (body.startsWith('CALL_STARTED:')) {
-                                const parts = body.split(':');
-                                const roomName = parts[parts.length - 1];
-                                const roomUrl = parts.slice(1, parts.length - 1).join(':');
-                                const isInCall = activeCall?.room_name === roomName;
-                                return (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', margin: '4px 0' }}>
-                                    <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.25)', borderRadius: 20, padding: '5px 14px' }}>
-                                      <i className="fa-solid fa-phone" style={{ fontSize: 11, color: '#3ecf8e' }}></i>
-                                      <span style={{ fontSize: 11, color: '#3ecf8e', fontWeight: 700 }}>Call in progress</span>
-                                      {!isInCall && (
-                                        <button onClick={() => setActiveCall({ room_url: roomUrl, room_name: roomName, comm_id: activeCommId })}
-                                          style={{ background: '#3ecf8e', border: 'none', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#000', fontFamily: 'inherit' }}>
-                                          Join
-                                        </button>
-                                      )}
-                                      {isInCall && <span style={{ fontSize: 10, color: '#3ecf8e', opacity: 0.7 }}>You are in this call</span>}
+                  {!isMember(activeCommId) ? (
+                    <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                      <i className="fa-solid fa-lock" style={{ fontSize: 32, color: 'var(--text-muted)', marginBottom: 16, display: 'block' }}></i>
+                      <p style={{ color: 'var(--text-muted)' }}>You must be a member to access Circle Chat.</p>
+                    </div>
+                  ) : activeComm?.status === 'pending' ? (
+                    <div className="post" style={{ textAlign: 'center', padding: 40 }}>
+                      <i className="fa-solid fa-hourglass-half" style={{ fontSize: 32, color: 'var(--orange)', marginBottom: 16, display: 'block' }}></i>
+                      <p style={{ color: 'var(--orange)', fontWeight: 700, marginBottom: 8 }}>Circle is still forming</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chat unlocks once 3 members have joined. Share the circle in Explore so others can apply!</p>
+                    </div>
+                  ) : (
+                    (() => {
+                      const lastOwnIdx = circleChatMessages.reduce((acc, x, i) => x.student_id === user?.student_id ? i : acc, -1);
+                      const lastMsgId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].id : null;
+                      const lastMsgSenderId = circleChatMessages.length > 0 ? circleChatMessages[circleChatMessages.length - 1].student_id : null;
+                      const lastMsgReaders = (messageReads[lastMsgId] || []).filter(
+                        r => r.reader_id !== user?.id && r.reader_id !== lastMsgSenderId
+                      );
+                      return circleChatMessages.map((m, idx) => {
+                        const isSysMsg = m.content?.startsWith('NEXOSYS:');
+                        const isOwnerMsg = m.sender_id === user?.student_id;
+                        const canDelete = isOwnerMsg || canModerate;
+                        const prev = circleChatMessages[idx - 1];
+                        const next = circleChatMessages[idx + 1];
+                        const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
+                        const isLastOwn = isOwnerMsg && idx === lastOwnIdx;
+                        const isLastMsg = m.id === lastMsgId;
+
+                        // Group consecutive messages from same user within 3 minutes
+                        // Group consecutive messages from same user within 3 minutes
+                        const isGrouped = !isSysMsg && prev &&
+                          !prev.content?.startsWith('NEXOSYS:') &&
+                          prev.sender_id === m.sender_id &&
+                          (new Date(m.created_at) - new Date(prev.created_at)) < 3 * 60 * 1000;
+
+                        const isLastInGroup = isSysMsg || !next ||
+                          next.content?.startsWith('NEXOSYS:') ||
+                          next.sender_id !== m.sender_id ||
+                          (new Date(next.created_at) - new Date(m.created_at)) >= 3 * 60 * 1000;
+                        return (
+                          <React.Fragment key={m.id}>
+                            {showSep && <ChatTimeSeparator date={m.created_at} />}
+                            {m.id === firstUnreadId && (
+                              <div ref={firstUnreadRef}><UnreadDivider /></div>
+                            )}
+                            {m.content?.startsWith('NEXOSYS:') ? (
+                              (() => {
+                                const body = m.content.slice('NEXOSYS:'.length);
+                                if (body.startsWith('CALL_STARTED:')) {
+                                  const parts = body.split(':');
+                                  const roomName = parts[parts.length - 1];
+                                  const roomUrl = parts.slice(1, parts.length - 1).join(':');
+                                  const isInCall = activeCall?.room_name === roomName;
+                                  return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', margin: '4px 0' }}>
+                                      <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.25)', borderRadius: 20, padding: '5px 14px' }}>
+                                        <i className="fa-solid fa-phone" style={{ fontSize: 11, color: '#3ecf8e' }}></i>
+                                        <span style={{ fontSize: 11, color: '#3ecf8e', fontWeight: 700 }}>Call in progress</span>
+                                        {!isInCall && (
+                                          <button onClick={() => setActiveCall({ room_url: roomUrl, room_name: roomName, comm_id: activeCommId })}
+                                            style={{ background: '#3ecf8e', border: 'none', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#000', fontFamily: 'inherit' }}>
+                                            Join
+                                          </button>
+                                        )}
+                                        {isInCall && <span style={{ fontSize: 10, color: '#3ecf8e', opacity: 0.7 }}>You are in this call</span>}
+                                      </div>
+                                      <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
                                     </div>
-                                    <div style={{ flex: 1, height: 1, background: 'rgba(62,207,142,0.2)' }} />
-                                  </div>
-                                );
-                              }
-                              if (body === 'CALL_ENDED') {
+                                  );
+                                }
+                                if (body === 'CALL_ENDED') {
+                                  return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
+                                      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', padding: '0 6px' }}>
+                                        <i className="fa-solid fa-phone-slash" style={{ marginRight: 5 }}></i>Call ended
+                                      </span>
+                                      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
                                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', padding: '0 6px' }}>
-                                      <i className="fa-solid fa-phone-slash" style={{ marginRight: 5 }}></i>Call ended
-                                    </span>
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>{body}</span>
                                     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                                   </div>
                                 );
-                              }
-                              return (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 16px', margin: '2px 0' }}>
-                                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', whiteSpace: 'nowrap', padding: '0 6px' }}>{body}</span>
-                                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                                </div>
-                              );
-                            })()
-                          ) : (
-                          <MessageItem
-                            m={m}
-                            tagColor={tagColor}
-                            isOwnerMsg={isOwnerMsg}
-                            canDelete={canDelete}
-                            onDelete={async (id) => {
-                              if (!confirm('Delete this message?')) return;
-                              const msg = circleChatMessages.find(m => m.id === id);
-                              await deleteMediaFromStorage(msg?.media_url);
-                              await supabase.from('messages').delete().eq('id', id);
-                              setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
-                            }}
-                            onEdit={async (id, content) => {
-                              await supabase.from('messages').update({ content, edited: true }).eq('id', id);
-                              setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
-                            }}
-                            currentStudentId={user?.student_id}
-                            avatarUrl={avatarCache[m.sender_id] || null}
-                            onViewProfile={viewUserProfile}
-                            online={isOnline(profileIdCache[m.sender_id])}
-                            readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
-                            isLastOwn={isLastOwn}
-                            isGrouped={isGrouped}
-                            isLastInGroup={isLastInGroup}
-                            userCustomizations={userCustomizations}
-                            onReply={(msg) => setReplyTo(msg)}
-                          />
-                          )}
-                        </React.Fragment>
-                      );
-                    });
-                  })()
-                )}
-                <div ref={feedBottomRef} />
-              </div>
+                              })()
+                            ) : (
+                              <MessageItem
+                                m={m}
+                                tagColor={tagColor}
+                                isOwnerMsg={isOwnerMsg}
+                                canDelete={canDelete}
+                                onDelete={async (id) => {
+                                  if (!confirm('Delete this message?')) return;
+                                  const msg = circleChatMessages.find(m => m.id === id);
+                                  await deleteMediaFromStorage(msg?.media_url);
+                                  await supabase.from('messages').delete().eq('id', id);
+                                  setCircleChatMessages(prev => prev.filter(msg => msg.id !== id));
+                                }}
+                                onEdit={async (id, content) => {
+                                  await supabase.from('messages').update({ content, edited: true }).eq('id', id);
+                                  setCircleChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content, edited: true } : msg));
+                                }}
+                                currentStudentId={user?.student_id}
+                                avatarUrl={avatarCache[m.sender_id] || null}
+                                onViewProfile={viewUserProfile}
+                                online={isOnline(profileIdCache[m.sender_id])}
+                                readers={isLastMsg && isLastInGroup ? lastMsgReaders : []}
+                                isLastOwn={isLastOwn}
+                                isGrouped={isGrouped}
+                                isLastInGroup={isLastInGroup}
+                                userCustomizations={userCustomizations}
+                                onReply={(msg) => setReplyTo(msg)}
+                              />
+                            )}
+                          </React.Fragment>
+                        );
+                      });
+                    })()
+                  )}
+                  <div ref={feedBottomRef} />
+                </div>
 
-              {isMember(activeCommId) && user?.is_verified && activeComm?.status !== 'pending' && (
-                <div className="composer composer-chat">
-                  {/* Reply preview bar */}
-                  {replyTo && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(0,240,255,0.06)', borderTop: '1px solid rgba(0,240,255,0.15)', fontSize: 12 }}>
-                      <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 11 }}></i>
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>{replyTo.full_name} </span>
-                        <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content?.slice(0, 80)}</span>
-                      </div>
-                      <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
-                        <i className="fa-solid fa-xmark"></i>
-                      </button>
-                    </div>
-                  )}
-                  {circlePendingMedia && (
-                    <MediaPreview 
-                      file={circlePendingMedia.file} 
-                      mediaType={circlePendingMedia.mediaType}
-                      onCancel={() => setCirclePendingMedia(null)}
-                    />
-                  )}
-                  <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <button onClick={() => setShowAttachMenu(v => !v)} disabled={uploading}
-                        style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: showAttachMenu ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)', color: showAttachMenu ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s', transform: showAttachMenu ? 'rotate(45deg)' : 'none' }}>
-                        <i className="fa-solid fa-plus" />
-                      </button>
-                      {showAttachMenu && (
-                        <div style={{ position: 'absolute', bottom: 42, left: 0, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 400 }}>
-                          <MediaUploadButton onMediaSelected={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
-                          <VoiceRecorder onVoiceRecorded={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
+                {isMember(activeCommId) && user?.is_verified && activeComm?.status !== 'pending' && (
+                  <div className="composer composer-chat">
+                    {/* Reply preview bar */}
+                    {replyTo && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(0,240,255,0.06)', borderTop: '1px solid rgba(0,240,255,0.15)', fontSize: 12 }}>
+                        <i className="fa-solid fa-reply" style={{ color: 'var(--cyber-cyan)', fontSize: 11 }}></i>
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>{replyTo.full_name} </span>
+                          <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{replyTo.content?.slice(0, 80)}</span>
                         </div>
-                      )}
-                    </div>
-                    <input ref={circleChatInputRef}
-                      onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
-                      placeholder={`Message ${activeComm.name}...`}
-                      disabled={uploading}
-                      style={{ flex: 1 }} />
-                    {shoutoutSuggestions.length > 0 && (
-                      <div style={{ position: 'absolute', bottom: 52, left: 0, right: 0, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(0,240,255,0.3)', borderRadius: 10, overflow: 'hidden', zIndex: 300, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)' }}>
-                        {shoutoutSuggestions.map(p => (
-                          <div key={p.id} onMouseDown={e => { e.preventDefault(); selectShoutoutMention(p, circleChatInputRef); }}
-                            style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.1)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            {p.id === 'everyone'
-                              ? <><i className="fa-solid fa-users" style={{ color: 'var(--cyber-cyan)', width: 16 }}></i><span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>@everyone</span></>
-                              : <><i className="fa-solid fa-user" style={{ color: 'var(--text-muted)', width: 16 }}></i><span>{p.full_name}</span></>}
-                          </div>
-                        ))}
+                        <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: 0 }}>
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
                       </div>
                     )}
-                    <button className="chat-send-btn" onClick={sendCircleChatPost} disabled={uploading} title="Send">
-                      <i className="fa-solid fa-paper-plane"></i>
-                    </button>
-                  </div>
-                </div>
-              )}
-              {showMembersPanel && (
-                <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
-                  <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS - {circleChatMembers.length}</span><button onClick={() => setShowHierarchyHelp(true)} title='Role Hierarchy' style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}><i className='fa-solid fa-circle-question'></i></button></div>
-                  {[
-                    { label: 'ONLINE', filter: m => isOnline(m.id) },
-                    { label: 'OFFLINE', filter: m => !isOnline(m.id) },
-                  ].map(({ label, filter }) => {
-                    const group = circleChatMembers.filter(filter);
-                    if (!group.length) return null;
-                    return (
-                      <div key={label}>
-                        <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                          {label} · {group.length}
-                        </div>
-                        {group.map(m => {
-                          const memberStudentId = m.student_id || m.ctu_id;
-                          const url = avatarCache[memberStudentId] || m.avatar_url;
-                          const initials = (m.full_name || '?')[0].toUpperCase();
-                          const rankLabels = ['', 'MOD', 'CO-LEAD', 'LEADER'];
-                          return (
-                            <div key={m.id} onClick={() => {
-                              if (memberStudentId === user?.student_id || memberStudentId === String(user?.ctu_id)) {
-                                setShowProfile(true);
-                              } else {
-                                viewUserProfile(memberStudentId);
-                              }
-                            }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
-                              <div style={{ position: 'relative', flexShrink: 0 }}>
-                                <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
-                                  {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
-                                </div>
-                                {isOnline(m.id) && <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)' }} />}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.full_name}</div>
-                                {m.rank_level > 0 && <div style={{ fontSize: 9, color: 'var(--cyber-yellow)', letterSpacing: 1 }}>{rankLabels[m.rank_level] || ''}</div>}
-                              </div>
-                            </div>
-                          );
-                        })}
+                    {circlePendingMedia && (
+                      <MediaPreview
+                        file={circlePendingMedia.file}
+                        mediaType={circlePendingMedia.mediaType}
+                        onCancel={() => setCirclePendingMedia(null)}
+                      />
+                    )}
+                    <div className="c-input-wrap chat-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <button onClick={() => setShowAttachMenu(v => !v)} disabled={uploading}
+                          style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.15)', background: showAttachMenu ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.05)', color: showAttachMenu ? 'var(--cyber-cyan)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, transition: 'all 0.2s', transform: showAttachMenu ? 'rotate(45deg)' : 'none' }}>
+                          <i className="fa-solid fa-plus" />
+                        </button>
+                        {showAttachMenu && (
+                          <div style={{ position: 'absolute', bottom: 42, left: 0, display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 8, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)', zIndex: 400 }}>
+                            <MediaUploadButton onMediaSelected={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
+                            <VoiceRecorder onVoiceRecorded={(m) => { setCirclePendingMedia(m); setShowAttachMenu(false); }} disabled={uploading || !!circlePendingMedia} />
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <input ref={circleChatInputRef}
+                        onChange={e => { handleChatInputChange(e.target.value); setShowAttachMenu(false); }}
+                        placeholder={`Message ${activeComm.name}...`}
+                        disabled={uploading}
+                        style={{ flex: 1 }} />
+                      {shoutoutSuggestions.length > 0 && (
+                        <div style={{ position: 'absolute', bottom: 52, left: 0, right: 0, background: 'var(--card-bg,#1a1a2e)', border: '1px solid rgba(0,240,255,0.3)', borderRadius: 10, overflow: 'hidden', zIndex: 300, boxShadow: '0 -4px 20px rgba(0,0,0,0.5)' }}>
+                          {shoutoutSuggestions.map(p => (
+                            <div key={p.id} onMouseDown={e => { e.preventDefault(); selectShoutoutMention(p, circleChatInputRef); }}
+                              style={{ padding: '9px 14px', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,240,255,0.1)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              {p.id === 'everyone'
+                                ? <><i className="fa-solid fa-users" style={{ color: 'var(--cyber-cyan)', width: 16 }}></i><span style={{ color: 'var(--cyber-cyan)', fontWeight: 700 }}>@everyone</span></>
+                                : <><i className="fa-solid fa-user" style={{ color: 'var(--text-muted)', width: 16 }}></i><span>{p.full_name}</span></>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button className="chat-send-btn" onClick={sendCircleChatPost} disabled={uploading} title="Send">
+                        <i className="fa-solid fa-paper-plane"></i>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {showMembersPanel && (
+                  <div style={{ width: 220, background: 'rgba(13,13,18,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: 'none', borderRadius: '0 0 15px 0', overflowY: 'auto', flexShrink: 0, padding: '14px 0' }}>
+                    <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><span style={{ fontSize: 10, color: 'var(--cyber-cyan)', letterSpacing: 2, fontWeight: 700 }}>MEMBERS - {circleChatMembers.length}</span><button onClick={() => setShowHierarchyHelp(true)} title='Role Hierarchy' style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}><i className='fa-solid fa-circle-question'></i></button></div>
+                    {[
+                      { label: 'ONLINE', filter: m => isOnline(m.id) },
+                      { label: 'OFFLINE', filter: m => !isOnline(m.id) },
+                    ].map(({ label, filter }) => {
+                      const group = circleChatMembers.filter(filter);
+                      if (!group.length) return null;
+                      return (
+                        <div key={label}>
+                          <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
+                            {label} ? {group.length}
+                          </div>
+                          {group.map(m => {
+                            const memberStudentId = m.student_id || m.ctu_id;
+                            const url = avatarCache[memberStudentId] || m.avatar_url;
+                            const initials = (m.full_name || '?')[0].toUpperCase();
+                            const rankLabels = ['', 'MOD', 'CO-LEAD', 'LEADER'];
+                            return (
+                              <div key={m.id} onClick={() => {
+                                if (memberStudentId === user?.student_id || memberStudentId === String(user?.ctu_id)) {
+                                  setShowProfile(true);
+                                } else {
+                                  viewUserProfile(memberStudentId);
+                                }
+                              }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', opacity: isOnline(m.id) ? 1 : 0.45, cursor: 'pointer' }}>
+                                <div style={{ position: 'relative', flexShrink: 0 }}>
+                                  <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'rgba(0,240,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--cyber-cyan)' }}>
+                                    {url ? <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                                  </div>
+                                  {isOnline(m.id) && <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#3ecf8e', border: '2px solid var(--bg-black)' }} />}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.full_name}</div>
+                                  {m.rank_level > 0 && <div style={{ fontSize: 9, color: 'var(--cyber-yellow)', letterSpacing: 1 }}>{rankLabels[m.rank_level] || ''}</div>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>{/* end chat+panel wrapper */}
             </>
           )}
@@ -9080,7 +4518,7 @@ export default function UserPortal() {
             setShowGivePoints({
               targetUser: {
                 id: member.user_id,
-                full_name: member.accounts?.full_name || '??',
+                full_name: member.accounts?.full_name || 'Unknown',
                 ctu_id: member.accounts?.ctu_id || '',
                 avatar_url: member.accounts?.avatar_url || null
               }
@@ -9090,7 +4528,7 @@ export default function UserPortal() {
             setShowFlagUser({
               targetUser: {
                 id: member.user_id,
-                full_name: member.accounts?.full_name || '??',
+                full_name: member.accounts?.full_name || 'Unknown',
                 ctu_id: member.accounts?.ctu_id || '',
                 avatar_url: member.accounts?.avatar_url || null
               }
@@ -9100,7 +4538,7 @@ export default function UserPortal() {
       )}
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={handleCommCreated} userId={user?.id} />}
 
-      {/* ── SUCCESSOR PICKER MODAL ── */}
+      {/* -- SUCCESSOR PICKER MODAL -- */}
       {successorPicker && (
         <div className="modal-overlay" onClick={() => setSuccessorPicker(null)}>
           <div className="auth-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, width: '94vw', padding: '28px 28px 24px', borderRadius: 16 }}>
@@ -9122,7 +4560,7 @@ export default function UserPortal() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{m.full_name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {m.rank_level === 2 ? '👑 Co-Leader' : m.rank_level === 1 ? '🛡 Moderator' : '👤 Member'}
+                      {m.rank_level === 2 ? '👑 Co-Leader' : m.rank_level === 1 ? '🛡️ Moderator' : '👤 Member'}
                     </div>
                   </div>
                   <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11 }} />
@@ -9135,14 +4573,14 @@ export default function UserPortal() {
           </div>
         </div>
       )}
-      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onUpdateUser={setCurrentUser} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
+      {showProfile && <ProfileModal user={user} communities={myCirclesForProfile} onUpdateUser={setCurrentUser} onShowToast={showToast} onClose={async () => { setShowProfile(false); if (user?.id) { const { data: s } = await supabase.from('user_profile_settings').select('active_companion').eq('user_id', user.id).maybeSingle(); if (s?.active_companion) { const { data: item } = await supabase.from('shop_items').select('css_data').eq('id', s.active_companion).single(); if (item?.css_data) { const d = typeof item.css_data === 'string' ? JSON.parse(item.css_data) : item.css_data; setNavCompanion(d?.url || null); } } else { setNavCompanion(null); } } }} onLogout={logout} onAvatarUpdate={(url) => setNavAvatarUrl(url)} currentAvatarUrl={navAvatarUrl} />}
       {viewingProfile && (
         <ProfileModal
           user={viewingProfile}
           communities={viewingProfile._circles || []}
           onClose={() => setViewingProfile(null)}
-          onLogout={() => {}}
-          onAvatarUpdate={() => {}}
+          onLogout={() => { }}
+          onAvatarUpdate={() => { }}
           currentAvatarUrl={viewingProfile.avatar_url}
           onReport={(data) => setShowReport(data)}
           onCircleInfo={(c) => setShowCircleInfo(c)}
@@ -9206,14 +4644,14 @@ export default function UserPortal() {
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>Each role has a daily TP giving cap per recipient. You cannot give points upward (e.g. Member cannot give to Leader). 24-hour cooldown per person.</p>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead><tr style={{ background: 'rgba(0,240,255,0.08)' }}>
-                  {['Role','Max','TP Given','Pool','Total'].map(h => <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1, fontSize: 10, borderBottom: '1px solid rgba(0,240,255,0.2)' }}>{h}</th>)}
+                  {['Role', 'Max', 'TP Given', 'Pool', 'Total'].map(h => <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--cyber-cyan)', fontWeight: 700, letterSpacing: 1, fontSize: 10, borderBottom: '1px solid rgba(0,240,255,0.2)' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {[
-                    { role: 'Leader',     color: 'var(--cyber-yellow)', icon: 'fa-solid fa-crown',       max: '1',         tp: 5, pool: 1, total: 6 },
-                    { role: 'Co-Leader',  color: 'var(--cyber-cyan)',   icon: 'fa-solid fa-star',        max: '2',         tp: 4, pool: 1, total: 5 },
-                    { role: 'Moderator',  color: 'var(--green)',        icon: 'fa-solid fa-shield',      max: '3',         tp: 3, pool: 1, total: 4 },
-                    { role: 'Member',     color: 'var(--text-muted)',   icon: 'fa-solid fa-user',        max: 'Unlimited', tp: 2, pool: 1, total: 3 },
+                    { role: 'Leader', color: 'var(--cyber-yellow)', icon: 'fa-solid fa-crown', max: '1', tp: 5, pool: 1, total: 6 },
+                    { role: 'Co-Leader', color: 'var(--cyber-cyan)', icon: 'fa-solid fa-star', max: '2', tp: 4, pool: 1, total: 5 },
+                    { role: 'Moderator', color: 'var(--green)', icon: 'fa-solid fa-shield', max: '3', tp: 3, pool: 1, total: 4 },
+                    { role: 'Member', color: 'var(--text-muted)', icon: 'fa-solid fa-user', max: 'Unlimited', tp: 2, pool: 1, total: 3 },
                   ].map((r, i) => (
                     <tr key={r.role} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
                       <td style={{ padding: '10px 10px' }}><span style={{ color: r.color, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}><i className={r.icon} style={{ fontSize: 11 }}></i>{r.role}</span></td>
@@ -9226,11 +4664,11 @@ export default function UserPortal() {
                 </tbody>
               </table>
               <div style={{ marginTop: 16, padding: '12px 14px', background: 'rgba(252,238,10,0.05)', border: '1px solid rgba(252,238,10,0.2)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-                <strong style={{ color: 'var(--cyber-yellow)' }}>Rules:</strong><br/>
-                - Max column = max of that role per circle<br/>
-                - TP Given = points given to the recipient<br/>
-                - Pool = points added to the circle TP pool<br/>
-                - You cannot give TP to someone of higher rank<br/>
+                <strong style={{ color: 'var(--cyber-yellow)' }}>Rules:</strong><br />
+                - Max column = max of that role per circle<br />
+                - TP Given = points given to the recipient<br />
+                - Pool = points added to the circle TP pool<br />
+                - You cannot give TP to someone of higher rank<br />
                 - 24-hour cooldown per recipient
               </div>
             </div>
@@ -9275,30 +4713,33 @@ export default function UserPortal() {
       )}
 
       {/* Circle Info Card Modal */}
-      {showCircleInfo && (        <CircleInfoCard
-          circle={showCircleInfo}
-          memberCount={memberCounts[showCircleInfo.id] || 0}
-          myMemberships={myMemberships}
-          myApplications={myApplications}
-          currentUser={user}
-          onClose={() => setShowCircleInfo(null)}
-          onEnter={(commId) => { setShowCircleInfo(null); navTo('circles', commId); }}
-          onRequestJoin={async (commId) => { await requestJoin(commId); setShowCircleInfo(null); }}
-          onApply={(comm) => { setShowCircleInfo(null); setShowApplicationForm({ comm }); }}
-          onAcceptInvite={async (commId) => { await acceptInvite(commId); setShowCircleInfo(null); }}
-          onDeclineInvite={async (commId) => { await declineInvite(commId); setShowCircleInfo(null); }}
-          onLeave={async (commId) => { await leaveCircle(commId); setShowCircleInfo(null); }}
-          onViewApplication={async (myApp, circle) => {
-            const [rRes, qRes] = await Promise.all([
-              supabase.from('application_submissions').select('*').eq('id', myApp.id).single(),
-              supabase.from('Application_questions').select('*').eq('community_id', circle.id).order('order_index'),
-            ]);
-            setShowCircleInfo(null);
-            setViewingApplication({ response: rRes.data, community: circle, questions: qRes.data || [] });
-          }}
-          onViewLeaderProfile={viewUserProfile}
-          onReport={(data) => setShowReport(data)}
-        />
+      {showCircleInfo && (<CircleInfoCard
+        circle={showCircleInfo}
+        memberCount={memberCounts[showCircleInfo.id] || 0}
+        myMemberships={myMemberships}
+        myApplications={myApplications}
+        currentUser={user}
+        onClose={() => setShowCircleInfo(null)}
+        onEnter={(commId) => { setShowCircleInfo(null); navTo('circles', commId); }}
+        onRequestJoin={async (commId) => { await requestJoin(commId); setShowCircleInfo(null); }}
+        onApply={(comm) => { setShowCircleInfo(null); setShowApplicationForm({ comm }); }}
+        onAcceptInvite={async (commId) => { await acceptInvite(commId); setShowCircleInfo(null); }}
+        onDeclineInvite={async (commId) => { await declineInvite(commId); setShowCircleInfo(null); }}
+        onLeave={async (commId) => { await leaveCircle(commId); setShowCircleInfo(null); }}
+        onViewApplication={async (myApp, circle) => {
+          const [rRes, aRes, qList] = await Promise.all([
+            supabase.from('application_submissions').select('*').eq('id', myApp.id).single(),
+            supabase.from('application_answers').select('question_id, answer_text').eq('submission_id', myApp.id),
+            myApp.application_id ? fetchQuestionsWithOptions([myApp.application_id]) : Promise.resolve([]),
+          ]);
+          const answers = {};
+          (aRes.data || []).forEach(ans => { answers[ans.question_id] = ans.answer_text; });
+          setShowCircleInfo(null);
+          setViewingApplication({ response: { ...(rRes.data || {}), answers }, community: circle, questions: qList });
+        }}
+        onViewLeaderProfile={viewUserProfile}
+        onReport={(data) => setShowReport(data)}
+      />
       )}
 
       {/* Theme Picker Modal */}
@@ -9310,6 +4751,36 @@ export default function UserPortal() {
         />
       )}
 
+      {/* Starting Call Loading Overlay */}
+      {startingCall && !activeCall && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9998,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#0d0d12', border: '1px solid rgba(62,207,142,0.35)',
+            borderRadius: 16, padding: '32px 40px', textAlign: 'center',
+            boxShadow: '0 0 40px rgba(0,0,0,0.7)',
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%',
+              background: 'rgba(62,207,142,0.12)', border: '2px solid #3ecf8e',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px', fontSize: 22, color: '#3ecf8e',
+            }}>
+              <i className="fa-solid fa-phone fa-beat"></i>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
+              Connecting to {activeComm?.name || 'Circle'} call...
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+              Setting up voice & video room
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Call Modal */}
       {activeCall && (
         <CallModal
@@ -9319,7 +4790,7 @@ export default function UserPortal() {
           currentUser={user}
           communityId={activeCall.comm_id}
           supabase={supabase}
-          onClose={() => { endCall(); }}
+          onClose={(isLast) => { endCall(isLast); }}
         />
       )}
 
@@ -9337,9 +4808,9 @@ export default function UserPortal() {
                 &times;
               </button>
             </div>
-            
+
             {/* Content */}
-            <div className="events-modal-content"> 
+            <div className="events-modal-content">
               {eventsLoading ? (
                 <div className="events-loading">
                   <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 8 }}></i>
@@ -9362,7 +4833,7 @@ export default function UserPortal() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Circle Events Section */}
                   <div className="events-section">
                     <h3 className="events-section-title">
@@ -9370,7 +4841,7 @@ export default function UserPortal() {
                     </h3>
                     {circleEvents.length === 0 ? (
                       <div className="events-empty">
-                        {communities.length === 0 
+                        {communities.length === 0
                           ? "Join circles to see their events"
                           : "No upcoming events from your circles"}
                       </div>

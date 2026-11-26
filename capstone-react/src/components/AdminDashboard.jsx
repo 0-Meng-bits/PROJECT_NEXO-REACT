@@ -582,8 +582,7 @@ export default function AdminDashboard() {
           event_end_date: newEvent.event_end_date || newEvent.event_date,
           event_time: newEvent.event_time || null,
           location: newEvent.location.trim() || null,
-          poster_name: admin?.full_name || 'Admin',
-          poster_type: 'Admin',
+          poster_id: admin?.id || null,
         }),
       });
       if (res.ok) {
@@ -650,8 +649,9 @@ export default function AdminDashboard() {
       const adminData = adminRes.ok ? await adminRes.json() : {};
       setCommunities(commRes.ok ? await commRes.json() : []);
       setStudents((adminData.students || []).map(s => {
-        const { id: _asId, ...accountStatus } = s.account_status || {};
-        // account_details may come back as an array (one-to-many join) or object
+        // account_status and account_details may come back as an array or object
+        const asRaw = Array.isArray(s.account_status) ? s.account_status[0] : s.account_status;
+        const { id: _asId, ...accountStatus } = asRaw || {};
         const adRaw = Array.isArray(s.account_details) ? s.account_details[0] : s.account_details;
         const { id: _adId, ...accountDetails } = adRaw || {};
         // accounts table uses ctu_id, map it to student_id for display consistency
@@ -978,6 +978,13 @@ export default function AdminDashboard() {
       }),
     });
     if (res.ok) {
+      if (type === 'message') {
+        setAllMessages(prev => prev.filter(m => m.id !== contentId));
+        setGlobalMessages(prev => prev.filter(m => m.id !== contentId));
+      } else if (type === 'announcement') {
+        setAllCircleAnnouncements(prev => prev.filter(a => a.id !== contentId));
+        setAnnouncements(prev => prev.filter(a => a.id !== contentId));
+      }
       showToast('Content removed.');
     } else {
       const err = await res.json().catch(() => ({}));
@@ -1633,7 +1640,7 @@ export default function AdminDashboard() {
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={async () => {
                       setSelectedUser(s);
                       // Fetch fresh photo from account_details on click
-                      const { data: ad } = await supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).single();
+                      const { data: ad } = await supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).maybeSingle();
                       setSelectedUser(prev => ({ ...prev, id_photo_url: ad?.id_photo_url || null, id_verified: ad?.id_verified ?? false }));
                     }}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
@@ -1942,7 +1949,7 @@ export default function AdminDashboard() {
                       general:      { label: 'General',       color: 'var(--text-muted)',   icon: 'fa-solid fa-comment' },
                     };
                     const type = typeMap[a.post_type] || typeMap.general;
-                    const isAnon = a.author_name === 'Anonymous';
+                    const isAnon = Boolean(a.anonymous) || a.author_name === 'Anonymous';
                     // Admin can see the real poster even for anonymous posts
                     const realAuthor = isAnon
                       ? students.find(s => s.id === a.author_id)
@@ -2216,11 +2223,11 @@ export default function AdminDashboard() {
                       <tr key={r.id}>
                         <td style={{ fontSize: 11 }}>
                           <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
-                          <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.student_id}</div>
+                          <div style={{ color: 'var(--text-muted)' }}>{r.reporter?.ctu_id || r.reporter?.student_id}</div>
                         </td>
                         <td style={{ fontSize: 11 }}>
                           <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reported?.full_name || '—'}</div>
-                          <div style={{ color: 'var(--text-muted)' }}>{r.reported?.student_id}</div>
+                          <div style={{ color: 'var(--text-muted)' }}>{r.reported?.ctu_id || r.reported?.student_id}</div>
                         </td>
                         <td><span className="adm-tag">{r.content_type}</span></td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 200 }}>

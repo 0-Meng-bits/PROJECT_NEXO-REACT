@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   LiveKitRoom,
   VideoConference,
@@ -7,56 +7,46 @@ import {
   useTracks,
   ParticipantTile,
   useLocalParticipant,
-  useRoomContext,
+  useConnectionState,
 } from '@livekit/components-react';
-import { Track, RoomEvent } from 'livekit-client';
+import { Track, ConnectionState } from 'livekit-client';
 import '@livekit/components-styles';
 
-// Logs join/leave events as system messages in circle chat
-function ParticipantEventLogger({ communityId, supabase }) {
-  const room = useRoomContext();
-  const loggedRef = React.useRef(new Set());
+// Overlay shown while LiveKit room is still connecting
+function CallConnectingOverlay({ circleName }) {
+  const connectionState = useConnectionState();
+  if (connectionState === ConnectionState.Connected) return null;
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 20,
+      background: '#0d0d12',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 12,
+    }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: '50%',
+        background: 'rgba(62,207,142,0.12)', border: '2px solid #3ecf8e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, color: '#3ecf8e',
+      }}>
+        <i className="fa-solid fa-phone fa-beat"></i>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+        {connectionState === ConnectionState.Reconnecting ? 'Reconnecting...' : `Joining ${circleName} call...`}
+      </div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+        Connecting to voice & video
+      </div>
+    </div>
+  );
+}
 
-  React.useEffect(() => {
-    if (!room || !supabase || !communityId) return;
-
-    const onJoin = (participant) => {
-      if (participant.isLocal) return; // don't log yourself
-      const name = participant.name || participant.identity || 'Someone';
-      const key = `join-${participant.sid}`;
-      if (loggedRef.current.has(key)) return;
-      loggedRef.current.add(key);
-      supabase.from('messages').insert([{
-        full_name: 'System',
-        content: `NEXOSYS:📞 ${name} joined the call`,
-        message_type: 'text',
-        community_id: communityId,
-        channel_id: null,
-        sender_id: null,
-      }]).then(() => {});
-    };
-
-    const onLeave = (participant) => {
-      if (participant.isLocal) return;
-      const name = participant.name || participant.identity || 'Someone';
-      supabase.from('messages').insert([{
-        full_name: 'System',
-        content: `NEXOSYS:📞 ${name} left the call`,
-        message_type: 'text',
-        community_id: communityId,
-        channel_id: null,
-        sender_id: null,
-      }]).then(() => {});
-    };
-
-    room.on(RoomEvent.ParticipantConnected, onJoin);
-    room.on(RoomEvent.ParticipantDisconnected, onLeave);
-    return () => {
-      room.off(RoomEvent.ParticipantConnected, onJoin);
-      room.off(RoomEvent.ParticipantDisconnected, onLeave);
-    };
-  }, [room, supabase, communityId]);
-
+// Keeps track of current participant count so leaving knows if you're the last one
+function ParticipantCountTracker({ countRef }) {
+  const participants = useParticipants();
+  useEffect(() => {
+    countRef.current = participants.length;
+  }, [participants.length, countRef]);
   return null;
 }
 
@@ -74,7 +64,6 @@ function RaiseHandButton({ isMobile = false, communityId, supabase, currentUser 
       if (next && supabase && communityId) {
         const name = currentUser?.full_name || localParticipant.name || 'Someone';
         await supabase.from('messages').insert([{
-          full_name: 'System',
           content: `NEXOSYS:✋ ${name} raised their hand`,
           message_type: 'text',
           community_id: communityId,
@@ -237,6 +226,14 @@ function PipContent({ circleName, onMaximize, onLeave }) {
 
 export default function CallModal({ token, livekitUrl, circleName, currentUser, communityId, supabase, onClose }) {
   const [minimized, setMinimized] = useState(false);
+  const participantCountRef = useRef(1);
+  const closedRef = useRef(false);
+
+  const handleClose = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    onClose(participantCountRef.current <= 1);
+  }, [onClose]);
 
   return (
     // ONE single LiveKitRoom — never unmounts, keeps connection alive
@@ -244,13 +241,13 @@ export default function CallModal({ token, livekitUrl, circleName, currentUser, 
       token={token}
       serverUrl={livekitUrl}
       connect={true}
-      video={true}
-      audio={true}
-      onDisconnected={onClose}
+      video={false}
+      audio={false}
+      onDisconnected={handleClose}
       style={{ display: 'contents' }}
     >
       <RoomAudioRenderer />
-      <ParticipantEventLogger communityId={communityId} supabase={supabase} />
+      <ParticipantCountTracker countRef={participantCountRef} />
 
       {/* Full modal — hidden via CSS when minimized, NOT unmounted */}
       <div style={{
@@ -294,6 +291,7 @@ export default function CallModal({ token, livekitUrl, circleName, currentUser, 
               .lk-participant-tile { border-radius: 10px; }
             `}</style>
             <HandRaisedWatcher />
+            <CallConnectingOverlay circleName={circleName} />
           </div>
         </div>
       </div>
@@ -303,7 +301,7 @@ export default function CallModal({ token, livekitUrl, circleName, currentUser, 
         <PipContent
           circleName={circleName}
           onMaximize={() => setMinimized(false)}
-          onLeave={onClose}
+          onLeave={handleClose}
         />
       )}
     </LiveKitRoom>

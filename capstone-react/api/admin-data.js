@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 export default async function handler(req, res) {
   // POST — write actions (add/delete events)
@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const { action, id, ...payload } = req.body;
     try {
       if (action === 'add_event') {
-        const { title, description, category, event_date, event_end_date, event_time, location, poster_name, poster_type } = payload;
+        const { title, description, category, event_date, event_end_date, event_time, location, poster_id } = payload;
         const eventData = {
           title,
           description: description || null,
@@ -15,8 +15,7 @@ export default async function handler(req, res) {
           event_end_date: event_end_date || event_date || null,
           event_time: event_time || null,
           location: location || null,
-          poster_name: poster_name || 'Admin',
-          poster_type: poster_type || 'Admin',
+          poster_id: poster_id || null,
           community_id: null,
           is_official: true,
         };
@@ -94,11 +93,27 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('point_transactions').insert([{
           user_id, amount: -points_deducted, transaction_type: 'warning', reason: `Warning: ${reason}`, reference_id: warning?.id
         }]);
-        const { data: status } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', user_id).single();
+        const { data: status } = await supabaseAdmin.from('account_status')
+          .select('trust_points, warning_count, suspended_until, is_banned')
+          .eq('id', user_id).maybeSingle();
         const newTP = Math.max(0, (status?.trust_points ?? 10) - points_deducted);
-        await supabaseAdmin.from('account_status').update({ trust_points: newTP }).eq('id', user_id);
+        const newWarnings = (status?.warning_count || 0) + 1;
+        const willSuspend = newTP === 0 && !status?.is_banned;
+        const suspendedUntil = willSuspend ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : undefined;
+        await supabaseAdmin.from('account_status').update({
+          trust_points: newTP,
+          warning_count: newWarnings,
+          ...(suspendedUntil ? { suspended_until: suspendedUntil } : {}),
+        }).eq('id', user_id);
         await supabaseAdmin.from('user_flags').update({ status: 'warning_issued', reviewed_by: admin_id, reviewed_at: new Date().toISOString() }).eq('id', flag_id);
-        return res.json({ ok: true });
+        await supabaseAdmin.from('notifications').insert([{
+          user_id,
+          type: 'audition_update',
+          message: willSuspend
+            ? `🚫 Your account has been suspended for 7 days following a ${severity} warning (${reason}).`
+            : `⚠️ Official ${severity} warning (-${points_deducted} TP, ${newTP} TP remaining): ${reason}`,
+        }]);
+        return res.json({ ok: true, newTP, willSuspend });
       }
       if (action === 'ban_user') {
         const { user_id, admin_id, reason } = payload;
@@ -186,11 +201,9 @@ export default async function handler(req, res) {
         return res.json({ ok: true });
       }
       if (action === 'admin_post') {
-        const { admin_id, admin_name, title, content, post_type } = payload;
+        const { admin_id, title, content, post_type } = payload;
         const { error } = await supabaseAdmin.from('announcements').insert([{
           author_id: admin_id,
-          author_name: admin_name || 'Admin',
-          author_type: 'Admin',
           title, content, post_type: post_type || 'announcement',
           community_id: null,
         }]);
@@ -285,7 +298,10 @@ export default async function handler(req, res) {
       supabaseAdmin.from('announcements').select('*, communities(name)').not('community_id', 'is', null).order('created_at', { ascending: false }).limit(300),
       supabaseAdmin.from('campus_events').select('*').order('event_date', { ascending: true }),
       supabaseAdmin.from('support_tickets').select('*, accounts:user_id(full_name, ctu_id)').order('created_at', { ascending: false }),
-      supabaseAdmin.from('deletion_warnings').select('*').eq('status', 'pending').order('flagged_at', { ascending: false }),
+      Promise.all([
+        supabaseAdmin.from('account_deletion_warnings').select('*').eq('status', 'pending').order('flagged_at', { ascending: false }),
+        supabaseAdmin.from('community_deletion_warnings').select('*').eq('status', 'pending').order('flagged_at', { ascending: false }),
+      ]).then(([a, b]) => ({ data: [...(a.data||[]).map(r=>({...r,target_type:'account',target_id:r.account_id})), ...(b.data||[]).map(r=>({...r,target_type:'community',target_id:r.community_id}))], error: a.error || b.error })),
       supabaseAdmin.from('user_flags').select('*, flagged_user:accounts!flagged_user_id(full_name, ctu_id, account_details(avatar_url)), flagger:accounts!flagger_id(full_name, ctu_id), community:communities(name)').order('created_at', { ascending: false }),
     ]);
 
@@ -300,23 +316,67 @@ export default async function handler(req, res) {
     let auditions = audRes.data || [];
     if (auditions.length > 0) {
       const applicantIds = [...new Set(auditions.map(s => s.applicant_id).filter(Boolean))];
-      const communityIds = [...new Set(auditions.map(s => s.community_id).filter(Boolean))];
       const appIds       = [...new Set(auditions.map(s => s.application_id).filter(Boolean))];
-      const [accsRes, commsRes, appsRes] = await Promise.all([
+      const [accsRes, appsRes] = await Promise.all([
         applicantIds.length ? supabaseAdmin.from('accounts').select('id, full_name, ctu_id').in('id', applicantIds) : { data: [] },
-        communityIds.length ? supabaseAdmin.from('communities').select('id, name').in('id', communityIds)           : { data: [] },
-        appIds.length       ? supabaseAdmin.from('applications').select('id, title').in('id', appIds)              : { data: [] },
+        appIds.length       ? supabaseAdmin.from('applications').select('id, title, community_id').in('id', appIds) : { data: [] },
       ]);
-      const accMap  = Object.fromEntries((accsRes.data  || []).map(a => [a.id, a]));
-      const commMap = Object.fromEntries((commsRes.data || []).map(c => [c.id, c]));
-      const appMap  = Object.fromEntries((appsRes.data  || []).map(a => [a.id, a]));
-      auditions = auditions.map(s => ({
-        ...s,
-        accounts:     accMap[s.applicant_id]  || null,
-        communities:  commMap[s.community_id] || null,
-        Applications: appMap[s.application_id] || null,
-      }));
+      const accMap = Object.fromEntries((accsRes.data || []).map(a => [a.id, a]));
+      const appMap = Object.fromEntries((appsRes.data || []).map(a => [a.id, a]));
+      const communityIds = [...new Set((appsRes.data || []).map(a => a.community_id).filter(Boolean))];
+      const { data: commsData } = communityIds.length
+        ? await supabaseAdmin.from('communities').select('id, name').in('id', communityIds)
+        : { data: [] };
+      const commMap = Object.fromEntries((commsData || []).map(c => [c.id, c]));
+      auditions = auditions.map(s => {
+        const app = appMap[s.application_id] || null;
+        return {
+          ...s,
+          community_id: app?.community_id || null,
+          accounts:     accMap[s.applicant_id]  || null,
+          communities:  app?.community_id ? (commMap[app.community_id] || null) : null,
+          Applications: app,
+        };
+      });
     }
+
+    // Enrich messages with full_name from accounts (since messages.full_name was normalized out)
+    const enrichMessagesAdmin = async (rows) => {
+      if (!rows?.length) return rows || [];
+      const senderIds = [...new Set(rows.map(m => m.sender_id).filter(Boolean))];
+      const { data: senders } = senderIds.length
+        ? await supabaseAdmin.from('accounts').select('ctu_id, full_name').in('ctu_id', senderIds)
+        : { data: [] };
+      const senderMap = Object.fromEntries((senders || []).map(a => [a.ctu_id, a.full_name]));
+      return rows.map(m => ({
+        ...m,
+        full_name: m.content?.startsWith('NEXOSYS:') && !m.sender_id
+          ? 'System'
+          : (senderMap[m.sender_id] || 'User'),
+      }));
+    };
+
+    // Enrich announcements with author_name/author_type from accounts
+    const enrichAnnouncementsAdmin = async (rows) => {
+      if (!rows?.length) return rows || [];
+      const authorIds = [...new Set(rows.map(a => a.author_id).filter(Boolean))];
+      const { data: authors } = authorIds.length
+        ? await supabaseAdmin.from('accounts').select('id, full_name, user_type').in('id', authorIds)
+        : { data: [] };
+      const authorMap = Object.fromEntries((authors || []).map(a => [a.id, a]));
+      return rows.map(a => ({
+        ...a,
+        author_name: a.anonymous ? 'Anonymous' : (authorMap[a.author_id]?.full_name || 'User'),
+        author_type: a.anonymous ? 'Anonymous' : (authorMap[a.author_id]?.user_type || 'Student'),
+      }));
+    };
+
+    const [enrichedAnn, enrichedCircleAnn, enrichedMsgs, enrichedAllMsgs] = await Promise.all([
+      enrichAnnouncementsAdmin(annRes.data || []),
+      enrichAnnouncementsAdmin(circAnnRes.data || []),
+      enrichMessagesAdmin(msgRes.data || []),
+      enrichMessagesAdmin(allMsgRes.data || []),
+    ]);
 
     res.json({
       students: (studRes.data || []).map(s => ({
@@ -326,13 +386,13 @@ export default async function handler(req, res) {
         deletion_flagged_at: delWarnMap[s.id]?.flagged_at ?? null,
         deletion_deadline: delWarnMap[s.id]?.deadline  ?? null,
       })),
-      announcements: annRes.data || [],
+      announcements: enrichedAnn,
       auditions,
-      messages: msgRes.data || [],
+      messages: enrichedMsgs,
       memberships: membRes.data || [],
       reports: repRes.data || [],
-      allMessages: allMsgRes.data || [],
-      circleAnnouncements: circAnnRes.data || [],
+      allMessages: enrichedAllMsgs,
+      circleAnnouncements: enrichedCircleAnn,
       campusEvents: eventsRes.data || [],
       tickets: ticketsRes.data || [],
       userFlags: (flagsRes.data || []).map(f => ({

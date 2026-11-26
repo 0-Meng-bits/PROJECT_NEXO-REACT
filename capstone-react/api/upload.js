@@ -104,7 +104,7 @@ export default async function handler(req, res) {
 
     // ── UPLOAD COVER (COMMUNITY) ────────────────────────────────────────
     if (action === 'upload-cover') {
-      const { communityId, logo_url, cover_url, name, description, category, is_open, interest_tag } = req.body;
+      const { communityId, logo_url, cover_url, name, description, category, is_open, interest_tag, interest_tags } = req.body;
 
       if (!communityId) {
         return res.status(400).json({ error: 'Missing communityId' });
@@ -131,16 +131,33 @@ export default async function handler(req, res) {
       if (description !== undefined) updates.description = description;
       if (category !== undefined) updates.category = category;
       if (is_open !== undefined) updates.is_open = is_open;
-      if (interest_tag !== undefined) updates.interest_tag = interest_tag;
       if (logo_url !== undefined) updates.logo_url = await toStorageUrl(logo_url, 'logo');
       if (cover_url !== undefined) updates.cover_url = await toStorageUrl(cover_url, 'cover');
 
-      const { error } = await supabaseAdmin
-        .from('communities')
-        .update(updates)
-        .eq('id', communityId);
+      if (Object.keys(updates).length > 0) {
+        const { error } = await supabaseAdmin
+          .from('communities')
+          .update(updates)
+          .eq('id', communityId);
 
-      if (error) return res.status(400).json({ error: error.message });
+        if (error) return res.status(400).json({ error: error.message });
+      }
+
+      // Update normalized community_interests junction table
+      const rawTags = interest_tags !== undefined ? interest_tags : interest_tag;
+      if (rawTags !== undefined) {
+        const tagList = Array.isArray(rawTags)
+          ? rawTags.map(t => String(t).trim()).filter(Boolean)
+          : String(rawTags || '').split(',').map(t => t.trim()).filter(Boolean);
+        await supabaseAdmin.from('community_interests').delete().eq('community_id', communityId);
+        if (tagList.length > 0) {
+          const { error: intErr } = await supabaseAdmin.from('community_interests').insert(
+            [...new Set(tagList)].map(interest => ({ community_id: communityId, interest }))
+          );
+          if (intErr) return res.status(400).json({ error: intErr.message });
+        }
+      }
+
       return res.json({ success: true });
     }
 

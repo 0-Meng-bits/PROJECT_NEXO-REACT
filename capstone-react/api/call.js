@@ -33,13 +33,16 @@ export default async function handler(req, res) {
   // ── JOIN / CREATE ROOM ───────────────────────────────────────────────────────
   if (action === 'create') {
     if (!community_id) return res.status(400).json({ message: 'Missing community_id.' });
+    if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+      return res.status(500).json({ message: 'LiveKit credentials are not configured on the server.' });
+    }
 
     const roomName = `nexo-${community_id.slice(0, 8)}`;
 
     // Check for existing active call
     const { data: existing } = await supabaseAdmin
       .from('circle_calls')
-      .select('room_name, room_url')
+      .select('room_name')
       .eq('community_id', community_id)
       .eq('status', 'active')
       .maybeSingle();
@@ -57,6 +60,7 @@ export default async function handler(req, res) {
       room: finalRoomName,
       canPublish: true,
       canSubscribe: true,
+      canUpdateOwnMetadata: true,
     });
     const token = await at.toJwt();
 
@@ -65,7 +69,6 @@ export default async function handler(req, res) {
       await supabaseAdmin.from('circle_calls').insert([{
         community_id,
         room_name: finalRoomName,
-        room_url: LIVEKIT_URL,
         started_by: user.id,
         status: 'active',
       }]);
@@ -95,7 +98,7 @@ export default async function handler(req, res) {
     if (!community_id) return res.status(400).json({ message: 'Missing community_id.' });
     const { data } = await supabaseAdmin
       .from('circle_calls')
-      .select('room_url, room_name, started_at')
+      .select('room_name, started_at')
       .eq('community_id', community_id)
       .eq('status', 'active')
       .maybeSingle();

@@ -20,17 +20,15 @@ export default async function handler(req, res) {
 
       const deadline = makeDeadline();
 
-      // Insert into deletion_warnings (upsert — if one already exists, update it)
-      const { error } = await supabaseAdmin.from('deletion_warnings').upsert([{
-        target_type: 'account',
-        target_id: id,
+      const { error } = await supabaseAdmin.from('account_deletion_warnings').upsert([{
+        account_id: id,
         reason,
         flagged_by: adminId || null,
         flagged_at: new Date().toISOString(),
         deadline,
         status: 'pending',
         resolved_at: null,
-      }], { onConflict: 'target_type,target_id,status' });
+      }], { onConflict: 'account_id,status' });
       if (error) return res.status(400).json({ error: error.message });
 
       const deadlineStr = new Date(deadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -51,16 +49,15 @@ export default async function handler(req, res) {
 
       const deadline = makeDeadline();
 
-      const { error } = await supabaseAdmin.from('deletion_warnings').upsert([{
-        target_type: 'community',
-        target_id: id,
+      const { error } = await supabaseAdmin.from('community_deletion_warnings').upsert([{
+        community_id: id,
         reason,
         flagged_by: adminId || null,
         flagged_at: new Date().toISOString(),
         deadline,
         status: 'pending',
         resolved_at: null,
-      }], { onConflict: 'target_type,target_id,status' });
+      }], { onConflict: 'community_id,status' });
       if (error) return res.status(400).json({ error: error.message });
 
       if (leaderId) {
@@ -82,9 +79,9 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: 'Missing id' });
 
-      const { error } = await supabaseAdmin.from('deletion_warnings')
+      const { error } = await supabaseAdmin.from('account_deletion_warnings')
         .update({ status: 'dismissed', resolved_at: new Date().toISOString() })
-        .eq('target_type', 'account').eq('target_id', id).eq('status', 'pending');
+        .eq('account_id', id).eq('status', 'pending');
       if (error) return res.status(400).json({ error: error.message });
 
       await supabaseAdmin.from('notifications').insert([{
@@ -103,9 +100,9 @@ export default async function handler(req, res) {
 
       const { data: circle } = await supabaseAdmin.from('communities').select('name').eq('id', id).single();
 
-      const { error } = await supabaseAdmin.from('deletion_warnings')
+      const { error } = await supabaseAdmin.from('community_deletion_warnings')
         .update({ status: 'dismissed', resolved_at: new Date().toISOString() })
-        .eq('target_type', 'community').eq('target_id', id).eq('status', 'pending');
+        .eq('community_id', id).eq('status', 'pending');
       if (error) return res.status(400).json({ error: error.message });
 
       if (leaderId) {
@@ -125,10 +122,9 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: 'Missing community id' });
 
-      // Mark the warning as confirmed before deleting
-      await supabaseAdmin.from('deletion_warnings')
+      await supabaseAdmin.from('community_deletion_warnings')
         .update({ status: 'confirmed', resolved_at: new Date().toISOString() })
-        .eq('target_type', 'community').eq('target_id', id).eq('status', 'pending');
+        .eq('community_id', id).eq('status', 'pending');
 
       const { error } = await supabaseAdmin.from('communities').delete().eq('id', id);
       if (error) return res.status(400).json({ error: error.message });
@@ -140,10 +136,9 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: 'Missing user id' });
 
-      // Mark the warning as confirmed (audit trail) before cascading delete
-      await supabaseAdmin.from('deletion_warnings')
+      await supabaseAdmin.from('account_deletion_warnings')
         .update({ status: 'confirmed', resolved_at: new Date().toISOString() })
-        .eq('target_type', 'account').eq('target_id', id).eq('status', 'pending');
+        .eq('account_id', id).eq('status', 'pending');
 
       // Delete from accounts (cascades to account_status, account_details, etc.)
       const { error } = await supabaseAdmin.from('accounts').delete().eq('id', id);

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../lib/api';
 import { INTEREST_LABELS } from '../lib/constants';
 import { supabase } from '../lib/supabase';
@@ -224,13 +224,20 @@ function CircleCard({ circle, onJoin }) {
           {circle.description.slice(0, 100)}{circle.description.length > 100 ? '...' : ''}
         </p>
       )}
-      {circle.interest_tag && (
-        <span style={{
-          fontSize: 10, padding: '2px 8px', borderRadius: 8, marginBottom: 10, display: 'inline-block',
-          background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          {INTEREST_LABELS[circle.interest_tag] || circle.interest_tag}
-        </span>
+      {((circle.interest_tags && circle.interest_tags.length > 0) || circle.interest_tag) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {(Array.isArray(circle.interest_tags) && circle.interest_tags.length > 0
+            ? circle.interest_tags
+            : String(circle.interest_tag || '').split(',').map(t => t.trim()).filter(Boolean)
+          ).map(tag => (
+            <span key={tag} style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 8, display: 'inline-block',
+              background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              {INTEREST_LABELS[tag] || tag}
+            </span>
+          ))}
+        </div>
       )}
       {!circle.is_member && (
         <button
@@ -357,8 +364,13 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
     setConnecting(null);
   };
 
-  // Get all unique interests from the user list for filter chips
-  const allInterests = [...new Set(users.flatMap(u => u.interests || []))].sort();
+  // Build filter chips: always show ALL predefined interests so filters are always visible.
+  // Interests that actually appear in the current user list are "active" (can produce results);
+  // the rest are shown dimmer but still clickable so the UI is consistent.
+  const usedInterests = new Set(users.flatMap(u => u.interests || []));
+  const allInterests = Object.keys(INTEREST_LABELS).sort((a, b) =>
+    INTEREST_LABELS[a].localeCompare(INTEREST_LABELS[b])
+  );
 
   // Filter and view logic
   let displayedUsers = users;
@@ -436,9 +448,8 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
         ))}
       </div>
 
-      {/* Interest filter chips */}
-      {allInterests.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+      {/* Interest filter chips — always shown from the predefined interest list */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
           <button
             onClick={() => setActiveFilter(null)}
             style={{
@@ -449,19 +460,23 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
             }}>
             All
           </button>
-          {allInterests.map(interest => (
-            <button key={interest} onClick={() => setActiveFilter(activeFilter === interest ? null : interest)}
-              style={{
-                padding: '4px 12px', borderRadius: 16, fontSize: 11, fontFamily: 'inherit', cursor: 'pointer',
-                background: activeFilter === interest ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${activeFilter === interest ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
-                color: activeFilter === interest ? 'var(--cyber-cyan)' : 'var(--text-muted)',
-              }}>
-              {INTEREST_LABELS[interest] || interest}
-            </button>
-          ))}
+          {allInterests.map(interest => {
+            const hasUsers = usedInterests.has(interest);
+            const isActive = activeFilter === interest;
+            return (
+              <button key={interest} onClick={() => setActiveFilter(isActive ? null : interest)}
+                style={{
+                  padding: '4px 12px', borderRadius: 16, fontSize: 11, fontFamily: 'inherit', cursor: 'pointer',
+                  background: isActive ? 'rgba(0,240,255,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${isActive ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.1)'}`,
+                  color: isActive ? 'var(--cyber-cyan)' : hasUsers ? 'var(--text-muted)' : 'rgba(255,255,255,0.25)',
+                  opacity: hasUsers || isActive ? 1 : 0.5,
+                }}>
+                {INTEREST_LABELS[interest]}
+              </button>
+            );
+          })}
         </div>
-      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>

@@ -22,13 +22,19 @@ function ProtectedRoute({ children, allowedType }) {
     const refreshToken = localStorage.getItem('refreshToken');
     const storedUser = localStorage.getItem('currentUser');
 
-    // Restore Supabase session if tokens exist (fixes 406 errors)
+    // Restore Supabase session only if not already present (avoids navigator.locks contention)
     if (token && refreshToken) {
-      supabase.auth.setSession({
-        access_token: token,
-        refresh_token: refreshToken
+      supabase.auth.getSession().then(({ data }) => {
+        if (!data?.session) {
+          return supabase.auth.setSession({
+            access_token: token,
+            refresh_token: refreshToken
+          });
+        }
       }).catch(err => {
-        console.error('Failed to restore Supabase session:', err);
+        if (err?.name !== 'NavigatorLockAcquireTimeoutError') {
+          console.error('Failed to restore Supabase session:', err);
+        }
       });
     }
 

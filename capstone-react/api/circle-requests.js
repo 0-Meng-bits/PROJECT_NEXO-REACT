@@ -71,7 +71,6 @@ export default async function handler(req, res) {
         category: request.category,
         icon: request.icon,
         creator_id: request.creator_id,
-        interest_tag: request.interest_tag || null,
         is_open: request.is_open || false,
         logo_url: finalLogoUrl,
         status: 'pending',
@@ -83,6 +82,16 @@ export default async function handler(req, res) {
     if (createError) {
       console.error('[APPROVE CIRCLE]', createError);
       return res.status(500).json({ message: 'Failed to create circle.' });
+    }
+
+    // 1b. Insert normalized community_interests rows if request had interest_tag(s)
+    const requestTags = request.interest_tag
+      ? String(request.interest_tag).split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+    if (requestTags.length > 0) {
+      await supabaseAdmin.from('community_interests').insert(
+        [...new Set(requestTags)].map(interest => ({ community_id: newCommunity.id, interest }))
+      );
     }
 
     // 2. Add creator as a member with Leader rank (rank_level 3)
