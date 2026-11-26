@@ -205,7 +205,7 @@ function MemberCard({ m, onSetRank, onKick, coLeaderCount, moderatorCount, canMa
 }
 
 // -- MANAGE GROUP MODAL --------------------------------------------------------
-export default function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, onGivePoints, onFlagUser }) {
+export default function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner, viewerRankLevel = 0, viewerStudentId, onGivePoints, onFlagUser }) {
   const [form, setForm] = useState({
     name: comm.name,
     description: comm.description || '',
@@ -229,6 +229,7 @@ export default function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner
       message_type: 'text',
       community_id: comm.id,
       channel_id: null,
+      ...(viewerStudentId ? { sender_id: viewerStudentId } : {}),
     }]);
   };
   const [inviteResult, setInviteResult] = useState(null);

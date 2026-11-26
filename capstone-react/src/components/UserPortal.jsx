@@ -2247,12 +2247,11 @@ export default function UserPortal() {
         // Fetch current active members (excluding self) to pick a successor
         const { data: members } = await supabase
           .from('memberships')
-          .select('id, user_id, rank_level, created_at, accounts(full_name, ctu_id)')
+          .select('id, user_id, rank_level, accounts:user_id(full_name, ctu_id)')
           .eq('community_id', commId)
           .eq('status', 'active')
           .neq('user_id', user.id)
-          .order('rank_level', { ascending: false })
-          .order('created_at', { ascending: true });
+          .order('rank_level', { ascending: false });
 
         if (!members || members.length === 0) {
           // No other members ? can leave freely, circle may dissolve
@@ -4737,6 +4736,7 @@ export default function UserPortal() {
         <ManageGroupModal comm={activeComm} onClose={() => setShowManage(false)}
           viewerIsOwner={isOwner}
           viewerRankLevel={myRankLevel}
+          viewerStudentId={user?.student_id}
           onSaved={(updated) => {
             setCommunities(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
             loadCommunities();

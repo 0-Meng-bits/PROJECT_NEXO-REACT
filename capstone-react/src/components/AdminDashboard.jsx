@@ -525,6 +525,7 @@ export default function AdminDashboard() {
   const [audFilter, setAudFilter] = useState('all');
   const [showSectionInfo, setShowSectionInfo] = useState(false);
   const [togglingOfficialId, setTogglingOfficialId] = useState(null);
+  const [processingRequestId, setProcessingRequestId] = useState(null);
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -679,6 +680,8 @@ export default function AdminDashboard() {
   }, []);
 
   const approveCircleRequest = async (req) => {
+    if (processingRequestId === req.id) return;
+    setProcessingRequestId(req.id);
     try {
       const res = await fetch(getApiUrl('/api/circle-requests/approve'), {
         method: 'POST',
@@ -689,29 +692,35 @@ export default function AdminDashboard() {
       if (!res.ok) { 
         const d = await res.json().catch(() => ({ message: 'Unknown error' })); 
         showToast(d.message || 'Failed to approve.'); 
+        await fetchCircleRequests();
         return; 
       }
       
-      const result = await res.json();
+      await res.json();
       showToast(`Circle "${req.name}" approved.`);
       await fetchCircleRequests();
       await fetchData();
     } catch (err) { 
       console.error('[APPROVE ERROR]', err);
       showToast('Network error.'); 
+    } finally {
+      setProcessingRequestId(null);
     }
   };
 
   const rejectCircleRequest = async (req, note) => {
+    if (processingRequestId === req.id) return;
+    setProcessingRequestId(req.id);
     try {
       await fetch(getApiUrl('/api/circle-requests/reject'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: req.id, adminId: admin?.id, note }),
       });
-    } catch { showToast('Network error.'); return; }
-    showToast('Circle request rejected.');
-    fetchCircleRequests();
+      showToast('Circle request rejected.');
+      await fetchCircleRequests();
+    } catch { showToast('Network error.'); }
+    finally { setProcessingRequestId(null); }
   };
 
   const deleteCircleRequest = async (id) => {
@@ -1387,15 +1396,21 @@ export default function AdminDashboard() {
                     </div>
                     {req.status === 'pending' && (
                       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                        <button onClick={() => approveCircleRequest(req)}
-                          style={{ background: 'rgba(62,207,142,0.1)', color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
-                          <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>Approve
+                        <button
+                          disabled={processingRequestId === req.id}
+                          onClick={() => approveCircleRequest(req)}
+                          style={{ background: 'rgba(62,207,142,0.1)', color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', borderRadius: 8, padding: '6px 14px', cursor: processingRequestId === req.id ? 'wait' : 'pointer', opacity: processingRequestId === req.id ? 0.6 : 1, fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                          {processingRequestId === req.id
+                            ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 4 }}></i>Approving...</>
+                            : <><i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>Approve</>}
                         </button>
-                        <button onClick={() => {
-                          const note = prompt('Reason for rejecting (optional):');
-                          if (note !== null) rejectCircleRequest(req, note);
-                        }}
-                          style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid rgba(247,95,95,0.3)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                        <button
+                          disabled={processingRequestId === req.id}
+                          onClick={() => {
+                            const note = prompt('Reason for rejecting (optional):');
+                            if (note !== null) rejectCircleRequest(req, note);
+                          }}
+                          style={{ background: 'rgba(247,95,95,0.1)', color: 'var(--red)', border: '1px solid rgba(247,95,95,0.3)', borderRadius: 8, padding: '6px 14px', cursor: processingRequestId === req.id ? 'not-allowed' : 'pointer', opacity: processingRequestId === req.id ? 0.5 : 1, fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
                           <i className="fa-solid fa-xmark" style={{ marginRight: 4 }}></i>Reject
                         </button>
                       </div>

@@ -44,6 +44,27 @@ export default async function handler(req, res) {
   }
 
   if (action === 'approve') {
+    if (request.status !== 'pending') {
+      return res.status(409).json({ message: `This circle request was already ${request.status}.` });
+    }
+
+    // Atomically claim the pending request so double-clicks cannot create duplicate circles
+    const { data: claimed, error: claimErr } = await supabaseAdmin
+      .from('circle_requests')
+      .update({
+        status: 'approved',
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', requestId)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle();
+
+    if (claimErr || !claimed) {
+      return res.status(409).json({ message: 'This circle request is already being processed or was already approved.' });
+    }
+
     // If logo_url is base64, upload to storage first
     let finalLogoUrl = request.logo_url || null;
     if (finalLogoUrl && finalLogoUrl.startsWith('data:')) {
@@ -81,6 +102,11 @@ export default async function handler(req, res) {
 
     if (createError) {
       console.error('[APPROVE CIRCLE]', createError);
+      // Revert claim so admin can retry if community creation failed
+      await supabaseAdmin
+        .from('circle_requests')
+        .update({ status: 'pending', reviewed_by: null, reviewed_at: null })
+        .eq('id', requestId);
       return res.status(500).json({ message: 'Failed to create circle.' });
     }
 
