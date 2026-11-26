@@ -10,7 +10,7 @@ export function GivePointsModal({ targetUser, onClose, currentUser, communityId,
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
-  const maxAmount = myRankLevel >= 2 ? 5 : 3;
+  const maxAmount = myRankLevel >= 3 ? 5 : myRankLevel === 2 ? 4 : myRankLevel === 1 ? 3 : 2;
   const maxRecipients = myRankLevel >= 2 ? 5 : 3;
 
   const submit = async () => {
@@ -60,7 +60,7 @@ export function GivePointsModal({ targetUser, onClose, currentUser, communityId,
             <div className="input-group">
               <label>POINTS TO GIVE (Max: {maxAmount})</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                {[1, 2, 3, myRankLevel >= 2 ? 4 : null, myRankLevel >= 2 ? 5 : null].filter(Boolean).map(val => (
+                {[1, 2, 3, 4, 5].filter(val => val <= maxAmount).map(val => (
                   <button key={val} onClick={() => setAmount(val)} className="cyber-btn" style={{ flex: 1, padding: '10px', fontSize: 13, background: amount === val ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.1)', color: amount === val ? '#000' : 'var(--cyber-cyan)', border: `1px solid ${amount === val ? 'var(--cyber-cyan)' : 'rgba(0,240,255,0.3)'}` }}>+{val}</button>
                 ))}
               </div>
@@ -79,8 +79,10 @@ export function GivePointsModal({ targetUser, onClose, currentUser, communityId,
                 Your rank: {myRankLevel >= 3 ? 'Leader' : myRankLevel >= 2 ? 'Co-Leader' : myRankLevel >= 1 ? 'Moderator' : 'Member'} — can give up to +{maxAmount} TP · {maxRecipients} people/day
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-crown" style={{ marginRight: 5, color: '#f5e642' }}></i>Leader / Co-Leader</span><span>Max +5 TP · 5 people/day</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-shield" style={{ marginRight: 5, color: 'var(--cyber-cyan)' }}></i>Moderator / Member</span><span>Max +3 TP · 3 people/day</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-crown" style={{ marginRight: 5, color: '#f5e642' }}></i>Leader</span><span>Max +5 TP · 5 people/day</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-star" style={{ marginRight: 5, color: 'var(--cyber-cyan)' }}></i>Co-Leader</span><span>Max +4 TP · 5 people/day</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-shield" style={{ marginRight: 5, color: 'var(--green)' }}></i>Moderator</span><span>Max +3 TP · 3 people/day</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><i className="fa-solid fa-user" style={{ marginRight: 5, color: 'var(--text-muted)' }}></i>Member</span><span>Max +2 TP · 3 people/day</span></div>
               </div>
             </div>
             {error && <div style={{ background: 'rgba(247,95,95,0.1)', border: '1px solid var(--red)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--red)' }}><i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }}></i>{error}</div>}

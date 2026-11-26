@@ -2339,7 +2339,8 @@ export default function UserPortal() {
   const myRankLevel = isOwner ? 3 : (getMembership(activeCommId)?.rank_level ?? 0);
   const myRole = myRankLevel >= 3 ? 'LEADER' : myRankLevel === 2 ? 'CO-LEADER' : myRankLevel === 1 ? 'MODERATOR' : 'MEMBER';
   const canModerate = isOwner || myRankLevel >= 2; // leader or co-leader
-  const tagColor = myRole === 'LEADER' ? 'var(--cyber-yellow)' : myRole === 'CO-LEADER' ? 'var(--cyber-cyan)' : 'var(--text-muted)';
+  const canDeleteChat = isOwner || myRankLevel >= 1; // leader, co-leader, or moderator
+  const tagColor = myRole === 'LEADER' ? 'var(--cyber-yellow)' : myRole === 'CO-LEADER' ? 'var(--cyber-cyan)' : myRole === 'MODERATOR' ? 'var(--green)' : 'var(--text-muted)';
 
   const deleteMediaFromStorage = async (mediaUrl) => {
     if (!mediaUrl) return;
@@ -3906,7 +3907,7 @@ export default function UserPortal() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                         {activeCommId !== 'global' && (
                           <div className="verified-badge" style={{ borderColor: tagColor, color: tagColor, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <i className={myRole === 'LEADER' ? 'fa-solid fa-crown' : myRole === 'CO-LEADER' ? 'fa-solid fa-star' : 'fa-solid fa-user'} style={{ fontSize: 10 }}></i>
+                            <i className={myRole === 'LEADER' ? 'fa-solid fa-crown' : myRole === 'CO-LEADER' ? 'fa-solid fa-star' : myRole === 'MODERATOR' ? 'fa-solid fa-shield' : 'fa-solid fa-user'} style={{ fontSize: 10 }}></i>
                             {myRole}
                           </div>
                         )}
@@ -4332,7 +4333,7 @@ export default function UserPortal() {
                     );
                     return messages.map((m, idx) => {
                       const isOwnerMsg = m.sender_id === user?.student_id;
-                      const canDelete = isOwnerMsg || canModerate;
+                      const canDelete = isOwnerMsg || canDeleteChat;
                       const prev = messages[idx - 1];
                       const next = messages[idx + 1];
                       const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
@@ -4515,7 +4516,7 @@ export default function UserPortal() {
                       return circleChatMessages.map((m, idx) => {
                         const isSysMsg = m.content?.startsWith('NEXOSYS:');
                         const isOwnerMsg = m.sender_id === user?.student_id;
-                        const canDelete = isOwnerMsg || canModerate;
+                        const canDelete = isOwnerMsg || canDeleteChat;
                         const prev = circleChatMessages[idx - 1];
                         const next = circleChatMessages[idx + 1];
                         const showSep = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
@@ -4896,7 +4897,7 @@ export default function UserPortal() {
                 - TP Given = points given to the recipient<br />
                 - Pool = points added to the circle TP pool<br />
                 - You cannot give TP to someone of higher rank<br />
-                - 24-hour cooldown per recipient
+                - 12-hour cooldown per recipient
               </div>
             </div>
           </div>

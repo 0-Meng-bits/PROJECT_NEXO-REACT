@@ -30,16 +30,22 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Cooldown active. Wait 12 hours before giving to this person again.' });
       }
 
-      // Get giver's rank to check daily limits
+      // Get giver's rank to check daily limits & max TP per rank
       let maxRecipients = 3;
+      let maxAmount = 3;
       if (communityId) {
         const { data: membership } = await supabaseAdmin
           .from('memberships')
           .select('rank_level')
           .eq('user_id', giverId)
           .eq('community_id', communityId)
-          .single();
-        if (membership && membership.rank_level >= 2) maxRecipients = 5;
+          .maybeSingle();
+        const rank = membership?.rank_level ?? 0;
+        maxAmount = rank >= 3 ? 5 : rank === 2 ? 4 : rank === 1 ? 3 : 2;
+        if (rank >= 2) maxRecipients = 5;
+      }
+      if (amount > maxAmount) {
+        return res.status(400).json({ error: `Your rank can give at most +${maxAmount} TP per person.` });
       }
 
       // Check daily limit from point_transactions

@@ -706,9 +706,9 @@ export default function ManageGroupModal({ comm, onClose, onSaved, viewerIsOwner
                               onSetRank={setRank} onKick={kickMember}
                               coLeaderCount={coLeaderCount}
                               moderatorCount={moderatorCount}
-                              canManage={viewerRankLevel >= 2}
+                              canManage={viewerRankLevel >= 2 && viewerRankLevel > m.rank_level}
                               onGivePoints={onGivePoints}
-                              onFlagUser={viewerRankLevel >= 2 ? onFlagUser : null}
+                              onFlagUser={viewerRankLevel >= 1 && viewerRankLevel > m.rank_level ? onFlagUser : null}
                               communityCategory={comm.category}
                               onUpdateRole={updateMemberRole}
                             />
