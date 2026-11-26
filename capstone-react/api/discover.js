@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from './_supabase.js';
+import { supabaseAdmin } from './_supabase.js';
 
 // Helper: resolve user ID from Authorization header
 async function getAuthUserId(req) {
@@ -16,12 +16,11 @@ export default async function handler(req, res) {
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
   // 1. Get viewer's own interests for suggested ordering
-  const { data: viewerDetails } = await supabaseAdmin
-    .from('account_details')
-    .select('interests')
-    .eq('id', userId)
-    .single();
-  const viewerInterests = viewerDetails?.interests || [];
+  const { data: viewerInterests } = await supabaseAdmin
+    .from('user_interests')
+    .select('interest')
+    .eq('user_id', userId);
+  const viewerInterestList = (viewerInterests || []).map(r => r.interest);
 
   // 2. Get all users the viewer has blocked or been blocked by
   const { data: blocks } = await supabaseAdmin
@@ -52,23 +51,37 @@ export default async function handler(req, res) {
       .map(([id]) => id)
   );
 
-  // 4. Fetch discoverable users with interests — query account_details, accounts, and account_status separately
-  const { data: details, error: detailsError } = await supabaseAdmin
-    .from('account_details')
-    .select('id, interests, program, avatar_url')
-    .not('interests', 'is', null)
-    .eq('discoverable', true);
+  // 4. Fetch discoverable users with interests — query user_interests, accounts, and account_status separately
+  const { data: interestRows, error: detailsError } = await supabaseAdmin
+    .from('user_interests')
+    .select('user_id, interest');
 
   if (detailsError) {
-    console.error('[DISCOVER] detailsError:', detailsError);
+    console.error('[DISCOVER] interestRows error:', detailsError);
     return res.status(400).json({ message: detailsError.message });
   }
 
-  if (!details || details.length === 0) {
+  if (!interestRows || interestRows.length === 0) {
     return res.json({ users: [], circles: [] });
   }
 
-  const detailIds = details.map(d => d.id);
+  // Group interests by user_id
+  const interestsByUser = {};
+  interestRows.forEach(r => {
+    if (!interestsByUser[r.user_id]) interestsByUser[r.user_id] = [];
+    interestsByUser[r.user_id].push(r.interest);
+  });
+
+  const detailIds = Object.keys(interestsByUser);
+
+  // Fetch account_details for avatar and program
+  const { data: detailRows } = await supabaseAdmin
+    .from('account_details')
+    .select('id, program, avatar_url, discoverable')
+    .in('id', detailIds);
+
+  const detailMap = {};
+  (detailRows || []).forEach(d => { detailMap[d.id] = d; });
 
   // Fetch accounts for these IDs
   const { data: accounts, error: accountsError } = await supabaseAdmin
@@ -93,28 +106,32 @@ export default async function handler(req, res) {
   (statuses || []).forEach(s => { statusMap[s.id] = s; });
 
   // 5. Filter and map to user cards
-  const userCards = details
-    .filter(d => {
-      const status = statusMap[d.id];
+  const userCards = detailIds
+    .filter(id => {
+      const status = statusMap[id];
+      const detail = detailMap[id];
       if (!status?.is_verified) return false;
       if (status?.is_banned) return false;
-      if (!d.interests || d.interests.length === 0) return false;
-      if (d.id === userId) return false;
-      if (blockedIds.has(d.id)) return false;
+      if (!detail?.discoverable) return false;
+      if (!interestsByUser[id] || interestsByUser[id].length === 0) return false;
+      if (id === userId) return false;
+      if (blockedIds.has(id)) return false;
       return true;
     })
-    .map(d => {
-      const acc = accountMap[d.id] || {};
-      const sharedInterests = viewerInterests.filter(i => d.interests.includes(i));
-      const connInfo = connectionMap[d.id] || null;
+    .map(id => {
+      const acc = accountMap[id] || {};
+      const d = detailMap[id] || {};
+      const interests = interestsByUser[id] || [];
+      const sharedInterests = viewerInterestList.filter(i => interests.includes(i));
+      const connInfo = connectionMap[id] || null;
       return {
-        id: d.id,
+        id,
         full_name: acc.full_name || '',
         ctu_id: acc.ctu_id || '',
         user_type: acc.user_type || 'Student',
         program: d.program || '',
         avatar_url: d.avatar_url || null,
-        interests: d.interests || [],
+        interests,
         shared_interest_count: sharedInterests.length,
         connection_status: connInfo?.status || null,
         connection_id: connInfo?.connection_id || null,
@@ -130,7 +147,7 @@ export default async function handler(req, res) {
     return a.full_name.localeCompare(b.full_name);
   });
 
-  // 7. Fetch open circles with membership info for connection-highlight
+  // 7. Fetch open circles with membership info
   const { data: openCircles } = await supabaseAdmin
     .from('communities')
     .select(`
@@ -148,12 +165,16 @@ export default async function handler(req, res) {
     );
     const hasConnectedMember = [...acceptedConnectionIds].some(id => memberIds.has(id));
     const isMember = memberIds.has(userId);
+    const tags = c.interest_tag
+      ? String(c.interest_tag).split(',').map(t => t.trim()).filter(Boolean)
+      : [];
     return {
       id: c.id,
       name: c.name,
       description: c.description,
       category: c.category,
-      interest_tag: c.interest_tag,
+      interest_tags: tags,
+      interest_tag: c.interest_tag || '',
       member_count: memberIds.size,
       has_connected_member: hasConnectedMember,
       is_member: isMember,
