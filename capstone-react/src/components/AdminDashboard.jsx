@@ -524,6 +524,7 @@ export default function AdminDashboard() {
   const [showFlagModal, setShowFlagModal] = useState(null); // { type: 'user'|'circle', id, name, leaderId? }
   const [audFilter, setAudFilter] = useState('all');
   const [showSectionInfo, setShowSectionInfo] = useState(false);
+  const [togglingOfficialId, setTogglingOfficialId] = useState(null);
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -778,17 +779,28 @@ export default function AdminDashboard() {
   };
 
   const toggleOfficialCircle = async (id, currentValue, name) => {
-    const next = !currentValue;
-    const token = localStorage.getItem('accessToken');
-    const res = await fetch(getApiUrl('/api/admin-data'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'toggle_official', id, is_official: next }),
-    });
-    if (res.ok) {
-      showToast(next ? `"${name}" marked as Verified Circle.` : `"${name}" unverified.`);
-      fetchData();
-    } else showToast('Failed to update.');
+    if (togglingOfficialId === id) return;
+    const next = !Boolean(currentValue);
+    setTogglingOfficialId(id);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(getApiUrl('/api/admin-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'toggle_official', id, is_official: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showToast(next ? `"${name}" is now a Verified Circle.` : `"${name}" verification removed.`);
+        await fetchData();
+      } else {
+        showToast(data.message || 'Failed to update verification status.');
+      }
+    } catch {
+      showToast('Network error while updating verification status.');
+    } finally {
+      setTogglingOfficialId(null);
+    }
   };
 
   const deleteCommunity = async (id, name) => {
@@ -1786,13 +1798,34 @@ export default function AdminDashboard() {
                           : <span style={{ fontSize: 11, color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Active</span>}
                       </td>
                       <td>
-                        <button onClick={() => toggleOfficialCircle(c.id, c.is_official, c.name)}
-                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit',
-                            background: c.is_official ? 'rgba(62,207,142,0.15)' : 'rgba(255,255,255,0.05)',
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700,
                             color: c.is_official ? 'var(--green)' : 'var(--text-muted)',
-                            border: `1px solid ${c.is_official ? 'var(--green)' : '#444'}` }}>
-                          {c.is_official ? <><i className="fa-solid fa-circle-check" style={{ marginRight: 5 }}></i>Verified</> : 'Unverified'}
-                        </button>
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                          }}>
+                            <i className={`fa-solid ${c.is_official ? 'fa-circle-check' : 'fa-circle-xmark'}`}></i>
+                            {c.is_official ? 'Verified' : 'Not Verified'}
+                          </span>
+                          <button
+                            disabled={togglingOfficialId === c.id}
+                            onClick={() => toggleOfficialCircle(c.id, c.is_official, c.name)}
+                            title={c.is_official ? `Remove verified status from ${c.name}` : `Mark ${c.name} as Verified`}
+                            style={{
+                              fontSize: 11, padding: '3px 9px', borderRadius: 6, cursor: togglingOfficialId === c.id ? 'wait' : 'pointer',
+                              fontWeight: 700, fontFamily: 'inherit', transition: '0.15s',
+                              opacity: togglingOfficialId === c.id ? 0.6 : 1,
+                              background: c.is_official ? 'rgba(248,113,113,0.12)' : 'rgba(62,207,142,0.15)',
+                              color: c.is_official ? '#f87171' : 'var(--green)',
+                              border: `1px solid ${c.is_official ? 'rgba(248,113,113,0.4)' : 'rgba(62,207,142,0.4)'}`,
+                            }}>
+                            {togglingOfficialId === c.id
+                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 4 }}></i>Saving...</>
+                              : c.is_official
+                                ? 'Unverify'
+                                : 'Verify'}
+                          </button>
+                        </div>
                       </td>
                       <td>
                         <span style={{ fontSize: 11, color: c.application_enabled ? 'var(--green)' : 'var(--text-muted)' }}>

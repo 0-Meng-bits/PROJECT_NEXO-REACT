@@ -212,8 +212,12 @@ export default async function handler(req, res) {
       }
       if (action === 'toggle_official') {
         const { is_official } = payload;
-        await supabaseAdmin.from('communities').update({ is_official }).eq('id', id);
-        return res.json({ ok: true });
+        if (!id || typeof is_official !== 'boolean') {
+          return res.status(400).json({ message: 'Missing or invalid circle id or is_official flag.' });
+        }
+        const { error } = await supabaseAdmin.from('communities').update({ is_official }).eq('id', id);
+        if (error) return res.status(400).json({ message: error.message });
+        return res.json({ ok: true, is_official });
       }
       if (action === 'delete_community') {
         const { error } = await supabaseAdmin.from('communities').delete().eq('id', id);

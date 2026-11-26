@@ -316,6 +316,8 @@ export default function UserPortal() {
   const [postingAnnouncement, setPostingAnnouncement] = useState(false);
   const [postPendingMedia, setPostPendingMedia] = useState(null); // { file, mediaType } for post composers
   const [showComposer, setShowComposer] = useState(false);
+  const [showBulletinComposer, setShowBulletinComposer] = useState(false);
+  const [bulletinPost, setBulletinPost] = useState({ title: '', content: '', post_type: 'announcement', community_id: '', pollOptions: ['', ''], event_metadata: null });
   const [showCircleAnnouncements, setShowCircleAnnouncements] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1017,24 +1019,28 @@ export default function UserPortal() {
       try { mediaUrl = await uploadMediaFile(postPendingMedia.file, user.id, postPendingMedia.mediaType); } catch { /* non-fatal */ }
     }
 
+    const comm = communities.find(c => c.id === commId);
+    const isBulletinCrossPost = Boolean(comm?.is_official && crossPostToFeed && myRankLevel >= 2 && newCirclePost.post_type !== 'thread');
+
     const postPayload = {
       author_id: user.id,
       title: newCirclePost.title.trim(),
       content: newCirclePost.content.trim(),
       post_type: newCirclePost.post_type,
       community_id: commId,
+      cross_posted_from: isBulletinCrossPost ? commId : null,
       media_url: mediaUrl,
     };
     const { data: annData, error } = await supabase.from('announcements').insert([postPayload]).select('id').single();
 
-    // Insert poll options + event metadata into normalized tables
+    // Insert poll options + event metadata into normalized tables (single unified row)
     if (!error && annData?.id) {
       if (pollOptions) {
         await supabase.from('poll_options').insert(
           pollOptions.map((opt, i) => ({ announcement_id: annData.id, option_text: opt, display_order: i }))
         );
       }
-      if (newCirclePost.post_type === 'poll' && newCirclePost.event_metadata?.event_date) {
+      if (newCirclePost.event_metadata?.event_date) {
         await supabase.from('announcement_events').insert({
           announcement_id: annData.id,
           event_date: newCirclePost.event_metadata.event_date,
@@ -1045,23 +1051,13 @@ export default function UserPortal() {
       }
     }
 
-    // If leader/co-leader manually toggled "Post to Home Feed" on a verified circle
-    const comm = communities.find(c => c.id === commId);
-    if (!error && comm?.is_official && crossPostToFeed) {
-      await supabase.from('announcements').insert([{
-        ...postPayload,
-        community_id: null,
-        cross_posted_from: commId,
-      }]);
-    }
-
     setPostingAnnouncement(false);
     if (!error) {
       setNewCirclePost({ title: '', content: '', post_type: 'thread', pollOptions: ['', ''], event_metadata: null });
       setCrossPostToFeed(false);
       setPostPendingMedia(null);
       loadCircleAnnouncements(commId);
-      if (comm?.is_official) loadAnnouncements();
+      if (isBulletinCrossPost) loadAnnouncements();
 
       // Auto-sync to Campus Events if verified circle posts an Event type with metadata
       if (newCirclePost.post_type === 'event' && comm?.is_official && newCirclePost.event_metadata?.event_date) {
@@ -1099,6 +1095,83 @@ export default function UserPortal() {
         }));
         await supabase.from('notifications').insert(notifs);
       }
+    }
+  };
+
+  const postBulletinAnnouncement = async (verifiedLeaderCircles) => {
+    if (!bulletinPost.title.trim()) return;
+    const allowedBulletinTypes = ['announcement', 'event', 'poll'];
+    const type = allowedBulletinTypes.includes(bulletinPost.post_type) ? bulletinPost.post_type : 'announcement';
+    if (type !== 'poll' && !bulletinPost.content.trim()) return;
+    if (type === 'poll') {
+      const valid = bulletinPost.pollOptions.filter(o => o.trim());
+      if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
+    }
+    const isAdmin = user?.user_type === 'Admin';
+    const selectedCommId = bulletinPost.community_id || (!isAdmin ? verifiedLeaderCircles[0]?.id : '');
+    const targetComm = selectedCommId ? verifiedLeaderCircles.find(c => c.id === selectedCommId) : null;
+    if (!isAdmin && !targetComm) {
+      showToast('Only Admin or Verified Circle Leaders/Co-Leaders can post to the Bulletin.');
+      return;
+    }
+
+    if (containsBadWord(bulletinPost.title) || containsBadWord(bulletinPost.content)) {
+      showToast('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      return;
+    }
+
+    setPostingAnnouncement(true);
+    const pollOptions = type === 'poll' ? bulletinPost.pollOptions.filter(o => o.trim()) : null;
+    let mediaUrl = null;
+    if (postPendingMedia) {
+      try { mediaUrl = await uploadMediaFile(postPendingMedia.file, user.id, postPendingMedia.mediaType); } catch { /* non-fatal */ }
+    }
+
+    const postPayload = {
+      author_id: user.id,
+      title: bulletinPost.title.trim(),
+      content: bulletinPost.content.trim(),
+      post_type: type,
+      community_id: targetComm ? targetComm.id : null,
+      cross_posted_from: targetComm ? targetComm.id : null,
+      media_url: mediaUrl,
+    };
+    const { data: annData, error } = await supabase.from('announcements').insert([postPayload]).select('id').single();
+
+    if (!error && annData?.id && pollOptions) {
+      await supabase.from('poll_options').insert(
+        pollOptions.map((opt, i) => ({ announcement_id: annData.id, option_text: opt, display_order: i }))
+      );
+    }
+
+    setPostingAnnouncement(false);
+    if (!error) {
+      setBulletinPost({ title: '', content: '', post_type: 'announcement', community_id: '', pollOptions: ['', ''], event_metadata: null });
+      setPostPendingMedia(null);
+      setShowBulletinComposer(false);
+      loadAnnouncements();
+      if (targetComm && activeCommId === targetComm.id) loadCircleAnnouncements(targetComm.id);
+
+      if (targetComm) {
+        const { data: members } = await supabase
+          .from('memberships')
+          .select('user_id')
+          .eq('community_id', targetComm.id)
+          .eq('status', 'active')
+          .neq('user_id', user.id);
+
+        if (members && members.length > 0) {
+          await supabase.from('notifications').insert(members.map(m => ({
+            user_id: m.user_id,
+            type: 'new_announcement',
+            message: `New ${type === 'poll' ? 'poll' : 'announcement'} in "${targetComm.name}": ${bulletinPost.title.trim()}`,
+            link_comm_id: targetComm.id,
+          })));
+        }
+      }
+      showToast('Published to Bulletin!');
+    } else {
+      showToast('Failed to publish: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -3234,7 +3307,17 @@ export default function UserPortal() {
           )}
 
           {/* -- BULLETIN -- official posts from Admin + verified circle leaders -- */}
-          {section === 'bulletin' && (
+          {section === 'bulletin' && (() => {
+            const isAdminUser = user?.user_type === 'Admin';
+            const myVerifiedLeaderCircles = communities.filter(c => {
+              if (!c.is_official || c.id === 'global') return false;
+              if (c.creator_id === user?.id) return true;
+              const m = myMemberships.find(mem => mem.community_id === c.id && mem.status === 'active');
+              return (m?.rank_level ?? 0) >= 2;
+            });
+            const canPostToBulletin = Boolean(user?.is_verified && (isAdminUser || myVerifiedLeaderCircles.length > 0));
+            const effectiveBulletinCommId = bulletinPost.community_id || (!isAdminUser ? (myVerifiedLeaderCircles[0]?.id || '') : '');
+            return (
             <div className="c-feed fade-in">
               <div className="home-hero" style={{ background: 'linear-gradient(135deg, rgba(0,240,255,0.08), rgba(168,85,247,0.08))', minHeight: 'unset', padding: '24px 28px' }}>
                 <div className="home-hero-text">
@@ -3242,6 +3325,145 @@ export default function UserPortal() {
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>Official announcements, events, and updates from Admin and verified circle leaders.</p>
                 </div>
               </div>
+
+              {/* Direct Bulletin Composer for Admin & Verified Circle Leaders/Co-Leaders */}
+              {canPostToBulletin && (
+                <div className="home-post-composer" style={{ marginTop: 12 }}>
+                  {!showBulletinComposer ? (
+                    <div className="home-composer-header" onClick={() => setShowBulletinComposer(true)} style={{ cursor: 'pointer' }}>
+                      <div className="home-composer-avatar" style={{ background: 'rgba(0,240,255,0.12)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)' }}>
+                        {navAvatarUrl ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                      </div>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 13, flex: 1 }}>
+                        Post an official announcement, event, or poll to the Bulletin...
+                      </span>
+                      <i className="fa-solid fa-thumbtack" style={{ color: 'var(--cyber-cyan)', fontSize: 14 }}></i>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="home-composer-header">
+                        <div className="home-composer-avatar" style={{ background: 'rgba(0,240,255,0.12)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)' }}>
+                          {navAvatarUrl ? <img src={navAvatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>New Official Bulletin</span>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {effectiveBulletinCommId
+                              ? 'Synced to both the Bulletin and the selected verified circle'
+                              : 'Campus-wide official Admin post'}
+                          </div>
+                        </div>
+                        <button onClick={() => { setShowBulletinComposer(false); setBulletinPost({ title: '', content: '', post_type: 'announcement', community_id: '', pollOptions: ['', ''], event_metadata: null }); setPostPendingMedia(null); }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
+                      </div>
+
+                      {/* Posting-as selector */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Posting as:</span>
+                        {(isAdminUser || myVerifiedLeaderCircles.length > 1) ? (
+                          <select
+                            value={effectiveBulletinCommId}
+                            onChange={e => setBulletinPost(p => ({ ...p, community_id: e.target.value }))}
+                            style={{
+                              background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,240,255,0.25)',
+                              borderRadius: 8, padding: '5px 10px', color: 'var(--text-primary)',
+                              fontSize: 12, fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+                            }}>
+                            {isAdminUser && <option value="">Campus Admin (Official)</option>}
+                            {myVerifiedLeaderCircles.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} (Verified Circle)</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fa-solid fa-circle-check"></i>
+                            {myVerifiedLeaderCircles[0]?.name}
+                          </span>
+                        )}
+                      </div>
+
+                      <input className="home-composer-title" placeholder="Bulletin Title"
+                        value={bulletinPost.title}
+                        onChange={e => setBulletinPost(p => ({ ...p, title: e.target.value }))} autoFocus />
+
+                      {bulletinPost.post_type !== 'poll' && (
+                        <textarea className="home-composer-body"
+                          placeholder={bulletinPost.post_type === 'event' ? 'Describe the official event, date, and venue...' : 'Write your official bulletin announcement...'}
+                          value={bulletinPost.content}
+                          onChange={e => setBulletinPost(p => ({ ...p, content: e.target.value }))}
+                          rows={3} />
+                      )}
+
+                      {bulletinPost.post_type === 'poll' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                          {bulletinPost.pollOptions.map((opt, i) => (
+                            <div key={i} style={{ display: 'flex', gap: 6 }}>
+                              <input
+                                className="home-composer-title"
+                                style={{ marginBottom: 0, flex: 1 }}
+                                placeholder={`Option ${i + 1}`}
+                                value={opt}
+                                onChange={e => {
+                                  const opts = [...bulletinPost.pollOptions];
+                                  opts[i] = e.target.value;
+                                  setBulletinPost(p => ({ ...p, pollOptions: opts }));
+                                }}
+                              />
+                              {bulletinPost.pollOptions.length > 2 && (
+                                <button type="button"
+                                  onClick={() => setBulletinPost(p => ({ ...p, pollOptions: p.pollOptions.filter((_, idx) => idx !== i) }))}
+                                  style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: 'var(--red)', cursor: 'pointer', padding: '0 10px', fontSize: 13 }}>
+                                  <i className="fa-solid fa-xmark"></i>
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          {bulletinPost.pollOptions.length < 6 && (
+                            <button type="button"
+                              onClick={() => setBulletinPost(p => ({ ...p, pollOptions: [...p.pollOptions, ''] }))}
+                              style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed rgba(0,240,255,0.3)', borderRadius: 6, color: 'var(--cyber-cyan)', cursor: 'pointer', padding: '4px 12px', fontSize: 11, fontFamily: 'inherit' }}>
+                              + Add Option
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {postPendingMedia && (
+                        <MediaPreview file={postPendingMedia.file} mediaType={postPendingMedia.mediaType} onCancel={() => setPostPendingMedia(null)} />
+                      )}
+
+                      <div className="home-composer-footer">
+                        <div className="home-composer-types">
+                          {['announcement', 'event', 'poll'].map(t => {
+                            const cfg = POST_TYPE[t];
+                            return (
+                              <button key={t}
+                                className={`home-type-btn ${bulletinPost.post_type === t ? 'active' : ''}`}
+                                style={{ '--type-color': cfg.color }}
+                                onClick={() => setBulletinPost(p => ({ ...p, post_type: t }))}>
+                                <i className={cfg.icon}></i> {cfg.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button className="cyber-btn"
+                            style={{ width: 'auto', padding: '8px 20px', fontSize: 12 }}
+                            disabled={postingAnnouncement || !bulletinPost.title.trim() || (bulletinPost.post_type !== 'poll' && !bulletinPost.content.trim())}
+                            onClick={() => postBulletinAnnouncement(myVerifiedLeaderCircles)}>
+                            {postingAnnouncement
+                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Publishing...</>
+                              : <><i className="fa-solid fa-thumbtack" style={{ marginRight: 6 }}></i>Publish</>}
+                          </button>
+                          <MediaUploadButton onMediaSelected={setPostPendingMedia} disabled={postingAnnouncement || !!postPendingMedia} />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Bulletin search */}
               <div style={{ position: 'relative', margin: '10px 0 4px' }}>
@@ -3347,7 +3569,8 @@ export default function UserPortal() {
                 );
               })()}
             </div>
-          )}
+            );
+          })()}
 
           {/* -- GLOBAL FEED "? campus-wide chat -- */}
           {section === 'global' && (
@@ -3896,22 +4119,26 @@ export default function UserPortal() {
                                 <button key={t}
                                   className={`home-type-btn ${newCirclePost.post_type === t ? 'active' : ''}`}
                                   style={{ '--type-color': cfg.color }}
-                                  onClick={() => setNewCirclePost(p => ({ ...p, post_type: t }))}>
+                                  onClick={() => {
+                                    setNewCirclePost(p => ({ ...p, post_type: t }));
+                                    if (t === 'thread') setCrossPostToFeed(false);
+                                  }}>
                                   <i className={cfg.icon}></i> {cfg.label}
                                 </button>
                               );
                             })}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {activeComm.is_official && (
-                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: crossPostToFeed ? 'var(--green)' : 'var(--text-muted)', userSelect: 'none' }}>
+                            {activeComm.is_official && myRankLevel >= 2 && newCirclePost.post_type !== 'thread' && (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, color: crossPostToFeed ? 'var(--green)' : 'var(--text-muted)', userSelect: 'none' }}
+                                title="Also publish this official post to the campus Bulletin">
                                 <input
                                   type="checkbox"
                                   checked={crossPostToFeed}
                                   onChange={e => setCrossPostToFeed(e.target.checked)}
                                   style={{ accentColor: 'var(--green)', width: 13, height: 13, cursor: 'pointer' }}
                                 />
-                                <i className="fa-solid fa-earth-asia" style={{ fontSize: 10 }}></i>
+                                <i className="fa-solid fa-thumbtack" style={{ fontSize: 10 }}></i>
                                 Post to Bulletin
                               </label>
                             )}
