@@ -540,10 +540,10 @@ function AnnouncementCard({ a, user, onPin, onDelete, onVote, onApply, onReport,
               <span style={{ marginLeft: 4, color: 'var(--text-muted)' }}>? {a.author_student_id}</span>
             )}
           </div>
-          {a.cross_posted_from && (
+          {a.cross_posted_from && a.post_type !== 'thread' && a.post_type !== 'general' && (
             <div style={{ fontSize: 10, color: 'var(--green)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
               <i className="fa-solid fa-circle-check"></i>
-              Originally posted in a verified circle
+              Published from a verified circle
             </div>
           )}
           {a.visibility === 'connections' && (
