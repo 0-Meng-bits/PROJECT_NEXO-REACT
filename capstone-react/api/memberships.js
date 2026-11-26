@@ -184,6 +184,9 @@ export default async function handler(req, res) {
         .update({ rank_level: 3 })
         .eq('community_id', community_id)
         .eq('user_id', successor_id);
+      await supabaseAdmin.from('communities')
+        .update({ creator_id: successor_id })
+        .eq('id', community_id);
       await insertNotification({
         userId: successor_id,
         type: 'promoted',
@@ -195,19 +198,34 @@ export default async function handler(req, res) {
     // Delete the membership
     await supabaseAdmin.from('memberships').delete().eq('id', membership.id);
 
-    if (community?.status === 'pending') {
-      if (community.creator_id === userId) {
-        await dissolvePendingCircle(community_id, community.name);
-        return res.json({ success: true, dissolved: true });
-      }
-    } else {
-      // Only run auto-transfer if no successor was explicitly chosen
-      if (!successor_id && membership.rank_level === 3) {
-        await promoteNextLeader(community_id, userId);
+    if (community?.status === 'pending' && community.creator_id === userId) {
+      await dissolvePendingCircle(community_id, community.name);
+      return res.json({ success: true, dissolved: true });
+    }
+
+    // Check if any active members remain; if 0, dissolve the empty circle
+    const { count: remainingActive } = await supabaseAdmin
+      .from('memberships')
+      .select('*', { count: 'exact', head: true })
+      .eq('community_id', community_id)
+      .eq('status', 'active');
+
+    if ((remainingActive ?? 0) === 0) {
+      await supabaseAdmin.from('communities').delete().eq('id', community_id);
+      return res.json({ success: true, dissolved: true });
+    }
+
+    // Only run auto-transfer if no successor was explicitly chosen
+    if (!successor_id && (membership.rank_level === 3 || community?.creator_id === userId)) {
+      const newLeaderId = await promoteNextLeader(community_id, userId);
+      if (newLeaderId) {
+        await supabaseAdmin.from('communities')
+          .update({ creator_id: newLeaderId })
+          .eq('id', community_id);
       }
     }
 
-    return res.json({ success: true });
+    return res.json({ success: true, dissolved: false });
   }
 
   // ── CANCEL CIRCLE — creator cancels a pending circle ──

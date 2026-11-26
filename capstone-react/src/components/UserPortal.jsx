@@ -1872,6 +1872,7 @@ export default function UserPortal() {
       message_type: 'text',
       community_id: commId,
       channel_id: null,
+      ...(user?.student_id ? { sender_id: user.student_id } : {}),
     }]);
   };
 
@@ -2281,9 +2282,16 @@ export default function UserPortal() {
         body: JSON.stringify({ action: 'leave', community_id: commId }),
       });
       if (!res.ok) { showToast('Failed to leave circle.'); leaveCircle._pending = false; return; }
-      await insertSystemMessage(commId, `${user.full_name} left the circle.`);
-      showToast('You have left the circle.');
-      await loadMyMemberships();
+      const leaveData = await res.json().catch(() => ({}));
+      if (leaveData.dissolved) {
+        setCommunities(prev => prev.filter(c => c.id !== commId));
+        showToast('Circle dissolved.');
+        await Promise.all([loadMyMemberships(), loadCommunities()]);
+      } else {
+        await insertSystemMessage(commId, `${user.full_name} left the circle.`);
+        showToast('You have left the circle.');
+        await loadMyMemberships();
+      }
       navTo('home', 'global');
     } finally { leaveCircle._pending = false; }
   };
@@ -2296,10 +2304,17 @@ export default function UserPortal() {
       body: JSON.stringify({ action: 'leave', community_id: commId, successor_id: successorId }),
     });
     if (!res.ok) { showToast('Failed to transfer leadership.'); return; }
+    const leaveData = await res.json().catch(() => ({}));
     setSuccessorPicker(null);
-    await insertSystemMessage(commId, `${user.full_name} left the circle and transferred leadership.`);
-    showToast('Leadership transferred. You have left the circle.');
-    await loadMyMemberships();
+    if (leaveData.dissolved) {
+      setCommunities(prev => prev.filter(c => c.id !== commId));
+      showToast('Circle dissolved.');
+      await Promise.all([loadMyMemberships(), loadCommunities()]);
+    } else {
+      await insertSystemMessage(commId, `${user.full_name} left the circle and transferred leadership.`);
+      showToast('Leadership transferred. You have left the circle.');
+      await Promise.all([loadMyMemberships(), loadCommunities()]);
+    }
     navTo('home', 'global');
   };
 
