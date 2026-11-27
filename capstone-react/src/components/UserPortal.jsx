@@ -1609,6 +1609,17 @@ export default function UserPortal() {
   const backStateRef = useRef({});
   // Registry for child component overlay closers (photo viewers etc.)
   const overlayCloserRef = useRef(null);
+  const hasTrapRef = useRef(false);
+  const [hasHomeTrap, setHasHomeTrap] = useState(false);
+
+  // Add a single trap entry when the user first lands on the home feed
+  useEffect(() => {
+    if (section === 'home' && !hasHomeTrap) {
+      window.history.pushState({ portalTrap: true }, '');
+      setHasHomeTrap(true);
+    }
+  }, [section, hasHomeTrap]);
+
   useEffect(() => {
     backStateRef.current = {
       section,
