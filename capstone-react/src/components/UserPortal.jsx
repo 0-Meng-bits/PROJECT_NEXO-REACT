@@ -1631,21 +1631,28 @@ export default function UserPortal() {
     };
   });
 
-  // Arm the back-button trap on the first user gesture (and re-arm after it's consumed).
-  // Because pointerdown/keydown are real user gestures, Chrome will NOT skip this entry.
+  // Arm the back-button trap on mount (fallback for zero-tap back) AND on the first real
+  // user gesture (touchend/click/keydown — note pointerdown does NOT grant user activation
+  // on mobile touchscreens, which caused Chrome to skip the trap).
   useEffect(() => {
+    if (!window.history.state?.portalTrap && !window.history.state?.portalNav) {
+      window.history.pushState({ portalTrap: true, mount: true }, '', window.location.pathname + window.location.search);
+    }
+
     const armTrap = () => {
       if (trapArmedRef.current) return;
       // Only arm when we don't already have a portalNav entry on top of a trap
       if (window.history.state?.portalNav && window.history.state?.section !== 'home') return;
-      window.history.pushState({ portalTrap: true }, '', window.location.pathname + window.location.search);
+      window.history.pushState({ portalTrap: true, user: true }, '', window.location.pathname + window.location.search);
       trapArmedRef.current = true;
     };
 
-    window.addEventListener('pointerdown', armTrap, { capture: true, passive: true });
+    window.addEventListener('touchend', armTrap, { capture: true, passive: true });
+    window.addEventListener('click', armTrap, { capture: true, passive: true });
     window.addEventListener('keydown', armTrap, { capture: true, passive: true });
     return () => {
-      window.removeEventListener('pointerdown', armTrap, { capture: true });
+      window.removeEventListener('touchend', armTrap, { capture: true });
+      window.removeEventListener('click', armTrap, { capture: true });
       window.removeEventListener('keydown', armTrap, { capture: true });
     };
   }, []);
