@@ -268,17 +268,22 @@ export default function UserPortal() {
   // Helper: update section + community in both state and URL so back/refresh work
   const navTo = useCallback((newSection, newCommId) => {
     const comm = newCommId !== undefined ? newCommId : activeCommId;
+    const prevSection = new URLSearchParams(window.location.search).get('section') || 'home';
     setSection(newSection);
     if (newCommId !== undefined) setActiveCommId(newCommId);
-    // Push a real history entry when leaving home so back returns here first.
-    // Replace when already on a non-home section (no need to stack multiple entries).
+
     const params = new URLSearchParams();
     params.set('section', newSection);
     if (comm && comm !== 'global') params.set('commId', comm);
     const url = window.location.pathname + '?' + params.toString();
-    // Always use replaceState – the popstate trap handles back navigation,
-    // so we don't need extra history entries from tab switches.
-    window.history.replaceState({ portalNav: true }, '', url);
+
+    // Push a real (user-activated) history entry when leaving home so Back returns to home first.
+    // Use replaceState when switching between non-home sections or returning to home via nav.
+    if (newSection !== 'home' && prevSection === 'home') {
+      window.history.pushState({ portalNav: true, section: newSection }, '', url);
+    } else {
+      window.history.replaceState({ portalNav: true, section: newSection }, '', url);
+    }
   }, [activeCommId]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
@@ -360,9 +365,13 @@ export default function UserPortal() {
     }
   }, [blocker.state]);
 
-  // When user cancels logout, just close the modal
+  // When user cancels logout, close modal and re-arm the back trap (this click is a user gesture)
   const handleCancelLogout = () => {
     setShowLogoutConfirm(false);
+    if (!trapArmedRef.current) {
+      window.history.pushState({ portalTrap: true }, '', window.location.pathname + window.location.search);
+      trapArmedRef.current = true;
+    }
   };
 
   // When user confirms logout
@@ -1603,12 +1612,14 @@ export default function UserPortal() {
   }, [section, activeCommId, user?.id, user?.student_id]);
 
   // Ref that always holds the latest state values needed by the back handler.
-  // Avoids stale closures ? listener registered once, reads fresh values via ref.
+  // Avoids stale closures – listener registered once, reads fresh values via ref.
   const backStateRef = useRef({});
   // Registry for child component overlay closers (photo viewers etc.)
   const overlayCloserRef = useRef(null);
-  const hasTrapRef = useRef(false);
-  const [hasHomeTrap, setHasHomeTrap] = useState(false);
+  // Tracks whether a user-activated portalTrap entry is currently on the history stack.
+  // Chrome's History Manipulation Intervention skips pushState entries created without a
+  // user gesture (e.g. on mount or inside popstate), so we arm the trap on pointerdown/keydown.
+  const trapArmedRef = useRef(false);
 
   // Keep backStateRef in sync with current state so the popstate handler reads fresh values
   useEffect(() => {
@@ -1616,71 +1627,74 @@ export default function UserPortal() {
       section,
       showProfile, viewingProfile, showManage, showMembersPanel,
       showNotifications, showShop, showHelp, showThemePicker, showEventsModal,
-      showCreate, showApplicationForm, viewingApplication,
+      showCreate, showApplicationForm, viewingApplication, showLogoutConfirm,
     };
   });
 
-  // Back-button / swipe-back handler – registered ONCE on mount.
-  // We push a single trap entry so the first back press fires popstate
-  // instead of leaving the page. Inside the handler we re-push the trap
-  // so subsequent back presses keep being caught.
+  // Arm the back-button trap on the first user gesture (and re-arm after it's consumed).
+  // Because pointerdown/keydown are real user gestures, Chrome will NOT skip this entry.
   useEffect(() => {
-    // Push ONE trap entry so back button triggers popstate
-    window.history.pushState({ portalTrap: true }, '');
+    const armTrap = () => {
+      if (trapArmedRef.current) return;
+      // Only arm when we don't already have a portalNav entry on top of a trap
+      if (window.history.state?.portalNav && window.history.state?.section !== 'home') return;
+      window.history.pushState({ portalTrap: true }, '', window.location.pathname + window.location.search);
+      trapArmedRef.current = true;
+    };
 
-    const onPopState = (e) => {
-      // Always prevent leaving the page by pushing a new trap immediately
-      // Use setTimeout to ensure the browser has finished its navigation
-      // before we push the new trap entry
-      const handleBack = () => {
-        // Check if a child overlay (photo viewer etc.) is open – close it first
-        if (overlayCloserRef.current) {
-          overlayCloserRef.current();
-          overlayCloserRef.current = null;
-          window.history.pushState({ portalTrap: true }, '');
-          return;
-        }
-        if (window.__nexoOverlayCloser) {
-          window.__nexoOverlayCloser();
-          window.__nexoOverlayCloser = null;
-          window.history.pushState({ portalTrap: true }, '');
-          return;
-        }
+    window.addEventListener('pointerdown', armTrap, { capture: true, passive: true });
+    window.addEventListener('keydown', armTrap, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', armTrap, { capture: true });
+      window.removeEventListener('keydown', armTrap, { capture: true });
+    };
+  }, []);
 
-        const s = backStateRef.current;
+  // Back-button / swipe-back handler – registered ONCE on mount.
+  useEffect(() => {
+    const onPopState = () => {
+      // Check if a child overlay (photo viewer etc.) is open – close it first
+      if (overlayCloserRef.current) {
+        overlayCloserRef.current();
+        overlayCloserRef.current = null;
+        trapArmedRef.current = false;
+        return;
+      }
+      if (window.__nexoOverlayCloser) {
+        window.__nexoOverlayCloser();
+        window.__nexoOverlayCloser = null;
+        trapArmedRef.current = false;
+        return;
+      }
 
-        // a. Close open overlays first
-        if (s.showProfile) { setShowProfile(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.viewingProfile) { setViewingProfile(null); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showManage) { setShowManage(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showMembersPanel) { setShowMembersPanel(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showNotifications) { setShowNotifications(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showShop) { setShowShop(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showHelp) { setShowHelp(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showThemePicker) { setShowThemePicker(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showEventsModal) { setShowEventsModal(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showCreate) { setShowCreate(false); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalTrap: true }, ''); return; }
-        if (s.viewingApplication) { setViewingApplication(null); window.history.pushState({ portalTrap: true }, ''); return; }
+      const s = backStateRef.current;
 
-        // b. Not on home – go to home feed
-        if (s.section !== 'home') {
-          setSection('home');
-          setActiveCommId('global');
-          setActiveChannelId(null);
-          window.history.pushState({ portalTrap: true }, '');
-          window.history.replaceState({ portalNav: true, portalTrap: true }, '', window.location.pathname + '?section=home');
-          return;
-        }
+      // a. Close open overlays first
+      if (s.showProfile) { setShowProfile(false); trapArmedRef.current = false; return; }
+      if (s.viewingProfile) { setViewingProfile(null); trapArmedRef.current = false; return; }
+      if (s.showManage) { setShowManage(false); trapArmedRef.current = false; return; }
+      if (s.showMembersPanel) { setShowMembersPanel(false); trapArmedRef.current = false; return; }
+      if (s.showNotifications) { setShowNotifications(false); trapArmedRef.current = false; return; }
+      if (s.showShop) { setShowShop(false); trapArmedRef.current = false; return; }
+      if (s.showHelp) { setShowHelp(false); trapArmedRef.current = false; return; }
+      if (s.showThemePicker) { setShowThemePicker(false); trapArmedRef.current = false; return; }
+      if (s.showEventsModal) { setShowEventsModal(false); trapArmedRef.current = false; return; }
+      if (s.showCreate) { setShowCreate(false); trapArmedRef.current = false; return; }
+      if (s.showApplicationForm) { setShowApplicationForm(null); trapArmedRef.current = false; return; }
+      if (s.viewingApplication) { setViewingApplication(null); trapArmedRef.current = false; return; }
 
-        // c. On home – show logout modal (still push trap to prevent exit)
-        window.history.pushState({ portalTrap: true }, '');
-        setShowLogoutConfirm(true);
-      };
+      // b. Not on home – go to home feed (we just popped portalNav and landed on portalTrap)
+      if (s.section !== 'home') {
+        setSection('home');
+        setActiveCommId('global');
+        setActiveChannelId(null);
+        window.history.replaceState({ portalTrap: true }, '', window.location.pathname + '?section=home');
+        return;
+      }
 
-      // Use setTimeout(0) so the browser finishes its popstate navigation
-      // before we push our trap back on top
-      setTimeout(handleBack, 0);
+      // c. On home – show logout modal (portalTrap was just popped, so mark unarmed)
+      trapArmedRef.current = false;
+      setShowLogoutConfirm(true);
     };
 
     window.addEventListener('popstate', onPopState);
