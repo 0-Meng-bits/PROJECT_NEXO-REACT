@@ -1,10 +1,190 @@
+import crypto from 'crypto';
 import { supabaseAdmin } from './_supabase.js';
 import nodemailer from 'nodemailer';
+
+function getOtpSecret() {
+  const secret = process.env.OTP_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) throw new Error('Missing OTP secret configuration.');
+  return secret;
+}
+
+function signPayload(payloadObj) {
+  const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
+  const sig = crypto.createHmac('sha256', getOtpSecret()).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifySignedPayload(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const [payload, sig] = token.split('.');
+  const expectedSig = crypto.createHmac('sha256', getOtpSecret()).update(payload).digest('base64url');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expectedSig);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!parsed.exp || Date.now() > parsed.exp) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function hashOtpCode(email, studentId, code) {
+  return crypto
+    .createHmac('sha256', getOtpSecret())
+    .update(`${String(email).trim().toLowerCase()}:${String(studentId).trim()}:${String(code).trim()}`)
+    .digest('hex');
+}
+
+async function sendEmail({ to, subject, html }) {
+  let emailSent = false;
+
+  // Try Resend first (reliable on cloud)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'NEXO Connect <onboarding@resend.dev>', to, subject, html }),
+      });
+      if (resendRes.ok) emailSent = true;
+    } catch { /* non-fatal, fall back to Gmail */ }
+  }
+
+  // Fall back to Gmail with 10s timeout
+  if (!emailSent && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000,
+      });
+      await transporter.sendMail({
+        from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
+        to,
+        subject,
+        html,
+      });
+      emailSent = true;
+      console.log('[SIGNUP] Email sent to', to);
+    } catch (emailErr) {
+      console.error('[SIGNUP] Email send error:', emailErr.message);
+    }
+  }
+
+  return emailSent;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, password, fullName, studentId, user_type, gender, id_verified, id_photo_base64, id_photo_ext, selfie_base64, selfie_ext } = req.body;
+  const { action } = req.body || {};
+
+  // ── STEP 1A: SEND 6-DIGIT EMAIL OTP BEFORE ID/SELFIE ────────────────────
+  if (action === 'send-otp') {
+    const { email, studentId, fullName } = req.body;
+    if (!email || !studentId) {
+      return res.status(400).json({ message: 'Email and CTU ID are required.' });
+    }
+
+    const { data: existingAccount } = await supabaseAdmin
+      .from('accounts')
+      .select('id')
+      .eq('ctu_id', studentId)
+      .maybeSingle();
+    if (existingAccount) {
+      return res.status(400).json({ message: 'This CTU ID is already registered.' });
+    }
+
+    const { data: existingEmailAcc } = await supabaseAdmin
+      .from('accounts')
+      .select('id')
+      .ilike('email', email)
+      .maybeSingle();
+    if (existingEmailAcc) {
+      return res.status(400).json({ message: 'This email is already registered.' });
+    }
+
+    const code = String(crypto.randomInt(100000, 1000000));
+    const otpToken = signPayload({
+      type: 'email_otp',
+      email: email.trim().toLowerCase(),
+      studentId: String(studentId).trim(),
+      codeHash: hashOtpCode(email, studentId, code),
+      exp: Date.now() + 10 * 60 * 1000, // 10 minutes
+    });
+
+    const emailHtml = `
+      <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
+        <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
+        <p>Welcome, <strong>${fullName || 'Student'}</strong>!</p>
+        <p>Enter this 6-digit verification code to continue your registration:</p>
+        <div style="margin:20px 0;padding:16px 24px;background:#16161f;border:1px solid #00f0ff;border-radius:8px;text-align:center;font-size:32px;font-weight:800;letter-spacing:10px;color:#f5e642;">
+          ${code}
+        </div>
+        <p style="color:#888;font-size:12px;">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `;
+
+    const sent = await sendEmail({
+      to: email.trim(),
+      subject: `${code} is your NEXO Connect verification code`,
+      html: emailHtml,
+    });
+
+    if (!sent) {
+      return res.status(500).json({ message: 'Failed to send verification code. Please check your email address and try again.' });
+    }
+
+    return res.json({ ok: true, otpToken });
+  }
+
+  // ── STEP 1B: VERIFY 6-DIGIT EMAIL OTP ────────────────────────────────────
+  if (action === 'verify-otp') {
+    const { email, studentId, code, otpToken } = req.body;
+    const payload = verifySignedPayload(otpToken);
+    if (!payload || payload.type !== 'email_otp') {
+      return res.status(400).json({ message: 'Verification code expired. Please request a new code.' });
+    }
+    if (
+      payload.email !== String(email || '').trim().toLowerCase() ||
+      payload.studentId !== String(studentId || '').trim()
+    ) {
+      return res.status(400).json({ message: 'Email or CTU ID mismatch. Please go back and try again.' });
+    }
+
+    const candidateHash = hashOtpCode(email, studentId, code || '');
+    const a = Buffer.from(candidateHash, 'hex');
+    const b = Buffer.from(payload.codeHash, 'hex');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(400).json({ message: 'Invalid verification code. Please check and try again.' });
+    }
+
+    const emailVerifiedToken = signPayload({
+      type: 'email_verified',
+      email: payload.email,
+      studentId: payload.studentId,
+      exp: Date.now() + 30 * 60 * 1000, // 30 minutes to complete ID + selfie
+    });
+
+    return res.json({ ok: true, emailVerifiedToken });
+  }
+
+  const { email, password, fullName, studentId, user_type, gender, id_verified, id_photo_base64, id_photo_ext, selfie_base64, selfie_ext, emailVerifiedToken } = req.body;
+
+  // Enforce email OTP verification token before creating account
+  const verifiedPayload = verifySignedPayload(emailVerifiedToken);
+  if (
+    !verifiedPayload ||
+    verifiedPayload.type !== 'email_verified' ||
+    verifiedPayload.email !== String(email || '').trim().toLowerCase() ||
+    verifiedPayload.studentId !== String(studentId || '').trim()
+  ) {
+    return res.status(403).json({ message: 'Email verification required before creating an account.' });
+  }
 
   // Validate gender
   const VALID_GENDERS = ['Male', 'Female', 'Prefer not to say'];
@@ -31,11 +211,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'This email is already registered.' });
   }
 
-  // Create user with email_confirm: false (requires verification)
+  // Create user with email already confirmed via 6-digit OTP
   let { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    email_confirm: false, // User must verify email
+    email_confirm: true,
   });
 
   // If Auth says email exists even though accounts has no row, clean up the orphaned auth user and retry
@@ -50,7 +230,7 @@ export default async function handler(req, res) {
       const retry = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        email_confirm: false,
+        email_confirm: true,
       });
       authData = retry.data;
       authError = retry.error;
@@ -95,74 +275,8 @@ export default async function handler(req, res) {
     console.warn('[SIGNUP] New table insert warning:', e.message);
   }
 
-  // Generate email verification link
-  const siteUrl = process.env.SITE_URL || 'https://project-nexo-react.vercel.app';
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'signup',
-    email: email,
-    options: { redirectTo: `${siteUrl}/portal` },
-  });
-
-  if (linkError) {
-    console.error('[SIGNUP] Link generation error:', linkError.message);
-    // Continue anyway - user can request password reset to verify email later
-  }
-
-  // Send verification email — try Resend first, fall back to Gmail
-  if (linkData?.properties?.action_link) {
-    const emailHtml = `
-      <div style="font-family:monospace;background:#0d0d12;color:white;padding:32px;border-radius:8px;">
-        <h2 style="color:#00f0ff;letter-spacing:2px;">NEXO CONNECT</h2>
-        <p>Welcome, <strong>${fullName}</strong>!</p>
-        <p>Click the link below to verify your email and activate your account:</p>
-        <a href="${linkData.properties.action_link}"
-           style="display:inline-block;margin:16px 0;padding:12px 24px;background:#f5e642;color:#0d0d12;font-weight:bold;text-decoration:none;border-radius:4px;">
-          VERIFY EMAIL
-        </a>
-        <p style="color:#666;font-size:12px;">This link expires in 24 hours. After verification, your account will be reviewed by an admin.</p>
-      </div>
-    `;
-
-    let emailSent = false;
-
-    // Try Resend first (reliable on cloud)
-    if (process.env.RESEND_API_KEY) {
-      try {
-        const resendRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: 'NEXO Connect <onboarding@resend.dev>', to: email, subject: 'Verify your NEXO Connect account', html: emailHtml }),
-        });
-        if (resendRes.ok) emailSent = true;
-      } catch { /* non-fatal */ }
-    }
-
-    // Fall back to Gmail with 10s timeout
-    if (!emailSent && process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-      try {
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 10000,
-        });
-        await transporter.sendMail({
-          from: `"NEXO Connect" <${process.env.GMAIL_USER}>`,
-          to: email,
-          subject: 'Verify your NEXO Connect account',
-          html: emailHtml,
-        });
-        console.log('[SIGNUP] Verification email sent to', email);
-      } catch (emailErr) {
-        console.error('[SIGNUP] Email send error:', emailErr.message);
-        // Non-fatal
-      }
-    }
-  }
-
   res.status(200).json({
-    message: 'Account created! Check your email to verify your account.',
+    message: 'Account created! Your account is now pending admin approval.',
     user: { id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type },
     session: null,
   });

@@ -10,8 +10,13 @@ export default function Auth() {
   const initialMode = params.get('mode') || 'login';
 
   const [mode, setMode] = useState(initialMode);
-  const [signupStep, setSignupStep] = useState('form'); // 'form' | 'id-verify'
+  const [signupStep, setSignupStep] = useState('form'); // 'form' | 'email-otp' | 'id-verify'
   const [loading, setLoading] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [emailVerifiedToken, setEmailVerifiedToken] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [idVerified, setIdVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -28,14 +33,87 @@ export default function Auth() {
 
   const update = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
-  // Called when signup form is submitted — go to ID verify step first
-  const handleSignupFormSubmit = (e) => {
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  const sendOtpCode = async () => {
+    setLoading(true);
+    setOtpError('');
+    try {
+      const res = await fetch(getApiUrl('/api/signup'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send-otp',
+          email: form.email,
+          studentId: form.ctuId,
+          fullName: form.fullName,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert('SYSTEM_ALERT: ' + (data.message || 'Could not send verification code.'));
+        return false;
+      }
+      setOtpToken(data.otpToken || '');
+      setOtpCode('');
+      setResendCooldown(30);
+      return true;
+    } catch {
+      alert('TERMINAL_OFFLINE: Connection failed while sending verification code.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Called when signup form is submitted — send 6-digit email OTP first
+  const handleSignupFormSubmit = async (e) => {
     e.preventDefault();
     if (form.password.length < 6) {
       alert('SYSTEM_ALERT: Password must be at least 6 characters.');
       return;
     }
-    setSignupStep('id-verify');
+    const ok = await sendOtpCode();
+    if (ok) setSignupStep('email-otp');
+  };
+
+  // Verify 6-digit email OTP before proceeding to ID + Selfie
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otpCode.trim().length !== 6) {
+      setOtpError('Please enter the 6-digit code sent to your email.');
+      return;
+    }
+    setLoading(true);
+    setOtpError('');
+    try {
+      const res = await fetch(getApiUrl('/api/signup'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify-otp',
+          email: form.email,
+          studentId: form.ctuId,
+          code: otpCode.trim(),
+          otpToken,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setOtpError(data.message || 'Invalid verification code.');
+        return;
+      }
+      setEmailVerifiedToken(data.emailVerifiedToken || '');
+      setSignupStep('id-verify');
+    } catch {
+      setOtpError('Connection failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Called after ID photo and live selfie are submitted — do the actual signup
@@ -90,6 +168,7 @@ export default function Auth() {
           id_photo_ext,
           selfie_base64,
           selfie_ext,
+          emailVerifiedToken,
         }),
       });
 
@@ -328,6 +407,75 @@ export default function Auth() {
           <button className="cyber-btn secondary" onClick={() => setMode('login')} style={{ width: '100%', marginTop: 12 }}>
             BACK TO LOGIN
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EMAIL OTP STEP ──
+  if (mode === 'signup' && signupStep === 'email-otp') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card-glow" style={{ width: '440px' }}>
+          <div className="auth-card fade-in">
+            <button className="auth-back-btn" onClick={() => setSignupStep('form')} type="button" disabled={loading}>
+              <i className="fa-solid fa-arrow-left" /> Change Email
+            </button>
+            <h1 className="logo-text" style={{ marginBottom: 4 }}>NEXO<span>CONNECT</span></h1>
+            <p className="auth-subtitle">VERIFYING_EMAIL_ADDRESS...</p>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, margin: '16px 0' }}>
+              We sent a 6-digit verification code to <strong style={{ color: 'var(--cyber-cyan)' }}>{form.email}</strong>.
+              Enter it below to continue to ID &amp; Selfie verification.
+            </p>
+
+            <form onSubmit={handleVerifyOtp}>
+              <div className="input-group">
+                <label>6-DIGIT VERIFICATION CODE</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  required
+                  disabled={loading}
+                  style={{ textAlign: 'center', fontSize: 24, fontWeight: 800, letterSpacing: 10, fontFamily: 'monospace' }}
+                />
+              </div>
+
+              {otpError && (
+                <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 12 }}>
+                  <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 6 }} />
+                  {otpError}
+                </p>
+              )}
+
+              <button type="submit" className="cyber-btn" disabled={loading || otpCode.length !== 6} style={{ width: '100%' }}>
+                {loading ? 'VERIFYING...' : 'VERIFY & CONTINUE'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 12 }}>
+              <button
+                type="button"
+                className="lnd-inline-link"
+                onClick={sendOtpCode}
+                disabled={loading || resendCooldown > 0}
+              >
+                {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : 'Resend code'}
+              </button>
+              <button
+                type="button"
+                className="lnd-inline-link"
+                onClick={() => setSignupStep('form')}
+                disabled={loading}
+              >
+                Wrong email? Go back
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
