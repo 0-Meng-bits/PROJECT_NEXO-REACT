@@ -39,11 +39,14 @@ export default function Auth() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
+  // Route signup/OTP through Vercel serverless in production (Render blocks Gmail SMTP)
+  const signupUrl = import.meta.env.DEV ? getApiUrl('/api/signup') : '/api/signup';
+
   const sendOtpCode = async () => {
     setLoading(true);
     setOtpError('');
     try {
-      const res = await fetch(getApiUrl('/api/signup'), {
+      const res = await fetch(signupUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,7 +94,7 @@ export default function Auth() {
     setLoading(true);
     setOtpError('');
     try {
-      const res = await fetch(getApiUrl('/api/signup'), {
+      const res = await fetch(signupUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +156,7 @@ export default function Auth() {
       const id_photo_ext = 'jpg';
       const selfie_ext = 'jpg';
 
-      const res = await fetch(getApiUrl('/api/signup'), {
+      const res = await fetch(signupUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

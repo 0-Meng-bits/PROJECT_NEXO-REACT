@@ -39,6 +39,7 @@ function hashOtpCode(email, studentId, code) {
 
 async function sendEmail({ to, subject, html }) {
   let emailSent = false;
+  let lastError = 'Email service not configured.';
 
   // Try Resend first (reliable on cloud)
   if (process.env.RESEND_API_KEY) {
@@ -48,8 +49,16 @@ async function sendEmail({ to, subject, html }) {
         headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: 'NEXO Connect <onboarding@resend.dev>', to, subject, html }),
       });
-      if (resendRes.ok) emailSent = true;
-    } catch { /* non-fatal, fall back to Gmail */ }
+      if (resendRes.ok) {
+        emailSent = true;
+      } else {
+        const errBody = await resendRes.json().catch(() => ({}));
+        lastError = errBody.message || `Resend HTTP ${resendRes.status}`;
+        console.error('[SIGNUP] Resend error:', lastError);
+      }
+    } catch (err) {
+      lastError = err.message;
+    }
   }
 
   // Fall back to Gmail with 10s timeout
@@ -71,11 +80,12 @@ async function sendEmail({ to, subject, html }) {
       emailSent = true;
       console.log('[SIGNUP] Email sent to', to);
     } catch (emailErr) {
+      lastError = emailErr.message;
       console.error('[SIGNUP] Email send error:', emailErr.message);
     }
   }
 
-  return emailSent;
+  return { ok: emailSent, error: lastError };
 }
 
 export default async function handler(req, res) {
@@ -129,14 +139,14 @@ export default async function handler(req, res) {
       </div>
     `;
 
-    const sent = await sendEmail({
+    const { ok: sent, error: sendErr } = await sendEmail({
       to: email.trim(),
       subject: `${code} is your NEXO Connect verification code`,
       html: emailHtml,
     });
 
     if (!sent) {
-      return res.status(500).json({ message: 'Failed to send verification code. Please check your email address and try again.' });
+      return res.status(500).json({ message: `Failed to send verification code: ${sendErr}` });
     }
 
     return res.json({ ok: true, otpToken });
