@@ -48,7 +48,10 @@ CREATE TABLE IF NOT EXISTS account_details (
   onboarding_complete boolean     DEFAULT false,
   gender              text        CHECK (gender IN ('Male', 'Female', 'Prefer not to say')),
   discoverable        boolean     NOT NULL DEFAULT true,
-  bio                 text
+  bio                 text,
+  streak_count        int         NOT NULL DEFAULT 0,
+  last_login_date     date,
+  longest_streak      int         NOT NULL DEFAULT 0
 );
 ALTER TABLE account_details ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own details"   ON account_details;
@@ -501,41 +504,27 @@ CREATE POLICY "Users manage own comment hearts" ON comment_hearts FOR ALL TO aut
   USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 
--- ── 21. POST_LIKES ───────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS post_likes (
+-- ── 21. POST_REACTIONS (merged post_likes + showcase_feedback) ────────
+CREATE TABLE IF NOT EXISTS post_reactions (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   announcement_id uuid        NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
   user_id         uuid        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  reaction_type   text        NOT NULL CHECK (reaction_type IN (
+                                'like', 'effort', 'creative', 'technique', 'style', 'impact'
+                              )),
   created_at      timestamptz DEFAULT now(),
-  UNIQUE (announcement_id, user_id)
+  UNIQUE (announcement_id, user_id, reaction_type)
 );
-CREATE INDEX IF NOT EXISTS idx_post_likes_announcement_id ON post_likes(announcement_id);
-CREATE INDEX IF NOT EXISTS idx_post_likes_user_id         ON post_likes(user_id);
-ALTER TABLE post_likes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users read post likes"  ON post_likes;
-DROP POLICY IF EXISTS "Users manage own likes" ON post_likes;
-CREATE POLICY "Users read post likes"  ON post_likes FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Users manage own likes" ON post_likes FOR ALL    TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
-
--- ── 22. SHOWCASE_FEEDBACK ────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS showcase_feedback (
-  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  announcement_id uuid        NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
-  user_id         uuid        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  tag_type        text        NOT NULL CHECK (tag_type IN ('effort', 'creative', 'technique', 'style', 'impact')),
-  created_at      timestamptz DEFAULT now(),
-  UNIQUE (announcement_id, user_id, tag_type)
-);
-CREATE INDEX IF NOT EXISTS idx_showcase_feedback_announcement ON showcase_feedback(announcement_id);
-CREATE INDEX IF NOT EXISTS idx_showcase_feedback_user         ON showcase_feedback(user_id, announcement_id);
-ALTER TABLE showcase_feedback ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Anyone can view showcase feedback"    ON showcase_feedback;
-DROP POLICY IF EXISTS "Users can add their own feedback"     ON showcase_feedback;
-DROP POLICY IF EXISTS "Users can remove their own feedback"  ON showcase_feedback;
-CREATE POLICY "Anyone can view showcase feedback"   ON showcase_feedback FOR SELECT USING (true);
-CREATE POLICY "Users can add their own feedback"    ON showcase_feedback FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can remove their own feedback" ON showcase_feedback FOR DELETE USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_post_reactions_announcement_id ON post_reactions(announcement_id);
+CREATE INDEX IF NOT EXISTS idx_post_reactions_user_id         ON post_reactions(user_id);
+ALTER TABLE post_reactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can read post reactions"   ON post_reactions;
+DROP POLICY IF EXISTS "Users manage own post reactions" ON post_reactions;
+DROP POLICY IF EXISTS "Service role full access"        ON post_reactions;
+CREATE POLICY "Anyone can read post reactions"   ON post_reactions FOR SELECT USING (true);
+CREATE POLICY "Users manage own post reactions"  ON post_reactions FOR ALL TO authenticated
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Service role full access"         ON post_reactions TO service_role USING (true) WITH CHECK (true);
 
 
 -- ── 23. NOTIFICATIONS ────────────────────────────────────────────────
@@ -893,37 +882,7 @@ CREATE POLICY "Users can read own flags" ON user_flags FOR SELECT USING (auth.ui
 CREATE POLICY "Leaders can create flags" ON user_flags FOR INSERT WITH CHECK (auth.uid() = flagger_id);
 
 
--- ── 36. ABUSE_PATTERNS ───────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS abuse_patterns (
-  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  pattern_type   text        NOT NULL CHECK (pattern_type IN (
-                               'mass_flag_single_user','coordinated_flagging',
-                               'rapid_succession','circle_harassment'
-                             )),
-  community_id   uuid        REFERENCES communities(id),
-  target_user_id uuid        REFERENCES accounts(id),
-  detected_at    timestamptz DEFAULT now(),
-  severity       text        DEFAULT 'medium' CHECK (severity IN ('low','medium','high')),
-  status         text        DEFAULT 'reviewing' CHECK (status IN ('reviewing','confirmed','false_alarm')),
-  admin_notes    text
-);
-CREATE INDEX IF NOT EXISTS idx_abuse_target    ON abuse_patterns(target_user_id);
-CREATE INDEX IF NOT EXISTS idx_abuse_community ON abuse_patterns(community_id);
-CREATE INDEX IF NOT EXISTS idx_abuse_status    ON abuse_patterns(status);
-ALTER TABLE abuse_patterns ENABLE ROW LEVEL SECURITY;
-
-
--- ── 37. ABUSE_PATTERN_FLAGGERS ───────────────────────────────────────
--- 1NF junction table (replaces uuid[] flagger_ids on abuse_patterns)
-CREATE TABLE IF NOT EXISTS abuse_pattern_flaggers (
-  pattern_id uuid NOT NULL REFERENCES abuse_patterns(id) ON DELETE CASCADE,
-  flagger_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  PRIMARY KEY (pattern_id, flagger_id)
-);
-ALTER TABLE abuse_pattern_flaggers ENABLE ROW LEVEL SECURITY;
-
-
--- ── 38. SUPPORT_TICKETS ──────────────────────────────────────────────
+-- ── 36. SUPPORT_TICKETS ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS support_tickets (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid        REFERENCES accounts(id) ON DELETE CASCADE,
@@ -976,18 +935,6 @@ CREATE INDEX IF NOT EXISTS idx_comm_del_warnings_community ON community_deletion
 ALTER TABLE community_deletion_warnings ENABLE ROW LEVEL SECURITY;
 
 
--- ── 41. LOGIN_STREAKS ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS login_streaks (
-  user_id         uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-  streak_count    int  NOT NULL DEFAULT 0,
-  last_login_date date,
-  longest_streak  int  NOT NULL DEFAULT 0
-);
-ALTER TABLE login_streaks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users read own streak" ON login_streaks;
-CREATE POLICY "Users read own streak" ON login_streaks FOR SELECT USING (auth.uid() = user_id);
-
-
 -- ── 42. POINT_TRANSACTIONS ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS point_transactions (
   id               uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1007,25 +954,12 @@ CREATE TABLE IF NOT EXISTS point_transactions (
 CREATE INDEX IF NOT EXISTS idx_point_transactions_user ON point_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_point_transactions_date ON point_transactions(created_at);
 CREATE INDEX IF NOT EXISTS idx_point_transactions_type ON point_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_point_transactions_appreciation_cooldown
+  ON point_transactions(from_user_id, user_id, created_at)
+  WHERE transaction_type = 'appreciation';
 ALTER TABLE point_transactions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own transactions" ON point_transactions;
 CREATE POLICY "Users can read own transactions" ON point_transactions FOR SELECT USING (auth.uid() = user_id);
-
-
--- ── 43. APPRECIATION_COOLDOWNS ───────────────────────────────────────
-CREATE TABLE IF NOT EXISTS appreciation_cooldowns (
-  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  giver_id    uuid        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  receiver_id uuid        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  given_at    timestamptz DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_cooldowns_giver    ON appreciation_cooldowns(giver_id, given_at);
-CREATE INDEX IF NOT EXISTS idx_cooldowns_receiver ON appreciation_cooldowns(receiver_id);
-ALTER TABLE appreciation_cooldowns ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can read own cooldowns" ON appreciation_cooldowns;
-DROP POLICY IF EXISTS "Users can insert cooldowns"   ON appreciation_cooldowns;
-CREATE POLICY "Users can read own cooldowns" ON appreciation_cooldowns FOR SELECT USING (auth.uid() = giver_id OR auth.uid() = receiver_id);
-CREATE POLICY "Users can insert cooldowns"   ON appreciation_cooldowns FOR INSERT WITH CHECK (auth.uid() = giver_id);
 
 
 -- ── 44. SHOP_ITEMS ───────────────────────────────────────────────────
@@ -1312,70 +1246,13 @@ RETURNS boolean AS $$
 DECLARE last_given timestamptz;
 BEGIN
   IF p_giver_id = p_receiver_id THEN RETURN false; END IF;
-  SELECT MAX(given_at) INTO last_given
-  FROM appreciation_cooldowns
-  WHERE giver_id = p_giver_id AND receiver_id = p_receiver_id;
+  SELECT MAX(created_at) INTO last_given
+  FROM point_transactions
+  WHERE transaction_type = 'appreciation'
+    AND from_user_id = p_giver_id
+    AND user_id = p_receiver_id;
   IF last_given IS NULL THEN RETURN true; END IF;
   RETURN NOW() - last_given >= INTERVAL '12 hours';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION detect_abuse_patterns()
-RETURNS void AS $$
-DECLARE
-  rec record;
-  new_pattern_id uuid;
-BEGIN
-  -- Mass flagging: 3+ pending flags on same user from same community in 24h
-  FOR rec IN
-    SELECT community_id, flagged_user_id, ARRAY_AGG(DISTINCT flagger_id) AS flaggers
-    FROM user_flags
-    WHERE created_at > NOW() - INTERVAL '24 hours'
-      AND status = 'pending'
-    GROUP BY community_id, flagged_user_id
-    HAVING COUNT(*) >= 3
-  LOOP
-    IF NOT EXISTS (
-      SELECT 1 FROM abuse_patterns
-      WHERE pattern_type = 'mass_flag_single_user'
-        AND community_id IS NOT DISTINCT FROM rec.community_id
-        AND target_user_id = rec.flagged_user_id
-        AND status = 'reviewing'
-    ) THEN
-      INSERT INTO abuse_patterns (pattern_type, community_id, target_user_id, severity)
-      VALUES ('mass_flag_single_user', rec.community_id, rec.flagged_user_id, 'high')
-      RETURNING id INTO new_pattern_id;
-
-      INSERT INTO abuse_pattern_flaggers (pattern_id, flagger_id)
-      SELECT new_pattern_id, UNNEST(rec.flaggers)
-      ON CONFLICT DO NOTHING;
-    END IF;
-  END LOOP;
-
-  -- Rapid succession: Same user flagged 5+ times in 7 days
-  FOR rec IN
-    SELECT flagged_user_id, ARRAY_AGG(DISTINCT flagger_id) AS flaggers
-    FROM user_flags
-    WHERE created_at > NOW() - INTERVAL '7 days'
-      AND status = 'pending'
-    GROUP BY flagged_user_id
-    HAVING COUNT(*) >= 5
-  LOOP
-    IF NOT EXISTS (
-      SELECT 1 FROM abuse_patterns
-      WHERE pattern_type = 'rapid_succession'
-        AND target_user_id = rec.flagged_user_id
-        AND status = 'reviewing'
-    ) THEN
-      INSERT INTO abuse_patterns (pattern_type, target_user_id, severity)
-      VALUES ('rapid_succession', rec.flagged_user_id, 'medium')
-      RETURNING id INTO new_pattern_id;
-
-      INSERT INTO abuse_pattern_flaggers (pattern_id, flagger_id)
-      SELECT new_pattern_id, UNNEST(rec.flaggers)
-      ON CONFLICT DO NOTHING;
-    END IF;
-  END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1470,7 +1347,7 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================
--- TABLE COUNT SUMMARY (51 normalized tables)
+-- TABLE COUNT SUMMARY (46 normalized tables)
 -- ============================================================
 -- 1.  accounts
 -- 2.  account_status
@@ -1492,35 +1369,30 @@ ON CONFLICT DO NOTHING;
 -- 18. announcement_events
 -- 19. post_comments
 -- 20. comment_hearts
--- 21. post_likes
--- 22. showcase_feedback
--- 23. notifications
--- 24. notification_mutes
--- 25. applications
--- 26. application_questions
--- 27. application_question_options
--- 28. application_submissions
--- 29. application_answers
--- 30. connections
--- 31. blocks
--- 32. reports
--- 33. user_warnings
--- 34. warning_appeals
--- 35. user_flags
--- 36. abuse_patterns
--- 37. abuse_pattern_flaggers
--- 38. support_tickets
--- 39. account_deletion_warnings
--- 40. community_deletion_warnings
--- 41. login_streaks
--- 42. point_transactions
--- 43. appreciation_cooldowns
--- 44. shop_items
--- 45. user_purchases
--- 46. user_profile_settings
--- 47. profile_photos
--- 48. profile_photo_reactions
--- 49. circle_reviews
--- 50. circle_calls
--- 51. task_items
+-- 21. post_reactions
+-- 22. notifications
+-- 23. notification_mutes
+-- 24. applications
+-- 25. application_questions
+-- 26. application_question_options
+-- 27. application_submissions
+-- 28. application_answers
+-- 29. connections
+-- 30. blocks
+-- 31. reports
+-- 32. user_warnings
+-- 33. warning_appeals
+-- 34. user_flags
+-- 35. support_tickets
+-- 36. account_deletion_warnings
+-- 37. community_deletion_warnings
+-- 38. point_transactions
+-- 39. shop_items
+-- 40. user_purchases
+-- 41. user_profile_settings
+-- 42. profile_photos
+-- 43. profile_photo_reactions
+-- 44. circle_reviews
+-- 45. circle_calls
+-- 46. task_items
 -- ============================================================
