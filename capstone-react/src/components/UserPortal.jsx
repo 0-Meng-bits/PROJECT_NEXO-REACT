@@ -1612,14 +1612,7 @@ export default function UserPortal() {
   const hasTrapRef = useRef(false);
   const [hasHomeTrap, setHasHomeTrap] = useState(false);
 
-  // Add a single trap entry when the user first lands on the home feed
-  useEffect(() => {
-    if (section === 'home' && !hasHomeTrap) {
-      window.history.pushState({ portalTrap: true }, '');
-      setHasHomeTrap(true);
-    }
-  }, [section, hasHomeTrap]);
-
+  // Keep backStateRef in sync with current state so the popstate handler reads fresh values
   useEffect(() => {
     backStateRef.current = {
       section,
@@ -1629,18 +1622,19 @@ export default function UserPortal() {
     };
   });
 
-  // Guard flag: set to true when WE trigger replaceState/pushState so popstate
-  // Back-button / swipe-back handler ? registered ONCE on mount.
-  // pushState never fires popstate ? only the user's back gesture does.
-  // So every popstate here is a genuine back press, no need to suppress.
+  // Back-button / swipe-back handler – registered ONCE on mount.
+  // We push a single trap entry so the first back press fires popstate
+  // instead of leaving the page. Inside the handler we re-push the trap
+  // so subsequent back presses keep being caught.
   useEffect(() => {
-    // Push a trap entry so we can intercept the back button
+    // Push ONE trap entry so back button triggers popstate
     window.history.pushState({ portalTrap: true }, '');
 
     const onPopState = () => {
+      // Re-push trap so the next back press is also caught
       window.history.pushState({ portalTrap: true }, '');
 
-      // Check if a child overlay (photo viewer etc.) is open ? close it first
+      // Check if a child overlay (photo viewer etc.) is open – close it first
       if (overlayCloserRef.current) {
         overlayCloserRef.current();
         overlayCloserRef.current = null;
@@ -1661,13 +1655,14 @@ export default function UserPortal() {
       if (s.showMembersPanel) { setShowMembersPanel(false); return; }
       if (s.showNotifications) { setShowNotifications(false); return; }
       if (s.showShop) { setShowShop(false); return; }
-      if (s.showHelp) { setShowHelp(false); return; } if (s.showThemePicker) { setShowThemePicker(false); return; }
+      if (s.showHelp) { setShowHelp(false); return; }
+      if (s.showThemePicker) { setShowThemePicker(false); return; }
       if (s.showEventsModal) { setShowEventsModal(false); return; }
       if (s.showCreate) { setShowCreate(false); return; }
       if (s.showApplicationForm) { setShowApplicationForm(null); return; }
       if (s.viewingApplication) { setViewingApplication(null); return; }
 
-      // b. Not on home ? go to home feed
+      // b. Not on home – go to home feed
       if (s.section !== 'home') {
         setSection('home');
         setActiveCommId('global');
@@ -1676,7 +1671,7 @@ export default function UserPortal() {
         return;
       }
 
-      // c. On home ? show logout modal
+      // c. On home – show logout modal
       setShowLogoutConfirm(true);
     };
 
