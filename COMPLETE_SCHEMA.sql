@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS account_details (
   avatar_url          text,
   cover_url           text,
   id_photo_url        text,
+  selfie_url          text,
   id_verified         boolean     DEFAULT false,
   last_seen           timestamptz,
   onboarding_complete boolean     DEFAULT false,

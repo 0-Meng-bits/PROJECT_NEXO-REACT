@@ -1589,7 +1589,7 @@ export default function AdminDashboard() {
             ) : (
               <div style={{ overflowX: 'auto' }}>
               <table className="adm-table">
-                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID Photo</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
+                <thead><tr><th>CTU ID</th><th>Full Name</th><th>Type</th><th>School ID &amp; Selfie</th><th>Scanner</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody>
                   {pending.map(s => (
                     <tr key={s.id}>
@@ -1597,20 +1597,31 @@ export default function AdminDashboard() {
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
                       <td><span className="adm-tag">{s.user_type}</span></td>
                       <td>
-                        {s.id_photo_url ? (
-                          <a href={s.id_photo_url} target="_blank" rel="noreferrer">
-                            <img
-                              src={s.id_photo_url}
-                              alt="School ID"
-                              style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: `1px solid ${s.id_verified ? 'rgba(62,207,142,0.4)' : 'rgba(247,169,79,0.4)'}`, cursor: 'pointer' }}
-                            />
-                          </a>
-                        ) : (
-                          <span style={{ fontSize: 11, color: 'var(--red)' }}>
-                            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
-                            No photo
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {s.id_photo_url ? (
+                            <a href={s.id_photo_url} target="_blank" rel="noreferrer" title="School ID Photo">
+                              <img
+                                src={s.id_photo_url}
+                                alt="School ID"
+                                style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6, border: `1px solid ${s.id_verified ? 'rgba(62,207,142,0.4)' : 'rgba(247,169,79,0.4)'}`, cursor: 'pointer' }}
+                              />
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--red)' }}>
+                              <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
+                              No ID
+                            </span>
+                          )}
+                          {s.selfie_url && (
+                            <a href={s.selfie_url} target="_blank" rel="noreferrer" title="Live Selfie">
+                              <img
+                                src={s.selfie_url}
+                                alt="Live Selfie"
+                                style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(0,240,255,0.4)', cursor: 'pointer' }}
+                              />
+                            </a>
+                          )}
+                        </div>
                       </td>
                       <td>
                         {!s.id_photo_url ? (
@@ -1667,8 +1678,8 @@ export default function AdminDashboard() {
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={async () => {
                       setSelectedUser(s);
                       // Fetch fresh photo from account_details on click
-                      const { data: ad } = await supabase.from('account_details').select('id_photo_url, id_verified').eq('id', s.id).maybeSingle();
-                      setSelectedUser(prev => ({ ...prev, id_photo_url: ad?.id_photo_url || null, id_verified: ad?.id_verified ?? false }));
+                      const { data: ad } = await supabase.from('account_details').select('id_photo_url, selfie_url, id_verified').eq('id', s.id).maybeSingle();
+                      setSelectedUser(prev => ({ ...prev, id_photo_url: ad?.id_photo_url || null, selfie_url: ad?.selfie_url || null, id_verified: ad?.id_verified ?? false }));
                     }}>
                       <td><span className="adm-mono">{s.student_id}</span></td>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{s.full_name}</td>
@@ -1761,22 +1772,35 @@ export default function AdminDashboard() {
                     }
                   </div>
                 </div>
-                {/* Right: ID photo */}
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>SCHOOL ID PHOTO</div>
-                  {selectedUser.id_photo_url ? (
-                    <a href={selectedUser.id_photo_url} target="_blank" rel="noreferrer">
-                      <img src={selectedUser.id_photo_url} alt="School ID"
-                        style={{ width: '100%', maxWidth: 360, borderRadius: 10, border: '1px solid rgba(0,240,255,0.2)', cursor: 'zoom-in', objectFit: 'contain', background: '#000' }} />
-                    </a>
-                  ) : (
-                    <div style={{ width: '100%', maxWidth: 360, height: 200, borderRadius: 10, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <i className="fa-solid fa-id-card" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}></i>
-                        No ID photo uploaded
+                {/* Right: ID photo & Live Selfie */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>SCHOOL ID PHOTO</div>
+                    {selectedUser.id_photo_url ? (
+                      <a href={selectedUser.id_photo_url} target="_blank" rel="noreferrer">
+                        <img src={selectedUser.id_photo_url} alt="School ID"
+                          style={{ width: '100%', maxWidth: 360, borderRadius: 10, border: '1px solid rgba(0,240,255,0.2)', cursor: 'zoom-in', objectFit: 'contain', background: '#000' }} />
+                      </a>
+                    ) : (
+                      <div style={{ width: '100%', maxWidth: 360, height: 200, borderRadius: 10, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <i className="fa-solid fa-id-card" style={{ fontSize: 32, display: 'block', marginBottom: 8 }}></i>
+                          No ID photo uploaded
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 1, marginBottom: 12 }}>LIVE SELFIE</div>
+                    {selectedUser.selfie_url ? (
+                      <a href={selectedUser.selfie_url} target="_blank" rel="noreferrer">
+                        <img src={selectedUser.selfie_url} alt="Live Selfie"
+                          style={{ width: '100%', maxWidth: 240, borderRadius: 10, border: '1px solid rgba(0,240,255,0.2)', cursor: 'zoom-in', objectFit: 'contain', background: '#000' }} />
+                      </a>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No live selfie uploaded</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

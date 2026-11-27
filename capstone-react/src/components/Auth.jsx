@@ -38,17 +38,16 @@ export default function Auth() {
     setSignupStep('id-verify');
   };
 
-  // Called after ID photo is submitted — do the actual signup
-  const doSignup = async (verified, idPhotoFile) => {
+  // Called after ID photo and live selfie are submitted — do the actual signup
+  const doSignup = async (verified, idPhotoFile, selfieFile) => {
     setLoading(true);
     try {
       // Convert photo file to base64 — resize to max 1200px and compress to reduce payload size
-      let id_photo_base64 = null;
-      let id_photo_ext = 'jpg';
-      if (idPhotoFile instanceof File) {
+      const compressToBase64 = async (file) => {
+        if (!(file instanceof File)) return null;
         const compressed = await new Promise((resolve) => {
           const img = new Image();
-          const url = URL.createObjectURL(idPhotoFile);
+          const url = URL.createObjectURL(file);
           img.onload = () => {
             const maxSize = 1200;
             const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
@@ -59,16 +58,22 @@ export default function Auth() {
             URL.revokeObjectURL(url);
             canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
           };
-          img.onerror = () => { URL.revokeObjectURL(url); resolve(idPhotoFile); };
+          img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
           img.src = url;
         });
         const buf = await compressed.arrayBuffer();
         const bytes = new Uint8Array(buf);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        id_photo_base64 = btoa(binary);
-        id_photo_ext = 'jpg';
-      }
+        return btoa(binary);
+      };
+
+      const [id_photo_base64, selfie_base64] = await Promise.all([
+        compressToBase64(idPhotoFile),
+        compressToBase64(selfieFile),
+      ]);
+      const id_photo_ext = 'jpg';
+      const selfie_ext = 'jpg';
 
       const res = await fetch(getApiUrl('/api/signup'), {
         method: 'POST',
@@ -83,6 +88,8 @@ export default function Auth() {
           id_verified: verified,
           id_photo_base64,
           id_photo_ext,
+          selfie_base64,
+          selfie_ext,
         }),
       });
 
@@ -346,7 +353,7 @@ export default function Auth() {
           ) : (
             <IdVerifier
               ctuId={form.ctuId}
-              onVerified={(verified, photoFile) => doSignup(verified, photoFile)}
+              onVerified={(verified, photoFile, selfieFile) => doSignup(verified, photoFile, selfieFile)}
             />
           )}
           </div>

@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, password, fullName, studentId, user_type, gender, id_verified, id_photo_base64, id_photo_ext } = req.body;
+  const { email, password, fullName, studentId, user_type, gender, id_verified, id_photo_base64, id_photo_ext, selfie_base64, selfie_ext } = req.body;
 
   // Validate gender
   const VALID_GENDERS = ['Male', 'Female', 'Prefer not to say'];
@@ -60,31 +60,37 @@ export default async function handler(req, res) {
   if (authError) return res.status(400).json({ message: authError.message });
   if (!authData?.user) return res.status(400).json({ message: 'Signup failed.' });
 
-  // Upload ID photo via service role if provided
-  let idPhotoUrl = null;
-  if (id_photo_base64) {
+  // Upload ID photo and live selfie via service role if provided
+  const uploadVerificationImage = async (base64, ext, folder) => {
+    if (!base64) return null;
     try {
-      const ext = id_photo_ext || 'jpg';
-      const path = `id-photos/${studentId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${ext}`;
-      const buffer = Buffer.from(id_photo_base64, 'base64');
+      const safeExt = ext || 'jpg';
+      const path = `${folder}/${studentId.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.${safeExt}`;
+      const buffer = Buffer.from(base64, 'base64');
       const { error: uploadError } = await supabaseAdmin.storage
         .from('id-photos')
-        .upload(path, buffer, { contentType: `image/${ext}`, upsert: true });
+        .upload(path, buffer, { contentType: `image/${safeExt}`, upsert: true });
       if (!uploadError) {
         const { data: urlData } = supabaseAdmin.storage.from('id-photos').getPublicUrl(path);
-        idPhotoUrl = urlData.publicUrl;
+        return urlData.publicUrl;
       }
     } catch {
       // photo upload failure is non-fatal
     }
-  }
+    return null;
+  };
+
+  const [idPhotoUrl, selfieUrl] = await Promise.all([
+    uploadVerificationImage(id_photo_base64, id_photo_ext, 'id-photos'),
+    uploadVerificationImage(selfie_base64, selfie_ext, 'selfie-photos'),
+  ]);
 
   try {
     await supabaseAdmin.from('accounts').insert([{
       id: authData.user.id, ctu_id: studentId, full_name: fullName, email, user_type,
     }]);
     await supabaseAdmin.from('account_status').insert([{ id: authData.user.id, is_verified: false }]);
-    await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl, gender }]);
+    await supabaseAdmin.from('account_details').insert([{ id: authData.user.id, id_photo_url: idPhotoUrl, selfie_url: selfieUrl, gender }]);
   } catch (e) {
     console.warn('[SIGNUP] New table insert warning:', e.message);
   }

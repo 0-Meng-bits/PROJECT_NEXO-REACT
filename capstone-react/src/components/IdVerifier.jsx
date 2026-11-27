@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { createWorker } from 'tesseract.js';
 
 // Common OCR misreads for digits - only allow letter-to-digit confusion, not digit-to-digit
@@ -183,15 +183,21 @@ async function preprocessImage(imageFile, cropRatio = 1, fromTop = false) {
   });
 }
 export default function IdVerifier({ ctuId, onVerified }) {
+  const [step, setStep] = useState('id'); // id | selfie
   const [stage, setStage] = useState('idle'); // idle | camera | scanning | done | error
+  const [selfieStage, setSelfieStage] = useState('camera'); // camera | preview | error
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState(null);
+  const [selfiePreview, setSelfiePreview] = useState(null);
   const [result, setResult] = useState(null);
   const [cameraError, setCameraError] = useState(null);
+  const [selfieError, setSelfieError] = useState(null);
   const fileRef = useRef(null);
   const videoRef = useRef(null);
+  const selfieVideoRef = useRef(null);
   const streamRef = useRef(null);
   const capturedFileRef = useRef(null);
+  const selfieFileRef = useRef(null);
   const scanningRef = useRef(false); // prevent double-trigger on mobile camera return
 
   const stopCamera = useCallback(() => {
@@ -200,6 +206,8 @@ export default function IdVerifier({ ctuId, onVerified }) {
       streamRef.current = null;
     }
   }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   const openCamera = async () => {
     setCameraError(null);
@@ -296,20 +304,73 @@ export default function IdVerifier({ ctuId, onVerified }) {
     runOCR(file);
   };
 
+  const openSelfieCamera = async () => {
+    stopCamera();
+    setStep('selfie');
+    setSelfieError(null);
+    setSelfieStage('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      streamRef.current = stream;
+      if (selfieVideoRef.current) {
+        selfieVideoRef.current.srcObject = stream;
+      } else {
+        setTimeout(() => {
+          if (selfieVideoRef.current) selfieVideoRef.current.srcObject = stream;
+        }, 50);
+      }
+    } catch {
+      setSelfieError('Camera access is required for live selfie verification. Please allow camera permission and try again.');
+      setSelfieStage('error');
+    }
+  };
+
+  const captureSelfie = () => {
+    if (!selfieVideoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = selfieVideoRef.current.videoWidth;
+    canvas.height = selfieVideoRef.current.videoHeight;
+    canvas.getContext('2d').drawImage(selfieVideoRef.current, 0, 0);
+    stopCamera();
+    canvas.toBlob((blob) => {
+      if (!blob) { setSelfieError('Selfie capture failed. Please try again.'); setSelfieStage('error'); return; }
+      const file = new File([blob], 'selfie-capture.jpg', { type: 'image/jpeg' });
+      selfieFileRef.current = file;
+      setSelfiePreview(URL.createObjectURL(blob));
+      setSelfieStage('preview');
+    }, 'image/jpeg', 0.92);
+  };
+
   const handleContinue = async () => {
-    onVerified(result?.found || false, capturedFileRef.current || null);
+    onVerified(result?.found || false, capturedFileRef.current || null, selfieFileRef.current || null);
   };
 
   const reset = () => {
     stopCamera();
     scanningRef.current = false;
+    setStep('id');
     setStage('idle');
+    setSelfieStage('camera');
     setPreview(null);
+    setSelfiePreview(null);
     setResult(null);
     setProgress(0);
     setCameraError(null);
+    setSelfieError(null);
     capturedFileRef.current = null;
+    selfieFileRef.current = null;
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const backToId = () => {
+    stopCamera();
+    setStep('id');
+    setSelfieStage('camera');
+    setSelfiePreview(null);
+    setSelfieError(null);
+    selfieFileRef.current = null;
   };
 
   const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
@@ -317,17 +378,21 @@ export default function IdVerifier({ ctuId, onVerified }) {
   return (
     <div className="id-verifier">
       <div className="id-verifier-header">
-        <i className="fa-solid fa-id-card" style={{ color: 'var(--cyber-cyan)', marginRight: 8 }} />
+        <i className={`fa-solid ${step === 'id' ? 'fa-id-card' : 'fa-camera-retro'}`} style={{ color: 'var(--cyber-cyan)', marginRight: 8 }} />
         <div>
-          <div className="id-verifier-title">School ID Verification</div>
+          <div className="id-verifier-title">
+            {step === 'id' ? 'Step 1 of 2: School ID Verification' : 'Step 2 of 2: Live Selfie Check'}
+          </div>
           <div className="id-verifier-sub">
-            Upload a photo of your CTU school ID so the admin can verify you're a real student
+            {step === 'id'
+              ? "Upload a flat photo of your CTU school ID so the admin can verify you're a real student"
+              : 'Take a quick live selfie so the admin can confirm your face matches your CTU ID'}
           </div>
         </div>
       </div>
 
-      {/* ── IDLE ── */}
-      {stage === 'idle' && (
+      {/* ── STEP 1: ID PHOTO ── */}
+      {step === 'id' && stage === 'idle' && (
         <div className="id-upload-area">
           {/* ID positioning guide */}
           <div style={{
@@ -392,7 +457,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
       )}
 
       {/* ── CAMERA (desktop) ── */}
-      {stage === 'camera' && (
+      {step === 'id' && stage === 'camera' && (
         <div className="id-camera-wrap">
           <div className="id-camera-frame">
             <video ref={videoRef} autoPlay playsInline muted className="id-camera-video" />
@@ -409,7 +474,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
       )}
 
       {/* ── SCANNING / DONE / ERROR ── */}
-      {(stage === 'scanning' || stage === 'done' || stage === 'error') && (
+      {step === 'id' && (stage === 'scanning' || stage === 'done' || stage === 'error') && (
         <div className="id-scan-area">
           {preview && (
             <div className="id-preview-wrap">
@@ -462,9 +527,9 @@ export default function IdVerifier({ ctuId, onVerified }) {
                   <i className="fa-solid fa-rotate-left" style={{ marginRight: 6 }} />
                   Retake
                 </button>
-                <button className="cyber-btn" onClick={handleContinue} type="button"
+                <button className="cyber-btn" onClick={openSelfieCamera} type="button"
                   style={{ flex: 1 }}>
-                  <i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />Submit
+                  <i className="fa-solid fa-camera" style={{ marginRight: 6 }} />Next: Selfie
                 </button>
               </div>
             </div>
@@ -477,6 +542,79 @@ export default function IdVerifier({ ctuId, onVerified }) {
               <div className="id-result-sub">Could not read the image. Try a clearer photo.</div>
               <button className="cyber-btn secondary" onClick={reset} type="button"
                 style={{ marginTop: 14, width: '100%' }}>Try Again</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── STEP 2: LIVE SELFIE ── */}
+      {step === 'selfie' && (
+        <div className="id-scan-area">
+          {selfieStage === 'camera' && (
+            <div className="id-camera-wrap">
+              <div className="id-camera-frame">
+                <video
+                  ref={selfieVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="id-camera-video"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 10 }}>
+                <i className="fa-solid fa-circle-info" style={{ color: 'var(--cyber-cyan)', marginRight: 5 }} />
+                Look straight at the camera in good lighting
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button className="cyber-btn secondary" onClick={backToId} type="button" style={{ flex: 1 }}>
+                  Back
+                </button>
+                <button className="cyber-btn" onClick={captureSelfie} type="button" style={{ flex: 1 }}>
+                  <i className="fa-solid fa-camera" style={{ marginRight: 6 }} />Capture Selfie
+                </button>
+              </div>
+            </div>
+          )}
+
+          {selfieStage === 'preview' && selfiePreview && (
+            <>
+              <div className="id-preview-wrap">
+                <img src={selfiePreview} alt="Live selfie preview" className="id-preview-img" />
+              </div>
+              <div className="id-result success" style={{ marginTop: 12 }}>
+                <i className="fa-solid fa-circle-check" style={{ fontSize: 22, marginBottom: 6 }} />
+                <div className="id-result-title">Selfie Ready!</div>
+                <div className="id-result-sub">
+                  Both your CTU ID and live selfie will be sent to the admin for verification.
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14, width: '100%' }}>
+                  <button className="cyber-btn secondary" onClick={openSelfieCamera} type="button" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-rotate-left" style={{ marginRight: 6 }} />
+                    Retake Selfie
+                  </button>
+                  <button className="cyber-btn" onClick={handleContinue} type="button" style={{ flex: 1 }}>
+                    <i className="fa-solid fa-paper-plane" style={{ marginRight: 6 }} />
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {selfieStage === 'error' && (
+            <div className="id-result fail">
+              <i className="fa-solid fa-video-slash" style={{ fontSize: 24, marginBottom: 8 }} />
+              <div className="id-result-title">Camera Required</div>
+              <div className="id-result-sub">{selfieError}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, width: '100%' }}>
+                <button className="cyber-btn secondary" onClick={backToId} type="button" style={{ flex: 1 }}>
+                  Back
+                </button>
+                <button className="cyber-btn" onClick={openSelfieCamera} type="button" style={{ flex: 1 }}>
+                  Try Again
+                </button>
+              </div>
             </div>
           )}
         </div>
