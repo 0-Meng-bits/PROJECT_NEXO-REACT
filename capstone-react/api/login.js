@@ -101,30 +101,19 @@ export default async function handler(req, res) {
 
   const isPending = !status.is_verified;
 
-  let authData;
-  const { data: firstAuthData, error: authError } = await supabase.auth.signInWithPassword({
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email: account.email,
     password,
   });
 
   if (authError) {
-    // Auto-confirm email if not confirmed — happens with new signups before email verification
     if (authError.message?.includes('Email not confirmed') || authError.message?.includes('email_not_confirmed')) {
-      try {
-        await supabaseAdmin.auth.admin.updateUserById(account.id, { email_confirm: true });
-        const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
-          email: account.email, password,
-        });
-        if (retryError) return res.status(401).json({ message: 'Invalid credentials.' });
-        authData = retryData;
-      } catch {
-        return res.status(401).json({ message: 'Invalid credentials.' });
-      }
-    } else {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(403).json({
+        message: 'Please verify your email address first. Check your inbox for the verification link.',
+        email_unconfirmed: true,
+      });
     }
-  } else {
-    authData = firstAuthData;
+    return res.status(401).json({ message: 'Invalid credentials.' });
   }
 
   // Check ban/suspension AFTER password is verified — don't leak account status to wrong-password attempts
