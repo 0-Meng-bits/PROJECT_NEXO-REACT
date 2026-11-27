@@ -276,11 +276,9 @@ export default function UserPortal() {
     params.set('section', newSection);
     if (comm && comm !== 'global') params.set('commId', comm);
     const url = window.location.pathname + '?' + params.toString();
-    if (newSection !== 'home' && (new URLSearchParams(window.location.search).get('section') || 'home') === 'home') {
-      window.history.pushState({ portalNav: true }, '', url);
-    } else {
-      window.history.replaceState({ portalNav: true }, '', url);
-    }
+    // Always use replaceState – the popstate trap handles back navigation,
+    // so we don't need extra history entries from tab switches.
+    window.history.replaceState({ portalNav: true }, '', url);
   }, [activeCommId]);
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
@@ -1630,49 +1628,59 @@ export default function UserPortal() {
     // Push ONE trap entry so back button triggers popstate
     window.history.pushState({ portalTrap: true }, '');
 
-    const onPopState = () => {
-      // Re-push trap so the next back press is also caught
-      window.history.pushState({ portalTrap: true }, '');
+    const onPopState = (e) => {
+      // Always prevent leaving the page by pushing a new trap immediately
+      // Use setTimeout to ensure the browser has finished its navigation
+      // before we push the new trap entry
+      const handleBack = () => {
+        // Check if a child overlay (photo viewer etc.) is open – close it first
+        if (overlayCloserRef.current) {
+          overlayCloserRef.current();
+          overlayCloserRef.current = null;
+          window.history.pushState({ portalTrap: true }, '');
+          return;
+        }
+        if (window.__nexoOverlayCloser) {
+          window.__nexoOverlayCloser();
+          window.__nexoOverlayCloser = null;
+          window.history.pushState({ portalTrap: true }, '');
+          return;
+        }
 
-      // Check if a child overlay (photo viewer etc.) is open – close it first
-      if (overlayCloserRef.current) {
-        overlayCloserRef.current();
-        overlayCloserRef.current = null;
-        return;
-      }
-      if (window.__nexoOverlayCloser) {
-        window.__nexoOverlayCloser();
-        window.__nexoOverlayCloser = null;
-        return;
-      }
+        const s = backStateRef.current;
 
-      const s = backStateRef.current;
+        // a. Close open overlays first
+        if (s.showProfile) { setShowProfile(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.viewingProfile) { setViewingProfile(null); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showManage) { setShowManage(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showMembersPanel) { setShowMembersPanel(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showNotifications) { setShowNotifications(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showShop) { setShowShop(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showHelp) { setShowHelp(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showThemePicker) { setShowThemePicker(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showEventsModal) { setShowEventsModal(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showCreate) { setShowCreate(false); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.showApplicationForm) { setShowApplicationForm(null); window.history.pushState({ portalTrap: true }, ''); return; }
+        if (s.viewingApplication) { setViewingApplication(null); window.history.pushState({ portalTrap: true }, ''); return; }
 
-      // a. Close open overlays first
-      if (s.showProfile) { setShowProfile(false); return; }
-      if (s.viewingProfile) { setViewingProfile(null); return; }
-      if (s.showManage) { setShowManage(false); return; }
-      if (s.showMembersPanel) { setShowMembersPanel(false); return; }
-      if (s.showNotifications) { setShowNotifications(false); return; }
-      if (s.showShop) { setShowShop(false); return; }
-      if (s.showHelp) { setShowHelp(false); return; }
-      if (s.showThemePicker) { setShowThemePicker(false); return; }
-      if (s.showEventsModal) { setShowEventsModal(false); return; }
-      if (s.showCreate) { setShowCreate(false); return; }
-      if (s.showApplicationForm) { setShowApplicationForm(null); return; }
-      if (s.viewingApplication) { setViewingApplication(null); return; }
+        // b. Not on home – go to home feed
+        if (s.section !== 'home') {
+          setSection('home');
+          setActiveCommId('global');
+          setActiveChannelId(null);
+          window.history.pushState({ portalTrap: true }, '');
+          window.history.replaceState({ portalNav: true, portalTrap: true }, '', window.location.pathname + '?section=home');
+          return;
+        }
 
-      // b. Not on home – go to home feed
-      if (s.section !== 'home') {
-        setSection('home');
-        setActiveCommId('global');
-        setActiveChannelId(null);
-        window.history.replaceState({ portalNav: true }, '', window.location.pathname + '?section=home');
-        return;
-      }
+        // c. On home – show logout modal (still push trap to prevent exit)
+        window.history.pushState({ portalTrap: true }, '');
+        setShowLogoutConfirm(true);
+      };
 
-      // c. On home – show logout modal
-      setShowLogoutConfirm(true);
+      // Use setTimeout(0) so the browser finishes its popstate navigation
+      // before we push our trap back on top
+      setTimeout(handleBack, 0);
     };
 
     window.addEventListener('popstate', onPopState);
