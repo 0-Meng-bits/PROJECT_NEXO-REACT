@@ -50,34 +50,44 @@ function buildOcrVariants(ocrText) {
   return [...variants];
 }
 
+// Detect whether the OCR text contains CTU school ID keywords
+function detectCTU(ocrText) {
+  const upper = ocrText.toUpperCase();
+  const keywords = ['CEBU TECHNOLOGICAL', 'CEBU TECH', 'CTU', 'TECHNOLOGICAL UNIVERSITY'];
+  return keywords.some(kw => upper.includes(kw));
+}
+
 function extractIdFromText(text, typedId) {
   // Normalize OCR text and typed ID
   const ocrRaw = text.toUpperCase();
   const ocrStripped = ocrRaw.replace(/[\s\-\.]/g, '');
   const idClean = typedId.replace(/[\s\-\.]/g, '').toUpperCase();
 
+  // Check if the card is a CTU ID (independent of number match)
+  const isCTU = detectCTU(ocrRaw);
+
   // 1. Direct exact match
-  if (ocrStripped.includes(idClean)) return { found: true };
+  if (ocrStripped.includes(idClean)) return { found: true, isCTU };
 
   // 2. Match with spaces/separators allowed between digits (OCR sometimes inserts spaces)
   const spacedPattern = idClean.split('').join('[\\s\\-\\.]*');
-  if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true };
+  if (new RegExp(spacedPattern).test(ocrRaw)) return { found: true, isCTU };
 
   // 3. Strip everything except alphanumeric and check again
   // Handles cases like "1 No.8230582" where noise prefixes the number
   const ocrAlphaNum = ocrRaw.replace(/[^A-Z0-9]/g, '');
-  if (ocrAlphaNum.includes(idClean)) return { found: true };
+  if (ocrAlphaNum.includes(idClean)) return { found: true, isCTU };
 
   // 4. Fuzzy match — generate all possible interpretations of OCR text
   const ocrVariants = buildOcrVariants(ocrStripped);
-  if (ocrVariants.includes(idClean)) return { found: true };
+  if (ocrVariants.includes(idClean)) return { found: true, isCTU };
 
   // Also check with spaces in OCR text
   const ocrWords = ocrRaw.match(/\S+/g) || [];
   for (const word of ocrWords) {
     const wordStripped = word.replace(/[\s\-\.]/g, '');
     const wordVariants = buildOcrVariants(wordStripped);
-    if (wordVariants.includes(idClean)) return { found: true };
+    if (wordVariants.includes(idClean)) return { found: true, isCTU };
   }
 
   // 5. Check each line's digit-only sequence against the ID
@@ -85,10 +95,10 @@ function extractIdFromText(text, typedId) {
   const lines = ocrRaw.split(/\n/);
   for (const line of lines) {
     const digitsOnly = line.replace(/[^0-9]/g, '');
-    if (digitsOnly.includes(idClean.replace(/[^0-9]/g, ''))) return { found: true };
+    if (digitsOnly.includes(idClean.replace(/[^0-9]/g, ''))) return { found: true, isCTU };
   }
 
-  return { found: false };
+  return { found: false, isCTU };
 }
 // Preprocess image on canvas to improve OCR accuracy:
 // - Optionally crop to bottom portion (cropRatio=0.4 means bottom 40%)
@@ -253,11 +263,14 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
       // Pass 2: only if crop pass failed — try full image
       if (!result.found) {
+        const isCTUFromCrop = result.isCTU; // preserve CTU detection from pass 1
         setProgress(0);
         const fullFile = await preprocessImage(imageFile, 1);
         const { data: { text: fullText } } = await worker.recognize(fullFile);
         console.log('[OCR] Full image pass:', fullText);
         result = extractIdFromText(fullText, ctuId);
+        // If either pass detected CTU keywords, mark it
+        if (isCTUFromCrop && !result.isCTU) result = { ...result, isCTU: true };
       }
 
       await worker.terminate();
