@@ -101,15 +101,15 @@ function extractIdFromText(text, typedId) {
   return { found: false, isCTU };
 }
 // Preprocess image on canvas to improve OCR accuracy:
-// - Optionally crop to bottom portion (cropRatio=0.4 means bottom 40%)
+// - Optionally crop to bottom or top portion (cropRatio=0.4, fromTop=false means bottom 40%)
 // - Upscale to target size, adaptive threshold binarization
-async function preprocessImage(imageFile, cropRatio = 1) {
+async function preprocessImage(imageFile, cropRatio = 1, fromTop = false) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(imageFile);
     img.onload = () => {
-      const srcY = Math.floor(img.height * (1 - cropRatio));
-      const srcH = img.height - srcY;
+      const srcY = fromTop ? 0 : Math.floor(img.height * (1 - cropRatio));
+      const srcH = fromTop ? Math.floor(img.height * cropRatio) : img.height - srcY;
       // Use lower target for crop pass (faster), higher for full image pass
       const targetSize = cropRatio < 1 ? 1600 : 2000;
       const scale = Math.max(1, targetSize / Math.max(img.width, srcH));
@@ -261,7 +261,7 @@ export default function IdVerifier({ ctuId, onVerified }) {
 
       let result = extractIdFromText(croppedText, ctuId);
 
-      // Pass 2: only if crop pass failed — try full image
+      // Pass 2: if crop pass failed, try full image; if ID matched but CTU header wasn't in bottom crop, check top 45%
       if (!result.found) {
         const isCTUFromCrop = result.isCTU; // preserve CTU detection from pass 1
         setProgress(0);
@@ -271,6 +271,11 @@ export default function IdVerifier({ ctuId, onVerified }) {
         result = extractIdFromText(fullText, ctuId);
         // If either pass detected CTU keywords, mark it
         if (isCTUFromCrop && !result.isCTU) result = { ...result, isCTU: true };
+      } else if (!result.isCTU) {
+        const topFile = await preprocessImage(imageFile, 0.45, true);
+        const { data: { text: topText } } = await worker.recognize(topFile);
+        console.log('[OCR] Top CTU pass:', topText);
+        if (detectCTU(topText)) result = { ...result, isCTU: true };
       }
 
       await worker.terminate();
