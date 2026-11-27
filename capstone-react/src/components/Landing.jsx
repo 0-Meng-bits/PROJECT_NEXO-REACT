@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { loadTheme } from '../lib/theme';
 import { NEXO_YOUTUBE_EMBED_URL } from '../lib/constants';
@@ -35,13 +35,14 @@ function Reveal({ children, delay = 0, className = '', style = {} }) {
 }
 
 export default function Landing({ onEnter }) {
-  const [pulse, setPulse] = useState({ online: 0, connections: 0 });
+  const [pulse, setPulse] = useState({ online: 0, connections: 0, weekly: 0 });
   const [visible, setVisible] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     loadTheme();
-    setTimeout(() => setVisible(true), 80);
+    const t = setTimeout(() => setVisible(true), 80);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -51,22 +52,26 @@ export default function Landing({ onEnter }) {
   }, []);
 
   useEffect(() => {
-    const fetch = async () => {
-      const now = new Date();
-      const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      const weekAgoUTC = new Date(todayUTC); weekAgoUTC.setUTCDate(weekAgoUTC.getUTCDate() - 7);
-      const [{ count: total }, { count: todayCount }, { count: weekCount }] = await Promise.all([
-        supabase.from('account_status').select('*', { count: 'exact', head: true }).eq('is_verified', true),
-        supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', todayUTC.toISOString()),
-        supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoUTC.toISOString()),
-      ]);
-      setPulse({
-        online: total || 0,
-        connections: todayCount || 0,
-        weekly: weekCount || 0,
-      });
+    const fetchPulse = async () => {
+      try {
+        const now = new Date();
+        const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        const weekAgoUTC = new Date(todayUTC); weekAgoUTC.setUTCDate(weekAgoUTC.getUTCDate() - 7);
+        const [{ count: total }, { count: todayCount }, { count: weekCount }] = await Promise.all([
+          supabase.from('account_status').select('*', { count: 'exact', head: true }).eq('is_verified', true),
+          supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', todayUTC.toISOString()),
+          supabase.from('accounts').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoUTC.toISOString()),
+        ]);
+        setPulse({
+          online: total || 0,
+          connections: todayCount || 0,
+          weekly: weekCount || 0,
+        });
+      } catch (err) {
+        console.error('Failed to load landing stats:', err);
+      }
     };
-    fetch();
+    fetchPulse();
   }, []);
 
   const scrollTo = (id) => {

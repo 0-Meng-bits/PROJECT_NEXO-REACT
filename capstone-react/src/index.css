@@ -4397,9 +4397,9 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   padding: 10px 0;
 }
 .lnd-nav-inner {
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 clamp(24px, 4vw, 64px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4484,14 +4484,15 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 /* -- HERO ï¿½ SPLIT LAYOUT -- */
 .lnd-hero {
   min-height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   position: relative;
   overflow: hidden;
-  padding: 120px 48px 80px;
+  padding: 120px clamp(24px, 5vw, 80px) 80px;
   background: var(--cyber-bg);
-  gap: 60px;
+  gap: clamp(32px, 5vw, 96px);
 }
 .lnd-hero-grid {
   position: absolute;
@@ -4517,8 +4518,9 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .lnd-hero-left {
   position: relative;
   z-index: 1;
-  flex: 1;
-  max-width: 620px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 780px;
 }
 .lnd-hero-badge {
   display: inline-flex;
@@ -4563,7 +4565,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   color: var(--text-muted);
   line-height: 1.75;
   margin-bottom: 36px;
-  max-width: 480px;
+  max-width: 640px;
 }
 .lnd-hero-btns {
   display: flex;
@@ -4646,7 +4648,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .lnd-hero-right {
   position: relative;
   z-index: 1;
-  flex: 0 0 400px;
+  flex: 0 0 clamp(360px, 32vw, 480px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4712,7 +4714,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* -- SHARED SECTIONS -- */
 .lnd-section {
-  padding: 96px 32px;
+  padding: 96px clamp(24px, 5vw, 80px);
   background: var(--cyber-bg);
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -4720,7 +4722,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   background-size: 44px 44px;
   position: relative;
 }
-.lnd-container { max-width: 1200px; margin: 0 auto; }
+.lnd-container { width: 100%; max-width: none; margin: 0 auto; }
 .lnd-eyebrow {
   font-size: 11px;
   font-weight: 700;
@@ -4743,7 +4745,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   font-size: 15px;
   color: var(--text-muted);
   line-height: 1.75;
-  max-width: 620px;
+  max-width: 760px;
   margin-bottom: 52px;
 }
 
@@ -4863,7 +4865,7 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* -- FINAL CTA -- */
 .lnd-cta-section {
-  padding: 80px 32px;
+  padding: 80px clamp(24px, 5vw, 80px);
   background: var(--cyber-bg);
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -4969,9 +4971,9 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   padding: 36px 0;
 }
 .lnd-footer-inner {
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 clamp(24px, 4vw, 64px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4991,10 +4993,11 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .lnd-explainer-inner {
   display: flex;
   align-items: center;
-  gap: 64px;
+  justify-content: space-between;
+  gap: clamp(32px, 5vw, 80px);
 }
-.lnd-explainer-left { flex: 1; max-width: 520px; }
-.lnd-explainer-right { flex: 1; display: flex; justify-content: center; }
+.lnd-explainer-left { flex: 1; max-width: 720px; }
+.lnd-explainer-right { flex: 0 1 480px; display: flex; justify-content: center; }
 .lnd-explainer-points { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
 .lnd-explainer-point {
   display: flex;
@@ -5014,7 +5017,8 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 
 /* -- APP MOCKUP -- */
 .lnd-explainer-mockup {
-  width: 380px;
+  width: 100%;
+  max-width: 460px;
   background: var(--cyber-card);
   border: 1px solid var(--cyber-border);
   border-radius: 14px;

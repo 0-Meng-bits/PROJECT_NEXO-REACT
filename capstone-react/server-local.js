@@ -8,6 +8,7 @@ net.setDefaultAutoSelectFamily?.(false);
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -80,7 +81,7 @@ app.get('/', (req, res) => res.status(200).json({ status: 'ok', service: 'NEXO C
 // SPA fallback — only if dist exists (local dev), otherwise return 200
 app.get('*', (req, res) => {
   const indexPath = path.join(__dirname, 'dist', 'index.html');
-  if (require('fs').existsSync(indexPath)) {
+  if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
     res.status(200).json({ status: 'ok', service: 'NEXO Connect API' });

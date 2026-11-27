@@ -651,17 +651,24 @@ export default function UserPortal() {
     });
   }, [user?.id]);
 
-  // Heartbeat: update last_seen every 60s directly via Supabase client
+  // Heartbeat: update last_seen every 90s directly via Supabase client
+  // Only pings when the tab is visible — background/minimized tabs skip writes
   useEffect(() => {
     if (!user?.id) return;
-    const ping = () => supabase
-      .from('account_details')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('id', user.id)
-      .then(() => {}, () => {});
+    const ping = () => {
+      if (document.visibilityState !== 'visible') return;
+      supabase
+        .from('account_details')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', user.id)
+        .then(() => {}, () => {});
+    };
     ping();
-    const t = setInterval(ping, 60000);
-    return () => clearInterval(t);
+    const t = setInterval(ping, 90000);
+    // Ping immediately when user returns to the tab
+    const onVisible = () => { if (document.visibilityState === 'visible') ping(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
   }, [user?.id]);
 
   // Poll online users every 90s (online = last_seen within 3 minutes)
@@ -670,7 +677,7 @@ export default function UserPortal() {
 
   useEffect(() => {
     const fetchOnline = async () => {
-      const since = new Date(Date.now() - 3 * 60 * 1000).toISOString(); // 3 min window
+      const since = new Date(Date.now() - 4 * 60 * 1000).toISOString(); // 4 min window
       const { data } = await supabase.from('accounts')
         .select('id, full_name, ctu_id, account_details!inner(avatar_url, last_seen)')
         .gte('account_details.last_seen', since)
