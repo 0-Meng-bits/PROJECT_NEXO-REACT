@@ -545,8 +545,9 @@ export default function AdminDashboard() {
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
 
-  // ── Back-button trap: user-gesture armed so Chrome doesn't skip it ────────
+  // ── Back-button trap: matches UserPortal's proven pattern + beforeunload ───
   const adminLeavingRef = useRef(false); // set true only when deliberately logging out
+  const adminTrapArmedRef = useRef(false);
   const adminBackStateRef = useRef({});
   adminBackStateRef.current = {
     section, selectedUser, selectedCircle, showFlagModal,
@@ -554,43 +555,52 @@ export default function AdminDashboard() {
   };
 
   const confirmAdminLogout = () => {
-    adminLeavingRef.current = true;        // allow beforeunload to pass through
+    adminLeavingRef.current = true;
     setShowLogoutConfirm(false);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    navigate('/auth');
+    navigate('/auth', { replace: true });
   };
 
   const handleCancelAdminLogout = () => {
     setShowLogoutConfirm(false);
-    // Push a fresh trap entry so the next Back press fires popstate again
-    window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
+    if (!adminTrapArmedRef.current) {
+      window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
+      adminTrapArmedRef.current = true;
+    }
   };
 
-  // ── beforeunload guard (always fires — immune to history intervention) ───────
+  // ── beforeunload guard (catches tab close / refresh / external navigation) ──
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (adminLeavingRef.current) return; // intentional logout — let it through
+      if (adminLeavingRef.current) return;
       e.preventDefault();
-      e.returnValue = ''; // Chrome requires returnValue to show the dialog
+      e.returnValue = '';
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // ── push one trap entry after the first real user gesture ───────────────────
+  // ── Arm trap on mount (fallback) AND on first real user gesture ────────────
   useEffect(() => {
+    if (!window.history.state?.adminTrap && !window.history.state?.adminNav) {
+      window.history.pushState({ adminTrap: true, mount: true }, '', window.location.pathname + window.location.search);
+    }
+
     const armTrap = () => {
-      if (window.history.state?.adminTrap || window.history.state?.adminNav) return;
+      if (adminTrapArmedRef.current) return;
+      if (window.history.state?.adminNav && window.history.state?.section !== 'analytics') return;
       window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
+      adminTrapArmedRef.current = true;
     };
-    window.addEventListener('click',    armTrap, { capture: true, passive: true });
+
     window.addEventListener('touchend', armTrap, { capture: true, passive: true });
+    window.addEventListener('click',    armTrap, { capture: true, passive: true });
     window.addEventListener('keydown',  armTrap, { capture: true, passive: true });
     return () => {
-      window.removeEventListener('click',    armTrap, { capture: true });
       window.removeEventListener('touchend', armTrap, { capture: true });
+      window.removeEventListener('click',    armTrap, { capture: true });
       window.removeEventListener('keydown',  armTrap, { capture: true });
     };
   }, []);
@@ -601,10 +611,12 @@ export default function AdminDashboard() {
     setShowSectionInfo(false);
     const url = window.location.pathname + (newSection === 'analytics' ? '' : `?section=${newSection}`);
     if (newSection !== 'analytics') {
-      // Always push a nav entry so Back returns here
-      window.history.pushState({ adminNav: true, section: newSection }, '', url);
-    } else {
-      // Going back to analytics — replace so we land on the trap
+      if (window.history.state?.adminNav) {
+        window.history.replaceState({ adminNav: true, section: newSection }, '', url);
+      } else {
+        window.history.pushState({ adminNav: true, section: newSection }, '', url);
+      }
+    } else if (window.history.state?.adminNav) {
       window.history.replaceState({ adminTrap: true }, '', window.location.pathname);
     }
   };
@@ -614,47 +626,24 @@ export default function AdminDashboard() {
       const s = adminBackStateRef.current;
       if (s.showLogoutConfirm) return;
 
-      // 1. Close open modals / detail panels first (re-push trap so next Back works)
-      if (s.showFlagModal) {
-        setShowFlagModal(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
-        return;
-      }
-      if (s.showAdminAgreement) {
-        setShowAdminAgreement(false);
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
-        return;
-      }
-      if (s.showEventForm) {
-        setShowEventForm(false);
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
-        return;
-      }
-      if (s.selectedUser) {
-        setSelectedUser(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
-        return;
-      }
-      if (s.selectedCircle) {
-        setSelectedCircle(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
-        return;
-      }
+      // 1. Close open modals / detail panels first
+      if (s.showFlagModal)      { setShowFlagModal(null);       adminTrapArmedRef.current = false; return; }
+      if (s.showAdminAgreement) { setShowAdminAgreement(false); adminTrapArmedRef.current = false; return; }
+      if (s.showEventForm)      { setShowEventForm(false);      adminTrapArmedRef.current = false; return; }
+      if (s.selectedUser)       { setSelectedUser(null);        adminTrapArmedRef.current = false; return; }
+      if (s.selectedCircle)     { setSelectedCircle(null);      adminTrapArmedRef.current = false; return; }
 
-      // 2. If in a non-analytics section, navigate back to analytics and re-arm trap
+      // 2. If in another admin section, go back to analytics (we just popped adminNav and landed on adminTrap)
       if (s.section !== 'analytics') {
         setSection('analytics');
         setShowSectionInfo(false);
         window.history.replaceState({ adminTrap: true }, '', window.location.pathname);
-        // Push another trap entry so the NEXT Back still triggers popstate
-        window.history.pushState({ adminTrap: true }, '', window.location.pathname);
         return;
       }
 
-      // 3. On root analytics screen — show logout confirm; beforeunload handles hard exit
+      // 3. On root analytics screen — show logout confirmation modal
+      adminTrapArmedRef.current = false;
       setShowLogoutConfirm(true);
-      // Push a fresh trap so if they cancel, the next Back fires this handler again
-      window.history.pushState({ adminTrap: true }, '', window.location.pathname + window.location.search);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -1267,10 +1256,11 @@ export default function AdminDashboard() {
                 <i className="fa-solid fa-check" style={{ marginRight: 6 }}></i>I ACCEPT & UNDERSTAND
               </button>
               <button className="cyber-btn secondary" style={{ flex: 1 }} onClick={() => {
+                adminLeavingRef.current = true;
                 localStorage.removeItem('currentUser');
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
-                navigate('/');
+                navigate('/', { replace: true });
               }}>
                 <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>DECLINE
               </button>
@@ -1335,7 +1325,7 @@ export default function AdminDashboard() {
             <i className="fa-solid fa-file-shield"></i>
             <span>View Agreement</span>
           </div>
-          <div className="adm-nav-item" onClick={() => { localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/'); }}>
+          <div className="adm-nav-item" onClick={() => { adminLeavingRef.current = true; localStorage.removeItem('currentUser'); localStorage.removeItem('accessToken'); localStorage.removeItem('refreshToken'); navigate('/', { replace: true }); }}>
             <i className="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
           </div>

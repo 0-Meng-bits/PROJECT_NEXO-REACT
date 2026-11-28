@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getApiUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,22 @@ export default function Auth() {
     agreedToTerms: !!localStorage.getItem('nexo-terms-accepted'),
   });
   const navigate = useNavigate();
+
+  // If already logged in (e.g., user pressed Back from /admin or /portal), keep them inside the app
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    const rawUser = localStorage.getItem('currentUser');
+    if (token && rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        if (u?.user_type === 'Admin') {
+          navigate('/admin', { replace: true });
+        } else if (u?.student_id) {
+          navigate('/portal', { replace: true });
+        }
+      } catch { /* ignore invalid JSON */ }
+    }
+  }, [navigate]);
 
   const update = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -190,7 +206,7 @@ export default function Auth() {
           setTermsReadOnly(false);
           setShowTermsModal(true);
         } else {
-          navigate(targetRoute);
+          navigate(targetRoute, { replace: true });
         }
       } else {
         if (data.banned) {
@@ -637,7 +653,7 @@ export default function Auth() {
                   setShowTermsModal(false);
                   // Only navigate post-login (when pendingRoute was set by handleLogin).
                   // During signup the modal is just a confirmation — don't navigate away.
-                  if (isLogin && pendingRoute) navigate(pendingRoute);
+                  if (isLogin && pendingRoute) navigate(pendingRoute, { replace: true });
                 }}>
                 <i className="fa-solid fa-arrow-right" style={{ marginRight: 6 }}></i>Continue
               </button>
