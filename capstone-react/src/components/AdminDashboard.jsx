@@ -523,6 +523,7 @@ export default function AdminDashboard() {
   const [allCircleAnnouncements, setAllCircleAnnouncements] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [circleRequests, setCircleRequests] = useState([]);
+  const [pendingAppealsCount, setPendingAppealsCount] = useState(0);
   const [showFlagModal, setShowFlagModal] = useState(null); // { type: 'user'|'circle', id, name, leaderId? }
   const [audFilter, setAudFilter] = useState('all');
   const [showSectionInfo, setShowSectionInfo] = useState(false);
@@ -703,11 +704,17 @@ export default function AdminDashboard() {
     const token = localStorage.getItem('accessToken');
     const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
     try {
-      const [commRes, adminRes] = await Promise.all([
+      const [commRes, adminRes, appealsRes] = await Promise.all([
         fetch(getApiUrl('/api/communities'), { headers: authHeaders }),
         fetch(getApiUrl('/api/admin-data'), { headers: authHeaders }),
+        fetch(getApiUrl('/api/admin-data?type=appeals'), { headers: authHeaders }),
       ]);
       const adminData = adminRes.ok ? await adminRes.json() : {};
+      if (appealsRes.ok) {
+        const appealsData = await appealsRes.json();
+        const pendingWarnings = (appealsData.appeals || []).filter(a => a.status === 'pending').length;
+        setPendingAppealsCount(pendingWarnings);
+      }
       setCommunities(commRes.ok ? await commRes.json() : []);
       setStudents((adminData.students || []).map(s => {
         // account_status and account_details may come back as an array or object
@@ -1268,6 +1275,9 @@ export default function AdminDashboard() {
               const total = flaggedUsers + flaggedCircles;
               return total > 0 ? <span className="adm-badge" style={{ background: '#a855f7' }}>{total}</span> : null;
             })()}
+            {s.key === 'appeals' && pendingAppealsCount > 0 && (
+              <span className="adm-badge" style={{ background: 'var(--cyber-cyan)', color: '#000' }}>{pendingAppealsCount}</span>
+            )}
           </div>
         ))}
 
