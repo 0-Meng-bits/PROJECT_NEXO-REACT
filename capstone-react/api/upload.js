@@ -34,6 +34,46 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── GET SIGNED UPLOAD URL FOR CIRCLE APPLICATION FILES ────────────────
+    if (action === 'get-application-upload-url') {
+      const { commId, applicantId, questionId, fileName } = req.body;
+      if (!commId || !applicantId || !questionId || !fileName) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const bucketName = 'application-files';
+      const { error: bucketErr } = await supabaseAdmin.storage.getBucket(bucketName);
+      if (bucketErr) {
+        const { error: createErr } = await supabaseAdmin.storage.createBucket(bucketName, {
+          public: true,
+          fileSizeLimit: 20 * 1024 * 1024, // 20 MB, all file types allowed (PDF, DOC, DOCX, images, etc.)
+        });
+        if (createErr && !/already exists/i.test(createErr.message || '')) {
+          return res.status(500).json({ error: `Storage bucket error: ${createErr.message}` });
+        }
+      }
+
+      const safeName = String(fileName).replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `Applications/${commId}/${applicantId}/${questionId}-${Date.now()}-${safeName}`;
+
+      const { data, error } = await supabaseAdmin.storage
+        .from(bucketName)
+        .createSignedUploadUrl(storagePath);
+
+      if (error) {
+        console.error('Application signed URL error:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      const { data: urlData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(storagePath);
+
+      return res.json({
+        path: storagePath,
+        token: data.token,
+        publicUrl: urlData.publicUrl,
+      });
+    }
+
     // ── UPLOAD AVATAR ───────────────────────────────────────────────────
     if (action === 'upload-avatar') {
       const { userId, avatar } = req.body;

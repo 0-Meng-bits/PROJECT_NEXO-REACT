@@ -1,5 +1,6 @@
-﻿﻿import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../lib/api';
 
 export function ApplicationStatusLabel(status, phase2Result) {
   if (status === 'phase2') return phase2Result ? (phase2Result === 'accepted' ? 'Accepted' : 'Rejected') : 'Phase 2 - Live Screening';
@@ -544,23 +545,78 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
   const pickApp = (app) => {
     setSelectedApp(app);
     setAnswers({});
+    setFileErrors({});
+    setUploadedNames({});
     setQuestions([]);
     setLoading(true);
     fetchQuestionsWithOptions([app.id])
       .then((data) => { setQuestions(data); setLoading(false); });
   };
 
+  const [uploadingFiles, setUploadingFiles] = useState({});
+  const [fileErrors, setFileErrors] = useState({});
+  const [uploadedNames, setUploadedNames] = useState({});
+
   const handleFileUpload = async (questionId, file) => {
-    const ext = file.name.split('.').pop();
-    const path = 'Applications/' + comm.id + '/' + applicantId + '/' + questionId + '.' + ext;
-    const { error } = await supabase.storage.from('Application-files').upload(path, file, { upsert: true });
-    if (!error) {
-      const { data: urlData } = supabase.storage.from('Application-files').getPublicUrl(path);
-      setAnswers(prev => ({ ...prev, [questionId]: urlData.publicUrl }));
+    if (file.size > 20 * 1024 * 1024) {
+      setFileErrors(prev => ({ ...prev, [questionId]: 'File is too large (max 20 MB).' }));
+      return;
+    }
+
+    setUploadingFiles(prev => ({ ...prev, [questionId]: true }));
+    setFileErrors(prev => ({ ...prev, [questionId]: '' }));
+
+    try {
+      const res = await fetch(getApiUrl('/api/upload'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-application-upload-url',
+          commId: comm.id,
+          applicantId,
+          questionId,
+          fileName: file.name,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token || !data.path) {
+        throw new Error(data.error || 'Could not prepare file upload.');
+      }
+
+      const { error: upErr } = await supabase.storage
+        .from('application-files')
+        .uploadToSignedUrl(data.path, data.token, file);
+
+      if (upErr) throw upErr;
+
+      setAnswers(prev => ({ ...prev, [questionId]: data.publicUrl }));
+      setUploadedNames(prev => ({ ...prev, [questionId]: file.name }));
+    } catch (err) {
+      console.error('[APPLICATION UPLOAD]', err);
+      setAnswers(prev => {
+        const next = { ...prev };
+        delete next[questionId];
+        return next;
+      });
+      setFileErrors(prev => ({
+        ...prev,
+        [questionId]: err?.message || 'File upload failed. Please try again.',
+      }));
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [questionId]: false }));
     }
   };
 
   const submit = async () => {
+    if (Object.values(uploadingFiles).some(Boolean)) {
+      alert('Please wait for your file upload to finish.');
+      return;
+    }
+    const failedFiles = questions.filter(q => q.type === 'file' && fileErrors[q.id]);
+    if (failedFiles.length > 0) {
+      alert('A file failed to upload. Please re-upload it before submitting.');
+      return;
+    }
     const unanswered = questions.filter(q => q.type !== 'file' && !answers[q.id]?.trim());
     if (unanswered.length > 0) { alert('Please answer all questions.'); return; }
     if (!activeApp?.id) { alert('No active application form selected.'); return; }
@@ -714,10 +770,23 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
                     {q.type === 'file' && (
                       <div>
                         <input type="file" style={{ color: 'var(--text-muted)', fontSize: 12 }}
+                          disabled={!!uploadingFiles[q.id]}
                           onChange={e => e.target.files[0] && handleFileUpload(q.id, e.target.files[0])} />
-                        {answers[q.id] && (
+                        {uploadingFiles[q.id] && (
+                          <p style={{ fontSize: 11, color: 'var(--cyber-cyan)', marginTop: 4 }}>
+                            <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 4 }}></i>Uploading file...
+                          </p>
+                        )}
+                        {!uploadingFiles[q.id] && answers[q.id] && (
                           <p style={{ fontSize: 11, color: 'var(--green)', marginTop: 4 }}>
-                            <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>File uploaded
+                            <i className="fa-solid fa-check" style={{ marginRight: 4 }}></i>
+                            File uploaded{uploadedNames[q.id] ? `: ${uploadedNames[q.id]}` : ''}
+                          </p>
+                        )}
+                        {fileErrors[q.id] && (
+                          <p style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>
+                            <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }}></i>
+                            {fileErrors[q.id]}
                           </p>
                         )}
                       </div>
