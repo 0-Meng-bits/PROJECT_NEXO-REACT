@@ -517,7 +517,7 @@ export default function Auth() {
   // ── LOGIN / SIGNUP FORM ──
   return (
     <div className="auth-page">
-      <div className="auth-card-glow" style={{ width: isLogin ? '420px' : '600px' }}>
+      <div className={isLogin ? 'auth-card-glow auth-glow-login' : 'auth-card-glow auth-glow-signup'}>
         <div className="auth-card fade-in">
         <div className="auth-header">
           <button className="auth-back-btn" onClick={() => navigate('/')} type="button">
@@ -552,9 +552,9 @@ export default function Auth() {
               </div>
             </>
           ) : (
-            /* ── SIGNUP — two column grid ── */
+            /* ── SIGNUP — two column grid (responsive) ── */
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
+              <div className="signup-two-col">
                 <div className="input-group">
                   <label>CTU_ID</label>
                   <input name="ctuId" value={form.ctuId} onChange={update}
@@ -566,23 +566,11 @@ export default function Auth() {
                     placeholder="Juan Dela Cruz" required disabled={loading} />
                 </div>
                 <div className="input-group">
-                  <label>EMAIL (for password recovery)</label>
+                  <label>EMAIL</label>
                   <input name="email" type="email" value={form.email} onChange={update}
                     placeholder="your.real@email.com" required disabled={loading}
                     pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
                     title="Please enter a valid email address (e.g. name@gmail.com)" />
-                </div>
-                <div className="input-group">
-                  <label>ACCOUNT TYPE</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 8, border: '1px solid var(--cyber-cyan)', background: 'rgba(0,240,255,0.08)', color: 'var(--cyber-cyan)', fontSize: 13, fontWeight: 700 }}>
-                      <i className="fa-solid fa-graduation-cap" style={{ fontSize: 14 }}></i>
-                      Student
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      CTU Daanbantayan students only
-                    </div>
-                  </div>
                 </div>
                 <div className="input-group">
                   <label>GENDER</label>
@@ -593,6 +581,11 @@ export default function Auth() {
                     <option value="Prefer not to say">Prefer not to say</option>
                   </select>
                 </div>
+              </div>
+              <div className="signup-student-badge">
+                <i className="fa-solid fa-graduation-cap"></i>
+                <span>Student</span>
+                <span className="signup-student-note">CTU Daanbantayan students only</span>
               </div>
 
               <div className="input-group">

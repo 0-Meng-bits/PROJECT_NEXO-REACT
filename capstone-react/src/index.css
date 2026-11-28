@@ -325,6 +325,10 @@ body {
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
   box-sizing: border-box;
 }
+/* Login card — narrower */
+.auth-glow-login  { width: 420px; max-width: 100%; }
+/* Signup card — wider, but constrained on small screens */
+.auth-glow-signup { width: 580px; max-width: 100%; }
 
 .auth-card {
   position: relative;
@@ -3213,9 +3217,14 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
   .nav-search-wrap { max-width: none; flex: 1; }
 
   /* Auth */
-  .auth-card-glow { margin: 16px; }
-  .auth-card { padding: 28px 20px; }
+  .auth-card-glow { margin: 12px; width: auto !important; }
+  .auth-glow-login,
+  .auth-glow-signup { width: auto !important; }
+  .auth-card { padding: 24px 16px; }
+  .auth-page { padding: 12px; align-items: flex-start; padding-top: 24px; }
   .logo-text { font-size: 1.6rem; }
+  .signup-two-col { grid-template-columns: 1fr !important; }
+  .signup-student-badge { font-size: 12px; }
 
   /* Home feed */
   .welcome-grid { grid-template-columns: 1fr; }
@@ -3539,6 +3548,29 @@ div:hover > .reaction-names-tooltip { opacity: 1; }
 .signup-col {
   display: flex;
   flex-direction: column;
+}
+/* Student-only badge row (replaces the cramped ACCOUNT TYPE column) */
+.signup-student-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--cyber-cyan);
+  background: rgba(0,240,255,0.06);
+  color: var(--cyber-cyan);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-align: left;
+}
+.signup-student-badge i { font-size: 15px; }
+.signup-student-note {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
 }
 @media (max-width: 600px) {
   .signup-two-col { grid-template-columns: 1fr; }
