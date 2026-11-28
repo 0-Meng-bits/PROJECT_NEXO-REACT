@@ -924,12 +924,13 @@ export default function AdminDashboard() {
         body: JSON.stringify({ action: 'issue_warning', user_id: userId, admin_id: admin?.id, reason }),
       });
       const result = await res.json();
-      if (result.alreadyBanned) { showToast(`${userName} is already banned.`); return; }
-      if (result.autoBanned) { showToast(`${userName} has been permanently banned.`); fetchData(); return; }
-      if (result.willSuspend) { showToast(`${userName} suspended for 7 days.`); }
-      else { showToast(`Warning issued to ${userName}. ${result.newPoints} point(s) left.`); }
+      if (result.alreadyBanned) { showToast(`${userName} is already banned.`); return result; }
+      if (result.autoBanned) { showToast(`${userName} has been permanently banned.`); fetchData(); return result; }
+      if (result.willSuspend) { showToast(`${userName} suspended for 7 days (${result.newWarnings}/3 warnings, -${result.pointsDeducted ?? 1} TP).`); }
+      else { showToast(`Warning ${result.newWarnings}/3 issued to ${userName} (-${result.pointsDeducted ?? 1} TP, ${result.newPoints} TP left).`); }
       fetchData();
-    } catch { showToast('Failed to issue warning.'); }
+      return result;
+    } catch { showToast('Failed to issue warning.'); return null; }
   };
 
   const banUser = async (userId, userName) => {
@@ -1822,7 +1823,19 @@ export default function AdminDashboard() {
                   <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {!selectedUser.is_banned && selectedUser.is_verified && (
                       <button className="adm-btn" style={{ color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)' }}
-                        onClick={() => { const r = prompt('Warning reason:'); if (r) { issueWarning(selectedUser.id, selectedUser.full_name, r); setSelectedUser(prev => ({ ...prev, warning_count: (prev.warning_count || 0) + 1, trust_points: Math.max(0, (prev.trust_points ?? 10) - 1) })); } }}>
+                        onClick={async () => {
+                          const r = prompt('Warning reason:');
+                          if (!r) return;
+                          const res = await issueWarning(selectedUser.id, selectedUser.full_name, r);
+                          if (res && !res.alreadyBanned) {
+                            setSelectedUser(prev => ({
+                              ...prev,
+                              warning_count: res.newWarnings ?? ((prev.warning_count || 0) + 1),
+                              trust_points: res.newPoints ?? prev.trust_points,
+                              ...(res.autoBanned ? { is_banned: true } : {}),
+                            }));
+                          }
+                        }}>
                         <i className="fa-solid fa-triangle-exclamation"></i> Issue Warning
                       </button>
                     )}
@@ -2430,6 +2443,7 @@ export default function AdminDashboard() {
             .filter(r => r.reason === AUTO_MOD_REASON && r.status === 'pending')
             .map(r => ({
               id: r.id,
+              user_id: r.reported_user_id || r.reporter_id,
               _type: `blocked_${r.content_type || 'message'}`,
               _isBlockedLog: true,
               full_name: r.reported?.full_name || r.reporter?.full_name || '—',
@@ -2486,17 +2500,34 @@ export default function AdminDashboard() {
                           </td>
                           <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
                           <td>
-                            {item._isBlockedLog ? (
-                              <button className="adm-btn approve" style={{ fontSize: 10 }}
-                                onClick={() => resolveReport(item.id, 'reviewed', 'Reviewed in Content Monitor')}>
-                                <i className="fa-solid fa-check"></i> Dismiss
-                              </button>
-                            ) : (
-                              <button className="adm-btn reject" style={{ fontSize: 10 }}
-                                onClick={() => deleteContent(item._type === 'announcement' ? 'announcement' : 'message', item.id)}>
-                                <i className="fa-solid fa-trash"></i> Delete
-                              </button>
-                            )}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {(item.user_id || item.sender_id || item.author_id) && (
+                                <button className="adm-btn" style={{ fontSize: 10, color: 'var(--orange)', borderColor: 'var(--orange)', background: 'rgba(247,169,79,0.08)' }}
+                                  onClick={async () => {
+                                    const targetId = item.user_id || item.sender_id || item.author_id;
+                                    const targetName = item.full_name || item.author_name || 'User';
+                                    const preview = (item.title ? `${item.title}: ${item.content}` : item.content || '').slice(0, 80);
+                                    if (!confirm(`Issue warning to ${targetName}? (Escalating TP deduction; 3 warnings = 7-day suspension)`)) return;
+                                    const res = await issueWarning(targetId, targetName, `Inappropriate language (${item._type?.replace('_', ' ')}): "${preview}"`);
+                                    if (res && item._isBlockedLog) {
+                                      await resolveReport(item.id, 'reviewed', 'Warning issued in Content Monitor');
+                                    }
+                                  }}>
+                                  <i className="fa-solid fa-triangle-exclamation"></i> Warn
+                                </button>
+                              )}
+                              {item._isBlockedLog ? (
+                                <button className="adm-btn approve" style={{ fontSize: 10 }}
+                                  onClick={() => resolveReport(item.id, 'reviewed', 'Reviewed in Content Monitor')}>
+                                  <i className="fa-solid fa-check"></i> Dismiss
+                                </button>
+                              ) : (
+                                <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                  onClick={() => deleteContent(item._type === 'announcement' ? 'announcement' : 'message', item.id)}>
+                                  <i className="fa-solid fa-trash"></i> Delete
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

@@ -55,8 +55,11 @@ export default async function handler(req, res) {
         if (profile?.is_banned) return res.json({ alreadyBanned: true });
 
         const currentPoints = profile?.trust_points ?? 10;
-        const newPoints = Math.max(0, currentPoints - 1);
-        const newWarnings = (profile?.warning_count || 0) + 1;
+        const priorWarnings = profile?.warning_count || 0;
+        const newWarnings = priorWarnings + 1;
+        // Escalating TP deduction: 1st = 1, 2nd = 5, 3rd+ = 10
+        const pointsToDeduct = priorWarnings === 0 ? 1 : priorWarnings === 1 ? 5 : 10;
+        const newPoints = Math.max(0, currentPoints - pointsToDeduct);
         const isAlreadySuspended = profile?.suspended_until && new Date(profile.suspended_until) > new Date();
 
         // Auto-ban: already suspended and gets another warning
@@ -67,11 +70,11 @@ export default async function handler(req, res) {
           return res.json({ autoBanned: true });
         }
 
-        const willSuspend = newPoints === 0;
+        const willSuspend = newWarnings >= 3 || newPoints === 0;
         const suspendedUntil = willSuspend ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null;
 
-        await supabaseAdmin.from('user_warnings').insert([{ user_id, admin_id, type: 'warning', reason }]);
-        await supabaseAdmin.from('point_transactions').insert([{ user_id, amount: -1, transaction_type: 'warning', from_user_id: admin_id, reason }]);
+        await supabaseAdmin.from('user_warnings').insert([{ user_id, admin_id, type: 'warning', points_deducted: pointsToDeduct, reason }]);
+        await supabaseAdmin.from('point_transactions').insert([{ user_id, amount: -pointsToDeduct, transaction_type: 'warning', from_user_id: admin_id, reason }]);
         await supabaseAdmin.from('account_status').update({
           warning_count: newWarnings,
           trust_points: newPoints,
@@ -79,11 +82,11 @@ export default async function handler(req, res) {
         }).eq('id', user_id);
 
         const notifMsg = willSuspend
-          ? `🚫 Your account has been suspended for 7 days due to repeated violations. Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
-          : `⚠️ Warning from Admin (${newPoints} trust point${newPoints !== 1 ? 's' : ''} remaining): ${reason}. ${newPoints === 1 ? 'One more violation will result in a 7-day suspension.' : ''}`;
+          ? `🚫 Your account has been suspended for 7 days (${newWarnings} warnings / ${newPoints} TP remaining). Reason: ${reason}. You can log in again after ${new Date(suspendedUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+          : `⚠️ Warning ${newWarnings}/3 from Admin (-${pointsToDeduct} TP, ${newPoints} TP remaining): ${reason}. ${newWarnings === 2 ? 'One more warning will result in a 7-day suspension.' : ''}`;
         await supabaseAdmin.from('notifications').insert([{ user_id, type: 'audition_update', message: notifMsg }]);
 
-        return res.json({ newPoints, willSuspend, newWarnings });
+        return res.json({ newPoints, pointsDeducted: pointsToDeduct, willSuspend, newWarnings });
       }
       if (action === 'issue_flag_warning') {
         const { flag_id, user_id, admin_id, severity, points_deducted, community_id, reason } = payload;
@@ -98,7 +101,7 @@ export default async function handler(req, res) {
           .eq('id', user_id).maybeSingle();
         const newTP = Math.max(0, (status?.trust_points ?? 10) - points_deducted);
         const newWarnings = (status?.warning_count || 0) + 1;
-        const willSuspend = newTP === 0 && !status?.is_banned;
+        const willSuspend = (newWarnings >= 3 || newTP === 0) && !status?.is_banned;
         const suspendedUntil = willSuspend ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : undefined;
         await supabaseAdmin.from('account_status').update({
           trust_points: newTP,
@@ -178,11 +181,15 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('user_warnings').update({
           status: decision === 'approved' ? 'overturned' : 'active',
         }).eq('id', warning_id);
-        // If approved: restore the 1 TP that was deducted + 1 bonus (no 10-TP cap)
+        // If approved: restore TP (+2) and decrement warning_count (no 10-TP cap)
         if (decision === 'approved') {
-          const { data: current } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', user_id).single();
+          const { data: current } = await supabaseAdmin.from('account_status').select('trust_points, warning_count').eq('id', user_id).single();
           const restored = (current?.trust_points ?? 10) + 2; // 1 restored + 1 bonus
-          await supabaseAdmin.from('account_status').update({ trust_points: restored }).eq('id', user_id);
+          const updatedWarnings = Math.max(0, (current?.warning_count || 0) - 1);
+          await supabaseAdmin.from('account_status').update({
+            trust_points: restored,
+            warning_count: updatedWarnings,
+          }).eq('id', user_id);
           await supabaseAdmin.from('point_transactions').insert([{
             user_id, amount: 2, transaction_type: 'appeal_approved', reason: 'Warning overturned by admin appeal',
           }]);
