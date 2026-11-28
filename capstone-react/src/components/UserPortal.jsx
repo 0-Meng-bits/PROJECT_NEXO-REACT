@@ -1024,8 +1024,12 @@ export default function UserPortal() {
       const valid = newCirclePost.pollOptions.filter(o => o.trim());
       if (valid.length < 2) { alert('A poll needs at least 2 options.'); return; }
     }
-    // Restrict posting to Leader (3) and Co-Leader (2) only ? except Thread which all members can post
-    if (myRankLevel < 2 && newCirclePost.post_type !== 'thread') { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
+    // Restrict announcement/event/poll to Leader (3) and Co-Leader (2); all members can post thread, plus question (academic) and showcase (hobby)
+    const isMemberAllowedType =
+      newCirclePost.post_type === 'thread' ||
+      (newCirclePost.post_type === 'question' && comm?.category === 'academic') ||
+      (newCirclePost.post_type === 'showcase' && comm?.category === 'hobby');
+    if (myRankLevel < 2 && !isMemberAllowedType) { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
 
     // Block post if it contains inappropriate language and log attempt for Content Monitor
     if (containsBadWord(newCirclePost.title) || containsBadWord(newCirclePost.content)) {
@@ -4274,7 +4278,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
+                            {['thread', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : []), ...(myRankLevel >= 2 ? ['announcement', 'event', 'poll'] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
