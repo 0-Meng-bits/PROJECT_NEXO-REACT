@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 
@@ -499,16 +499,33 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
   const [submitting, setSubmitting] = useState(false);
   const [availableApps, setAvailableApps] = useState([]);
   const [selectedApp, setSelectedApp] = useState(Application || null);
+  const [existingSubmissions, setExistingSubmissions] = useState({});
 
   // activeApp = the specific application passed in (e.g. from an announcement),
   // or the one the applicant picks from the list below
   const activeApp = Application || selectedApp;
 
   useEffect(() => {
+    const subsPromise = applicantId
+      ? supabase
+          .from('application_submissions')
+          .select('id, application_id, status, phase2_result, submitted_at')
+          .eq('applicant_id', applicantId)
+          .in('status', ['pending', 'phase2', 'accepted'])
+      : Promise.resolve({ data: [] });
+
     if (Application?.id) {
-      // A specific application was provided — load its questions directly
-      fetchQuestionsWithOptions([Application.id])
-        .then((data) => { setQuestions(data); setLoading(false); });
+      // A specific application was provided — check existing submission + load questions
+      Promise.all([
+        fetchQuestionsWithOptions([Application.id]),
+        subsPromise,
+      ]).then(([data, subsRes]) => {
+        const map = {};
+        (subsRes.data || []).forEach(s => { map[s.application_id] = s; });
+        setExistingSubmissions(map);
+        setQuestions(data);
+        setLoading(false);
+      });
       return;
     }
     // No specific application — fetch the open ones for this circle so the applicant can choose
@@ -519,7 +536,12 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
       applicantId
         ? supabase.from('memberships').select('id').eq('community_id', comm.id).eq('user_id', applicantId).eq('status', 'active').maybeSingle()
         : Promise.resolve({ data: null }),
-    ]).then(([{ data }, { data: membership }]) => {
+      subsPromise,
+    ]).then(([{ data }, { data: membership }, subsRes]) => {
+      const map = {};
+      (subsRes.data || []).forEach(s => { map[s.application_id] = s; });
+      setExistingSubmissions(map);
+
       const isMember = Boolean(membership?.id);
       // Only offer applications whose deadline hasn't passed and that match the user's membership status
       const open = (data || []).filter(a => {
@@ -692,18 +714,26 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
             <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>
               Choose which application to submit
             </div>
-            {availableApps.map(app => (
-              <div key={app.id} className="Application-response-row" onClick={() => pickApp(app)} style={{ cursor: 'pointer', overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: app.type === 'internal' ? 'rgba(252,238,10,0.15)' : 'rgba(0,240,255,0.15)', border: '1px solid ' + (app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)', flexShrink: 0 }}>
-                  <i className={app.type === 'internal' ? 'fa-solid fa-lock' : 'fa-solid fa-globe'}></i>
+            {availableApps.map(app => {
+              const applied = existingSubmissions[app.id];
+              return (
+                <div key={app.id} className="Application-response-row" onClick={() => pickApp(app)} style={{ cursor: 'pointer', overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: app.type === 'internal' ? 'rgba(252,238,10,0.15)' : 'rgba(0,240,255,0.15)', border: '1px solid ' + (app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: app.type === 'internal' ? 'var(--cyber-yellow)' : 'var(--cyber-cyan)', flexShrink: 0 }}>
+                    <i className={app.type === 'internal' ? 'fa-solid fa-lock' : 'fa-solid fa-globe'}></i>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.title}</div>
+                    {app.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>}
+                  </div>
+                  {applied && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 12, color: 'var(--cyber-cyan)', border: '1px solid var(--cyber-cyan)', background: 'rgba(0,240,255,0.1)', flexShrink: 0 }}>
+                      Already Applied
+                    </span>
+                  )}
+                  <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}></i>
                 </div>
-                <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.title}</div>
-                  {app.description && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>}
-                </div>
-                <i className="fa-solid fa-chevron-right" style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8, flexShrink: 0 }}></i>
-              </div>
-            ))}
+              );
+            })}
             <button className="cyber-btn secondary" onClick={onCancel} style={{ width: '100%', marginTop: 16 }}>Cancel</button>
           </>
         )}
@@ -718,7 +748,41 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
         )}
 
         {/* Question form — shown once an application is resolved (passed in or picked) */}
-        {activeApp && (
+        {activeApp && (() => {
+          const existingSub = existingSubmissions[activeApp.id];
+          if (existingSub) {
+            const statusColor = ApplicationStatusColor(existingSub.status, existingSub.phase2_result);
+            const statusLabel = ApplicationStatusLabel(existingSub.status, existingSub.phase2_result);
+            return (
+              <div style={{ textAlign: 'center', padding: '16px 8px' }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: '50%', margin: '0 auto 14px',
+                  background: `${statusColor}15`, border: `1px solid ${statusColor}55`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <i className="fa-solid fa-circle-check" style={{ fontSize: 24, color: statusColor }}></i>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                  Already Applied
+                </div>
+                <div style={{
+                  display: 'inline-block', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20,
+                  color: statusColor, border: `1px solid ${statusColor}`, background: `${statusColor}15`,
+                  marginBottom: 12,
+                }}>
+                  {statusLabel}
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
+                  You have already submitted an application for <strong style={{ color: 'var(--text-primary)' }}>{activeApp.title}</strong>.
+                  {existingSub.submitted_at ? ` (Submitted ${new Date(existingSub.submitted_at).toLocaleDateString()})` : ''}
+                </p>
+                <button className="cyber-btn secondary" onClick={onCancel} style={{ width: '100%' }}>
+                  Close
+                </button>
+              </div>
+            );
+          }
+          return (
           <>
             {activeApp.deadline && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, marginBottom: 16,
@@ -802,7 +866,8 @@ export function ApplicationApplicationForm({ comm, Application, appTitle, applic
               </>
             )}
           </>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
