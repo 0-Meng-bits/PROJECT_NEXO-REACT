@@ -11,6 +11,17 @@ import ResetPassword from './components/ResetPassword';
 
 function LandingWrapper() {
   const navigate = useNavigate();
+  const token = localStorage.getItem('accessToken');
+  const rawUser = localStorage.getItem('currentUser');
+  if (token && rawUser) {
+    try {
+      const user = JSON.parse(rawUser);
+      if (user?.user_type === 'Admin') {
+        sessionStorage.setItem('nexo_admin_back_prompt', '1');
+        return <Navigate to="/admin" replace />;
+      }
+    } catch { /* ignore invalid JSON */ }
+  }
   return <Landing onEnter={(mode) => navigate('/auth?mode=' + mode)} />;
 }
 

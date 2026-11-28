@@ -526,7 +526,13 @@ export default function AdminDashboard() {
   const [showSectionInfo, setShowSectionInfo] = useState(false);
   const [togglingOfficialId, setTogglingOfficialId] = useState(null);
   const [processingRequestId, setProcessingRequestId] = useState(null);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(() => {
+    if (sessionStorage.getItem('nexo_admin_back_prompt') === '1') {
+      sessionStorage.removeItem('nexo_admin_back_prompt');
+      return true;
+    }
+    return false;
+  });
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
