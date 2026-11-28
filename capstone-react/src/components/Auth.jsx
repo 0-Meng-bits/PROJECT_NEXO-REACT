@@ -686,7 +686,7 @@ export default function Auth() {
 
         {isLogin ? (
           <div className="auth-bottom-row">
-            <a href="#" className="auth-bottom-link" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); }}>
+            <a href="#" className="auth-bottom-link" onClick={(e) => { e.preventDefault(); setMode('signup'); setSignupStep('form'); setForm(f => ({ ...f, agreedToTerms: false })); }}>
                Create an account
             </a>
             <a href="#" className="auth-bottom-link" onClick={(e) => { e.preventDefault(); setMode('forgot'); }}>
@@ -783,7 +783,9 @@ export default function Auth() {
                   if (!form.agreedToTerms) return;
                   localStorage.setItem('nexo-terms-accepted', 'true');
                   setShowTermsModal(false);
-                  if (pendingRoute && pendingRoute !== '/portal' || !isLogin) navigate(pendingRoute);
+                  // Only navigate post-login (when pendingRoute was set by handleLogin).
+                  // During signup the modal is just a confirmation — don't navigate away.
+                  if (isLogin && pendingRoute) navigate(pendingRoute);
                 }}>
                 <i className="fa-solid fa-arrow-right" style={{ marginRight: 6 }}></i>Continue
               </button>
