@@ -2272,7 +2272,7 @@ export default function UserPortal() {
       navTo('home', 'global');
     } catch (err) {
       console.error('[DELETE CIRCLE] Error:', err);
-      showToast('Network error ? could not delete circle.');
+      showToast('Network error — could not delete circle.');
     }
   };
 
@@ -4073,7 +4073,7 @@ export default function UserPortal() {
                         return (
                           <div key={label}>
                             <div style={{ padding: '6px 20px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                              {label} ? {group.length}
+                              {label} · {group.length}
                             </div>
                             {group.map(m => {
                               const url = avatarCache[m.sender_id] || m.avatar_url;
@@ -4817,7 +4817,7 @@ export default function UserPortal() {
                       return (
                         <div key={label}>
                           <div style={{ padding: '8px 14px 4px', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700 }}>
-                            {label} ? {group.length}
+                            {label} · {group.length}
                           </div>
                           {group.map(m => {
                             const memberStudentId = m.student_id || m.ctu_id;

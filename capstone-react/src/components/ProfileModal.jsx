@@ -113,7 +113,7 @@ const INTEREST_BUBBLES = Object.entries(INTEREST_LABELS).map(([id, label]) => ({
 const PROGRAMS = ['BEED','BIT - AUTOMOTIVE','BIT - COMPUTER TECHNOLOGY','BIT - ELECTRONICS','BSED - MATH','BSFI','BSHM','BSIE','BSIT','BTLED - HE'];
 
 // -- PROFILE TRUST POINTS SECTION ---------------------------------------------
-function ProfileTrustPointsSection({ userId, onViewHistory }) {
+function ProfileTrustPointsSection({ userId, readOnly, onViewHistory }) {
   const [trustPoints, setTrustPoints] = useState(10);
   const [loading, setLoading] = useState(true);
 
@@ -140,11 +140,13 @@ function ProfileTrustPointsSection({ userId, onViewHistory }) {
       <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>TRUST POINTS</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <TrustPointsBadge points={trustPoints} size="large" showLabel={true} />
-        <button onClick={onViewHistory} style={{ background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '8px 14px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <i className="fa-solid fa-history"></i> View History
-        </button>
+        {!readOnly && (
+          <button onClick={onViewHistory} style={{ background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.3)', color: 'var(--cyber-cyan)', borderRadius: 8, padding: '8px 14px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="fa-solid fa-history"></i> View History
+          </button>
+        )}
       </div>
-      {trustPoints < 10 && (
+      {!readOnly && trustPoints < 10 && (
         <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
           <i className="fa-solid fa-info-circle" style={{ marginRight: 4, color: 'var(--cyber-cyan)' }}></i>
           You can earn points through peer appreciation and daily good behavior.
@@ -1020,7 +1022,7 @@ export default function ProfileModal({ user, communities, onClose, onLogout, onA
               </div>
             </div>
 
-            <ProfileTrustPointsSection userId={user.id} onViewHistory={() => setShowWarningHistory(true)} />
+            <ProfileTrustPointsSection userId={user.id} readOnly={readOnly} onViewHistory={() => setShowWarningHistory(true)} />
 
             {!readOnly && editing && (
               <div style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(12px)', border: '1px solid var(--cyber-cyan)', borderRadius: 10, padding: '10px 14px' }}>
@@ -1281,10 +1283,10 @@ export default function ProfileModal({ user, communities, onClose, onLogout, onA
           document.body
         )}
 
-        {showWarningHistory && (
+        {!readOnly && showWarningHistory && (
           <WarningHistoryModal userId={user.id} onClose={() => setShowWarningHistory(false)} onAppeal={(warning) => { setAppealingWarning(warning); setShowWarningHistory(false); }} />
         )}
-        {appealingWarning && (
+        {!readOnly && appealingWarning && (
           <AppealModal warning={appealingWarning} userId={user.id} onClose={() => { setAppealingWarning(null); setShowWarningHistory(true); }} />
         )}
 
