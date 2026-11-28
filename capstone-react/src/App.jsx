@@ -14,6 +14,13 @@ function LandingWrapper() {
   return <Landing onEnter={(mode) => navigate('/auth?mode=' + mode)} />;
 }
 
+// Redirect admins away from /portal back to /admin
+function PortalOrAdminRedirect() {
+  const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  if (user.user_type === 'Admin') return <Navigate to="/admin" replace />;
+  return <UserPortal />;
+}
+
 function ProtectedRoute({ children, allowedType }) {
   const [status, setStatus] = useState('checking');
 
@@ -135,7 +142,7 @@ export default function App() {
       } />
       <Route path="/portal" element={
         <ProtectedRoute>
-          <UserPortal />
+          <PortalOrAdminRedirect />
         </ProtectedRoute>
       } />
       <Route path="/admin" element={
