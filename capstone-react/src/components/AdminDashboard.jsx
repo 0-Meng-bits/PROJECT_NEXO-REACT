@@ -1900,59 +1900,65 @@ export default function AdminDashboard() {
             : communities.length === 0 ? <div className="adm-empty">No circles found.</div>
             : (
               <table className="adm-table">
-                <thead><tr><th>Name</th><th>Category</th><th>Status</th><th>Verified</th><th>Audition</th><th>Created By</th><th>Created</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Status</th><th>Verified</th><th>Created By</th><th>Actions</th></tr></thead>
                 <tbody>
                   {communities.map(c => (
                     <tr key={c.id} style={{ opacity: c.status === 'pending' ? 0.7 : 1 }}>
                       <td style={{ color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
                         onClick={() => viewCircleMembers(c)}>
-                        {c.name}
-                        <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
+                        <div>
+                          {c.name}
+                          <i className="fa-solid fa-arrow-up-right-from-square" style={{ marginLeft: 6, fontSize: 10, color: 'var(--cyber-cyan)' }}></i>
+                        </div>
+                        {c.category && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>{c.category}</div>}
                       </td>
-                      <td><span className="adm-tag">{c.category}</span></td>
                       <td>
                         {c.status === 'pending'
                           ? <span style={{ fontSize: 11, color: 'var(--orange)', border: '1px solid rgba(247,169,79,0.4)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-hourglass-half" style={{ marginRight: 4 }}></i>Forming</span>
                           : <span style={{ fontSize: 11, color: 'var(--green)', border: '1px solid rgba(62,207,142,0.3)', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}><i className="fa-solid fa-circle-check" style={{ marginRight: 4 }}></i>Active</span>}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 700,
-                            color: c.is_official ? 'var(--green)' : 'var(--text-muted)',
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                          }}>
-                            <i className={`fa-solid ${c.is_official ? 'fa-circle-check' : 'fa-circle-xmark'}`}></i>
-                            {c.is_official ? 'Verified' : 'Not Verified'}
-                          </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                           <button
+                            type="button"
+                            role="switch"
+                            aria-checked={Boolean(c.is_official)}
                             disabled={togglingOfficialId === c.id}
                             onClick={() => toggleOfficialCircle(c.id, c.is_official, c.name)}
                             title={c.is_official ? `Remove verified status from ${c.name}` : `Mark ${c.name} as Verified`}
                             style={{
-                              fontSize: 11, padding: '3px 9px', borderRadius: 6, cursor: togglingOfficialId === c.id ? 'wait' : 'pointer',
-                              fontWeight: 700, fontFamily: 'inherit', transition: '0.15s',
+                              position: 'relative',
+                              width: 40,
+                              height: 22,
+                              borderRadius: 999,
+                              padding: 0,
+                              border: `1px solid ${c.is_official ? 'rgba(62,207,142,0.6)' : 'rgba(255,255,255,0.2)'}`,
+                              background: c.is_official ? 'rgba(62,207,142,0.25)' : 'rgba(255,255,255,0.08)',
+                              cursor: togglingOfficialId === c.id ? 'wait' : 'pointer',
                               opacity: togglingOfficialId === c.id ? 0.6 : 1,
-                              background: c.is_official ? 'rgba(248,113,113,0.12)' : 'rgba(62,207,142,0.15)',
-                              color: c.is_official ? '#f87171' : 'var(--green)',
-                              border: `1px solid ${c.is_official ? 'rgba(248,113,113,0.4)' : 'rgba(62,207,142,0.4)'}`,
+                              transition: 'background 0.2s, border-color 0.2s',
+                              flexShrink: 0,
                             }}>
-                            {togglingOfficialId === c.id
-                              ? <><i className="fa-solid fa-spinner fa-spin" style={{ marginRight: 4 }}></i>Saving...</>
-                              : c.is_official
-                                ? 'Unverify'
-                                : 'Verify'}
+                            <span style={{
+                              position: 'absolute',
+                              top: 2,
+                              left: 2,
+                              width: 16,
+                              height: 16,
+                              borderRadius: '50%',
+                              background: c.is_official ? 'var(--green)' : '#8892a4',
+                              transform: c.is_official ? 'translateX(18px)' : 'translateX(0)',
+                              transition: 'transform 0.2s, background 0.2s',
+                            }} />
                           </button>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: c.is_official ? 'var(--green)' : 'var(--text-muted)', minWidth: 24 }}>
+                            {togglingOfficialId === c.id
+                              ? <i className="fa-solid fa-spinner fa-spin"></i>
+                              : c.is_official ? 'On' : 'Off'}
+                          </span>
                         </div>
                       </td>
-                      <td>
-                        <span style={{ fontSize: 11, color: c.application_enabled ? 'var(--green)' : 'var(--text-muted)' }}>
-                          <i className={`fa-solid ${c.application_enabled ? 'fa-microphone' : 'fa-microphone-slash'}`} style={{ marginRight: 4 }}></i>
-                          {c.application_enabled ? 'On' : 'Off'}
-                        </span>
-                      </td>
                       <td style={{ color: 'var(--text-muted)' }}>{c.accounts?.full_name || '—'}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString()}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="adm-btn approve" onClick={() => viewCircleMembers(c)}>
