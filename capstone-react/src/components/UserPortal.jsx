@@ -933,9 +933,16 @@ export default function UserPortal() {
     const allowedTypes = ['announcement', 'event', 'shoutout', 'thread', 'general', 'poll'];
     const type = allowedTypes.includes(requestedType) ? requestedType : 'thread';
 
-    // Block post if it contains inappropriate language
+    // Block post if it contains inappropriate language and log attempt for Content Monitor
     if (containsBadWord(newPost.title) || containsBadWord(newPost.content)) {
       alert('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      await autoFlagContent({
+        reporterId: user.id,
+        reportedUserId: user.id,
+        contentType: 'announcement',
+        contentId: null,
+        contentPreview: [newPost.title, newPost.content].filter(Boolean).join(': '),
+      });
       return;
     }
 
@@ -1018,9 +1025,16 @@ export default function UserPortal() {
     // Restrict posting to Leader (3) and Co-Leader (2) only ? except Thread which all members can post
     if (myRankLevel < 2 && newCirclePost.post_type !== 'thread') { showToast('Only Leaders and Co-Leaders can post announcements.'); return; }
 
-    // Block post if it contains inappropriate language
+    // Block post if it contains inappropriate language and log attempt for Content Monitor
     if (containsBadWord(newCirclePost.title) || containsBadWord(newCirclePost.content)) {
       showToast('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      await autoFlagContent({
+        reporterId: user.id,
+        reportedUserId: user.id,
+        contentType: 'announcement',
+        contentId: null,
+        contentPreview: [newCirclePost.title, newCirclePost.content].filter(Boolean).join(': '),
+      });
       return;
     }
 
@@ -1131,6 +1145,13 @@ export default function UserPortal() {
 
     if (containsBadWord(bulletinPost.title) || containsBadWord(bulletinPost.content)) {
       showToast('⚠️ Your post contains inappropriate language and cannot be published. Please remove it and try again.');
+      await autoFlagContent({
+        reporterId: user.id,
+        reportedUserId: user.id,
+        contentType: 'announcement',
+        contentId: null,
+        contentPreview: [bulletinPost.title, bulletinPost.content].filter(Boolean).join(': '),
+      });
       return;
     }
 

@@ -98,6 +98,8 @@ function StatCard({ label, value, color, icon }) {
 // Inappropriate words filter (basic list — expand as needed)
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'damn', 'crap', 'puta', 'gago', 'bobo', 'tanga', 'putangina', 'leche', 'pakshet', 'ulol'];
 
+const AUTO_MOD_REASON = 'Auto-detected: inappropriate language';
+
 function containsBadWord(text) {
   if (!text) return false;
   const lower = text.toLowerCase();
@@ -1250,8 +1252,8 @@ export default function AdminDashboard() {
             {s.key === 'verification' && pending.length > 0 && (
               <span className="adm-badge">{pending.length}</span>
             )}
-            {s.key === 'reports' && reports.filter(r => r.status === 'pending').length > 0 && (
-              <span className="adm-badge">{reports.filter(r => r.status === 'pending').length}</span>
+            {s.key === 'reports' && reports.filter(r => r.reason !== AUTO_MOD_REASON && r.status === 'pending').length > 0 && (
+              <span className="adm-badge">{reports.filter(r => r.reason !== AUTO_MOD_REASON && r.status === 'pending').length}</span>
             )}
             {s.key === 'communities' && communities.filter(c => c.status === 'pending').length > 0 && (
               <span className="adm-badge">{communities.filter(c => c.status === 'pending').length}</span>
@@ -2345,14 +2347,14 @@ export default function AdminDashboard() {
               </span>
             </div>
             {loading ? <div className="adm-empty">Loading...</div>
-            : reports.length === 0 ? (
+            : reports.filter(r => r.reason !== AUTO_MOD_REASON).length === 0 ? (
               <div className="adm-empty">No reports yet.</div>
             ) : (
               <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
                 <table className="adm-table">
                   <thead><tr><th>REPORTER</th><th>REPORTED</th><th>TYPE</th><th>REASON</th><th>STATUS</th><th>DATE</th><th>ACTIONS</th></tr></thead>
                   <tbody>
-                    {reports.map(r => (
+                    {reports.filter(r => r.reason !== AUTO_MOD_REASON).map(r => (
                       <tr key={r.id}>
                         <td style={{ fontSize: 11 }}>
                           <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{r.reporter?.full_name || '—'}</div>
@@ -2421,10 +2423,22 @@ export default function AdminDashboard() {
 
         {/* ── CONTENT MONITOR ── */}
         {section === 'moderation' && (() => {
+          const autoBlocked = reports
+            .filter(r => r.reason === AUTO_MOD_REASON && r.status === 'pending')
+            .map(r => ({
+              id: r.id,
+              _type: `blocked_${r.content_type || 'message'}`,
+              _isBlockedLog: true,
+              full_name: r.reported?.full_name || r.reporter?.full_name || '—',
+              ctu_id: r.reported?.ctu_id || r.reporter?.ctu_id || '',
+              content: r.content_preview || '(blocked content)',
+              created_at: r.created_at,
+            }));
           const flaggedMessages = allMessages.filter(m => containsBadWord(m.content));
           const flaggedAnnouncements = allCircleAnnouncements.filter(a => containsBadWord(a.title) || containsBadWord(a.content));
           const flaggedGlobal = globalMessages.filter(m => containsBadWord(m.content));
           const allFlagged = [
+            ...autoBlocked,
             ...flaggedMessages.map(m => ({ ...m, _type: 'circle_message' })),
             ...flaggedAnnouncements.map(a => ({ ...a, _type: 'announcement' })),
             ...flaggedGlobal.map(m => ({ ...m, _type: 'global_message', _circle: 'Global Feed' })),
@@ -2453,8 +2467,15 @@ export default function AdminDashboard() {
                     <tbody>
                       {allFlagged.map(item => (
                         <tr key={item.id}>
-                          <td><span className="adm-tag">{item._type?.replace('_', ' ')}</span></td>
-                          <td style={{ fontSize: 12, color: 'var(--text-primary)' }}>{item.full_name || item.author_name || '—'}</td>
+                          <td>
+                            <span className="adm-tag" style={item._isBlockedLog ? { borderColor: 'rgba(247,169,79,0.4)', color: 'var(--orange)' } : undefined}>
+                              {item._type?.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                            {item.full_name || item.author_name || '—'}
+                            {item.ctu_id && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.ctu_id}</div>}
+                          </td>
                           <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 300 }}>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {item.content || `${item.title}: ${item.content}`}
@@ -2462,10 +2483,17 @@ export default function AdminDashboard() {
                           </td>
                           <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleDateString()}</td>
                           <td>
-                            <button className="adm-btn reject" style={{ fontSize: 10 }}
-                              onClick={() => deleteContent(item._type === 'announcement' ? 'announcement' : 'message', item.id)}>
-                              <i className="fa-solid fa-trash"></i> Delete
-                            </button>
+                            {item._isBlockedLog ? (
+                              <button className="adm-btn approve" style={{ fontSize: 10 }}
+                                onClick={() => resolveReport(item.id, 'reviewed', 'Reviewed in Content Monitor')}>
+                                <i className="fa-solid fa-check"></i> Dismiss
+                              </button>
+                            ) : (
+                              <button className="adm-btn reject" style={{ fontSize: 10 }}
+                                onClick={() => deleteContent(item._type === 'announcement' ? 'announcement' : 'message', item.id)}>
+                                <i className="fa-solid fa-trash"></i> Delete
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
