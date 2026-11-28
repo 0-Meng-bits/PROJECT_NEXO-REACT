@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getApiUrl } from './lib/api';
 import { supabase } from './lib/supabase';
@@ -142,28 +142,37 @@ function ProtectedRoute({ children, allowedType }) {
   return children;
 }
 
+const router = createBrowserRouter([
+  { path: '/', element: <LandingWrapper /> },
+  { path: '/auth', element: <Auth /> },
+  {
+    path: '/onboarding',
+    element: (
+      <ProtectedRoute>
+        <Onboarding />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/portal',
+    element: (
+      <ProtectedRoute>
+        <PortalOrAdminRedirect />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute allowedType="Admin">
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  { path: '/reset-password', element: <ResetPassword /> },
+  { path: '*', element: <Navigate to="/" replace /> },
+]);
+
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<LandingWrapper />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/onboarding" element={
-        <ProtectedRoute>
-          <Onboarding />
-        </ProtectedRoute>
-      } />
-      <Route path="/portal" element={
-        <ProtectedRoute>
-          <PortalOrAdminRedirect />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin" element={
-        <ProtectedRoute allowedType="Admin">
-          <AdminDashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <RouterProvider router={router} />;
 }

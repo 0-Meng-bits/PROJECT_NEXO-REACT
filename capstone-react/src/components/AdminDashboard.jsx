@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { applyTheme } from '../lib/theme';
@@ -554,8 +554,17 @@ export default function AdminDashboard() {
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
 
-  // ── Logout & beforeunload guard ───────────────────────────────────────────
+  // ── Navigation blocker: intercepts ALL navigation away from /admin ──────────
   const adminLeavingRef = useRef(false);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    !adminLeavingRef.current &&
+    currentLocation.pathname === '/admin' &&
+    nextLocation.pathname !== '/admin'
+  );
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowLogoutConfirm(true);
+  }, [blocker.state]);
 
   const confirmAdminLogout = () => {
     adminLeavingRef.current = true;
@@ -563,11 +572,16 @@ export default function AdminDashboard() {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    navigate('/auth', { replace: true });
+    if (blocker.state === 'blocked') {
+      blocker.proceed();
+    } else {
+      navigate('/auth', { replace: true });
+    }
   };
 
   const handleCancelAdminLogout = () => {
     setShowLogoutConfirm(false);
+    if (blocker.state === 'blocked') blocker.reset();
   };
 
   // ── beforeunload guard (tab close / refresh / external URL) ──────────────

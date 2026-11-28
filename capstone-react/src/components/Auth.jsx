@@ -200,11 +200,10 @@ export default function Auth() {
         const targetRoute = data.user.user_type === 'Admin'
           ? '/admin'
           : (!data.user.onboarding_complete ? '/onboarding' : '/portal');
-        // Admin gets a full-page replace so the browser history entry is a real
-        // page load — this lets the History API trap in AdminDashboard work reliably.
-        // All other routes use the SPA navigate.
+        // Admin uses SPA navigate (pushing /admin onto history) so useBlocker in
+        // AdminDashboard always has a previous entry to intercept on Back.
         if (data.user.user_type === 'Admin') {
-          window.location.replace('/admin');
+          navigate('/admin');
           return;
         }
         // Check if user has accepted terms
