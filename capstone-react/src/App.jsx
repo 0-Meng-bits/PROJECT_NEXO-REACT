@@ -16,10 +16,11 @@ function LandingWrapper() {
   if (token && rawUser) {
     try {
       const user = JSON.parse(rawUser);
-      if (user?.user_type === 'Admin') {
-        sessionStorage.setItem('nexo_admin_back_prompt', '1');
-        return <Navigate to="/admin" replace />;
-      }
+      // Admin pressed Back and landed on Landing — send them straight back to /admin
+      // with ?back=1 so AdminDashboard shows the logout-confirm modal on mount
+      if (user?.user_type === 'Admin') return <Navigate to="/admin?back=1" replace />;
+      // Regular logged-in user landed on / — send back to portal
+      if (user?.student_id) return <Navigate to="/portal" replace />;
     } catch { /* ignore invalid JSON */ }
   }
   return <Landing onEnter={(mode) => navigate('/auth?mode=' + mode)} />;

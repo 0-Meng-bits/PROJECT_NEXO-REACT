@@ -527,8 +527,11 @@ export default function AdminDashboard() {
   const [togglingOfficialId, setTogglingOfficialId] = useState(null);
   const [processingRequestId, setProcessingRequestId] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(() => {
-    if (sessionStorage.getItem('nexo_admin_back_prompt') === '1') {
-      sessionStorage.removeItem('nexo_admin_back_prompt');
+    // LandingWrapper appends ?back=1 when admin presses Back and lands on /
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('back') === '1') {
+      // Clean the URL so refreshing doesn't re-open the modal
+      window.history.replaceState({}, '', '/admin');
       return true;
     }
     return false;
