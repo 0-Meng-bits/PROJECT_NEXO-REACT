@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { applyTheme } from '../lib/theme';
@@ -554,14 +554,19 @@ export default function AdminDashboard() {
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
 
-  // ── Back-button trap: matches UserPortal's proven pattern + beforeunload ───
-  const adminLeavingRef = useRef(false); // set true only when deliberately logging out
-  const adminTrapArmedRef = useRef(false);
-  const adminBackStateRef = useRef({});
-  adminBackStateRef.current = {
-    section, selectedUser, selectedCircle, showFlagModal,
-    showAdminAgreement, showEventForm, showLogoutConfirm,
-  };
+  // ── Navigation blocker: intercepts ALL navigation away from /admin ──────────
+  // useBlocker works at the React Router level — immune to History API issues.
+  const adminLeavingRef = useRef(false);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    !adminLeavingRef.current &&
+    currentLocation.pathname === '/admin' &&
+    nextLocation.pathname !== '/admin'
+  );
+
+  // When blocker fires, show the logout confirm modal
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowLogoutConfirm(true);
+  }, [blocker.state]);
 
   const confirmAdminLogout = () => {
     adminLeavingRef.current = true;
@@ -569,18 +574,19 @@ export default function AdminDashboard() {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    navigate('/auth', { replace: true });
+    if (blocker.state === 'blocked') {
+      blocker.proceed(); // let React Router navigate away
+    } else {
+      navigate('/auth', { replace: true });
+    }
   };
 
   const handleCancelAdminLogout = () => {
     setShowLogoutConfirm(false);
-    if (!adminTrapArmedRef.current) {
-      window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
-      adminTrapArmedRef.current = true;
-    }
+    if (blocker.state === 'blocked') blocker.reset(); // cancel the navigation
   };
 
-  // ── beforeunload guard (catches tab close / refresh / external navigation) ──
+  // ── beforeunload guard (tab close / refresh / external URL) ──────────────
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (adminLeavingRef.current) return;
@@ -591,72 +597,11 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // ── Arm trap on mount (fallback) AND on first real user gesture ────────────
-  useEffect(() => {
-    if (!window.history.state?.adminTrap && !window.history.state?.adminNav) {
-      window.history.pushState({ adminTrap: true, mount: true }, '', window.location.pathname + window.location.search);
-    }
-
-    const armTrap = () => {
-      if (adminTrapArmedRef.current) return;
-      if (window.history.state?.adminNav && window.history.state?.section !== 'analytics') return;
-      window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
-      adminTrapArmedRef.current = true;
-    };
-
-    window.addEventListener('touchend', armTrap, { capture: true, passive: true });
-    window.addEventListener('click',    armTrap, { capture: true, passive: true });
-    window.addEventListener('keydown',  armTrap, { capture: true, passive: true });
-    return () => {
-      window.removeEventListener('touchend', armTrap, { capture: true });
-      window.removeEventListener('click',    armTrap, { capture: true });
-      window.removeEventListener('keydown',  armTrap, { capture: true });
-    };
-  }, []);
-
   const adminNavTo = (newSection) => {
     setSection(newSection);
     setSelectedCircle(null);
     setShowSectionInfo(false);
-    const url = window.location.pathname + (newSection === 'analytics' ? '' : `?section=${newSection}`);
-    if (newSection !== 'analytics') {
-      if (window.history.state?.adminNav) {
-        window.history.replaceState({ adminNav: true, section: newSection }, '', url);
-      } else {
-        window.history.pushState({ adminNav: true, section: newSection }, '', url);
-      }
-    } else if (window.history.state?.adminNav) {
-      window.history.replaceState({ adminTrap: true }, '', window.location.pathname);
-    }
   };
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const s = adminBackStateRef.current;
-      if (s.showLogoutConfirm) return;
-
-      // 1. Close open modals / detail panels first
-      if (s.showFlagModal)      { setShowFlagModal(null);       adminTrapArmedRef.current = false; return; }
-      if (s.showAdminAgreement) { setShowAdminAgreement(false); adminTrapArmedRef.current = false; return; }
-      if (s.showEventForm)      { setShowEventForm(false);      adminTrapArmedRef.current = false; return; }
-      if (s.selectedUser)       { setSelectedUser(null);        adminTrapArmedRef.current = false; return; }
-      if (s.selectedCircle)     { setSelectedCircle(null);      adminTrapArmedRef.current = false; return; }
-
-      // 2. If in another admin section, go back to analytics (we just popped adminNav and landed on adminTrap)
-      if (s.section !== 'analytics') {
-        setSection('analytics');
-        setShowSectionInfo(false);
-        window.history.replaceState({ adminTrap: true }, '', window.location.pathname);
-        return;
-      }
-
-      // 3. On root analytics screen — show logout confirmation modal
-      adminTrapArmedRef.current = false;
-      setShowLogoutConfirm(true);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
 
   const EVENT_CATS = [
     { key: 'semester',   label: 'Semester',           color: '#facc15' },
