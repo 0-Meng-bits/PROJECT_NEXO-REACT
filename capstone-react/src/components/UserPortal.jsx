@@ -2500,15 +2500,82 @@ export default function UserPortal() {
   // Circles for profile display ? excludes the global feed
   const myCirclesForProfile = myCircles.filter(c => c.id !== 'global');
 
+  // ── PENDING LOCKOUT: show waiting room instead of full portal ──────────────
+  if (user && !user.is_verified) {
+    const handlePendingLogout = () => {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      navigate('/auth');
+    };
+    return (
+      <div className="auth-page" style={{ minHeight: '100vh' }}>
+        <div className="auth-card-glow auth-glow-login">
+          <div className="auth-card fade-in" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>⏳</div>
+            <h2 style={{ color: 'var(--cyber-cyan)', letterSpacing: 2, marginBottom: 8 }}>
+              PENDING APPROVAL
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
+              Your account is currently under review by the NEXO Admin.<br />
+              This usually takes <strong style={{ color: 'var(--cyber-yellow)' }}>1–2 school days</strong>.<br />
+              You'll get full access as soon as you're approved.
+            </p>
+
+            {/* Submitted info */}
+            <div style={{
+              background: 'rgba(0,240,255,0.04)',
+              border: '1px solid rgba(0,240,255,0.15)',
+              borderRadius: 10,
+              padding: '14px 18px',
+              marginBottom: 24,
+              textAlign: 'left',
+            }}>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 10, fontWeight: 700 }}>
+                SUBMITTED AS
+              </p>
+              {[
+                { icon: 'fa-solid fa-user', label: 'Name', value: user.full_name },
+                { icon: 'fa-solid fa-id-card', label: 'CTU ID', value: user.ctu_id || user.student_id },
+                { icon: 'fa-solid fa-envelope', label: 'Email', value: user.email },
+              ].map(({ icon, label, value }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, fontSize: 13 }}>
+                  <i className={icon} style={{ color: 'var(--cyber-cyan)', width: 16, textAlign: 'center' }} />
+                  <span style={{ color: 'var(--text-muted)', minWidth: 48 }}>{label}:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{value || '—'}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              background: 'rgba(252,238,10,0.06)',
+              border: '1px solid rgba(252,238,10,0.2)',
+              borderRadius: 8,
+              padding: '10px 14px',
+              marginBottom: 24,
+              fontSize: 12,
+              color: 'var(--cyber-yellow)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <i className="fa-solid fa-rotate" />
+              You can log back in anytime to check if you've been approved.
+            </div>
+
+            <button className="cyber-btn secondary" style={{ width: '100%' }} onClick={handlePendingLogout}>
+              <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 8 }} />
+              LOGOUT
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="portal-layout">
-      {/* PENDING BANNER */}
-      {!user?.is_verified && (
-        <div className="pending-banner">
-          <i className="fa-solid fa-clock" style={{ marginRight: 8 }}></i>
-          Your account is pending admin verification. You can browse but cannot post, message, or join circles yet.
-        </div>
-      )}
+      {/* PENDING BANNER removed — pending users now see lockout screen above */}
 
       {/* TOP NAV */}
       <nav className="top-nav-bar">
