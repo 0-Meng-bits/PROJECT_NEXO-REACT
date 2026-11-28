@@ -4274,7 +4274,7 @@ export default function UserPortal() {
                         )}
                         <div className="home-composer-footer">
                           <div className="home-composer-types">
-                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'poll', ...((activeComm.category === 'hobby' || activeComm.category === 'social') ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
+                            {['thread', ...(myRankLevel >= 2 ? ['announcement', 'event', 'poll', ...(activeComm.category === 'hobby' ? ['showcase'] : []), ...(activeComm.category === 'academic' ? ['question'] : [])] : [])].map(t => {
                               const cfg = POST_TYPE[t];
                               return (
                                 <button key={t}
