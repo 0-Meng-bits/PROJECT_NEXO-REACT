@@ -39,8 +39,7 @@ export default function Auth() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // Route signup/OTP through Vercel serverless in production (Render blocks Gmail SMTP)
-  const signupUrl = import.meta.env.DEV ? getApiUrl('/api/signup') : '/api/signup';
+  const signupUrl = getApiUrl('/api/signup');
 
   const sendOtpCode = async () => {
     setLoading(true);
