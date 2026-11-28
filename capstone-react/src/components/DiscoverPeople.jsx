@@ -80,8 +80,10 @@ function UserCard({ user, onConnect, onCancelRequest, onAcceptRequest, onViewPro
             onMouseLeave={e => e.target.style.color = 'var(--text-primary)'}
           >
             {user.full_name}
+            {user.is_verified && <i className="fa-solid fa-circle-check" style={{ color: 'var(--cyber-cyan)', fontSize: 10, marginLeft: 5 }} title="Verified student" />}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.program || user.user_type}</div>
+          {!user.is_verified && <div style={{ fontSize: 10, color: 'var(--orange)', marginTop: 1 }}>Pending verification</div>}
         </div>
         <ConnectionStatusBadge status={user.connection_status} />
       </div>
@@ -375,7 +377,10 @@ export default function DiscoverPeople({ user, onShowToast, onViewProfile, onNav
   // Filter and view logic
   let displayedUsers = users;
   if (view === 'suggested') {
-    displayedUsers = users.filter(u => u.shared_interest_count > 0);
+    // Suggested: users who share at least one interest, sorted by shared interests desc
+    displayedUsers = users
+      .filter(u => (u.shared_interest_count || 0) > 0)
+      .sort((a, b) => (b.shared_interest_count || 0) - (a.shared_interest_count || 0));
   }
   if (activeFilter) {
     displayedUsers = displayedUsers.filter(u => u.interests?.includes(activeFilter));
@@ -518,8 +523,8 @@ function EmptyState({ view, filter, search }) {
   if (view === 'suggested') return (
     <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
       <i className="fa-solid fa-bolt" style={{ fontSize: 32, marginBottom: 12, display: 'block', opacity: 0.3 }}></i>
-      <div style={{ marginBottom: 6 }}>No suggested people yet.</div>
-      <div style={{ fontSize: 12 }}>Switch to "All People" to browse everyone, or update your interests in your profile.</div>
+      <div style={{ marginBottom: 6 }}>No students found yet.</div>
+      <div style={{ fontSize: 12 }}>Try switching to "All People" or update your interests in your profile to see matches.</div>
     </div>
   );
   return (

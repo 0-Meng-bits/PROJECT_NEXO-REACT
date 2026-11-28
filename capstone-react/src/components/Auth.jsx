@@ -646,23 +646,29 @@ export default function Auth() {
               // Read-only (login page link / landing page) — just Close
               <button className="cyber-btn secondary" style={{ width: '100%' }}
                 onClick={() => { setShowTermsModal(false); setTermsReadOnly(false); }}>
-                <i className="fa-solid fa-xmark" style={{ marginRight: 6 }}></i>Close
+                <i className="fa-solid fa-arrow-left" style={{ marginRight: 6 }}></i>Back
               </button>
             ) : (
               // Signup / post-login — checkbox must be checked, then Continue
-              <button className="cyber-btn"
-                style={{ width: '100%', opacity: form.agreedToTerms ? 1 : 0.4, cursor: form.agreedToTerms ? 'pointer' : 'not-allowed' }}
-                disabled={!form.agreedToTerms}
-                onClick={() => {
-                  if (!form.agreedToTerms) return;
-                  localStorage.setItem('nexo-terms-accepted', 'true');
-                  setShowTermsModal(false);
-                  // Only navigate post-login (when pendingRoute was set by handleLogin).
-                  // During signup the modal is just a confirmation — don't navigate away.
-                  if (isLogin && pendingRoute) navigate(pendingRoute, { replace: true });
-                }}>
-                <i className="fa-solid fa-arrow-right" style={{ marginRight: 6 }}></i>Continue
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="cyber-btn secondary" style={{ flex: 1 }}
+                  onClick={() => { setShowTermsModal(false); }}>
+                  <i className="fa-solid fa-arrow-left" style={{ marginRight: 6 }}></i>Back
+                </button>
+                <button className="cyber-btn"
+                  style={{ flex: 2, opacity: form.agreedToTerms ? 1 : 0.4, cursor: form.agreedToTerms ? 'pointer' : 'not-allowed' }}
+                  disabled={!form.agreedToTerms}
+                  onClick={() => {
+                    if (!form.agreedToTerms) return;
+                    localStorage.setItem('nexo-terms-accepted', 'true');
+                    setShowTermsModal(false);
+                    // Only navigate post-login (when pendingRoute was set by handleLogin).
+                    // During signup the modal is just a confirmation — don't navigate away.
+                    if (isLogin && pendingRoute) navigate(pendingRoute, { replace: true });
+                  }}>
+                  <i className="fa-solid fa-arrow-right" style={{ marginRight: 6 }}></i>Continue
+                </button>
+              </div>
             )}
           </div>
         </div>

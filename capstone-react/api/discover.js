@@ -76,13 +76,13 @@ export default async function handler(req, res) {
   const statusMap = {};
   (statusesRes.data || []).forEach(s => { statusMap[s.id] = s; });
 
-  // 5. Filter and map to user cards
+  // 5. Filter and map to user cards (all non-banned, discoverable students)
   const userCards = (accountsRes.data || [])
     .filter(acc => {
       const id = acc.id;
       const status = statusMap[id];
       const detail = detailMap[id];
-      if (!status?.is_verified) return false;
+      if (acc.user_type === 'Admin') return false;
       if (status?.is_banned) return false;
       if (detail?.discoverable === false) return false;
       if (id === userId) return false;
@@ -92,6 +92,7 @@ export default async function handler(req, res) {
     .map(acc => {
       const id = acc.id;
       const d = detailMap[id] || {};
+      const s = statusMap[id] || {};
       const interests = interestsByUser[id] || [];
       const sharedInterests = viewerInterestList.filter(i => interests.includes(i));
       const connInfo = connectionMap[id] || null;
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
         user_type: acc.user_type || 'Student',
         program: d.program || '',
         avatar_url: d.avatar_url || null,
+        is_verified: Boolean(s.is_verified),
         interests,
         shared_interest_count: sharedInterests.length,
         connection_status: connInfo?.status || null,

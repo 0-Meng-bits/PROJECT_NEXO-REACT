@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 // data.type: 'profile_photo' | 'circle_photo' | 'user' | 'message' | 'circle' | post types
 export default function ReportModal({ data, user, onClose }) {
   const [reason, setReason] = useState('');
+  const [otherText, setOtherText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -46,8 +47,10 @@ export default function ReportModal({ data, user, onClose }) {
     'Other',
   ];
 
+  const effectiveReason = reason === 'Other' ? (otherText.trim() ? `Other: ${otherText.trim()}` : '') : reason;
+
   const submit = async () => {
-    if (!reason.trim()) return;
+    if (!effectiveReason) return;
     setSubmitting(true);
     setError('');
 
@@ -95,7 +98,7 @@ export default function ReportModal({ data, user, onClose }) {
       content_type: data.type,
       content_id: data.id,
       content_preview: data.preview?.slice(0, 200),
-      reason,
+      reason: effectiveReason,
       status: 'pending',
     }]);
 
@@ -137,10 +140,27 @@ export default function ReportModal({ data, user, onClose }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {REASONS.map(r => (
                   <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, width: '100%', boxSizing: 'border-box', color: reason === r ? 'var(--text-primary)' : 'var(--text-muted)', padding: '9px 12px', borderRadius: 8, border: `1px solid ${reason === r ? 'var(--cyber-cyan)' : 'rgba(255,255,255,0.08)'}`, background: reason === r ? 'rgba(0,240,255,0.06)' : 'transparent', transition: '0.15s' }}>
-                    <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} style={{ accentColor: 'var(--cyber-cyan)', flexShrink: 0, width: 16, height: 16 }} />
+                    <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => { setReason(r); if (r !== 'Other') setOtherText(''); }} style={{ accentColor: 'var(--cyber-cyan)', flexShrink: 0, width: 16, height: 16 }} />
                     <span style={{ flex: 1, minWidth: 0, lineHeight: 1.45 }}>{r}</span>
                   </label>
                 ))}
+                {reason === 'Other' && (
+                  <textarea
+                    value={otherText}
+                    onChange={e => setOtherText(e.target.value)}
+                    placeholder="Please describe the issue..."
+                    maxLength={300}
+                    rows={3}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', marginTop: 4,
+                      padding: '10px 12px', borderRadius: 8,
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0,240,255,0.3)',
+                      color: 'var(--text-primary)', fontSize: 12, fontFamily: 'inherit',
+                      resize: 'vertical', outline: 'none',
+                    }}
+                    autoFocus
+                  />
+                )}
               </div>
             </div>
             {error && (
@@ -149,7 +169,7 @@ export default function ReportModal({ data, user, onClose }) {
               </div>
             )}
             <div className="modal-actions">
-              <button className="cyber-btn" onClick={submit} disabled={submitting || !reason}
+              <button className="cyber-btn" onClick={submit} disabled={submitting || !effectiveReason}
                 style={{ flex: 1, background: 'rgba(247,95,95,0.15)', color: 'var(--red)', border: '1px solid var(--red)' }}>
                 {submitting ? 'Submitting...' : <><i className="fa-solid fa-flag" style={{ marginRight: 6 }}></i>Submit Report</>}
               </button>
