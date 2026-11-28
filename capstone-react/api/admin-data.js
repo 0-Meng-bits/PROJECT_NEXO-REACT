@@ -164,22 +164,25 @@ export default async function handler(req, res) {
       }
       if (action === 'resolve_appeal') {
         const { warning_id, user_id, decision, admin_note, admin_id } = payload;
-        // Update the appeal status
-        await supabaseAdmin.from('warning_appeals').update({
-          status: decision, // 'approved' or 'rejected'
-          admin_note: admin_note || null,
-          reviewed_by: admin_id,
+        // DB schema allows 'pending' | 'approved' | 'denied' and stores note in admin_decision
+        const dbStatus = decision === 'rejected' ? 'denied' : decision;
+        const { error: appealUpdateErr } = await supabaseAdmin.from('warning_appeals').update({
+          status: dbStatus,
+          admin_decision: admin_note || null,
+          reviewed_by: admin_id || null,
           reviewed_at: new Date().toISOString(),
         }).eq('id', id);
+        if (appealUpdateErr) return res.status(400).json({ error: appealUpdateErr.message });
+
         // Update the warning status too
         await supabaseAdmin.from('user_warnings').update({
           status: decision === 'approved' ? 'overturned' : 'active',
         }).eq('id', warning_id);
-        // If approved: restore the 1 TP that was deducted + 1 bonus
+        // If approved: restore the 1 TP that was deducted + 1 bonus (no 10-TP cap)
         if (decision === 'approved') {
           const { data: current } = await supabaseAdmin.from('account_status').select('trust_points').eq('id', user_id).single();
-          const restored = (current?.trust_points ?? 0) + 2; // 1 restored + 1 bonus
-          await supabaseAdmin.from('account_status').update({ trust_points: Math.min(restored, 10) }).eq('id', user_id);
+          const restored = (current?.trust_points ?? 10) + 2; // 1 restored + 1 bonus
+          await supabaseAdmin.from('account_status').update({ trust_points: restored }).eq('id', user_id);
           await supabaseAdmin.from('point_transactions').insert([{
             user_id, amount: 2, transaction_type: 'appeal_approved', reason: 'Warning overturned by admin appeal',
           }]);

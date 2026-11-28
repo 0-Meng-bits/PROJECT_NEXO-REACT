@@ -19,16 +19,30 @@ export default async function handler(req, res) {
       if (!id || !reason) return res.status(400).json({ error: 'Missing id or reason' });
 
       const deadline = makeDeadline();
+      const { data: existing } = await supabaseAdmin
+        .from('account_deletion_warnings')
+        .select('id')
+        .eq('account_id', id)
+        .eq('status', 'pending')
+        .maybeSingle();
 
-      const { error } = await supabaseAdmin.from('account_deletion_warnings').upsert([{
-        account_id: id,
-        reason,
-        flagged_by: adminId || null,
-        flagged_at: new Date().toISOString(),
-        deadline,
-        status: 'pending',
-        resolved_at: null,
-      }], { onConflict: 'account_id,status' });
+      const { error } = existing
+        ? await supabaseAdmin.from('account_deletion_warnings').update({
+            reason,
+            flagged_by: adminId || null,
+            flagged_at: new Date().toISOString(),
+            deadline,
+            resolved_at: null,
+          }).eq('id', existing.id)
+        : await supabaseAdmin.from('account_deletion_warnings').insert([{
+            account_id: id,
+            reason,
+            flagged_by: adminId || null,
+            flagged_at: new Date().toISOString(),
+            deadline,
+            status: 'pending',
+            resolved_at: null,
+          }]);
       if (error) return res.status(400).json({ error: error.message });
 
       const deadlineStr = new Date(deadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -48,16 +62,30 @@ export default async function handler(req, res) {
       if (!id || !reason) return res.status(400).json({ error: 'Missing id or reason' });
 
       const deadline = makeDeadline();
+      const { data: existing } = await supabaseAdmin
+        .from('community_deletion_warnings')
+        .select('id')
+        .eq('community_id', id)
+        .eq('status', 'pending')
+        .maybeSingle();
 
-      const { error } = await supabaseAdmin.from('community_deletion_warnings').upsert([{
-        community_id: id,
-        reason,
-        flagged_by: adminId || null,
-        flagged_at: new Date().toISOString(),
-        deadline,
-        status: 'pending',
-        resolved_at: null,
-      }], { onConflict: 'community_id,status' });
+      const { error } = existing
+        ? await supabaseAdmin.from('community_deletion_warnings').update({
+            reason,
+            flagged_by: adminId || null,
+            flagged_at: new Date().toISOString(),
+            deadline,
+            resolved_at: null,
+          }).eq('id', existing.id)
+        : await supabaseAdmin.from('community_deletion_warnings').insert([{
+            community_id: id,
+            reason,
+            flagged_by: adminId || null,
+            flagged_at: new Date().toISOString(),
+            deadline,
+            status: 'pending',
+            resolved_at: null,
+          }]);
       if (error) return res.status(400).json({ error: error.message });
 
       if (leaderId) {

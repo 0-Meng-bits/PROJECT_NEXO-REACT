@@ -1002,7 +1002,10 @@ export default function AdminDashboard() {
         const dl = new Date(d.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         showToast(`Flagged for deletion. Deadline: ${dl}`);
         fetchData();
-      } else showToast('Failed to flag for deletion.');
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Failed to flag for deletion.');
+      }
     } catch { showToast('Network error.'); }
   };
 
@@ -1473,7 +1476,7 @@ export default function AdminDashboard() {
                         </button>
                       </div>
                     )}
-                    {req.status !== 'pending' && (
+                    {req.status === 'rejected' && (
                       <button onClick={() => deleteCircleRequest(req.id)}
                         title="Delete this record"
                         style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid #333', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', flexShrink: 0, transition: '0.15s' }}
@@ -2531,9 +2534,9 @@ function WarningAppealsSection({ admin, showToast }) {
   const [processing, setProcessing] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
-  useEffect(() => { loadAppeals(); }, []);
+  useEffect(() => { loadAppeals(true); }, []);
 
-  const loadAppeals = async () => {
+  const loadAppeals = async (autoSwitch = false) => {
     setLoading(true);
     const token = localStorage.getItem('accessToken');
     const [warningRes, ticketsRes] = await Promise.all([
@@ -2547,9 +2550,9 @@ function WarningAppealsSection({ admin, showToast }) {
     if (warningRes.ok) {
       const d = await warningRes.json();
       setAppeals(d.appeals || []);
-      // Auto-switch to ban_appeals tab if no pending warning appeals
+      // Auto-switch to ban_appeals tab only on initial load if no pending warning appeals
       const pendingWarnings = (d.appeals || []).filter(a => a.status === 'pending');
-      if (pendingWarnings.length === 0) setTab('ban_appeals');
+      if (autoSwitch && pendingWarnings.length === 0) setTab('ban_appeals');
     }
     if (ticketsRes.ok) {
       const d = await ticketsRes.json();
@@ -2603,9 +2606,9 @@ function WarningAppealsSection({ admin, showToast }) {
     loadAppeals();
   };
 
-  const filtered = appeals.filter(a =>    tab === 'pending' ? a.status === 'pending' :
+  const filtered = appeals.filter(a => tab === 'pending' ? a.status === 'pending' :
     tab === 'approved' ? a.status === 'approved' :
-    a.status === 'rejected'
+    (a.status === 'rejected' || a.status === 'denied')
   );
 
   const pendingCount = appeals.filter(a => a.status === 'pending').length;
@@ -2726,9 +2729,9 @@ function WarningAppealsSection({ admin, showToast }) {
                       Evidence: {a.evidence}
                     </div>
                   )}
-                  {a.status !== 'pending' && a.admin_note && (
+                  {a.status !== 'pending' && (a.admin_decision || a.admin_note) && (
                     <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
-                      Admin note: {a.admin_note}
+                      Admin note: {a.admin_decision || a.admin_note}
                     </div>
                   )}
                 </div>
