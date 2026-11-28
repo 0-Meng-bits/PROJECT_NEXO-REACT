@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useBlocker } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
 import { applyTheme } from '../lib/theme';
@@ -554,19 +554,8 @@ export default function AdminDashboard() {
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
 
-  // ── Navigation blocker: intercepts ALL navigation away from /admin ──────────
-  // useBlocker works at the React Router level — immune to History API issues.
+  // ── Logout & beforeunload guard ───────────────────────────────────────────
   const adminLeavingRef = useRef(false);
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    !adminLeavingRef.current &&
-    currentLocation.pathname === '/admin' &&
-    nextLocation.pathname !== '/admin'
-  );
-
-  // When blocker fires, show the logout confirm modal
-  useEffect(() => {
-    if (blocker.state === 'blocked') setShowLogoutConfirm(true);
-  }, [blocker.state]);
 
   const confirmAdminLogout = () => {
     adminLeavingRef.current = true;
@@ -574,16 +563,11 @@ export default function AdminDashboard() {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    if (blocker.state === 'blocked') {
-      blocker.proceed(); // let React Router navigate away
-    } else {
-      navigate('/auth', { replace: true });
-    }
+    navigate('/auth', { replace: true });
   };
 
   const handleCancelAdminLogout = () => {
     setShowLogoutConfirm(false);
-    if (blocker.state === 'blocked') blocker.reset(); // cancel the navigation
   };
 
   // ── beforeunload guard (tab close / refresh / external URL) ──────────────
