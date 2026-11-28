@@ -200,6 +200,13 @@ export default function Auth() {
         const targetRoute = data.user.user_type === 'Admin'
           ? '/admin'
           : (!data.user.onboarding_complete ? '/onboarding' : '/portal');
+        // Admin gets a full-page replace so the browser history entry is a real
+        // page load — this lets the History API trap in AdminDashboard work reliably.
+        // All other routes use the SPA navigate.
+        if (data.user.user_type === 'Admin') {
+          window.location.replace('/admin');
+          return;
+        }
         // Check if user has accepted terms
         if (!localStorage.getItem('nexo-terms-accepted')) {
           setPendingRoute(targetRoute);
