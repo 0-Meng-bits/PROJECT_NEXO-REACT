@@ -153,15 +153,17 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Can only appeal active warnings' });
       }
 
-      // Check if already appealed
+      // Check if already has a PENDING appeal for this exact warning
+      // (approved/denied appeals are resolved — a new warning can be re-appealed if re-issued)
       const { data: existingAppeal } = await supabaseAdmin
         .from('warning_appeals')
-        .select('id')
+        .select('id, status')
         .eq('warning_id', warningId)
-        .single();
+        .eq('status', 'pending')
+        .maybeSingle();
 
       if (existingAppeal) {
-        return res.status(400).json({ error: 'You have already appealed this warning' });
+        return res.status(400).json({ error: 'You already have a pending appeal for this warning. Wait for it to be reviewed before submitting another.' });
       }
 
       // Create appeal

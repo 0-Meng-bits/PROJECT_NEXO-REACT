@@ -151,10 +151,11 @@ export default async function handler(req, res) {
           .from('support_tickets')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', account.id)
-          .in('category', ['Ban Appeal', 'Suspension Appeal'])
+          .eq('category', ticket_type === 'ban' ? 'Ban Appeal' : 'Suspension Appeal')
+          .not('status', 'in', '("resolved","closed")')
           .gte('created_at', todayStart);
         if (count > 0) {
-          return res.status(429).json({ message: 'You already submitted an appeal today. Please wait 24 hours before submitting again.' });
+          return res.status(429).json({ message: `You already submitted a ${ticket_type === 'ban' ? 'ban' : 'suspension'} appeal today. Please wait until tomorrow to submit another.` });
         }
 
         await supabaseAdmin.from('support_tickets').insert([{
