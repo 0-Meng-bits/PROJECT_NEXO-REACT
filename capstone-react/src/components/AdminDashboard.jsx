@@ -526,6 +526,7 @@ export default function AdminDashboard() {
   const [showSectionInfo, setShowSectionInfo] = useState(false);
   const [togglingOfficialId, setTogglingOfficialId] = useState(null);
   const [processingRequestId, setProcessingRequestId] = useState(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // ── Analytics state ──────────────────────────────────────────────────────
   const [preset, setPreset] = useState('week');
@@ -543,6 +544,68 @@ export default function AdminDashboard() {
   const [newEvent, setNewEvent] = useState({ title: '', description: '', category: 'general', event_date: '', event_end_date: '', event_time: '', location: '' });
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
+
+  // ── Back-button trap: prevent browser/Android Back from exiting /admin directly ──
+  const confirmAdminLogout = () => {
+    setShowLogoutConfirm(false);
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    navigate('/auth');
+  };
+
+  const handleCancelAdminLogout = () => {
+    setShowLogoutConfirm(false);
+    if (window.history.state?.adminTrap !== true) {
+      window.history.pushState({ adminTrap: true }, '', window.location.href);
+    }
+  };
+
+  useEffect(() => {
+    if (window.history.state?.adminTrap !== true) {
+      window.history.pushState({ adminTrap: true }, '', window.location.href);
+    }
+    const handlePopState = () => {
+      if (showLogoutConfirm) return;
+      // 1. Close open modals / detail panels first
+      if (showFlagModal) {
+        setShowFlagModal(null);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      if (showAdminAgreement) {
+        setShowAdminAgreement(false);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      if (showEventForm) {
+        setShowEventForm(false);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      if (selectedUser) {
+        setSelectedUser(null);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      if (selectedCircle) {
+        setSelectedCircle(null);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      // 2. If in another admin section, go back to analytics first
+      if (section !== 'analytics') {
+        setSection('analytics');
+        setShowSectionInfo(false);
+        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        return;
+      }
+      // 3. On root admin screen — ask before logging out
+      setShowLogoutConfirm(true);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [section, selectedUser, selectedCircle, showFlagModal, showAdminAgreement, showEventForm, showLogoutConfirm]);
 
   const EVENT_CATS = [
     { key: 'semester',   label: 'Semester',           color: '#facc15' },
@@ -2436,6 +2499,27 @@ export default function AdminDashboard() {
           }}
           onCancel={() => setShowFlagModal(null)}
         />
+      )}
+
+      {/* ── LOGOUT CONFIRM MODAL ── */}
+      {showLogoutConfirm && (
+        <div className="modal-overlay" onClick={handleCancelAdminLogout}>
+          <div className="modal-box" style={{ maxWidth: 380, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🚪</div>
+            <h3 style={{ marginBottom: 8 }}>Log Out of Admin?</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 22 }}>
+              Are you sure you want to exit the Admin Dashboard and log out?
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="cyber-btn secondary" onClick={handleCancelAdminLogout} style={{ flex: 1 }}>
+                Stay
+              </button>
+              <button className="cyber-btn" onClick={confirmAdminLogout} style={{ flex: 1 }}>
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
