@@ -59,8 +59,19 @@ export default async function handler(req, res) {
   const userId = await getAuthUserId(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized.' });
 
-  // ── GET — list viewer's connections and pending requests ──
+  // ── GET — list viewer's connections, or count accepted connections for ?user_id= ──
   if (req.method === 'GET') {
+    const targetUserId = req.query?.user_id;
+    if (targetUserId) {
+      const { count, error } = await supabaseAdmin
+        .from('connections')
+        .select('id', { count: 'exact', head: true })
+        .or(`user_id.eq.${targetUserId},connected_user_id.eq.${targetUserId}`)
+        .eq('status', 'accepted');
+      if (error) return res.status(400).json({ message: error.message });
+      return res.json({ count: count || 0 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('connections')
       .select(`
@@ -142,7 +153,7 @@ export default async function handler(req, res) {
       userId: to,
       type: 'connection_request',
       message: `${requester?.full_name || 'Someone'} sent you a connection request.`,
-      groupKey: `connection_request_${to}`,
+      groupKey: `connection_request:${userId}`,
       category: 'Connections',
     });
 
@@ -173,7 +184,7 @@ export default async function handler(req, res) {
       userId: conn.user_id,
       type: 'connection_accepted',
       message: `${accepter?.full_name || 'Someone'} accepted your connection request.`,
-      groupKey: `connection_accepted_${conn.user_id}`,
+      groupKey: `connection_accepted:${userId}`,
       category: 'Connections',
     });
 

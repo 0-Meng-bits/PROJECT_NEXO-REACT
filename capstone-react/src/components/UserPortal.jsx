@@ -185,6 +185,8 @@ function notifIcon(type) {
     shoutout: 'fa-solid fa-star',
     invite_accepted: 'fa-solid fa-envelope-open-text',
     circle_invite: 'fa-solid fa-envelope',
+    connection_request: 'fa-solid fa-user-plus',
+    connection_accepted: 'fa-solid fa-link',
     circle_approved: 'fa-solid fa-circle-check',
     circle_rejected: 'fa-solid fa-circle-xmark',
     system: 'fa-solid fa-triangle-exclamation',
@@ -2819,6 +2821,20 @@ export default function UserPortal() {
                             if (n.link_comm_id) {
                               setActiveChannelId(null);
                               navTo('circles', n.link_comm_id);
+                            }
+
+                          } else if (n.type === 'connection_request' || n.type === 'connection_accepted') {
+                            const gk = n.group_key || '';
+                            const colonIdx = gk.indexOf(':');
+                            const senderId = colonIdx !== -1 ? gk.slice(colonIdx + 1) : null;
+                            if (senderId) {
+                              viewUserProfileById(senderId);
+                            } else {
+                              const m = n.message?.match(/^(.+?)\s+(?:sent you a connection request|accepted your connection request)/i);
+                              if (m?.[1]) {
+                                supabase.from('accounts').select('id').ilike('full_name', m[1].trim()).limit(1).maybeSingle()
+                                  .then(({ data: acc }) => { if (acc?.id) viewUserProfileById(acc.id); });
+                              }
                             }
 
                           } else if (n.link_comm_id) {

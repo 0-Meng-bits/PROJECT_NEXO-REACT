@@ -552,9 +552,12 @@ export default function ProfileModal({ user, communities, onClose, onLogout, onA
   useEffect(() => {
     if (!user?.id) return;
     if (readOnly) {
-      supabase.from('connections').select('id', { count: 'exact', head: true })
-        .or(`user_id.eq.${user.id},connected_user_id.eq.${user.id}`).eq('status', 'accepted')
-        .then(({ count }) => setConnectionsCount(count || 0));
+      getFreshToken().then(token => fetch(getApiUrl(`/api/connections?user_id=${user.id}`), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+        .then(r => r.json())
+        .then(data => setConnectionsCount(data?.count || 0))
+        .catch(() => {}));
     } else {
       getFreshToken().then(token => fetch(getApiUrl('/api/connections'), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
