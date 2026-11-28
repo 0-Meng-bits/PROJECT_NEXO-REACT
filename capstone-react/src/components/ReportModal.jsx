@@ -8,6 +8,7 @@ export default function ReportModal({ data, user, onClose }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
   // Context-aware title and reasons based on report type
   const isPhoto = data.type === 'profile_photo' || data.type === 'circle_photo';
@@ -48,7 +49,47 @@ export default function ReportModal({ data, user, onClose }) {
   const submit = async () => {
     if (!reason.trim()) return;
     setSubmitting(true);
-    await supabase.from('reports').insert([{
+    setError('');
+
+    // Prevent duplicate pending reports on the same target or spam-reporting within 24h
+    let dupQuery = supabase
+      .from('reports')
+      .select('id')
+      .eq('reporter_id', user.id)
+      .eq('content_type', data.type)
+      .eq('status', 'pending')
+      .neq('reason', 'Auto-detected: inappropriate language')
+      .limit(1);
+
+    if (data.id) dupQuery = dupQuery.eq('content_id', data.id);
+    else if (data.reportedUserId) dupQuery = dupQuery.eq('reported_user_id', data.reportedUserId);
+
+    const { data: existingPending } = await dupQuery;
+    if (existingPending && existingPending.length > 0) {
+      setError('You already have a pending report for this. Please wait for admin review.');
+      setSubmitting(false);
+      return;
+    }
+
+    if (data.type === 'user' && data.reportedUserId) {
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentUserReports } = await supabase
+        .from('reports')
+        .select('id')
+        .eq('reporter_id', user.id)
+        .eq('reported_user_id', data.reportedUserId)
+        .eq('content_type', 'user')
+        .neq('reason', 'Auto-detected: inappropriate language')
+        .gte('created_at', dayAgo)
+        .limit(1);
+      if (recentUserReports && recentUserReports.length > 0) {
+        setError('You already reported this user in the last 24 hours.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    const { error: insertErr } = await supabase.from('reports').insert([{
       reporter_id: user.id,
       reported_user_id: data.reportedUserId || null,
       content_type: data.type,
@@ -57,6 +98,13 @@ export default function ReportModal({ data, user, onClose }) {
       reason,
       status: 'pending',
     }]);
+
+    if (insertErr) {
+      setError(insertErr.message || 'Failed to submit report. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+
     setSubmitting(false);
     setDone(true);
   };
@@ -95,6 +143,11 @@ export default function ReportModal({ data, user, onClose }) {
                 ))}
               </div>
             </div>
+            {error && (
+              <div style={{ background: 'rgba(247,95,95,0.12)', border: '1px solid rgba(247,95,95,0.4)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>
+                <i className="fa-solid fa-circle-exclamation" style={{ marginRight: 6 }}></i>{error}
+              </div>
+            )}
             <div className="modal-actions">
               <button className="cyber-btn" onClick={submit} disabled={submitting || !reason}
                 style={{ flex: 1, background: 'rgba(247,95,95,0.15)', color: 'var(--red)', border: '1px solid var(--red)' }}>
