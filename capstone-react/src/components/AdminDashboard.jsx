@@ -1258,6 +1258,9 @@ export default function AdminDashboard() {
             {s.key === 'communities' && communities.filter(c => c.status === 'pending').length > 0 && (
               <span className="adm-badge">{communities.filter(c => c.status === 'pending').length}</span>
             )}
+            {s.key === 'moderation' && reports.filter(r => r.reason === AUTO_MOD_REASON && r.status === 'pending').length > 0 && (
+              <span className="adm-badge" style={{ background: 'var(--orange)' }}>{reports.filter(r => r.reason === AUTO_MOD_REASON && r.status === 'pending').length}</span>
+            )}
             {s.key === 'pending_deletions' && (() => {
               const flaggedUsers = students.filter(st => st.deletion_pending).length;
               const flaggedCircles = communities.filter(c => c.deletion_pending).length;
@@ -2478,7 +2481,7 @@ export default function AdminDashboard() {
                           </td>
                           <td style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 300 }}>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.content || `${item.title}: ${item.content}`}
+                            {item.title ? `${item.title}: ${item.content}` : (item.content || '(blocked content)')}
                             </div>
                           </td>
                           <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleDateString()}</td>

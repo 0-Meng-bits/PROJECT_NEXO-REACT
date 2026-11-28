@@ -2125,7 +2125,7 @@ export default function UserPortal() {
                 const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
                 await supabase.from('notifications').insert([{
                   user_id: mentioned.id, type: 'new_announcement',
-                  message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  message: `📣 ${user.full_name} shouted you out: ${msgBody || shoutText}`,
                   link_comm_id: activeCommId !== 'global' ? activeCommId : null,
                 }]);
               }
@@ -2229,7 +2229,7 @@ export default function UserPortal() {
                 const msgBody = shoutText.replace(/^@[\w\s]+?\s/i, '');
                 await supabase.from('notifications').insert([{
                   user_id: mentioned.id, type: 'new_announcement',
-                  message: `? ${user.full_name} shouted you out: ${msgBody || shoutText}`,
+                  message: `📣 ${user.full_name} shouted you out: ${msgBody || shoutText}`,
                   link_comm_id: activeCommId,
                 }]);
               }
