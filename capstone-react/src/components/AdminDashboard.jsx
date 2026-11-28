@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../lib/api';
@@ -545,7 +545,14 @@ export default function AdminDashboard() {
   const [postingEvent, setPostingEvent] = useState(false);
   const [evTab, setEvTab] = useState('upcoming');
 
-  // ── Back-button trap: prevent browser/Android Back from exiting /admin directly ──
+  // ── Back-button trap: user-gesture armed so Chrome doesn't skip it ────────
+  const adminTrapArmedRef = useRef(false);
+  const adminBackStateRef = useRef({});
+  adminBackStateRef.current = {
+    section, selectedUser, selectedCircle, showFlagModal,
+    showAdminAgreement, showEventForm, showLogoutConfirm,
+  };
+
   const confirmAdminLogout = () => {
     setShowLogoutConfirm(false);
     localStorage.removeItem('currentUser');
@@ -556,56 +563,60 @@ export default function AdminDashboard() {
 
   const handleCancelAdminLogout = () => {
     setShowLogoutConfirm(false);
-    if (window.history.state?.adminTrap !== true) {
-      window.history.pushState({ adminTrap: true }, '', window.location.href);
+    if (!adminTrapArmedRef.current) {
+      window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
+      adminTrapArmedRef.current = true;
     }
   };
 
   useEffect(() => {
-    if (window.history.state?.adminTrap !== true) {
-      window.history.pushState({ adminTrap: true }, '', window.location.href);
+    if (!window.history.state?.adminTrap) {
+      window.history.pushState({ adminTrap: true, mount: true }, '', window.location.pathname + window.location.search);
     }
+
+    const armTrap = () => {
+      if (adminTrapArmedRef.current) return;
+      window.history.pushState({ adminTrap: true, user: true }, '', window.location.pathname + window.location.search);
+      adminTrapArmedRef.current = true;
+    };
+
+    window.addEventListener('touchend', armTrap, { capture: true, passive: true });
+    window.addEventListener('click', armTrap, { capture: true, passive: true });
+    window.addEventListener('keydown', armTrap, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('touchend', armTrap, { capture: true });
+      window.removeEventListener('click', armTrap, { capture: true });
+      window.removeEventListener('keydown', armTrap, { capture: true });
+    };
+  }, []);
+
+  useEffect(() => {
     const handlePopState = () => {
-      if (showLogoutConfirm) return;
+      const s = adminBackStateRef.current;
+      if (s.showLogoutConfirm) return;
+
       // 1. Close open modals / detail panels first
-      if (showFlagModal) {
-        setShowFlagModal(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
-        return;
-      }
-      if (showAdminAgreement) {
-        setShowAdminAgreement(false);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
-        return;
-      }
-      if (showEventForm) {
-        setShowEventForm(false);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
-        return;
-      }
-      if (selectedUser) {
-        setSelectedUser(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
-        return;
-      }
-      if (selectedCircle) {
-        setSelectedCircle(null);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
-        return;
-      }
+      if (s.showFlagModal)      { setShowFlagModal(null);      adminTrapArmedRef.current = false; return; }
+      if (s.showAdminAgreement) { setShowAdminAgreement(false); adminTrapArmedRef.current = false; return; }
+      if (s.showEventForm)      { setShowEventForm(false);     adminTrapArmedRef.current = false; return; }
+      if (s.selectedUser)       { setSelectedUser(null);       adminTrapArmedRef.current = false; return; }
+      if (s.selectedCircle)     { setSelectedCircle(null);     adminTrapArmedRef.current = false; return; }
+
       // 2. If in another admin section, go back to analytics first
-      if (section !== 'analytics') {
+      if (s.section !== 'analytics') {
         setSection('analytics');
         setShowSectionInfo(false);
-        window.history.pushState({ adminTrap: true }, '', window.location.href);
+        adminTrapArmedRef.current = false;
         return;
       }
+
       // 3. On root admin screen — ask before logging out
+      adminTrapArmedRef.current = false;
       setShowLogoutConfirm(true);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [section, selectedUser, selectedCircle, showFlagModal, showAdminAgreement, showEventForm, showLogoutConfirm]);
+  }, []);
 
   const EVENT_CATS = [
     { key: 'semester',   label: 'Semester',           color: '#facc15' },
